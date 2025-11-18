@@ -122,7 +122,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
               <div className="flex-1 text-right min-w-0">
                 <p className="font-bold text-sm text-slate-900 line-clamp-2">{product.nameAr}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  {!hidePrices && <p className="text-sm font-semibold text-primary">{product.price.toLocaleString()} ج.م</p>}
+                  {!hidePrices && <p className="text-sm font-semibold text-primary">{product.price ? product.price.toLocaleString() : 'N/A'} ج.م</p>}
                   {product.category && (
                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
                       {product.categoryAr || product.category}
@@ -138,7 +138,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                       <>
                         <span className="text-xs text-slate-500">•</span>
                         <p className="text-xs font-semibold text-slate-700">
-                          الإجمالي: {(product.price * newQuantity).toLocaleString()} ج.م
+                          الإجمالي: {product.price ? (product.price * newQuantity).toLocaleString() : 'N/A'} ج.م
                         </p>
                       </>
                     )}
@@ -512,12 +512,12 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                             <div className="flex items-baseline gap-1">
                               {!hidePrices && (
                                 <>
-                                  <span className="text-lg font-black text-primary">{product.price.toLocaleString()}</span>
+                                  <span className="text-lg font-black text-primary">{product.price ? product.price.toLocaleString() : 'N/A'}</span>
                                   <span className="text-xs text-slate-600">ج.م</span>
                                 </>
                               )}
                               {product.originalPrice && (
-                                <span className="text-xs text-slate-400 line-through">{product.originalPrice.toLocaleString()}</span>
+                                <span className="text-xs text-slate-400 line-through">{product.originalPrice ? product.originalPrice.toLocaleString() : 'N/A'}</span>
                               )}
                             </div>
                             
