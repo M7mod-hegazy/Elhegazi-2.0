@@ -1,24 +1,8 @@
-// Vercel Serverless Function - Express App Handler
-import express from 'express';
-import cors from 'cors';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
-import helmet from 'helmet';
-import compression from 'compression';
 
-// Load environment variables
 dotenv.config();
 
-// Initialize Express app
-const app = express();
-
-// Middleware
-app.use(cors());
-app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(compression());
-app.use(express.json({ limit: '2mb' }));
-
-// MongoDB connection pool
 let mongoConnection = null;
 
 async function connectMongoDB() {
@@ -33,227 +17,178 @@ async function connectMongoDB() {
       serverSelectionTimeoutMS: 8000,
       socketTimeoutMS: 45000,
     });
-    console.log('✓ MongoDB connected');
     return mongoConnection;
   } catch (error) {
-    console.error('✗ MongoDB connection failed:', error.message);
     throw error;
   }
 }
 
-// Attach minimal auth user from headers
-app.use(async (req, _res, next) => {
-  const userId = req.header('x-user-id');
-  if (userId) req.user = { _id: userId };
-  next();
-});
+export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-// Health check endpoint
-app.get('/api/health', (req, res) => {
-  res.json({ ok: true, status: 'running', timestamp: new Date().toISOString() });
-});
-
-// Debug endpoint
-app.get('/api/debug/whoami', async (req, res) => {
-  try {
-    const headerId = req.header('x-user-id') || null;
-    const headerEmail = req.header('x-user-email') || null;
-    const reqUser = req.user || null;
-    return res.json({ ok: true, headerId, headerEmail, reqUser });
-  } catch (err) {
-    return res.status(500).json({ ok: false, error: err.message });
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
   }
-});
 
-// Test MongoDB connection
-app.get('/api/test-db', async (req, res) => {
   try {
-    await connectMongoDB();
-    return res.json({ ok: true, message: 'MongoDB connected successfully' });
-  } catch (error) {
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
+    const url = new URL(req.url, 'http://localhost');
+    const pathname = url.pathname;
 
-// Example API endpoints
-app.get('/api/products', async (req, res) => {
-  try {
-    await connectMongoDB();
-    
-    // Dynamically import Product model
-    const { default: Product } = await import('../server/models/Product.js');
-    const products = await Product.find({}).limit(50).lean().maxTimeMS(8000);
-    
-    return res.json({ ok: true, items: products });
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.get('/api/categories', async (req, res) => {
-  try {
-    await connectMongoDB();
-    
-    // Dynamically import Category model
-    const { default: Category } = await import('../server/models/Category.js');
-    const categories = await Category.find({}).lean().maxTimeMS(8000);
-    
-    return res.json({ ok: true, items: categories });
-  } catch (error) {
-    console.error('Error fetching categories:', error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-app.get('/api/shop-setup', async (req, res) => {
-  try {
-    await connectMongoDB();
-    
-    // Dynamically import ShopSetup model
-    const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
-    const setup = await ShopSetup.findOne({}).lean().maxTimeMS(8000);
-    
-    return res.json({ ok: true, item: setup });
-  } catch (error) {
-    console.error('Error fetching shop setup:', error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-// Get home config
-app.get('/api/home-config', async (req, res) => {
-  try {
-    await connectMongoDB();
-    
-    const { default: HomeConfig } = await import('../server/models/HomeConfig.js');
-    const config = await HomeConfig.findOne({}).lean().maxTimeMS(8000);
-    
-    return res.json({ ok: true, item: config });
-  } catch (error) {
-    console.error('Error fetching home config:', error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-// Get settings
-app.get('/api/settings', async (req, res) => {
-  try {
-    await connectMongoDB();
-    
-    const { default: Settings } = await import('../server/models/Settings.js');
-    const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
-    
-    return res.json({ ok: true, item: settings });
-  } catch (error) {
-    console.error('Error fetching settings:', error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-// Get footer settings
-app.get('/api/settings/footer', async (req, res) => {
-  try {
-    await connectMongoDB();
-    
-    const { default: Settings } = await import('../server/models/Settings.js');
-    const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
-    
-    return res.json({ ok: true, item: settings?.footer || {} });
-  } catch (error) {
-    console.error('Error fetching footer settings:', error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-// Get popular searches
-app.get('/api/search/popular', async (req, res) => {
-  try {
-    await connectMongoDB();
-    
-    const { default: Product } = await import('../server/models/Product.js');
-    // Return popular products as search results
-    const popular = await Product.find({})
-      .limit(10)
-      .lean()
-      .maxTimeMS(8000);
-    
-    return res.json({ ok: true, items: popular });
-  } catch (error) {
-    console.error('Error fetching popular searches:', error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
-
-// Get products with query parameters
-app.get('/api/products', async (req, res) => {
-  try {
-    await connectMongoDB();
-    
-    const { limit = 60, featured, fields } = req.query;
-    const { default: Product } = await import('../server/models/Product.js');
-    
-    let query = Product.find({});
-    
-    if (featured === 'true') {
-      query = query.where('featured').equals(true);
+    // Health check - no DB needed
+    if (pathname === '/api/health') {
+      return res.json({ ok: true, status: 'running', timestamp: new Date().toISOString() });
     }
-    
-    if (fields) {
-      query = query.select(fields);
-    }
-    
-    const products = await query
-      .limit(parseInt(limit) || 60)
-      .lean()
-      .maxTimeMS(8000);
-    
-    return res.json({ ok: true, items: products });
-  } catch (error) {
-    console.error('Error fetching products:', error);
-    return res.status(500).json({ ok: false, error: error.message });
-  }
-});
 
-// Get categories with query parameters
-app.get('/api/categories', async (req, res) => {
-  try {
+    // Debug whoami - no DB needed
+    if (pathname === '/api/debug/whoami') {
+      return res.json({ 
+        ok: true, 
+        headerId: req.headers['x-user-id'] || null,
+        headerEmail: req.headers['x-user-email'] || null
+      });
+    }
+
+    // Connect to MongoDB for all other endpoints
     await connectMongoDB();
-    
-    const { limit, featured } = req.query;
-    const { default: Category } = await import('../server/models/Category.js');
-    
-    let query = Category.find({});
-    
-    if (featured === 'true') {
-      query = query.where('featured').equals(true);
+
+    // Shop setup
+    if (pathname === '/api/shop-setup') {
+      const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
+      const setup = await ShopSetup.findOne({}).lean().maxTimeMS(8000);
+      return res.json({ ok: true, item: setup });
     }
-    
-    if (limit) {
-      query = query.limit(parseInt(limit));
+
+    // Home config
+    if (pathname === '/api/home-config') {
+      const { default: HomeConfig } = await import('../server/models/HomeConfig.js');
+      const config = await HomeConfig.findOne({}).lean().maxTimeMS(8000);
+      return res.json({ ok: true, item: config });
     }
-    
-    const categories = await query
-      .lean()
-      .maxTimeMS(8000);
-    
-    return res.json({ ok: true, items: categories });
+
+    // Settings
+    if (pathname === '/api/settings') {
+      const { default: Settings } = await import('../server/models/Settings.js');
+      const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
+      return res.json({ ok: true, item: settings });
+    }
+
+    // Settings footer
+    if (pathname === '/api/settings/footer') {
+      const { default: Settings } = await import('../server/models/Settings.js');
+      const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
+      return res.json({ ok: true, item: settings?.footer || {} });
+    }
+
+    // Popular searches
+    if (pathname === '/api/search/popular') {
+      const { default: Product } = await import('../server/models/Product.js');
+      const popular = await Product.find({}).limit(10).lean().maxTimeMS(8000);
+      return res.json({ ok: true, items: popular });
+    }
+
+    // Products
+    if (pathname === '/api/products') {
+      const { default: Product } = await import('../server/models/Product.js');
+      const limit = url.searchParams.get('limit') || 60;
+      const featured = url.searchParams.get('featured');
+      const fields = url.searchParams.get('fields');
+
+      let query = Product.find({});
+      if (featured === 'true') query = query.where('featured').equals(true);
+      if (fields) query = query.select(fields);
+
+      const products = await query.limit(parseInt(limit) || 60).lean().maxTimeMS(8000);
+      return res.json({ ok: true, items: products });
+    }
+
+    // Categories
+    if (pathname === '/api/categories') {
+      const { default: Category } = await import('../server/models/Category.js');
+      const limit = url.searchParams.get('limit');
+      const featured = url.searchParams.get('featured');
+
+      let query = Category.find({});
+      if (featured === 'true') query = query.where('featured').equals(true);
+      if (limit) query = query.limit(parseInt(limit));
+
+      const categories = await query.lean().maxTimeMS(8000);
+      return res.json({ ok: true, items: categories });
+    }
+
+    // Branches
+    if (pathname === '/api/branches') {
+      const { default: Branch } = await import('../server/models/Branch.js');
+      const items = await Branch.find({}).sort({ name: 1 }).lean().maxTimeMS(8000);
+      return res.json({ ok: true, items });
+    }
+
+    // Expenses
+    if (pathname === '/api/expenses') {
+      const { default: Transaction } = await import('../server/models/Transaction.js');
+      const page = url.searchParams.get('page') || 1;
+      const limit = url.searchParams.get('limit') || 50;
+      const skip = (Number(page) - 1) * Number(limit);
+
+      const [items, total] = await Promise.all([
+        Transaction.find({}).sort({ date: -1 }).skip(skip).limit(Number(limit)).lean().maxTimeMS(8000),
+        Transaction.countDocuments({}),
+      ]);
+
+      return res.json({ ok: true, items, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    }
+
+    // History unread count
+    if (pathname === '/api/history/unread-count') {
+      const { default: History } = await import('../server/models/History.js');
+      const { default: HistoryRead } = await import('../server/models/HistoryRead.js');
+
+      const userId = url.searchParams.get('userId') || req.headers['x-user-id'];
+      if (!userId) return res.json({ ok: true, count: 0 });
+
+      const seen = await HistoryRead.findOne({ userId }).lean().maxTimeMS(8000);
+      const since = seen?.lastSeenAt || new Date(0);
+      const count = await History.countDocuments({ important: true, createdAt: { $gt: since } }).maxTimeMS(8000);
+
+      return res.json({ ok: true, count, lastSeenAt: since });
+    }
+
+    // RBAC my-permissions
+    if (pathname === '/api/rbac/my-permissions') {
+      const { default: User } = await import('../server/models/User.js');
+      const userId = req.headers['x-user-id'];
+      if (!userId) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+
+      const user = await User.findById(userId).lean().maxTimeMS(8000);
+      const isSuperAdmin = user && (user.role === 'SuperAdmin' || user.role === 'super_admin');
+
+      return res.json({ ok: true, permissions: [], isSuperAdmin: isSuperAdmin || false });
+    }
+
+    // RBAC super-admin
+    if (pathname === '/api/rbac/super-admin') {
+      const { default: User } = await import('../server/models/User.js');
+      const userId = req.headers['x-user-id'];
+      if (!userId) return res.status(401).json({ ok: false, error: 'Unauthorized' });
+
+      const user = await User.findById(userId).lean().maxTimeMS(8000);
+      const isSuperAdmin = user && (user.role === 'SuperAdmin' || user.role === 'super_admin');
+
+      return res.json({ ok: true, isSuperAdmin: isSuperAdmin || false, role: user?.role || 'user' });
+    }
+
+    // RBAC roles
+    if (pathname === '/api/rbac/roles') {
+      const { default: Role } = await import('../server/models/Role.js');
+      const roles = await Role.find({}).sort({ name: 1 }).lean().maxTimeMS(8000);
+      return res.json({ ok: true, items: roles });
+    }
+
+    // 404
+    return res.status(404).json({ ok: false, error: 'Not found' });
   } catch (error) {
-    console.error('Error fetching categories:', error);
+    console.error('Error:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
-});
-
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ ok: false, error: 'Not found' });
-});
-
-// Error handler
-app.use((err, req, res, next) => {
-  console.error('Error:', err);
-  res.status(500).json({ ok: false, error: err.message });
-});
-
-// Export for Vercel
-export default app;
+}
