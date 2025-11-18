@@ -227,7 +227,7 @@ const HeroSection = () => {
                       {!hidePrices && (
                         <div className="flex items-center space-x-2 space-x-reverse">
                           <span className="font-bold text-primary-foreground">
-                            {currentSlideData.product.price.toLocaleString()} ج.م
+                            {currentSlideData.product.price ? currentSlideData.product.price.toLocaleString() : 'N/A'} ج.م
                           </span>
                           {currentSlideData.product.originalPrice && (
                             <span className="text-sm text-primary-foreground/70 line-through">
@@ -272,7 +272,7 @@ const HeroSection = () => {
                     {!hidePrices && (
                       <div>
                         <span className="font-bold text-xl text-primary">
-                          {currentSlideData.product.price.toLocaleString()} ج.م
+                          {currentSlideData.product.price ? currentSlideData.product.price.toLocaleString() : 'N/A'} ج.م
                         </span>
                         {currentSlideData.product.originalPrice && (
                           <span className="text-sm text-muted-foreground line-through mr-2">

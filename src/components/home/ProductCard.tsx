@@ -161,7 +161,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               {!hidePrices && (
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold text-white">
-                    {product.price.toLocaleString()} ج.م
+                    {product.price ? product.price.toLocaleString() : 'N/A'} ج.م
                   </span>
                   {product.originalPrice && (
                     <span className="text-xs text-white/60 line-through">
@@ -267,7 +267,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             {!hidePrices && (
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-white">
-                  {product.price.toLocaleString()} ج.م
+                  {product.price ? product.price.toLocaleString() : 'N/A'} ج.م
                 </span>
                 {product.originalPrice && (
                   <span className="text-sm text-white/60 line-through">
