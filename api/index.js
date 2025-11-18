@@ -67,18 +67,18 @@ export default async function handler(req, res) {
       return res.json({ ok: true, item: config });
     }
 
+    // Settings footer (check this FIRST before /api/settings)
+    if (pathname === '/api/settings/footer') {
+      const { default: Settings } = await import('../server/models/Settings.js');
+      const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
+      return res.json({ ok: true, item: settings?.footer || {} });
+    }
+
     // Settings
     if (pathname === '/api/settings') {
       const { default: Settings } = await import('../server/models/Settings.js');
       const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
       return res.json({ ok: true, item: settings });
-    }
-
-    // Settings footer
-    if (pathname === '/api/settings/footer') {
-      const { default: Settings } = await import('../server/models/Settings.js');
-      const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
-      return res.json({ ok: true, item: settings?.footer || {} });
     }
 
     // Popular searches
