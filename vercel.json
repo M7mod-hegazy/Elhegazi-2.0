@@ -3,7 +3,7 @@
   "outputDirectory": "dist",
   "functions": {
     "api/index.js": {
-      "runtime": "nodejs18.x",
+      "runtime": "nodejs18",
       "memory": 1024,
       "maxDuration": 60
     }
