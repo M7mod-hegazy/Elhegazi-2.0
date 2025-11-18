@@ -33,16 +33,33 @@ export default async function handler(req, res) {
   try {
     await connectMongoDB();
     const { default: Product } = await import('../server/models/Product.js');
-    const { limit = 60, featured, fields } = req.query;
+    const { limit = 60, featured, fields, ids } = req.query;
+
+    console.log('[DEBUG] Products API called:', { limit, featured, fields: fields ? fields.substring(0, 50) : 'none', ids: ids ? ids.substring(0, 50) : 'none' });
 
     let query = Product.find({});
+    
+    // Filter by IDs if provided
+    if (ids) {
+      const idList = ids.split(',').filter(id => id.trim());
+      if (idList.length > 0) {
+        query = query.where('_id').in(idList);
+        console.log('[DEBUG] Filtering by IDs:', idList.length, 'IDs');
+      }
+    }
+    
     if (featured === 'true') query = query.where('featured').equals(true);
-    if (fields) query = query.select(fields);
+    if (fields) {
+      query = query.select(fields);
+      console.log('[DEBUG] Selecting fields:', fields);
+    }
 
     const products = await query.limit(parseInt(limit) || 60).lean().maxTimeMS(8000);
+    console.log('[DEBUG] Found', products.length, 'products. First product image:', products[0]?.image ? 'YES' : 'EMPTY');
+    
     return res.json({ ok: true, items: products });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('[ERROR] Products API error:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
 }
