@@ -5,11 +5,6 @@ import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import helmet from 'helmet';
 import compression from 'compression';
-import rateLimit from 'express-rate-limit';
-import { v2 as cloudinary } from 'cloudinary';
-import crypto from 'crypto';
-import multer from 'multer';
-import { requirePermission, applyReadConditions, validateWriteAgainstConditions, getUserPermissions, clearUserPermissionCache } from '../server/rbac/permissions.js';
 
 // Load environment variables
 dotenv.config();
@@ -23,26 +18,20 @@ app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 
-// Cloudinary configuration
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-// MongoDB connection
+// MongoDB connection pool
 let mongoConnection = null;
 
 async function connectMongoDB() {
-  if (mongoConnection) {
+  if (mongoConnection && mongoConnection.readyState === 1) {
     return mongoConnection;
   }
 
   try {
     mongoConnection = await mongoose.connect(process.env.MONGODB_URI, {
       dbName: process.env.MONGODB_DB || 'appdb',
-      maxPoolSize: 5,
-      serverSelectionTimeoutMS: 5000,
+      maxPoolSize: 2,
+      serverSelectionTimeoutMS: 8000,
+      socketTimeoutMS: 45000,
     });
     console.log('✓ MongoDB connected');
     return mongoConnection;
@@ -76,38 +65,28 @@ app.get('/api/debug/whoami', async (req, res) => {
   }
 });
 
-// Import models (lazy load)
-let models = {};
-
-async function loadModels() {
-  if (Object.keys(models).length > 0) return models;
-  
+// Test MongoDB connection
+app.get('/api/test-db', async (req, res) => {
   try {
     await connectMongoDB();
-    const { default: Product } = await import('../server/models/Product.js');
-    const { default: Category } = await import('../server/models/Category.js');
-    const { default: User } = await import('../server/models/User.js');
-    const { default: Order } = await import('../server/models/Order.js');
-    const { default: HomeConfig } = await import('../server/models/HomeConfig.js');
-    const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
-    const { default: Settings } = await import('../server/models/Settings.js');
-    
-    models = { Product, Category, User, Order, HomeConfig, ShopSetup, Settings };
-    return models;
+    return res.json({ ok: true, message: 'MongoDB connected successfully' });
   } catch (error) {
-    console.error('Error loading models:', error);
-    throw error;
+    return res.status(500).json({ ok: false, error: error.message });
   }
-}
+});
 
 // Example API endpoints
 app.get('/api/products', async (req, res) => {
   try {
     await connectMongoDB();
-    const { Product } = await loadModels();
-    const products = await Product.find({}).limit(50).lean();
+    
+    // Dynamically import Product model
+    const { default: Product } = await import('../server/models/Product.js');
+    const products = await Product.find({}).limit(50).lean().maxTimeMS(8000);
+    
     return res.json({ ok: true, items: products });
   } catch (error) {
+    console.error('Error fetching products:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
@@ -115,10 +94,14 @@ app.get('/api/products', async (req, res) => {
 app.get('/api/categories', async (req, res) => {
   try {
     await connectMongoDB();
-    const { Category } = await loadModels();
-    const categories = await Category.find({}).lean();
+    
+    // Dynamically import Category model
+    const { default: Category } = await import('../server/models/Category.js');
+    const categories = await Category.find({}).lean().maxTimeMS(8000);
+    
     return res.json({ ok: true, items: categories });
   } catch (error) {
+    console.error('Error fetching categories:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
@@ -126,10 +109,14 @@ app.get('/api/categories', async (req, res) => {
 app.get('/api/shop-setup', async (req, res) => {
   try {
     await connectMongoDB();
-    const { ShopSetup } = await loadModels();
-    const setup = await ShopSetup.findOne({}).lean();
+    
+    // Dynamically import ShopSetup model
+    const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
+    const setup = await ShopSetup.findOne({}).lean().maxTimeMS(8000);
+    
     return res.json({ ok: true, item: setup });
   } catch (error) {
+    console.error('Error fetching shop setup:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
 });
