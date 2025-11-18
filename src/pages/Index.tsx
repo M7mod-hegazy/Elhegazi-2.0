@@ -670,20 +670,23 @@ const Index = () => {
               <div className="relative bg-white rounded-2xl p-4 shadow-xl border border-slate-200">
                 <div className="flex flex-wrap gap-2 mb-4">
                   {branchKeys.length ? (
-                    branchKeys.map((key) => (
-                      <button
-                        key={key}
-                        onClick={() => setSelectedBranch(key)}
-                        className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
-                          selectedBranch === key 
-                            ? 'bg-slate-900 text-white shadow-md' 
-                            : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                        }`}
-                        title={branchLocations[key]?.name}
-                      >
-                        {branchLocations[key]?.name || key}
-                      </button>
-                    ))
+                    branchKeys.map((key) => {
+                      const branch = branchLocations[key];
+                      return (
+                        <button
+                          key={key}
+                          onClick={() => setSelectedBranch(key)}
+                          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-300 ${
+                            selectedBranch === key 
+                              ? 'bg-slate-900 text-white shadow-md' 
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                          title={branch?.name || key}
+                        >
+                          {branch?.name || key}
+                        </button>
+                      );
+                    })
                   ) : (
                     <span className="text-slate-500 text-sm">لا توجد فروع متاحة حالياً</span>
                   )}
