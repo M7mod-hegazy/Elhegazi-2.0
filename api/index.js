@@ -121,6 +121,129 @@ app.get('/api/shop-setup', async (req, res) => {
   }
 });
 
+// Get home config
+app.get('/api/home-config', async (req, res) => {
+  try {
+    await connectMongoDB();
+    
+    const { default: HomeConfig } = await import('../server/models/HomeConfig.js');
+    const config = await HomeConfig.findOne({}).lean().maxTimeMS(8000);
+    
+    return res.json({ ok: true, item: config });
+  } catch (error) {
+    console.error('Error fetching home config:', error);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// Get settings
+app.get('/api/settings', async (req, res) => {
+  try {
+    await connectMongoDB();
+    
+    const { default: Settings } = await import('../server/models/Settings.js');
+    const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
+    
+    return res.json({ ok: true, item: settings });
+  } catch (error) {
+    console.error('Error fetching settings:', error);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// Get footer settings
+app.get('/api/settings/footer', async (req, res) => {
+  try {
+    await connectMongoDB();
+    
+    const { default: Settings } = await import('../server/models/Settings.js');
+    const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
+    
+    return res.json({ ok: true, item: settings?.footer || {} });
+  } catch (error) {
+    console.error('Error fetching footer settings:', error);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// Get popular searches
+app.get('/api/search/popular', async (req, res) => {
+  try {
+    await connectMongoDB();
+    
+    const { default: Product } = await import('../server/models/Product.js');
+    // Return popular products as search results
+    const popular = await Product.find({})
+      .limit(10)
+      .lean()
+      .maxTimeMS(8000);
+    
+    return res.json({ ok: true, items: popular });
+  } catch (error) {
+    console.error('Error fetching popular searches:', error);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// Get products with query parameters
+app.get('/api/products', async (req, res) => {
+  try {
+    await connectMongoDB();
+    
+    const { limit = 60, featured, fields } = req.query;
+    const { default: Product } = await import('../server/models/Product.js');
+    
+    let query = Product.find({});
+    
+    if (featured === 'true') {
+      query = query.where('featured').equals(true);
+    }
+    
+    if (fields) {
+      query = query.select(fields);
+    }
+    
+    const products = await query
+      .limit(parseInt(limit) || 60)
+      .lean()
+      .maxTimeMS(8000);
+    
+    return res.json({ ok: true, items: products });
+  } catch (error) {
+    console.error('Error fetching products:', error);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
+// Get categories with query parameters
+app.get('/api/categories', async (req, res) => {
+  try {
+    await connectMongoDB();
+    
+    const { limit, featured } = req.query;
+    const { default: Category } = await import('../server/models/Category.js');
+    
+    let query = Category.find({});
+    
+    if (featured === 'true') {
+      query = query.where('featured').equals(true);
+    }
+    
+    if (limit) {
+      query = query.limit(parseInt(limit));
+    }
+    
+    const categories = await query
+      .lean()
+      .maxTimeMS(8000);
+    
+    return res.json({ ok: true, items: categories });
+  } catch (error) {
+    console.error('Error fetching categories:', error);
+    return res.status(500).json({ ok: false, error: error.message });
+  }
+});
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ ok: false, error: 'Not found' });
