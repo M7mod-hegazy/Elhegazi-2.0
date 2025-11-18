@@ -55,26 +55,32 @@ Output Directory: dist
 Add all these variables:
 
 ```
+# Database
 MONGODB_URI = mongodb+srv://m7mod:275757@elhegazicluster.na2a15z.mongodb.net/?retryWrites=true&w=majority&appName=elhegaziCluster
-
 MONGODB_DB = appdb
 
+# Cloudinary
 CLOUDINARY_CLOUD_NAME = dezcdcbui
-
 CLOUDINARY_API_KEY = 788685497634838
-
 CLOUDINARY_API_SECRET = uQ0lcWXczD5BT-u8bPBiss6SQAw
 
+# Firebase
+FIREBASE_API_KEY = your_firebase_api_key
+FIREBASE_AUTH_DOMAIN = your_project.firebaseapp.com
+FIREBASE_PROJECT_ID = your_project_id
+FIREBASE_STORAGE_BUCKET = your_project.appspot.com
+FIREBASE_MESSAGING_SENDER_ID = your_sender_id
+FIREBASE_APP_ID = your_app_id
+FIREBASE_MEASUREMENT_ID = your_measurement_id
+
+# Email
 EMAIL_SERVICE = gmail
-
 EMAIL_USER = medo.hagaze333@gmail.com
-
 EMAIL_PASSWORD = Mo@2351970321
 
+# URLs & Admin
 FRONTEND_URL = (will be provided by Vercel)
-
 ADMIN_EMAIL = admin@example.com
-
 ADMIN_PASSWORD = your_secure_password
 ```
 
