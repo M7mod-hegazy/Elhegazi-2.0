@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تم شحن طلبك</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .header .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #374151;
+        }
+        .shipping-info {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            border-radius: 8px;
+            padding: 24px;
+            margin: 24px 0;
+            border-right: 4px solid #059669;
+        }
+        .shipping-info h3 {
+            margin: 0 0 16px 0;
+            color: #065f46;
+            font-size: 20px;
+        }
+        .shipping-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #a7f3d0;
+        }
+        .shipping-detail:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        .shipping-detail .label {
+            font-weight: 600;
+            color: #047857;
+        }
+        .shipping-detail .value {
+            color: #065f46;
+            font-weight: 500;
+        }
+        .tracking-number {
+            background-color: #ffffff;
+            border: 2px solid #059669;
+            border-radius: 8px;
+            padding: 16px;
+            text-align: center;
+            margin: 20px 0;
+        }
+        .tracking-number .label {
+            font-size: 14px;
+            color: #047857;
+            margin-bottom: 8px;
+        }
+        .tracking-number .number {
+            font-size: 24px;
+            font-weight: bold;
+            color: #059669;
+            font-family: 'Courier New', monospace;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #059669 0%, #047857 100%);
+            color: white;
+            padding: 16px 32px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            margin: 24px 0;
+            transition: transform 0.2s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .timeline {
+            background-color: #f9fafb;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 24px 0;
+        }
+        .timeline-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 16px;
+            position: relative;
+        }
+        .timeline-item:last-child {
+            margin-bottom: 0;
+        }
+        .timeline-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-left: 16px;
+            font-size: 16px;
+        }
+        .timeline-icon.completed {
+            background-color: #059669;
+            color: white;
+        }
+        .timeline-icon.current {
+            background-color: #fbbf24;
+            color: white;
+        }
+        .timeline-icon.pending {
+            background-color: #e5e7eb;
+            color: #6b7280;
+        }
+        .timeline-content {
+            flex: 1;
+        }
+        .timeline-title {
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+        .timeline-desc {
+            font-size: 14px;
+            color: #6b7280;
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #059669;
+            margin-bottom: 8px;
+        }
+        .status-badge {
+            display: inline-block;
+            background-color: #059669;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 8px 0;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .content {
+                padding: 20px;
+            }
+            .header {
+                padding: 30px 20px;
+            }
+            .shipping-info {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">🚚</div>
+            <h1>طلبك في الطريق إليك!</h1>
+            <div class="status-badge">تم الشحن</div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                مرحباً {{customerName}}،
+            </div>
+            
+            <p style="font-size: 16px; line-height: 1.6; color: #4b5563;">
+                أخبار رائعة! تم شحن طلبك وهو الآن في طريقه إليك. 
+                يمكنك تتبع شحنتك باستخدام رقم التتبع أدناه.
+            </p>
+            
+            <div class="shipping-info">
+                <h3>معلومات الشحن</h3>
+                <div class="shipping-detail">
+                    <span class="label">رقم الطلب:</span>
+                    <span class="value">#{{orderNumber}}</span>
+                </div>
+                <div class="shipping-detail">
+                    <span class="label">تاريخ الشحن:</span>
+                    <span class="value">{{shippingDate}}</span>
+                </div>
+                <div class="shipping-detail">
+                    <span class="label">التوصيل المتوقع:</span>
+                    <span class="value">{{estimatedDelivery}}</span>
+                </div>
+                <div class="shipping-detail">
+                    <span class="label">شركة الشحن:</span>
+                    <span class="value">{{carrier}}</span>
+                </div>
+            </div>
+            
+            <div class="tracking-number">
+                <div class="label">رقم التتبع</div>
+                <div class="number">{{trackingNumber}}</div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{trackingUrl}}" class="cta-button">
+                    تتبع الشحنة 📍
+                </a>
+            </div>
+            
+            <div class="timeline">
+                <h4 style="margin: 0 0 20px 0; color: #1f2937;">مراحل التوصيل</h4>
+                
+                <div class="timeline-item">
+                    <div class="timeline-icon completed">✓</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">تم تأكيد الطلب</div>
+                        <div class="timeline-desc">تم استلام ومراجعة طلبك</div>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-icon completed">✓</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">تم تحضير الطلب</div>
+                        <div class="timeline-desc">تم تعبئة منتجاتك بعناية</div>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-icon current">🚚</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">تم الشحن</div>
+                        <div class="timeline-desc">طلبك في طريقه إليك الآن</div>
+                    </div>
+                </div>
+                
+                <div class="timeline-item">
+                    <div class="timeline-icon pending">📦</div>
+                    <div class="timeline-content">
+                        <div class="timeline-title">التوصيل</div>
+                        <div class="timeline-desc">سيتم توصيل طلبك قريباً</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="background-color: #fef3c7; border: 1px solid #f59e0b; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                <h4 style="margin: 0 0 12px 0; color: #92400e;">نصائح مهمة:</h4>
+                <ul style="margin: 0; padding-right: 20px; color: #92400e;">
+                    <li>تأكد من وجودك في العنوان المحدد وقت التوصيل</li>
+                    <li>احتفظ برقم التتبع للمراجعة</li>
+                    <li>تحقق من الطلب عند الاستلام</li>
+                    <li>في حالة عدم وجودك، سيتم إعادة المحاولة في اليوم التالي</li>
+                </ul>
+            </div>
+            
+            <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 30px;">
+                إذا كان لديك أي استفسار حول شحنتك، تواصل معنا على 
+                <a href="mailto:support@alhejazi.com" style="color: #059669;">support@alhejazi.com</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <div class="logo">الحجازي لتجهيز المحلات</div>
+            <p>نشكرك على ثقتك بنا. نتطلع لخدمتك مرة أخرى قريباً.</p>
+            <p style="font-size: 12px; margin-top: 16px;">
+                هذه رسالة تلقائية، يرجى عدم الرد عليها مباشرة.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

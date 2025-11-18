@@ -1,0 +1,40 @@
+/* Category Product Swiper Styles */
+.category-product-swiper {
+  width: 100%;
+  height: 100%;
+}
+
+.category-product-swiper .swiper-pagination {
+  bottom: 8px !important;
+  z-index: 15;
+}
+
+.category-product-swiper .swiper-pagination-bullet {
+  width: 6px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.7);
+  opacity: 1;
+  transition: all 0.3s ease;
+}
+
+.category-product-swiper .swiper-pagination-bullet-active {
+  background: white;
+  width: 16px;
+  border-radius: 4px;
+}
+
+/* Mobile adjustments for 3-column layout */
+@media (max-width: 640px) {
+  .category-product-swiper .swiper-pagination {
+    bottom: 4px !important;
+  }
+  
+  .category-product-swiper .swiper-pagination-bullet {
+    width: 4px;
+    height: 4px;
+  }
+  
+  .category-product-swiper .swiper-pagination-bullet-active {
+    width: 10px;
+  }
+}

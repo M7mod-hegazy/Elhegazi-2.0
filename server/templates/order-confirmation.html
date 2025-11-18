@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تأكيد الطلب</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f8fafc;
+            color: #1f2937;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: bold;
+        }
+        .header .icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+        .content {
+            padding: 40px 30px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+            color: #374151;
+        }
+        .order-info {
+            background-color: #f3f4f6;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 24px 0;
+            border-right: 4px solid #3b82f6;
+        }
+        .order-info h3 {
+            margin: 0 0 16px 0;
+            color: #1f2937;
+            font-size: 20px;
+        }
+        .order-detail {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        .order-detail:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+        }
+        .order-detail .label {
+            font-weight: 600;
+            color: #4b5563;
+        }
+        .order-detail .value {
+            color: #1f2937;
+            font-weight: 500;
+        }
+        .items-list {
+            background-color: #fefefe;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+        .item:last-child {
+            border-bottom: none;
+        }
+        .item-name {
+            font-weight: 500;
+            color: #1f2937;
+        }
+        .item-price {
+            font-weight: 600;
+            color: #059669;
+        }
+        .cta-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+            color: white;
+            padding: 16px 32px;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            text-align: center;
+            margin: 24px 0;
+            transition: transform 0.2s ease;
+        }
+        .cta-button:hover {
+            transform: translateY(-2px);
+        }
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px;
+            text-align: center;
+            color: #6b7280;
+            font-size: 14px;
+            border-top: 1px solid #e5e7eb;
+        }
+        .footer .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #3b82f6;
+            margin-bottom: 8px;
+        }
+        .status-badge {
+            display: inline-block;
+            background-color: #10b981;
+            color: white;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin: 8px 0;
+        }
+        @media (max-width: 600px) {
+            .container {
+                margin: 0;
+                border-radius: 0;
+            }
+            .content {
+                padding: 20px;
+            }
+            .header {
+                padding: 30px 20px;
+            }
+            .order-info {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="icon">✅</div>
+            <h1>تم تأكيد طلبك بنجاح!</h1>
+            <div class="status-badge">طلب مؤكد</div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">
+                مرحباً {{customerName}}،
+            </div>
+            
+            <p style="font-size: 16px; line-height: 1.6; color: #4b5563;">
+                شكراً لك على ثقتك بنا! تم استلام طلبك بنجاح وسيتم معالجته في أقرب وقت ممكن. 
+                سنقوم بإرسال تحديثات منتظمة حول حالة طلبك.
+            </p>
+            
+            <div class="order-info">
+                <h3>تفاصيل الطلب</h3>
+                <div class="order-detail">
+                    <span class="label">رقم الطلب:</span>
+                    <span class="value">#{{orderNumber}}</span>
+                </div>
+                <div class="order-detail">
+                    <span class="label">تاريخ الطلب:</span>
+                    <span class="value">{{orderDate}}</span>
+                </div>
+                <div class="order-detail">
+                    <span class="label">إجمالي المبلغ:</span>
+                    <span class="value">{{orderTotal}} ريال سعودي</span>
+                </div>
+                <div class="order-detail">
+                    <span class="label">حالة الطلب:</span>
+                    <span class="value">قيد المعالجة</span>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{frontendUrl}}/orders/{{orderNumber}}" class="cta-button">
+                    تتبع طلبك 📦
+                </a>
+            </div>
+            
+            <div style="background-color: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 20px; margin: 24px 0;">
+                <h4 style="margin: 0 0 12px 0; color: #1e40af;">ماذا يحدث الآن؟</h4>
+                <ul style="margin: 0; padding-right: 20px; color: #374151;">
+                    <li>سيتم مراجعة طلبك والتأكد من توفر المنتجات</li>
+                    <li>سنقوم بتحضير طلبك وتعبئته بعناية</li>
+                    <li>ستتلقى رسالة تأكيد الشحن مع رقم التتبع</li>
+                    <li>سيتم توصيل طلبك خلال 2-3 أيام عمل</li>
+                </ul>
+            </div>
+            
+            <p style="font-size: 14px; color: #6b7280; text-align: center; margin-top: 30px;">
+                إذا كان لديك أي استفسار، لا تتردد في التواصل معنا على 
+                <a href="mailto:support@alhejazi.com" style="color: #3b82f6;">support@alhejazi.com</a>
+            </p>
+        </div>
+        
+        <div class="footer">
+            <div class="logo">الحجازي لتجهيز المحلات</div>
+            <p>شكراً لاختيارك متجرنا. نحن نقدر ثقتك بنا ونسعى لتقديم أفضل خدمة.</p>
+            <p style="font-size: 12px; margin-top: 16px;">
+                هذه رسالة تلقائية، يرجى عدم الرد عليها مباشرة.
+            </p>
+        </div>
+    </div>
+</body>
+</html>

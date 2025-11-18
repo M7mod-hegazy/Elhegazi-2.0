@@ -1,0 +1,10 @@
+        />
+
+        {/* Old panels removed - now using bottom toolbar in ShopBuilder3DPage */}
+
+      </div>
+    </div>
+  );
+};
+
+export default FloorplanCanvas;
