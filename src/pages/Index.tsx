@@ -395,11 +395,11 @@ const Index = () => {
                   <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6 rounded-b-2xl">
                     <div className="grid grid-cols-2 gap-4 text-white">
                       <div>
-                        <div className="text-2xl md:text-3xl font-black">{about.stats?.customers || 'N/A'}</div>
+                        <div className="text-2xl md:text-3xl font-black">{about?.stats?.customers ? String(about.stats.customers) : 'N/A'}</div>
                         <div className="text-sm text-white/80">عميل راضي</div>
                       </div>
                       <div>
-                        <div className="text-2xl md:text-3xl font-black">{about.stats?.products || 'N/A'}</div>
+                        <div className="text-2xl md:text-3xl font-black">{about?.stats?.products ? String(about.stats.products) : 'N/A'}</div>
                         <div className="text-sm text-white/80">منتج متنوع</div>
                       </div>
                     </div>
