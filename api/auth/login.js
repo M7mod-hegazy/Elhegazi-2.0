@@ -58,7 +58,7 @@ export default async function handler(req, res) {
 
     // Connect to MongoDB and check user
     await connectMongoDB();
-    const { default: User } = await import('../server/models/User.js');
+    const { default: User } = await import('../../server/models/User.js');
 
     console.log('[AUTH/LOGIN] Looking up user:', email);
     const user = await User.findOne({ email }).lean().maxTimeMS(8000);
