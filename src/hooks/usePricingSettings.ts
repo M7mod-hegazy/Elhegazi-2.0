@@ -16,12 +16,59 @@ interface SettingsResponse {
   };
 }
 
+const CACHE_KEY = 'pricing_settings_cache';
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+interface CachedSettings extends PricingSettings {
+  timestamp: number;
+}
+
+const getCachedSettings = (): PricingSettings | null => {
+  try {
+    const cached = localStorage.getItem(CACHE_KEY);
+    if (!cached) return null;
+    
+    const data: CachedSettings = JSON.parse(cached);
+    const now = Date.now();
+    
+    // Check if cache is still valid
+    if (now - data.timestamp > CACHE_TTL) {
+      localStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    
+    return {
+      hidePrices: data.hidePrices,
+      contactMessage: data.contactMessage,
+    };
+  } catch (error) {
+    console.error('Failed to read pricing settings cache:', error);
+    return null;
+  }
+};
+
+const setCachedSettings = (settings: PricingSettings): void => {
+  try {
+    const data: CachedSettings = {
+      ...settings,
+      timestamp: Date.now(),
+    };
+    localStorage.setItem(CACHE_KEY, JSON.stringify(data));
+  } catch (error) {
+    console.error('Failed to cache pricing settings:', error);
+  }
+};
+
 export const usePricingSettings = () => {
-  const [pricingSettings, setPricingSettings] = useState<PricingSettings>({
-    hidePrices: false,
-    contactMessage: 'السلام عليكم، أود معرفة سعر المنتج',
-  });
-  const [loading, setLoading] = useState(true);
+  // Initialize with cached settings if available
+  const cachedSettings = getCachedSettings();
+  const [pricingSettings, setPricingSettings] = useState<PricingSettings>(
+    cachedSettings || {
+      hidePrices: false,
+      contactMessage: 'السلام عليكم، أود معرفة سعر المنتج',
+    }
+  );
+  const [loading, setLoading] = useState(!cachedSettings); // Only loading if no cache
   const [error, setError] = useState<string | null>(null);
 
   const loadSettings = useCallback(async () => {
@@ -36,6 +83,7 @@ export const usePricingSettings = () => {
         };
         
         setPricingSettings(newSettings);
+        setCachedSettings(newSettings); // Cache the settings
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load pricing settings');
@@ -47,21 +95,24 @@ export const usePricingSettings = () => {
   useEffect(() => {
     loadSettings();
     
-    // Poll for changes every 1 second (faster response)
-    const interval = setInterval(loadSettings, 1000);
-    
-    // Also listen for visibility changes - refetch when tab becomes visible
+    // Listen for visibility changes - refetch when tab becomes visible
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         loadSettings();
       }
     };
     
+    // Listen for settings change event from admin
+    const handleSettingsChange = () => {
+      loadSettings();
+    };
+    
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pricing-settings-changed', handleSettingsChange);
     
     return () => {
-      clearInterval(interval);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pricing-settings-changed', handleSettingsChange);
     };
   }, [loadSettings]);
 

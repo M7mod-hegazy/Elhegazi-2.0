@@ -1253,68 +1253,90 @@ const CategoryPage = () => {
                       </div>
                     )}
 
-                    {/* Full Width Cart Button */}
-                    <Button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (hidePrices) {
-                          setSelectedProductForWhatsApp(product);
-                          setShowWhatsAppModal(true);
-                        } else {
-                          handleAddToCart(e, product);
-                        }
-                      }}
-                      className={`w-full rounded-xl h-11 md:h-12 text-sm md:text-base font-bold transition-all duration-500 group/btn relative overflow-hidden shadow-lg hover:shadow-xl ${
-                        hidePrices
-                          ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
-                          : checkIsInCart(product.id)
-                            ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
-                            : 'bg-gradient-to-r from-primary to-secondary hover:from-primary/90 hover:to-secondary/90 text-white'
-                      }`}
-                    >
-                      {hidePrices ? (
-                        /* When prices hidden - WhatsApp contact */
-                        <>
-                          <span className="absolute inset-0 flex items-center justify-center gap-2 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
-                            <img src={whatsappIcon} alt="WhatsApp" className="w-5 h-5" />
-                            <span>لمعرفة السعر</span>
-                          </span>
-                          <span className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
-                            <img src={whatsappIcon} alt="WhatsApp" className="w-5 h-5" />
-                            <span>اضغط هنا</span>
-                          </span>
-                        </>
-                      ) : checkIsInCart(product.id) ? (
-                        /* In Cart - Show checkmark with hover animation */
-                        <>
-                          <span className="absolute inset-0 flex items-center justify-center gap-2 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
-                            <Check className="w-5 h-5" />
-                            <span>في السلة ✓</span>
-                          </span>
-                          <span className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
-                            <Plus className="w-5 h-5" />
-                            <span>إضافة المزيد</span>
-                          </span>
-                        </>
-                      ) : (
-                        <>
-                          <span className="absolute inset-0 flex items-center justify-center gap-2 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
-                            <ShoppingBag className="w-5 h-5" />
-                            <span>أضف للسلة</span>
-                          </span>
-                          <span className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
-                            <ShoppingBag className="w-5 h-5" />
-                            <span>إضافة إلى السلة 🛒</span>
-                          </span>
-                        </>
-                      )}
-                    </Button>
+                    {/* Eye Button + Action Button */}
+                    <div className="flex gap-2">
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`/product/${product.id}`);
+                              }}
+                              className="h-10 w-10 rounded-lg bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0 relative flex-shrink-0"
+                            >
+                              <Eye className="w-4 h-4 transition-all duration-300 group-hover/eye:scale-110" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" sideOffset={5}>
+                            <p>عرض التفاصيل</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                      
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (hidePrices) {
+                            setSelectedProductForWhatsApp(product);
+                            setShowWhatsAppModal(true);
+                          } else {
+                            handleAddToCart(e, product);
+                          }
+                        }}
+                        className={`flex-1 rounded-lg h-10 text-xs font-semibold transition-all duration-500 group/btn relative overflow-hidden ${
+                          hidePrices
+                            ? 'bg-primary hover:bg-primary/90 text-white'
+                            : checkIsInCart(product.id)
+                              ? 'bg-green-500 hover:bg-green-600 text-white'
+                              : 'bg-primary hover:bg-primary/90 text-white'
+                        }`}
+                      >
+                        {hidePrices ? (
+                          /* When prices hidden - WhatsApp contact */
+                          <>
+                            <span className="absolute inset-0 flex items-center justify-center gap-1 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
+                              <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
+                              <span>لمعرفة السعر</span>
+                            </span>
+                            <span className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
+                              <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
+                              <span>اضغط هنا</span>
+                            </span>
+                          </>
+                        ) : checkIsInCart(product.id) ? (
+                          /* In Cart - Show checkmark with hover animation */
+                          <>
+                            <span className="absolute inset-0 flex items-center justify-center gap-1 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
+                              <Check className="w-3 h-3" />
+                              <span>في السلة</span>
+                            </span>
+                            <span className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
+                              <Plus className="w-3 h-3" />
+                              <span>إضافة</span>
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            <span className="absolute inset-0 flex items-center justify-center gap-1 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
+                              <ShoppingBag className="w-3 h-3" />
+                              <span>أضف للسلة</span>
+                            </span>
+                            <span className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
+                              <ShoppingBag className="w-3 h-3" />
+                              <span>أضف للسلة</span>
+                            </span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
                 )
               ))}
             </div>
           )}
+          
           {/* Pagination Controls */}
           {filteredAndSortedProducts.length > 0 && (
             <div className="flex items-center justify-center gap-4 mt-8">

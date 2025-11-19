@@ -238,38 +238,38 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
 
   return (
     <div className="space-y-4">
-      {/* Fixed Cards - Mobile Optimized */}
-      <div className="flex gap-2 px-3">
+      {/* Fixed Cards - Mobile Optimized: Stack vertically */}
+      <div className="flex flex-col gap-2 px-3">
         <Link
           to="/products"
-          className="flex-1 bg-gradient-to-br from-primary to-primary/80 rounded-xl p-3 flex items-center gap-3 active:scale-95 transition-transform"
+          className="w-full bg-gradient-to-br from-primary to-primary/80 rounded-lg p-3 flex items-center gap-2 active:scale-95 transition-transform"
         >
-          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-            <Package className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+            <Package className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-white truncate">جميع المنتجات</h3>
+            <h3 className="text-xs font-bold text-white truncate">جميع المنتجات</h3>
             <p className="text-xs text-white/80 truncate">تصفح الكل</p>
           </div>
         </Link>
 
         <Link
           to="/categories"
-          className="flex-1 bg-gradient-to-br from-secondary to-secondary/80 rounded-xl p-3 flex items-center gap-3 active:scale-95 transition-transform"
+          className="w-full bg-gradient-to-br from-secondary to-secondary/80 rounded-lg p-3 flex items-center gap-2 active:scale-95 transition-transform"
         >
-          <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
-            <Grid3x3 className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0">
+            <Grid3x3 className="w-5 h-5 text-white" />
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-bold text-white truncate">كل الأقسام</h3>
+            <h3 className="text-xs font-bold text-white truncate">كل الأقسام</h3>
           </div>
         </Link>
       </div>
 
-      {/* Mobile Categories Carousel */}
-      <div className="relative w-full overflow-hidden px-3">
+      {/* Mobile Categories Carousel - No padding to allow full animation */}
+      <div className="relative w-screen overflow-hidden -ml-3 -mr-3">
         {loading ? (
-          <div className="grid grid-cols-1 gap-4">
+          <div className="grid grid-cols-1 gap-4 px-3">
             {Array.from({ length: 2 }).map((_, idx) => (
               <div key={idx} className="bg-white rounded-xl overflow-hidden shadow-lg border border-slate-200 w-full h-40">
                 <div className="flex h-full">
@@ -283,9 +283,10 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
           <>
             <Swiper
               modules={[Mousewheel]}
-              className="mb-4"
+              className="mb-4 !overflow-hidden px-3"
+              style={{ overflow: 'hidden' } as React.CSSProperties}
               speed={0}
-              spaceBetween={16}
+              spaceBetween={12}
               loop={true}
               loopAdditionalSlides={8}
               centeredSlides={false}
@@ -301,8 +302,8 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
                 setCurrentSlide(actualIndex);
               }}
               breakpoints={{
-                0: { slidesPerView: 1, spaceBetween: 12 },
-                480: { slidesPerView: 1.2, spaceBetween: 16 },
+                0: { slidesPerView: 1.05, spaceBetween: 8 },
+                480: { slidesPerView: 1.1, spaceBetween: 10 },
               }}
             >
               {[...displayCategories, ...displayCategories, ...displayCategories, ...displayCategories].map((category, categoryIndex) => (
@@ -343,10 +344,10 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
                         </div>
                       </div>
 
-                      {/* Mobile Split Screen Layout - 50/50 */}
-                      <div className="flex h-48">
-                        {/* Left Side - Category Info (50% on mobile) */}
-                        <div className="w-1/2 bg-gradient-to-br from-slate-50 to-slate-100 p-3 flex flex-col justify-between relative overflow-hidden">
+                      {/* Mobile Split Screen Layout - 50/50 - Smaller card */}
+                      <div className="flex h-40">
+                        {/* Left Side - Category Info (50% on mobile) - Compact */}
+                        <div className="w-1/2 bg-gradient-to-br from-slate-50 to-slate-100 p-2 flex flex-col justify-between relative overflow-hidden">
                           {/* Category Image Background Overlay */}
                           {category.image && (
                             <div className="absolute inset-0 opacity-15 z-0">
@@ -368,21 +369,21 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
                           </div>
                           
                           <div className="relative z-10">
-                            {/* Category Badge */}
-                            <div className="mb-2">
-                              <Badge className="bg-slate-900/90 text-white text-xs font-medium backdrop-blur-sm flex items-center gap-1 px-2 py-1 shadow-lg w-fit">
-                                <Tag className="w-2.5 h-2.5" />
+                            {/* Category Badge - Smaller */}
+                            <div className="mb-1">
+                              <Badge className="bg-slate-900/90 text-white text-xs font-medium backdrop-blur-sm flex items-center gap-1 px-2 py-0.5 shadow-lg w-fit">
+                                <Tag className="w-2 h-2" />
                                 فئة
                               </Badge>
                             </div>
                             
-                            {/* Category Name with Product Count */}
-                            <div className="flex items-center gap-2 mb-2">
-                              <h3 className="text-base font-bold text-slate-900 group-hover:text-primary transition-all duration-300 leading-tight flex-1 min-w-0">
+                            {/* Category Name with Product Count - Smaller text */}
+                            <div className="flex items-center gap-1 mb-1">
+                              <h3 className="text-xs font-bold text-slate-900 group-hover:text-primary transition-all duration-300 leading-tight flex-1 min-w-0">
                                 {category.nameAr}
                               </h3>
                               <div 
-                                className="bg-primary/10 text-primary px-2 py-1 rounded-full text-xs font-semibold flex-shrink-0 group-hover:bg-primary group-hover:text-white transition-all duration-300"
+                                className="bg-primary/10 text-primary px-1.5 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 group-hover:bg-primary group-hover:text-white transition-all duration-300"
                                 ref={(el) => {
                                   if (el && animatedCounts[category.id] === undefined) {
                                     setTimeout(() => animateCounter(category.id, category.productCount), 400);
@@ -392,26 +393,18 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
                                 {animatedCounts[category.id] ?? (category.productCount || 0)}
                               </div>
                             </div>
-                            <p className="text-slate-600 text-xs mb-3 opacity-80">{category.name}</p>
+                            <p className="text-slate-600 text-xs mb-2 opacity-80 line-clamp-1">{category.name}</p>
                             
-                            {/* Category Description */}
-                            {(category.descriptionAr || category.description) && (
-                              <div className="bg-white/60 rounded-lg p-2 mb-3">
-                                <div className="text-xs font-medium text-slate-700 mb-1">الوصف</div>
-                                <div className="text-xs text-slate-600 line-clamp-2 leading-relaxed">
-                                  {category.descriptionAr || category.description}
-                                </div>
-                              </div>
-                            )}
+                            {/* Category Description - Hidden on mobile to save space */}
+                            {/* Hidden for mobile compact view */}
                           </div>
 
-                          {/* Enhanced Action Button */}
+                          {/* Enhanced Action Button - Compact */}
                           <div className="relative z-10">
-                            <div className="bg-primary/10 hover:bg-primary/20 active:bg-primary/30 rounded-lg px-3 py-2 border border-primary/20 transition-all duration-200">
-                              <div className="flex items-center justify-center gap-2 text-primary font-bold">
-                                <Hand className="w-4 h-4 animate-pulse" />
-                                <span className="text-sm">اضغط للاستكشاف</span>
-                                <ArrowRight className="w-4 h-4 animate-bounce" />
+                            <div className="bg-primary/10 hover:bg-primary/20 active:bg-primary/30 rounded-lg px-2 py-1 border border-primary/20 transition-all duration-200">
+                              <div className="flex items-center justify-center gap-1 text-primary font-bold">
+                                <span className="text-xs">اضغط</span>
+                                <ArrowRight className="w-3 h-3" />
                               </div>
                             </div>
                           </div>
@@ -501,36 +494,21 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
                     </Link>
                   </motion.div>
                 </SwiperSlide>
-              ))}
+                ))}
             </Swiper>
-            
-            {/* Mobile Navigation Dots - Smaller */}
             {displayCategories.length > 0 && (
-              <div className="mt-4 flex justify-center gap-2">
-                {displayCategories.map((category, index) => (
-                  <div
-                    key={category.id}
-                    className="relative group cursor-pointer"
-                    onClick={() => {
-                      if (swiperInstance) {
-                        swiperInstance.slideTo(index);
-                      }
-                    }}
-                  >
-                    <div
-                      className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                        currentSlide === index
-                          ? 'bg-primary scale-125 shadow-md'
-                          : 'bg-slate-300 hover:bg-slate-400'
-                      }`}
-                    />
-                    {/* Mobile Tooltip - Simplified */}
-                    <div className="absolute bottom-5 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-all duration-200 pointer-events-none z-10">
-                      <div className="bg-slate-800 text-white text-xs px-2 py-1 rounded shadow-xl whitespace-nowrap">
-                        {category.nameAr || category.name}
-                      </div>
-                    </div>
-                  </div>
+              <div className="flex justify-center gap-2 mt-4">
+                {displayCategories.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => swiperInstance?.slideTo(index)}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      index === currentSlide
+                        ? 'bg-primary w-8'
+                        : 'bg-slate-300 w-2 hover:bg-slate-400'
+                    }`}
+                    aria-label={`Go to slide ${index + 1}`}
+                  />
                 ))}
               </div>
             )}
@@ -540,5 +518,38 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
     </div>
   );
 };
+
+// Hide scrollbar on mobile for Swiper
+const styles = `
+  .swiper {
+    overflow: hidden !important;
+  }
+  
+  .swiper-scrollbar {
+    display: none !important;
+  }
+  
+  .swiper-scrollbar-drag {
+    display: none !important;
+  }
+  
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .swiper::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .swiper {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
+}
 
 export default CategoriesMobile;

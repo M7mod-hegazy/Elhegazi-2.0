@@ -43,11 +43,11 @@ const Belt: React.FC<{ products: Product[]; speedPxPerSec?: number; sets?: numbe
   const isVisibleRef = useRef<boolean>(true);
   const SPACING = 10;
   const CARD_W = 190; // match rendered card container width
-  const CARD_H = 208; // match rendered card container height
+  const CARD_H = 280; // increased to show full card with price and buttons
   const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const SPEED = prefersReducedMotion ? Math.max(60, speedPxPerSec * 0.6) : speedPxPerSec;
   const SETS = Math.max(3, sets ?? 8); // allow caller to control sets
-  const [containerH, setContainerH] = useState<number>(245);
+  const [containerH, setContainerH] = useState<number>(300);
 
   useEffect(() => {
     const layer = layerRef.current;
@@ -65,7 +65,7 @@ const Belt: React.FC<{ products: Product[]; speedPxPerSec?: number; sets?: numbe
     const itemWidth = cardWidthOnly + SPACING;
     const containerRect = container.getBoundingClientRect();
     const containerWidth = Math.max(300, Math.round(containerRect.width || 300));
-    const measuredContainerH = Math.max(220, cardHeightOnly + 20);
+    const measuredContainerH = Math.max(300, cardHeightOnly + 30);
     setContainerH(measuredContainerH);
 
     // Place items horizontally with absolute transform

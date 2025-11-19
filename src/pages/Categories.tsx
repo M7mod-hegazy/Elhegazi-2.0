@@ -395,8 +395,8 @@ const Categories = () => {
           ) : (
             <div className={`grid ${
               viewMode === 'grid' 
-                ? 'grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8' 
-                : 'grid-cols-1 max-w-7xl mx-auto gap-3 sm:gap-4 lg:gap-6'
+                ? 'grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 divide-y sm:divide-y-0 divide-slate-200' 
+                : 'grid-cols-1 max-w-7xl mx-auto gap-3 sm:gap-4 lg:gap-6 divide-y divide-slate-200'
             }`}>
               {paginatedCategories.map((category, index) => (
                 <ScrollAnimation
@@ -408,7 +408,7 @@ const Categories = () => {
                     // Mobile-Optimized Category Card
                     <Link
                       to={`/category/${category.slug || category.id || category.nameAr?.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '') || 'category'}`}
-                      className="group block bg-white rounded-2xl sm:rounded-3xl overflow-hidden shadow-md sm:shadow-lg hover:shadow-xl sm:hover:shadow-2xl transition-all duration-500 sm:duration-700 transform hover:-translate-y-1 sm:hover:-translate-y-3 border border-slate-200/60 hover:border-primary/40 relative touch-manipulation hover:scale-[1.02] cursor-pointer"
+                      className="group block bg-white rounded-2xl sm:rounded-3xl overflow-hidden shadow-md sm:shadow-lg hover:shadow-xl sm:hover:shadow-2xl transition-all duration-500 sm:duration-700 transform hover:-translate-y-1 sm:hover:-translate-y-3 border-2 sm:border border-slate-300 sm:border-slate-200/60 hover:border-primary/40 relative touch-manipulation hover:scale-[1.02] cursor-pointer  sm:py-0"
                     >
                       {/* Featured Badge */}
                       {category.featured && (

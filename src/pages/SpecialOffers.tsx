@@ -1,9 +1,13 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { SectionGuard } from '@/components/common/SectionGuard';
-import { ArrowRight, Tag, Percent, Gift } from 'lucide-react';
+import { ArrowRight, Tag, Percent, Gift, Filter, Search, Grid, List, SortAsc, SortDesc } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Slider } from '@/components/ui/slider';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ProductCard from '@/components/product/ProductCard';
 import ProductsFilterBar from '@/components/product/ProductsFilterBar';
 import SocialLinks from '@/components/layout/SocialLinks';

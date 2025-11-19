@@ -381,13 +381,44 @@ const Navbar = () => {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="flex items-center space-x-2 space-x-reverse">
+              <div className="hidden lg:flex items-center space-x-2 space-x-reverse">
                 <Button variant="ghost" size="sm" asChild>
                   <Link to="/login">تسجيل الدخول</Link>
                 </Button>
                 <Button size="sm" asChild>
                   <Link to="/register">إنشاء حساب</Link>
                 </Button>
+              </div>
+            )}
+
+            {/* Mobile Icons - Only show if prices are visible */}
+            {!hidePrices && (
+              <div className="lg:hidden flex items-center gap-2">
+                {/* Heart/Favorites */}
+                <Link
+                  to="/favorites"
+                  className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
+                >
+                  <Heart className="w-5 h-5" />
+                  {favoritesCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                      {favoritesCount}
+                    </Badge>
+                  )}
+                </Link>
+
+                {/* Cart */}
+                <Link
+                  to="/cart"
+                  className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  {itemCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                      {itemCount}
+                    </Badge>
+                  )}
+                </Link>
               </div>
             )}
 
@@ -407,9 +438,9 @@ const Navbar = () => {
 
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-border py-4 animate-fade-in">
+          <div className="lg:hidden border-t border-border bg-gradient-to-b from-background to-muted/30 py-4 animate-fade-in max-h-[calc(100vh-4rem)] overflow-y-auto">
             {/* Mobile Search */}
-            <div className="mb-4">
+            <div className="mb-6 px-4">
               <SearchSuggestions
                 placeholder="البحث عن المنتجات..."
                 onSearch={() => setIsMobileMenuOpen(false)}
@@ -417,25 +448,30 @@ const Navbar = () => {
             </div>
 
             {/* Mobile Navigation Links */}
-            <div className="space-y-2">
+            <div className="space-y-1 mb-6">
               {mainNavItems.map((item) => (
                 <Link
                   key={item.path}
                   to={item.path}
                   onClick={() => setIsMobileMenuOpen(false)}
-                  className={`block py-2 px-4 rounded-lg transition-all duration-300 ease-out ${
+                  className={`block py-3 px-4 rounded-lg transition-all duration-300 ease-out font-medium ${
                     isActivePath(item.path)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'hover:bg-muted'
+                      ? 'bg-primary text-primary-foreground shadow-md'
+                      : 'hover:bg-muted/80 text-foreground'
                   }`}
                 >
                   {item.label}
                 </Link>
               ))}
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-border my-4" />
               
-              {/* Mobile Category Links */}
-              <div className="pt-2">
-                <div className="px-4 py-2 text-sm font-medium text-slate-500">الفئات</div>
+            {/* Mobile Category Links */}
+            <div className="mb-6">
+              <div className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">الفئات</div>
+              <div className="space-y-1">
                 {loadingCategories ? (
                   Array.from({ length: 5 }).map((_, i) => (
                     <div key={i} className="px-4 py-2">
@@ -452,45 +488,80 @@ const Navbar = () => {
                         key={category.id}
                         to={`/category/${category.slug}`}
                         onClick={() => setIsMobileMenuOpen(false)}
-                        className="block py-2 px-4 rounded-lg hover:bg-muted transition-all duration-300 ease-out"
+                        className="block py-2 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out text-sm"
                       >
                         <div className="flex items-center justify-between">
                           <span>{category.nameAr}</span>
                           {typeof category.productCount === 'number' && (
-                            <span className="text-xs text-slate-500">{category.productCount}</span>
+                            <span className="text-xs text-slate-500 bg-muted px-2 py-1 rounded-full">{category.productCount}</span>
                           )}
                         </div>
                       </Link>
                     ))
                 )}
               </div>
+            </div>
+
+            {/* Divider */}
+            <div className="h-px bg-border my-4" />
               
-              {isAuthenticated && (
+            {/* User Section */}
+            <div className="space-y-2">
+              {isAuthenticated ? (
                 <>
                   <Link
                     to="/profile"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="block py-2 px-4 rounded-lg hover:bg-muted transition-all duration-300 ease-out"
+                    className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
                   >
-                    الملف الشخصي
+                    <User className="w-4 h-4" />
+                    <span className="font-medium">الملف الشخصي</span>
                   </Link>
                   <Link
                     to="/orders"
                     onClick={() => setIsMobileMenuOpen(false)}
-                    className="block py-2 px-4 rounded-lg hover:bg-muted transition-all duration-300 ease-out"
+                    className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
                   >
-                    طلباتي
+                    <Package className="w-4 h-4" />
+                    <span className="font-medium">طلباتي</span>
                   </Link>
                   {isAdmin && (
                     <Link
                       to="/admin/dashboard"
                       onClick={() => setIsMobileMenuOpen(false)}
-                      className="block py-2 px-4 rounded-lg hover:bg-muted transition-all duration-300 ease-out"
+                      className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
                     >
-                      لوحة الإدارة
+                      <Settings className="w-4 h-4" />
+                      <span className="font-medium">لوحة الإدارة</span>
                     </Link>
                   )}
+                  <button
+                    onClick={() => {
+                      handleLogout();
+                      setIsMobileMenuOpen(false);
+                    }}
+                    className="flex items-center gap-2 w-full py-3 px-4 rounded-lg hover:bg-destructive/10 transition-all duration-300 ease-out text-destructive font-medium"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>تسجيل الخروج</span>
+                  </button>
                 </>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-2">الحساب</p>
+                  <div className="flex gap-2 px-4">
+                    <Button variant="outline" size="sm" asChild className="flex-1">
+                      <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                        تسجيل الدخول
+                      </Link>
+                    </Button>
+                    <Button size="sm" asChild className="flex-1 bg-primary hover:bg-primary/90">
+                      <Link to="/register" onClick={() => setIsMobileMenuOpen(false)}>
+                        إنشاء حساب
+                      </Link>
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
           </div>

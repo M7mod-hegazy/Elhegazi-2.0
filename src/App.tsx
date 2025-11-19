@@ -9,6 +9,9 @@ import { DualAuthProvider } from "@/context/DualAuthContext";
 import { ThemeProvider, useTheme } from "@/context/ThemeContext";
 import { useFavicon } from "@/hooks/useFavicon";
 import { useSiteName, cacheSiteName } from "@/hooks/useSiteName";
+import { useLoadingCoordinator } from "@/hooks/useLoadingCoordinator";
+import { useServiceWorker, useServiceWorkerUpdate } from "@/hooks/useServiceWorker";
+import { usePrefetchOnIdle, usePreloadCritical } from "@/hooks/usePrefetch";
 import Layout from "./components/layout/Layout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 import DualProtectedRoute from "./components/auth/DualProtectedRoute";
@@ -77,9 +80,23 @@ const AppInner = () => {
   
   // Update favicon and loading screen logo dynamically
   useFavicon();
-  const [heroReady, setHeroReady] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const location = useLocation();
+  
+  // Use loading coordinator to wait for all critical data
+  const { allReady, isLoading } = useLoadingCoordinator();
+  
+  // Register Service Worker for offline support
+  useServiceWorker();
+  
+  // Handle Service Worker updates
+  useServiceWorkerUpdate();
+  
+  // Prefetch resources on idle
+  usePrefetchOnIdle();
+  
+  // Preload critical resources
+  usePreloadCritical();
 
   // Cache site name for immediate access
   useEffect(() => {
@@ -100,13 +117,11 @@ const AppInner = () => {
     if (pre && pre.parentElement) pre.parentElement.removeChild(pre);
 
     const onDomReady = () => requestAnimationFrame(() => setDocLoaded(true));
-    const onHeroReady = () => setHeroReady(true);
     if (document.readyState === 'interactive' || document.readyState === 'complete') {
       requestAnimationFrame(() => setDocLoaded(true));
     } else {
       document.addEventListener('DOMContentLoaded', onDomReady, { once: true });
     }
-    window.addEventListener('hero-ready', onHeroReady as EventListener, { once: true });
     
     // Prevent React Router from hijacking external links (WhatsApp, etc.)
     const handleClickCapture = (e: Event) => {
@@ -155,25 +170,22 @@ const AppInner = () => {
     
     document.addEventListener('click', handleClickCapture, true);
     
-    // Faster fallback to avoid long waits
-    const fallback = setTimeout(() => setShowSplash(false), 4500);
+    // Faster fallback to avoid long waits (max 5 seconds)
+    const fallback = setTimeout(() => setShowSplash(false), 5000);
     return () => {
       document.removeEventListener('DOMContentLoaded', onDomReady);
-      window.removeEventListener('hero-ready', onHeroReady as EventListener);
       document.removeEventListener('click', handleClickCapture, true);
       clearTimeout(fallback);
     };
   }, []);
 
-  // Derive splash visibility from readiness flags with a short next-frame update
+  // Hide splash when all critical data is ready
   useEffect(() => {
-    const onHome = location.pathname === '/';
-    // If not on home, don't wait for heroReady
-    if (docLoaded && (!onHome || heroReady)) {
+    if (docLoaded && allReady) {
       const id = requestAnimationFrame(() => setShowSplash(false));
       return () => cancelAnimationFrame(id);
     }
-  }, [docLoaded, heroReady, location.pathname]);
+  }, [docLoaded, allReady]);
 
   // Global permission-denied toast (Arabic)
   useEffect(() => {

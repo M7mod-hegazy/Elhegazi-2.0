@@ -394,6 +394,33 @@
 
   html {
     direction: rtl;
+    /* Hide scrollbar globally */
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  html::-webkit-scrollbar {
+    display: none !important;  /* Chrome, Safari and Opera */
+  }
+  
+  body {
+    /* Hide scrollbar globally */
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  body::-webkit-scrollbar {
+    display: none !important;  /* Chrome, Safari and Opera */
+  }
+  
+  /* Hide scrollbar on all elements */
+  * {
+    -ms-overflow-style: none;  /* IE and Edge */
+    scrollbar-width: none;  /* Firefox */
+  }
+  
+  *::-webkit-scrollbar {
+    display: none !important;  /* Chrome, Safari and Opera */
   }
 }
 

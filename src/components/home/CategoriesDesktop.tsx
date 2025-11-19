@@ -244,22 +244,22 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
 
   return (
     <div className="space-y-6">
-      {/* Fixed Cards Row - Full Width */}
-      <div className="grid grid-cols-2 gap-4">
+      {/* Fixed Cards Row - Responsive: Stack on mobile, side-by-side on desktop */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         {/* All Products Card */}
         <Link
           to="/products"
-          className="group relative bg-gradient-to-br from-primary to-primary/80 rounded-xl p-5 overflow-hidden hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500 hover:-translate-y-1"
+          className="group relative bg-gradient-to-br from-primary to-primary/80 rounded-lg sm:rounded-xl p-3 sm:p-5 overflow-hidden hover:shadow-2xl hover:shadow-primary/20 transition-all duration-500 hover:-translate-y-1"
         >
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-              <Package className="w-7 h-7 text-white" />
+          <div className="relative z-10 flex items-center gap-2 sm:gap-4">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+              <Package className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
             </div>
             <div className="flex-1 text-right">
-              <h3 className="text-lg font-bold text-white">جميع المنتجات</h3>
-              <p className="text-sm text-white/90">تصفح كامل المتجر</p>
+              <h3 className="text-sm sm:text-lg font-bold text-white">جميع المنتجات</h3>
+              <p className="text-xs sm:text-sm text-white/90">تصفح كامل المتجر</p>
             </div>
-            <ArrowRight className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
           </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
         </Link>
@@ -267,17 +267,17 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
         {/* All Categories Card */}
         <Link
           to="/categories"
-          className="group relative bg-gradient-to-br from-secondary to-secondary/80 rounded-xl p-5 overflow-hidden hover:shadow-2xl hover:shadow-secondary/20 transition-all duration-500 hover:-translate-y-1"
+          className="group relative bg-gradient-to-br from-secondary to-secondary/80 rounded-lg sm:rounded-xl p-3 sm:p-5 overflow-hidden hover:shadow-2xl hover:shadow-secondary/20 transition-all duration-500 hover:-translate-y-1"
         >
-          <div className="relative z-10 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
-              <Grid3x3 className="w-7 h-7 text-white" />
+          <div className="relative z-10 flex items-center gap-2 sm:gap-4">
+            <div className="w-10 h-10 sm:w-14 sm:h-14 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center group-hover:scale-110 transition-transform duration-300 flex-shrink-0">
+              <Grid3x3 className="w-5 h-5 sm:w-7 sm:h-7 text-white" />
             </div>
             <div className="flex-1 text-right">
-              <h3 className="text-lg font-bold text-white">كل الأقسام</h3>
-              <p className="text-sm text-white/90">استعرض حسب القسم</p>
+              <h3 className="text-sm sm:text-lg font-bold text-white">كل الأقسام</h3>
+              <p className="text-xs sm:text-sm text-white/90">استعرض حسب القسم</p>
             </div>
-            <ArrowRight className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+            <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
           </div>
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
         </Link>
@@ -300,9 +300,10 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
           <>
             <Swiper
             modules={[Mousewheel]}
-            className="mb-6"
+            className="mb-6 !overflow-hidden"
+            style={{ overflow: 'hidden' } as React.CSSProperties}
             speed={0}
-            spaceBetween={20}
+            spaceBetween={12}
             loop={true}
             loopAdditionalSlides={6}
             centeredSlides={false}
@@ -317,7 +318,8 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
               setCurrentSlide(swiper.realIndex);
             }}
             breakpoints={{
-              0: { slidesPerView: 1, spaceBetween: 12 },
+              0: { slidesPerView: 1.05, spaceBetween: 8 },
+              480: { slidesPerView: 1.1, spaceBetween: 10 },
               768: { slidesPerView: 2, spaceBetween: 16 },
               1024: { slidesPerView: 3, spaceBetween: 20 },
             }}
@@ -357,10 +359,10 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                 )}
 
 
-                {/* Split Screen Layout */}
-                <div className="flex h-64">
-                  {/* Left Side - Category Info (40%) */}
-                  <div className="w-2/5 bg-gradient-to-br from-slate-50 to-slate-100 p-6 flex flex-col justify-between relative overflow-hidden">
+                {/* Split Screen Layout - Responsive height */}
+                <div className="flex h-48 sm:h-56 lg:h-64">
+                  {/* Left Side - Category Info (40%) - Responsive padding */}
+                  <div className="w-2/5 bg-gradient-to-br from-slate-50 to-slate-100 p-3 sm:p-4 lg:p-6 flex flex-col justify-between relative overflow-hidden">
                 {/* Category Image Background Overlay */}
                 {category.image && (
                   <div className="absolute inset-0 opacity-20 z-0">
@@ -382,21 +384,21 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                 </div>
                 
                 <div className="relative z-10">
-                  {/* Category Badge */}
-                  <div className="mb-2 animate-slide-in-left">
-                    <Badge className="bg-slate-900/90 text-white text-xs font-medium backdrop-blur-sm flex items-center gap-1 px-2 py-1 shadow-lg w-fit">
-                      <Tag className="w-2.5 h-2.5" />
+                  {/* Category Badge - Responsive sizing */}
+                  <div className="mb-1 sm:mb-2 animate-slide-in-left">
+                    <Badge className="bg-slate-900/90 text-white text-xs font-medium backdrop-blur-sm flex items-center gap-1 px-2 py-0.5 sm:py-1 shadow-lg w-fit">
+                      <Tag className="w-2 h-2 sm:w-2.5 sm:h-2.5" />
                       فئة
                     </Badge>
                   </div>
                   
-                  {/* Category Name with Product Count */}
-                  <div className="flex items-center gap-2 mb-2 animate-slide-in-left group-hover:translate-x-1 transition-transform duration-300">
-                    <h3 className="text-lg font-bold text-slate-900 group-hover:text-primary transition-all duration-300 leading-tight flex-1 min-w-0 group-hover:scale-105">
+                  {/* Category Name with Product Count - Responsive sizing */}
+                  <div className="flex items-center gap-1 sm:gap-2 mb-1 sm:mb-2 animate-slide-in-left group-hover:translate-x-1 transition-transform duration-300">
+                    <h3 className="text-xs sm:text-sm lg:text-lg font-bold text-slate-900 group-hover:text-primary transition-all duration-300 leading-tight flex-1 min-w-0 group-hover:scale-105">
                       {category.nameAr}
                     </h3>
                     <div 
-                      className="bg-primary/10 text-primary px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 group-hover:bg-primary group-hover:text-white group-hover:scale-110 transition-all duration-300"
+                      className="bg-primary/10 text-primary px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-semibold flex-shrink-0 group-hover:bg-primary group-hover:text-white group-hover:scale-110 transition-all duration-300"
                       ref={(el) => {
                         if (el && animatedCounts[category.id] === undefined) {
                           setTimeout(() => animateCounter(category.id, category.productCount), 600);
@@ -406,11 +408,11 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                       {animatedCounts[category.id] ?? (category.productCount || 0)}
                     </div>
                   </div>
-                  <p className="text-slate-600 text-xs mb-3 opacity-80 group-hover:opacity-100 group-hover:text-slate-700 transition-all duration-300">{category.name}</p>
+                  <p className="text-slate-600 text-xs mb-1 sm:mb-3 opacity-80 group-hover:opacity-100 group-hover:text-slate-700 transition-all duration-300">{category.name}</p>
                   
-                  {/* Category Description */}
+                  {/* Category Description - Hidden on mobile */}
                   {(category.descriptionAr || category.description) && (
-                    <div className="bg-white/60 rounded-lg p-2 animate-slide-in-left group-hover:bg-white/80 group-hover:shadow-md group-hover:scale-105 transition-all duration-300">
+                    <div className="hidden sm:block bg-white/60 rounded-lg p-2 animate-slide-in-left group-hover:bg-white/80 group-hover:shadow-md group-hover:scale-105 transition-all duration-300">
                       <div className="text-xs font-medium text-slate-700 mb-1 group-hover:text-primary transition-colors duration-300">الوصف</div>
                       <div className="text-xs text-slate-600 line-clamp-2 leading-relaxed group-hover:text-slate-800 transition-colors duration-300">
                         {category.descriptionAr || category.description}
@@ -419,11 +421,11 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                   )}
                 </div>
 
-                {/* Simple Action Button */}
+                {/* Simple Action Button - Responsive sizing */}
                 <div className="relative z-10">
-                  <div className="flex items-center gap-2 text-primary font-medium">
-                    <span className="text-sm">استكشف الآن</span>
-                    <ArrowRight className="w-4 h-4 rtl-flip" />
+                  <div className="flex items-center gap-1 sm:gap-2 text-primary font-medium">
+                    <span className="text-xs sm:text-sm">استكشف الآن</span>
+                    <ArrowRight className="w-3 h-3 sm:w-4 sm:h-4 rtl-flip" />
                   </div>
                 </div>
               </div>
@@ -444,8 +446,8 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                   </div>
                 </div>
                 
-                {/* Product Grid */}
-                <div className="h-full p-3 relative z-10">
+                {/* Product Grid - Responsive padding */}
+                <div className="h-full p-2 sm:p-3 relative z-10">
                   {(() => {
                     const previewProducts = getCategoryPreviewProducts(category);
                     const totalProducts = category.productCount || 0;
@@ -570,5 +572,38 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
     </div>
   );
 };
+
+// Hide scrollbar on mobile for Swiper
+const styles = `
+  .swiper {
+    overflow: hidden !important;
+  }
+  
+  .swiper-scrollbar {
+    display: none !important;
+  }
+  
+  .swiper-scrollbar-drag {
+    display: none !important;
+  }
+  
+  /* Hide scrollbar for Chrome, Safari and Opera */
+  .swiper::-webkit-scrollbar {
+    display: none;
+  }
+  
+  /* Hide scrollbar for IE, Edge and Firefox */
+  .swiper {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.textContent = styles;
+  document.head.appendChild(styleSheet);
+}
 
 export default CategoriesDesktop;

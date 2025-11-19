@@ -307,6 +307,15 @@ export default async function handler(req, res) {
       }
     }
 
+    // ===== SEARCH POPULAR =====
+    if (pathname === '/api/search/popular') {
+      if (req.method === 'GET') {
+        // Return default popular searches
+        const popularSearches = ['آيفون', 'سامسونج', 'لابتوب', 'ساعة ذكية', 'سماعات', 'تابلت', 'كاميرا', 'شاشة'];
+        return res.json({ ok: true, searches: popularSearches });
+      }
+    }
+
     // ===== HEALTH CHECK =====
     if (pathname === '/api/health') {
       return res.json({ ok: true, status: 'healthy', timestamp: new Date().toISOString() });
