@@ -33,8 +33,9 @@ export default async function handler(req, res) {
     const url = new URL(req.url, 'http://localhost');
     const pathname = url.pathname;
 
-    console.log(`[CATCH-ALL] ${req.method} ${pathname}`);
+    console.log(`[CATCH-ALL] CALLED - ${req.method} ${pathname}`);
     console.log(`[CATCH-ALL] Full URL: ${req.url}`);
+    console.log(`[CATCH-ALL] Query:`, req.query);
 
     // Connect to MongoDB for all endpoints
     await connectMongoDB();
