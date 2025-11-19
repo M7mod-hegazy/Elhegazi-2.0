@@ -7,31 +7,30 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
 
   try {
-    // Parse body - handle both JSON and form data
-    let email, password;
+    let body = req.body;
     
-    if (typeof req.body === 'string') {
+    // Manually parse body if it's a string
+    if (typeof body === 'string') {
       try {
-        const parsed = JSON.parse(req.body);
-        email = parsed.email;
-        password = parsed.password;
-      } catch {
-        return res.status(400).json({ ok: false, error: 'Invalid JSON' });
+        body = JSON.parse(body);
+      } catch (e) {
+        console.error('[AUTH/LOGIN] Failed to parse body:', e);
+        return res.status(400).json({ ok: false, error: 'Invalid JSON body' });
       }
-    } else {
-      email = req.body?.email;
-      password = req.body?.password;
     }
+
+    const email = body?.email?.trim?.() || body?.email;
+    const password = body?.password?.trim?.() || body?.password;
     
-    console.log('[AUTH/LOGIN] Received body:', { 
-      bodyType: typeof req.body,
-      bodyKeys: req.body ? Object.keys(req.body) : 'none',
-      email, 
-      password: password ? '***' : 'empty' 
+    console.log('[AUTH/LOGIN] Request:', { 
+      method: req.method,
+      bodyType: typeof body,
+      email: email || 'MISSING',
+      hasPassword: !!password
     });
     
     if (!email || !password) {
-      console.log('[AUTH/LOGIN] Missing email or password');
+      console.log('[AUTH/LOGIN] ✗ Missing credentials');
       return res.status(400).json({ ok: false, error: 'email and password required' });
     }
 
@@ -39,15 +38,18 @@ export default async function handler(req, res) {
     const ADMIN_EMAIL = 'admin@elhegazi.com';
     const ADMIN_PASSWORD = 'admin123';
 
-    console.log('[AUTH/LOGIN] Checking:', { 
-      email, 
-      expectedEmail: ADMIN_EMAIL, 
-      emailMatch: email === ADMIN_EMAIL,
-      passwordMatch: password === ADMIN_PASSWORD
+    const emailMatch = email === ADMIN_EMAIL;
+    const passwordMatch = password === ADMIN_PASSWORD;
+
+    console.log('[AUTH/LOGIN] Credentials check:', { 
+      emailMatch,
+      passwordMatch,
+      email,
+      password: '***'
     });
 
-    if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      console.log('[AUTH/LOGIN] ✓ Login successful');
+    if (emailMatch && passwordMatch) {
+      console.log('[AUTH/LOGIN] ✓ Success');
       return res.json({
         ok: true,
         user: {
@@ -65,7 +67,7 @@ export default async function handler(req, res) {
     console.log('[AUTH/LOGIN] ✗ Invalid credentials');
     return res.status(401).json({ ok: false, error: 'Invalid credentials' });
   } catch (error) {
-    console.error('[AUTH/LOGIN] Error:', error);
+    console.error('[AUTH/LOGIN] Exception:', error);
     return res.status(500).json({ ok: false, error: error.message });
   }
 }
