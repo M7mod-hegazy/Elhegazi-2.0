@@ -419,10 +419,10 @@ const Categories = () => {
                         </div>
                       )}
 
-                      {/* Split Screen Layout */}
-                      <div className="flex h-80">
-                        {/* Left Side - Category Info (40%) */}
-                        <div className="w-2/5 bg-gradient-to-br from-slate-50 to-slate-100 p-8 flex flex-col justify-between relative overflow-hidden">
+                      {/* Mobile: Vertical Layout | Desktop: Split Screen Layout */}
+                      <div className="flex flex-col sm:flex-row h-auto sm:h-80">
+                        {/* Left Side - Category Info (100% on mobile, 40% on desktop) */}
+                        <div className="w-full sm:w-2/5 bg-gradient-to-br from-slate-50 to-slate-100 p-4 sm:p-8 flex flex-col justify-between relative overflow-hidden">
                           {/* Category Image Background Overlay - 20% opacity behind text */}
                           {category.image && (
                             <div className="absolute inset-0 opacity-20 z-0">
@@ -453,8 +453,8 @@ const Categories = () => {
                             </div>
                             
                             {/* Mobile-Optimized Category Name with Product Count */}
-                            <div className="flex items-center gap-2 sm:gap-3 mb-2 sm:mb-3 animate-slide-in-left group-hover:translate-x-1 transition-transform duration-300" style={{ animationDelay: '300ms', animationDuration: '800ms', animationFillMode: 'both' }}>
-                              <h3 className="text-lg sm:text-xl lg:text-2xl font-bold text-slate-900 group-hover:text-primary transition-all duration-300 leading-tight flex-1 min-w-0 group-hover:scale-105">
+                            <div className="flex items-start sm:items-center gap-2 sm:gap-3 mb-2 sm:mb-3 animate-slide-in-left group-hover:translate-x-1 transition-transform duration-300" style={{ animationDelay: '300ms', animationDuration: '800ms', animationFillMode: 'both' }}>
+                              <h3 className="text-base sm:text-lg lg:text-xl font-bold text-slate-900 group-hover:text-primary transition-all duration-300 leading-tight flex-1 min-w-0 group-hover:scale-105">
                                 {category.nameAr}
                               </h3>
                               <div 
@@ -470,9 +470,9 @@ const Categories = () => {
                             </div>
                             <p className="text-slate-600 text-xs sm:text-sm mb-3 sm:mb-4 lg:mb-6 opacity-80 group-hover:opacity-100 group-hover:text-slate-700 transition-all duration-300">{category.name}</p>
                             
-                            {/* Mobile-Optimized Category Description */}
+                            {/* Mobile-Optimized Category Description - Hidden on mobile, shown on desktop */}
                             {(category.descriptionAr || category.description) && (
-                              <div className="bg-white/60 rounded-lg sm:rounded-xl p-2 sm:p-3 animate-slide-in-left group-hover:bg-white/80 group-hover:shadow-md group-hover:scale-105 transition-all duration-300" style={{ animationDelay: '500ms', animationDuration: '800ms', animationFillMode: 'both' }}>
+                              <div className="hidden sm:block bg-white/60 rounded-lg sm:rounded-xl p-2 sm:p-3 animate-slide-in-left group-hover:bg-white/80 group-hover:shadow-md group-hover:scale-105 transition-all duration-300" style={{ animationDelay: '500ms', animationDuration: '800ms', animationFillMode: 'both' }}>
                                 <div className="text-xs font-medium text-slate-700 mb-1 sm:mb-2 group-hover:text-primary transition-colors duration-300">الوصف</div>
                                 <div className="text-xs sm:text-sm text-slate-600 line-clamp-2 leading-relaxed group-hover:text-slate-800 transition-colors duration-300">
                                   {category.descriptionAr || category.description}
@@ -481,25 +481,25 @@ const Categories = () => {
                             )}
                           </div>
 
-                          {/* Enhanced Action Button with Invitation */}
+                          {/* Enhanced Action Button with Invitation - Responsive sizing */}
                           <div className="relative z-10 animate-slide-in-left group-hover:translate-x-2 transition-transform duration-300" style={{ animationDelay: '700ms', animationDuration: '800ms', animationFillMode: 'both' }}>
-                            <div className="bg-gradient-to-r from-primary/10 to-primary/20 rounded-xl p-3 group-hover:from-primary group-hover:to-primary/80 group-hover:shadow-lg transition-all duration-300">
-                              <div className="flex items-center gap-3 text-primary group-hover:text-white font-bold group-hover:gap-4 transition-all duration-300">
-                                <span className="text-lg group-hover:scale-110 transition-transform duration-300">استكشف الآن</span>
-                                <ArrowRight className="w-6 h-6 rtl-flip transform group-hover:scale-125 group-hover:translate-x-2 group-hover:rotate-12 transition-all duration-300" />
+                            <div className="bg-gradient-to-r from-primary/10 to-primary/20 rounded-lg sm:rounded-xl p-2 sm:p-3 group-hover:from-primary group-hover:to-primary/80 group-hover:shadow-lg transition-all duration-300">
+                              <div className="flex items-center gap-2 sm:gap-3 text-primary group-hover:text-white font-bold group-hover:gap-4 transition-all duration-300">
+                                <span className="text-sm sm:text-lg group-hover:scale-110 transition-transform duration-300">استكشف الآن</span>
+                                <ArrowRight className="w-4 h-4 sm:w-6 sm:h-6 rtl-flip transform group-hover:scale-125 group-hover:translate-x-2 group-hover:rotate-12 transition-all duration-300" />
                               </div>
-                              <div className="text-xs text-slate-600 group-hover:text-white/90 mt-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
+                              <div className="hidden sm:block text-xs text-slate-600 group-hover:text-white/90 mt-1 opacity-0 group-hover:opacity-100 transition-all duration-300 transform translate-y-2 group-hover:translate-y-0">
                                 اكتشف {category.productCount} منتج مميز
                               </div>
                             </div>
                           </div>
                         </div>
 
-                        {/* Right Side - Product Mosaic (60%) */}
-                        <div className="w-3/5 relative overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
+                        {/* Right Side - Product Mosaic (100% on mobile, 60% on desktop) */}
+                        <div className="w-full sm:w-3/5 relative overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 min-h-48 sm:min-h-auto">
                           
-                          {/* Flexible Product Grid */}
-                          <div className="h-full p-3 relative z-10">
+                          {/* Flexible Product Grid - Responsive Padding */}
+                          <div className="h-full p-2 sm:p-3 relative z-10">
                             {(() => {
                               const previewProducts = getCategoryPreviewProducts(category);
                               const totalProducts = category.productCount || 0;
