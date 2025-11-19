@@ -72,12 +72,16 @@ export default async function handler(req, res) {
     // ===== PRODUCTS =====
     if (pathname === '/api/products/:id' || pathname.match(/^\/api\/products\/[^/?]+$/)) {
       const id = pathname.split('/').pop();
-      console.log('[CATCH-ALL] GET /api/products/:id', { id });
+      console.log('[CATCH-ALL] GET /api/products/:id', { id, pathname });
       if (req.method === 'GET') {
+        console.log('[CATCH-ALL] Searching for product:', id);
         const prod = await Product.findById(id).lean().maxTimeMS(8000);
+        console.log('[CATCH-ALL] Product found:', prod ? 'YES' : 'NO', prod ? { _id: prod._id, name: prod.name } : 'null');
         if (!prod) {
+          console.log('[CATCH-ALL] Product not found, returning 404');
           return res.status(404).json({ ok: false, error: 'Product not found' });
         }
+        console.log('[CATCH-ALL] Returning product');
         return res.json({ ok: true, item: prod });
       }
       if (req.method === 'PUT') {

@@ -7,9 +7,28 @@ export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'Method not allowed' });
 
   try {
-    const { email, password } = req.body || {};
+    // Parse body - handle both JSON and form data
+    let email, password;
     
-    console.log('[AUTH/LOGIN] Received:', { email, password: password ? '***' : 'empty' });
+    if (typeof req.body === 'string') {
+      try {
+        const parsed = JSON.parse(req.body);
+        email = parsed.email;
+        password = parsed.password;
+      } catch {
+        return res.status(400).json({ ok: false, error: 'Invalid JSON' });
+      }
+    } else {
+      email = req.body?.email;
+      password = req.body?.password;
+    }
+    
+    console.log('[AUTH/LOGIN] Received body:', { 
+      bodyType: typeof req.body,
+      bodyKeys: req.body ? Object.keys(req.body) : 'none',
+      email, 
+      password: password ? '***' : 'empty' 
+    });
     
     if (!email || !password) {
       console.log('[AUTH/LOGIN] Missing email or password');
@@ -20,7 +39,12 @@ export default async function handler(req, res) {
     const ADMIN_EMAIL = 'admin@elhegazi.com';
     const ADMIN_PASSWORD = 'admin123';
 
-    console.log('[AUTH/LOGIN] Checking:', { email, expectedEmail: ADMIN_EMAIL, match: email === ADMIN_EMAIL });
+    console.log('[AUTH/LOGIN] Checking:', { 
+      email, 
+      expectedEmail: ADMIN_EMAIL, 
+      emailMatch: email === ADMIN_EMAIL,
+      passwordMatch: password === ADMIN_PASSWORD
+    });
 
     if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
       console.log('[AUTH/LOGIN] ✓ Login successful');
@@ -32,7 +56,7 @@ export default async function handler(req, res) {
           firstName: 'Admin',
           lastName: 'User',
           phone: '+966 12 345 6789',
-          role: 'SuperAdmin',
+          role: 'admin',
           isActive: true
         }
       });
