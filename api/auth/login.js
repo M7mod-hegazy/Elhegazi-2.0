@@ -1,3 +1,27 @@
+import mongoose from 'mongoose';
+import dotenv from 'dotenv';
+
+dotenv.config();
+
+let mongoConnection = null;
+
+async function connectMongoDB() {
+  if (mongoConnection && mongoConnection.readyState === 1) {
+    return mongoConnection;
+  }
+  try {
+    mongoConnection = await mongoose.connect(process.env.MONGODB_URI, {
+      dbName: process.env.MONGODB_DB || 'appdb',
+      maxPoolSize: 2,
+      serverSelectionTimeoutMS: 8000,
+      socketTimeoutMS: 45000,
+    });
+    return mongoConnection;
+  } catch (error) {
+    throw error;
+  }
+}
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -23,8 +47,6 @@ export default async function handler(req, res) {
     const password = body?.password?.trim?.() || body?.password;
     
     console.log('[AUTH/LOGIN] Request:', { 
-      method: req.method,
-      bodyType: typeof body,
       email: email || 'MISSING',
       hasPassword: !!password
     });
@@ -34,38 +56,51 @@ export default async function handler(req, res) {
       return res.status(400).json({ ok: false, error: 'email and password required' });
     }
 
-    // Hardcoded admin credentials
-    const ADMIN_EMAIL = 'admin@elhegazi.com';
-    const ADMIN_PASSWORD = 'admin123';
+    // Connect to MongoDB and check user
+    await connectMongoDB();
+    const { default: User } = await import('../server/models/User.js');
 
-    const emailMatch = email === ADMIN_EMAIL;
-    const passwordMatch = password === ADMIN_PASSWORD;
+    console.log('[AUTH/LOGIN] Looking up user:', email);
+    const user = await User.findOne({ email }).lean().maxTimeMS(8000);
 
-    console.log('[AUTH/LOGIN] Credentials check:', { 
-      emailMatch,
-      passwordMatch,
-      email,
-      password: '***'
-    });
-
-    if (emailMatch && passwordMatch) {
-      console.log('[AUTH/LOGIN] ✓ Success');
-      return res.json({
-        ok: true,
-        user: {
-          id: 'admin-001',
-          email: ADMIN_EMAIL,
-          firstName: 'Admin',
-          lastName: 'User',
-          phone: '+966 12 345 6789',
-          role: 'admin',
-          isActive: true
-        }
-      });
+    if (!user) {
+      console.log('[AUTH/LOGIN] ✗ User not found:', email);
+      return res.status(401).json({ ok: false, error: 'Invalid credentials' });
     }
 
-    console.log('[AUTH/LOGIN] ✗ Invalid credentials');
-    return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+    console.log('[AUTH/LOGIN] User found:', { email, role: user.role, isActive: user.isActive });
+
+    // Check password
+    if (user.password !== password) {
+      console.log('[AUTH/LOGIN] ✗ Password mismatch');
+      return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+    }
+
+    // Check if user is admin
+    if (user.role !== 'admin') {
+      console.log('[AUTH/LOGIN] ✗ User is not admin, role:', user.role);
+      return res.status(403).json({ ok: false, error: 'User does not have admin access' });
+    }
+
+    // Check if user is active
+    if (!user.isActive) {
+      console.log('[AUTH/LOGIN] ✗ User is not active');
+      return res.status(403).json({ ok: false, error: 'User account is inactive' });
+    }
+
+    console.log('[AUTH/LOGIN] ✓ Login successful for:', email);
+    return res.json({
+      ok: true,
+      user: {
+        id: user._id.toString(),
+        email: user.email,
+        firstName: user.firstName || '',
+        lastName: user.lastName || '',
+        phone: user.phone,
+        role: user.role,
+        isActive: user.isActive
+      }
+    });
   } catch (error) {
     console.error('[AUTH/LOGIN] Exception:', error);
     return res.status(500).json({ ok: false, error: error.message });
