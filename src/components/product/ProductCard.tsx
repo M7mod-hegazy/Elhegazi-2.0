@@ -146,7 +146,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
             >
               {/* Main Image */}
               <SwiperSlide>
-                <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
+                <Link to={`/product/${product.id}`} state={{ product }} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
                   <img
                     src={optimizeImage(product.image, { w: 320 })}
                     alt={product.nameAr}
@@ -163,7 +163,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
               {/* Additional Images */}
               {product.images && product.images.length > 0 && product.images.slice(0, 4).map((img, idx) => (
                 <SwiperSlide key={idx}>
-                  <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
+                  <Link to={`/product/${product.id}`} state={{ product }} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
                     <img
                       src={optimizeImage(img, { w: 320 })}
                       alt={`${product.nameAr} - ${idx + 1}`}
@@ -215,7 +215,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                 <>
                   {showQuickView && (
                     <Button size="icon" variant="outline" className="group w-10 h-10 md:w-11 md:h-11 rounded-full bg-white/90 hover:bg-white border border-slate-200 hover:border-primary/30 hover:ring-2 hover:ring-primary/20 shadow-sm hover:shadow-md transition-all" asChild>
-                      <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="w-full h-full flex items-center justify-center">
+                      <Link to={`/product/${product.id}`} state={{ product }} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="w-full h-full flex items-center justify-center">
                         <Eye className="w-4 h-4 text-slate-600 group-hover:text-primary transition-colors" />
                       </Link>
                     </Button>
@@ -244,7 +244,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
 
           {/* Content */}
           <div className="p-4 flex flex-col transition-all duration-300 group-hover:bg-slate-50 relative z-10 bg-white h-full">
-            <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()}>
+            <Link to={`/product/${product.id}`} state={{ product }} onClick={(e) => e.stopPropagation()}>
               <h3 className="font-bold text-slate-900 text-sm sm:text-base line-clamp-2 group-hover:text-blue-600 transition-colors duration-300 leading-tight tracking-tight">
                 {product.nameAr}
               </h3>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { 
   ArrowLeft, 
   Star, 
@@ -1251,6 +1251,7 @@ const DesktopProductDetail = ({
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
   const { addItem, isInCart, getItemByProductId } = useCart();
   const { toast } = useToast();
   const { isMobile } = useDeviceDetection();
@@ -1279,8 +1280,16 @@ const ProductDetail = () => {
     (async () => {
       try {
         setLoading(true);
-        const res = await apiGet<ApiProduct>(`/api/products/${id}`);
-        const item = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).item as ApiProduct | undefined;
+        
+        // Try to get product from location state first (passed from product list)
+        let item: ApiProduct | undefined = (location.state as any)?.product;
+        
+        // If not in state, fetch from API
+        if (!item) {
+          const res = await apiGet<ApiProduct>(`/api/products/${id}`);
+          item = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).item as ApiProduct | undefined;
+        }
+        
         if (!item) throw new Error('Product not found');
 
         // Fetch categories to resolve Arabic name and fetch related products by category slug
