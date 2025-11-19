@@ -291,8 +291,87 @@ export default async function handler(req, res) {
       }
     }
 
+    // ===== DEBUG SEED PRODUCTS =====
+    if (pathname === '/api/debug/seed-products') {
+      const { default: Product } = await import('../server/models/Product.js');
+      
+      if (req.method === 'GET') {
+        const count = await Product.countDocuments({});
+        return res.json({ ok: true, count, message: 'Use POST to seed products' });
+      }
+      
+      if (req.method === 'POST') {
+        const testProducts = [
+          {
+            name: 'Test Product 1',
+            nameAr: 'منتج اختبار 1',
+            sku: 'TEST-001',
+            price: 99.99,
+            originalPrice: 149.99,
+            description: 'This is a test product',
+            descriptionAr: 'هذا منتج اختبار',
+            image: 'https://via.placeholder.com/400x400?text=Product+1',
+            images: ['https://via.placeholder.com/400x400?text=Product+1'],
+            categorySlug: 'test-category',
+            stock: 10,
+            featured: true,
+            active: true,
+            rating: 4.5,
+            reviews: 5,
+            tags: ['test', 'sample']
+          },
+          {
+            name: 'Test Product 2',
+            nameAr: 'منتج اختبار 2',
+            sku: 'TEST-002',
+            price: 149.99,
+            originalPrice: 199.99,
+            description: 'This is another test product',
+            descriptionAr: 'هذا منتج اختبار آخر',
+            image: 'https://via.placeholder.com/400x400?text=Product+2',
+            images: ['https://via.placeholder.com/400x400?text=Product+2'],
+            categorySlug: 'test-category',
+            stock: 15,
+            featured: true,
+            active: true,
+            rating: 4.8,
+            reviews: 8,
+            tags: ['test', 'sample']
+          },
+          {
+            name: 'Test Product 3',
+            nameAr: 'منتج اختبار 3',
+            sku: 'TEST-003',
+            price: 199.99,
+            originalPrice: 299.99,
+            description: 'Premium test product',
+            descriptionAr: 'منتج اختبار متميز',
+            image: 'https://via.placeholder.com/400x400?text=Product+3',
+            images: ['https://via.placeholder.com/400x400?text=Product+3'],
+            categorySlug: 'test-category',
+            stock: 5,
+            featured: true,
+            active: true,
+            rating: 5,
+            reviews: 12,
+            tags: ['test', 'premium']
+          }
+        ];
+
+        await Product.deleteMany({});
+        const inserted = await Product.insertMany(testProducts);
+        
+        return res.json({
+          ok: true,
+          message: `Seeded ${inserted.length} test products`,
+          products: inserted.map(p => ({ _id: p._id, name: p.name, nameAr: p.nameAr }))
+        });
+      }
+    }
+
     // 404 for unhandled routes
-    return res.status(404).json({ ok: false, error: 'Not found' });
+    console.log('[CATCH-ALL] 404 - No handler for:', pathname);
+    return res.status(404).json({ ok: false, error: 'Not found', pathname });
   } catch (error) {
     console.error('[CATCH-ALL] Error:', error);
     return res.status(500).json({ ok: false, error: error.message });
