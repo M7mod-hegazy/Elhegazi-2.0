@@ -197,7 +197,7 @@ const ShopBuilderContent = () => {
       // Enter fullscreen only on first entry
       if (floorplanDiv.requestFullscreen) {
         floorplanDiv.requestFullscreen().catch(err => {
-          console.log('Could not enter fullscreen:', err);
+
         });
         setHasEnteredFullscreen(true);
       }
@@ -207,7 +207,7 @@ const ShopBuilderContent = () => {
       setHasEnteredFullscreen(false);
       if (document.fullscreenElement === floorplanDiv) {
         document.exitFullscreen().catch(err => {
-          console.log('Could not exit fullscreen:', err);
+
         });
       }
     }

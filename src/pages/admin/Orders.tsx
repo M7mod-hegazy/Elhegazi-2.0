@@ -589,18 +589,18 @@ const AdminOrders = () => {
     
     // Use same logic as checkbox
     setSelectedOrders(prev => {
-      console.log('Row clicked, orderId:', orderId);
-      console.log('Current selection:', prev);
+
+
       const isSelected = prev.includes(orderId);
-      console.log('Is selected:', isSelected);
+
       
       if (isSelected) {
         const newSelection = prev.filter(id => id !== orderId);
-        console.log('Removing, new selection:', newSelection);
+
         return newSelection;
       } else {
         const newSelection = [...prev, orderId];
-        console.log('Adding, new selection:', newSelection);
+
         return newSelection;
       }
     });
@@ -1258,20 +1258,20 @@ const AdminOrders = () => {
                             onClick={(e) => {
                               e.stopPropagation();
                               const orderId = order._id || order.id;
-                              console.log('Checkbox div clicked, orderId:', orderId);
-                              console.log('Current selection:', selectedOrders);
+
+
                               
                               setSelectedOrders(prev => {
                                 const isCurrentlySelected = prev.includes(orderId);
-                                console.log('Is currently selected:', isCurrentlySelected);
+
                                 
                                 if (isCurrentlySelected) {
                                   const newSelection = prev.filter(id => id !== orderId);
-                                  console.log('Removing, new selection:', newSelection);
+
                                   return newSelection;
                                 } else {
                                   const newSelection = [...prev, orderId];
-                                  console.log('Adding, new selection:', newSelection);
+
                                   return newSelection;
                                 }
                               });

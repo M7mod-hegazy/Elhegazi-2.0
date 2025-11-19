@@ -704,7 +704,7 @@ export default function AdminShareholders() {
           });
           
           if (response.ok) {
-            console.log(`✅ Updated report ${baseReportId}: removed shareholder ${shareholderId}`);
+
             // Refresh reports to show updated data
             const reportsResp = await apiGet<ProfitReport>('/api/profit-reports');
             if (reportsResp.ok) {

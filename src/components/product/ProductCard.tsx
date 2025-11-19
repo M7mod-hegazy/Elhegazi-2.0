@@ -35,11 +35,6 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
   const { isAuthenticated, isAdmin } = useDualAuth();
   const { toast } = useToast();
   const { hidePrices, contactMessage, loading: pricingLoading } = usePricingSettings();
-  
-  // Debug logging
-  console.log('🎯 ProductCard - hidePrices:', hidePrices, 'type:', typeof hidePrices, 'loading:', pricingLoading, 'product:', product.nameAr);
-  console.log('🎯 ProductCard - Conditional check: hidePrices === true?', hidePrices === true);
-  console.log('🎯 ProductCard - Price value:', product.price, 'Should show contact?', hidePrices === true);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();

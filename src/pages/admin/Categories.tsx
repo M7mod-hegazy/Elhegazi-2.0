@@ -311,7 +311,7 @@ const Categories = () => {
     if (currentProducts.includes(productId)) {
       // Remove product
       const newProducts = currentProducts.filter(id => id !== productId);
-      console.log('➖ REMOVING PRODUCT - New list:', newProducts);
+
       setFormData(prev => ({
         ...prev,
         previewProducts: newProducts
@@ -319,14 +319,14 @@ const Categories = () => {
     } else if (currentProducts.length < 3) {
       // Add product only if under limit of 3
       const newProducts = [...currentProducts, productId];
-      console.log('➕ ADDING PRODUCT - New list:', newProducts);
+
       setFormData(prev => ({
         ...prev,
         previewProducts: newProducts
       }));
     } else {
       // Show toast when trying to select more than 3
-      console.log('❌ LIMIT REACHED - Cannot add more products');
+
       toast({
         title: "تحذير",
         description: "يمكن اختيار 3 منتجات كحد أقصى للمعاينة",
@@ -473,12 +473,12 @@ const Categories = () => {
           useRandomPreview: false, // Always false since we removed the choice
           previewProducts: formData.previewProducts,
         };
-        console.log('🔄 SAVING CATEGORY - Full payload:', payload);
-        console.log('🎯 Preview products being saved:', payload.previewProducts);
-        console.log('📝 Form data before save:', formData);
+
+
+
         
         const response = await apiPutJson<CategoryItemResponse, typeof payload>(`/api/categories/${editingCategory.id}`, payload);
-        console.log('✅ API response after save:', response);
+
         
         if (response && response.ok) {
           const item = (response as any).item;
@@ -497,7 +497,7 @@ const Categories = () => {
         ));
         
         await refetch();
-        console.log('Refetch completed');
+
         toast({
           title: "تم التحديث بنجاح",
           description: "تم تحديث الفئة بنجاح",

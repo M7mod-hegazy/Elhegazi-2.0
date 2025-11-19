@@ -166,7 +166,7 @@ const AdminSettings = () => {
         }
         const s = (res.item ?? null) as SettingsDoc | null;
         if (s) {
-          console.log(' Loading settings:', s);
+
           
           // Normalize: prefer defaults when API returns empty strings
           if (s.storeInfo) {
@@ -179,8 +179,8 @@ const AdminSettings = () => {
             setStoreInfo(next);
           }
           if (s.social) {
-            console.log('🔧 Settings - API social data:', s.social);
-            console.log('🔧 Settings - API whatsappUrl:', s.social.whatsappUrl);
+
+
             setSocial({
               facebookUrl: s.social.facebookUrl || '',
               messengerUrl: s.social.messengerUrl || '',
@@ -191,11 +191,11 @@ const AdminSettings = () => {
 
           // Set theme settings (logo removed - now using fixed iconPng.png)
           if (s.theme) {
-            console.log('Loading theme from settings:', s.theme);
+
             if (s.theme.primaryColor) setPrimaryColor(s.theme.primaryColor);
             if (s.theme.secondaryColor) setSecondaryColor(s.theme.secondaryColor);
           } else {
-            console.log('No theme in settings');
+
           }
           
           // Set checkout settings
@@ -257,14 +257,14 @@ const AdminSettings = () => {
             hidePrices
           }
         };
-        console.log('🔧 Settings - Saving settings to API:', body);
-        console.log('🔧 Settings - Social data being saved:', social);
-        console.log('🔧 Settings - WhatsApp URL being saved:', social.whatsappUrl);
+
+
+
         const headers: Record<string, string> = {};
         const adminSecret = localStorage.getItem('ADMIN_SECRET');
         if (adminSecret) headers['x-admin-secret'] = adminSecret;
         const res = await apiPutJson<SettingsDoc, typeof body>('/api/settings', body, headers);
-        console.log('API response:', res);
+
         if (!res.ok) {
           throw new Error('error' in res ? res.error : 'Save failed');
         }
@@ -306,7 +306,7 @@ const AdminSettings = () => {
 
 
   const handleSaveTheme = async () => {
-    console.log('Saving theme colors:', { primaryColor, secondaryColor });
+
     try {
       // Clear theme cache before saving
       clearThemeCache();
@@ -323,7 +323,7 @@ const AdminSettings = () => {
         throw new Error('error' in res ? res.error : 'Save failed');
       }
       
-      console.log('Theme saved successfully');
+
       toast({ title: 'تم الحفظ', description: 'سيتم تحديث الصفحة لتطبيق التغييرات' });
       
       // Clear cache again after successful save
@@ -784,9 +784,9 @@ const AdminSettings = () => {
                                 }
                                 // Build WhatsApp URL and save it
                                 const whatsappUrl = phone ? `https://wa.me/${phone}` : '';
-                                console.log('🔧 Settings - WhatsApp phone input:', e.target.value);
-                                console.log('🔧 Settings - Formatted phone:', phone);
-                                console.log('🔧 Settings - WhatsApp URL to save:', whatsappUrl);
+
+
+
                                 setSocial({ ...social, whatsappUrl });
                               }}
                             />
@@ -1126,13 +1126,13 @@ const AdminSettings = () => {
 
                   <Button 
                     onClick={async () => {
-                      console.log('🔵 Saving pricing settings - hidePrices:', hidePrices);
+
                       try {
                         await saveSettings(false, 'pricing');
-                        console.log('✅ Pricing settings saved successfully');
+
                         
                         // Force refresh all pages by clearing cache and reloading
-                        console.log('🔄 Forcing page refresh to apply changes...');
+
                         localStorage.clear();
                         
                         // Wait a moment then reload

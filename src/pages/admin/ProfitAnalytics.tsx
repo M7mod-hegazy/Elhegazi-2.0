@@ -124,7 +124,7 @@ export default function ProfitAnalytics() {
     const balanceValues: number[] = [];
     const netProfitStorageDiffValues: number[] = [];
     
-    console.log('Processing reports:', reports.length);
+
     
     // Aggregate data from reports
     reports.forEach((report, index) => {
@@ -271,8 +271,8 @@ export default function ProfitAnalytics() {
       if (response.ok && response.items) {
         const reports: ProfitReportData[] = response.items;
         
-        console.log('All reports:', reports.length);
-        console.log('Date range:', dateRange);
+
+
         
         // Filter reports by date range - more flexible date comparison
         const filteredReports = reports.filter((singleReport) => {
@@ -295,11 +295,11 @@ export default function ProfitAnalytics() {
           return overlaps;
         }).sort((a, b) => new Date(a.endDate).getTime() - new Date(b.endDate).getTime());
 
-        console.log('Filtered reports:', filteredReports.length);
+
         
         if (filteredReports.length === 0) {
           // Show warning but don't immediately fall back to mock data
-          console.log('No reports found in date range, showing all available reports');
+
           
           // Try showing all reports if date filter is too restrictive
           if (reports.length > 0) {

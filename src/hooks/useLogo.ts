@@ -57,5 +57,5 @@ export async function preloadLogo(): Promise<LogoData> {
  * Legacy compatibility - no longer needed with fixed logo system
  */
 export function clearLogoCache() {
-  console.log('clearLogoCache called - no longer needed with fixed logo system');
+
 }

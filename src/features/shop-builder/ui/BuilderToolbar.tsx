@@ -156,8 +156,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       
       const response = await apiGet<{ items: Product3D[] }>(`/api/products-3d?${params.toString()}`);
       if (response.ok && response.items) {
-        console.log('✅ Fetched 3D products:', response.items.length, 'products');
-        console.log('📦 Products:', response.items);
+
+
         setProducts3D(response.items as unknown as Product3D[]);
       } else {
         console.error('❌ Failed to fetch products:', response);
@@ -210,8 +210,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
   // Handle search input with suggestions
   const handleSearchChange = (value: string) => {
-    console.log('🔍 Search changed:', value);
-    console.log('📦 Products3D available:', products3D.length);
+
+
     setSearchTerm(value);
     
     if (value.trim().length >= 2) {
@@ -223,18 +223,18 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
         p.category.toLowerCase().includes(value.toLowerCase())
       ).slice(0, 5);
       
-      console.log('✅ Filtered suggestions:', filtered.length, filtered);
+
       setSearchSuggestions(filtered);
       setShowSuggestions(true);
-      console.log('👁️ showSuggestions set to TRUE');
+
     } else if (value.trim().length === 0) {
       // When search is cleared, show recommendations again
-      console.log('🔄 Search cleared, loading recommendations');
+
       setSearchSuggestions([]);
       loadRecommendations();
       setShowSuggestions(true);
     } else {
-      console.log('❌ Search too short, hiding suggestions');
+
       setShowSuggestions(false);
       setSearchSuggestions([]);
     }

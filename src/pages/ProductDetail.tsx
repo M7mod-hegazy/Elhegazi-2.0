@@ -678,7 +678,7 @@ const MobileProductDetail = ({
                   productId={product._id} 
                   onRatingSubmit={(rating, review) => {
                     // In a real implementation, you would update the product rating
-                    console.log('Rating submitted:', { rating, review });
+
                   }}
                 />
               </div>
@@ -1183,7 +1183,7 @@ const DesktopProductDetail = ({
                       productId={product._id} 
                       onRatingSubmit={(rating, review) => {
                         // In a real implementation, you would update the product rating
-                        console.log('Rating submitted:', { rating, review });
+
                       }}
                     />
                   </div>
@@ -1341,14 +1341,14 @@ const ProductDetail = () => {
         // Fetch real rating history from backend
         let realRatingHistory: RatingHistory[] = [];
         try {
-          console.log(`Fetching ratings for product ID: ${item._id}`);
+
           const ratingsRes = await apiGet<RatingHistory>(`/api/products/${item._id}/ratings`);
-          console.log('Ratings API response:', ratingsRes);
+
           
           // Check if the response has items
           if ('items' in ratingsRes && ratingsRes.ok) {
             const ratingsItems = ratingsRes.items ?? [];
-            console.log('Ratings items:', ratingsItems);
+
             
             realRatingHistory = ratingsItems.map(rating => ({
               ...rating,
@@ -1356,14 +1356,14 @@ const ProductDetail = () => {
               date: new Date(rating.date).toISOString()
             }));
             
-            console.log('Processed rating history:', realRatingHistory);
+
           } else {
-            console.log('No ratings found for this product');
+
           }
         } catch (ratingError) {
           console.warn('Failed to fetch ratings from backend:', ratingError);
           // We'll use empty array instead of fallback data to make it clear there are no ratings
-          console.log('No rating data available, using empty array');
+
         }
 
         if (isMounted) {
@@ -1631,7 +1631,7 @@ const ProductDetail = () => {
         productName={product.nameAr || product.name}
         onRatingSubmit={(rating, review) => {
           // In a real implementation, you would update the product rating
-          console.log('Rating submitted:', { rating, review });
+
         }}
         averageRating={product.rating || 0}
         totalReviews={product.reviews || 0}

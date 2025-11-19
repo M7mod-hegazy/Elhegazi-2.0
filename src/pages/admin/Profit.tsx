@@ -462,7 +462,7 @@ export default function AdminProfit() {
             });
           });
           if (migrationCount > 0) {
-            console.log(`✅ Migrated ${migrationCount} transactions to include active field`);
+
           }
           
           const loadedExpenseTypes = item.expenseTypes && typeof item.expenseTypes === 'object' 
@@ -744,7 +744,7 @@ export default function AdminProfit() {
         txn.reportId?.startsWith(`${effectiveReportId}_`)
       );
       
-      console.log(`🔍 ${s.name} - Selected: ${isSelected}, Existing txn: ${existingTxn ? 'Yes' : 'No'}`);
+
       
       // Get balance before this report
       const lastNonReportTxn = existingHistory
@@ -969,7 +969,7 @@ export default function AdminProfit() {
         setQuickEditReport(prev => prev ? { ...prev, ...updatedReport } : null);
       }
       
-      console.log('✅ Report saved:', updatedReport.reportName);
+
       
       // Apply distribution for any edited report
       if (updatedReport.affectedShareholders !== undefined) {
@@ -1050,7 +1050,7 @@ export default function AdminProfit() {
               setTitle(doc.title || '');
               setDescription(doc.description || '');
               setReportName(doc.reportName || '');
-              console.log('🔄 Loading report for EDIT - reportName:', doc.reportName);
+
               setLastMonthClosing(Number(doc?.totals?.lastMonthClosing || 0));
               setManualLastMonthValue(false);
               
@@ -1084,18 +1084,18 @@ export default function AdminProfit() {
               // Restore selected shareholders from saved report
               if (doc.affectedShareholders && Array.isArray(doc.affectedShareholders)) {
                 setSelectedShareholders(new Set(doc.affectedShareholders));
-                console.log('👥 Restored selected shareholders:', doc.affectedShareholders);
+
               } else {
                 // No fallback - keep empty selection if none was saved
                 setSelectedShareholders(new Set());
-                console.log('👥 No saved selection found, keeping empty selection');
+
               }
               
               // Preserve report name (set again after other effects might clear it)
               setTimeout(() => {
                 if (doc.reportName && doc.reportName.trim()) {
                   setReportName(doc.reportName);
-                  console.log('📝 Preserved report name after delay:', doc.reportName);
+
                 }
               }, 100);
               
@@ -1141,7 +1141,7 @@ export default function AdminProfit() {
               setTitle(doc.title || '');
               setDescription(doc.description || '');
               setReportName(doc.reportName || '');
-              console.log('🔍 Loading report for VIEW - reportName:', doc.reportName);
+
               setLastMonthClosing(Number(doc?.totals?.lastMonthClosing || 0));
               setManualLastMonthValue(false);
               
@@ -1175,14 +1175,14 @@ export default function AdminProfit() {
               // Restore selected shareholders from saved report (for view mode)
               if (doc.affectedShareholders && Array.isArray(doc.affectedShareholders)) {
                 setSelectedShareholders(new Set(doc.affectedShareholders));
-                console.log('👥 Restored selected shareholders for view:', doc.affectedShareholders);
+
               }
               
               // Preserve report name for view mode
               setTimeout(() => {
                 if (doc.reportName && doc.reportName.trim()) {
                   setReportName(doc.reportName);
-                  console.log('📝 Preserved report name for view:', doc.reportName);
+
                 }
               }, 100);
               
@@ -1453,7 +1453,7 @@ export default function AdminProfit() {
     if (showResults && distributionAppliedRef.current) {
       // Re-apply distribution with new selection
       applyShareholderDistribution(currentReportId, selectedShareholders);
-      console.log('🔄 Re-applied distribution due to shareholder selection change');
+
     }
   }, [selectedShareholders, showResults, currentReportId]);
 
@@ -1597,7 +1597,7 @@ export default function AdminProfit() {
     // Allow empty string, negative sign, numbers, commas, and decimal points
     const numericRegex = /^-?[0-9,]*\.?[0-9]*$/;
     const isValid = numericRegex.test(value);
-    console.log('🔍 validateNumericInputWithNegative:', { value, isValid });
+
     return isValid;
   };
 
@@ -1744,7 +1744,7 @@ export default function AdminProfit() {
     setSaving(true);
     
     // Debug logging for shareholder selection
-    console.log('💾 Saving report with selectedShareholders:', selectedShareholders);
+
     console.log('💾 Converted to array:', Array.from(selectedShareholders));
     
     const payload = {
@@ -2250,7 +2250,7 @@ export default function AdminProfit() {
                           setQuickEditReport(localReport);
                           setShowQuickEditModal(true);
                         } else {
-                          console.log('🌐 Fetching fresh report data from API');
+
                           const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${r._id}`);
                           if (resp.ok) {
                             setQuickEditReport((resp as { ok: true; item: ProfitReportDoc }).item);
@@ -3037,12 +3037,12 @@ export default function AdminProfit() {
                         // Open comprehensive edit modal instead of wizard
                         const localReport = reports.find(report => report._id === currentReportId);
                         if (localReport) {
-                          console.log('🏠 Using local current report data:', localReport);
-                          console.log('🎯 Local current affectedShareholders:', localReport.affectedShareholders);
+
+
                           setQuickEditReport(localReport);
                           setShowQuickEditModal(true);
                         } else {
-                          console.log('🌐 Fetching current report from API');
+
                           const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${currentReportId}`);
                           if (resp.ok) {
                             setQuickEditReport((resp as { ok: true; item: ProfitReportDoc }).item);

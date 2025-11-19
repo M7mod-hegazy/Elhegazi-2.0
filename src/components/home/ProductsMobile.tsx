@@ -268,7 +268,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                           e.preventDefault();
                           e.stopPropagation();
                           // Handle favorite toggle here
-                          console.log('Toggle favorite for product:', product.id);
+
                         }}
                         className="group/heart bg-white/95 backdrop-blur-sm rounded-full p-1.5 shadow-md border border-slate-100 hover:bg-white hover:shadow-lg transition-all duration-300 relative heart-button"
                       >

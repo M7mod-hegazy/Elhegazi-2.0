@@ -60,7 +60,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   };
 
   const handleRatingSubmit = (rating: number, review?: string) => {
-    console.log('Rating submitted:', { productId: product.id, rating, review });
+
     setShowRatingModal(false);
     setSelectedRating(0);
   };

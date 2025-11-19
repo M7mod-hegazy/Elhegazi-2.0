@@ -71,7 +71,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       // Emergency reset: Ctrl+Shift+R
       if (e.ctrlKey && e.shiftKey && e.key === 'R') {
         e.preventDefault();
-        console.log('Emergency sidebar reset triggered');
+
         setCollapsed(false);
         localStorage.setItem('admin.sidebar.collapsed', '0');
       }
@@ -84,7 +84,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   // Double-click on main content to toggle sidebar
   const handleMainDoubleClick = (e: React.MouseEvent) => {
     if (e.detail === 2) {
-      console.log('Double-click toggle triggered');
+
       toggleSidebar();
     }
   };

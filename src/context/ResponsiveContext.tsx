@@ -81,7 +81,7 @@ export const ResponsiveProvider: React.FC<ResponsiveProviderProps> = ({
       if (event.ctrlKey && event.shiftKey && event.key === 'D') {
         event.preventDefault();
         setIsDebugMode(prev => !prev);
-        console.log('🔧 Debug mode:', !isDebugMode ? 'enabled' : 'disabled');
+
       }
     };
 
@@ -93,13 +93,13 @@ export const ResponsiveProvider: React.FC<ResponsiveProviderProps> = ({
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
       console.group('📱 Device Detection');
-      console.log('Device Type:', device.deviceType);
+
       console.log('Screen:', `${Number(device.width) || 0}x${Number(device.height) || 0} (${device.screenSize})`);
-      console.log('Orientation:', device.orientation);
-      console.log('Touch Support:', device.isTouchDevice);
-      console.log('Hover Support:', device.hasHover);
-      console.log('Animation Quality:', animationQuality);
-      console.log('Interaction Mode:', interactionMode);
+
+
+
+
+
       console.groupEnd();
     }
   }, [device, animationQuality, interactionMode]);

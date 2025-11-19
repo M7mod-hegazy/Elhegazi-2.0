@@ -88,7 +88,7 @@ const RoomPlanner3D_v2: React.FC = () => {
   // DEBUG: log modal open/close and expose a quick key toggle
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.log('[Walls2D] open =', isWalls2DOpen);
+
   }, [isWalls2DOpen]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -947,7 +947,7 @@ const RoomPlanner3D_v2: React.FC = () => {
                               variant="secondary"
                               onClick={() => {
                                 // eslint-disable-next-line no-console
-                                console.log('[Walls2D] open button clicked');
+
                                 setIsWalls2DOpen(true);
                               }}
                             >

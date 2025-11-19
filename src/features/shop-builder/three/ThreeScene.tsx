@@ -213,11 +213,11 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
 
   const ensureRenderer = useCallback(() => {
     if (rendererRef.current && cameraRef.current && sceneRef.current && orbitControlsRef.current) {
-      console.log('✅ DEBUG: Renderer already exists, skipping initialization');
+
       return;
     }
     
-    console.log('🔄 DEBUG: Creating new renderer and scene');
+
 
     const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'low-power' });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -284,7 +284,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     };
     
     const handleCanvasClick = (event: MouseEvent) => {
-      console.log('🖱️ Canvas click detected');
+
       
       // Ignore if it was a drag (OrbitControls)
       const timeDiff = Date.now() - mouseDownTime;
@@ -293,11 +293,11 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         Math.pow(event.clientY - mouseDownPos.y, 2)
       );
       
-      console.log('📏 Click metrics:', { distance, timeDiff });
+
       
       // If mouse moved more than 5px or took more than 200ms, it's a drag
       if (distance > 5 || timeDiff > 200) {
-        console.log('⏭️ Ignoring - was a drag');
+
         return;
       }
 
@@ -313,7 +313,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       if (transformControls.object) {
         const gizmoIntersects = raycaster.intersectObjects((transformControls as any).children, true);
         if (gizmoIntersects.length > 0) {
-          console.log('🎯 Clicked on gizmo - ignoring');
+
           return;
         }
       }
@@ -322,14 +322,14 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       const wallMeshes = Array.from(wallMeshRef.current.values());
       const productGroups = [...productMapRef.current.values()].map((entry) => entry.group);
       
-      console.log('📊 Available objects:', { walls: wallMeshes.length, products: productGroups.length });
+
       
       const allIntersects = raycaster.intersectObjects([...wallMeshes, ...productGroups], true);
       
-      console.log('🔍 Intersections found:', allIntersects.length);
+
       
       if (allIntersects.length === 0) {
-        console.log('⭕ Empty space - deselecting all');
+
         selectProduct(null);
         selectWall(null);
         selectColumn(null);
@@ -337,7 +337,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       }
 
       const closest = allIntersects[0];
-      console.log('🎯 Closest object:', closest.object.type, closest.object.name);
+
       
       // Check if it's a wall
       const wallEntry = Array.from(wallMeshRef.current.entries())
@@ -345,7 +345,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       
       if (wallEntry) {
         const [wallId] = wallEntry;
-        console.log('🧱 Wall selected:', wallId);
+
         // Only select wall without deselecting others
         selectWall(wallId);
         return;
@@ -364,13 +364,13 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       
       if (productEntry) {
         const [productId] = productEntry;
-        console.log('📦 Product selected:', productId);
+
         // Only select product without deselecting others
         selectProduct(productId);
         return;
       }
 
-      console.log('❓ Unknown object - deselecting all');
+
       selectProduct(null);
       selectWall(null);
       selectColumn(null);
@@ -379,7 +379,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     // Right-click handler to deselect all
     const handleContextMenu = (event: MouseEvent) => {
       event.preventDefault(); // Prevent default context menu
-      console.log('🖱️ Right-click detected - deselecting all');
+
       selectProduct(null);
       selectWall(null);
       selectColumn(null);
@@ -497,7 +497,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     const { width, height } = container.getBoundingClientRect();
     
     // DEBUG: Log container and canvas dimensions
-    console.log('🔍 DEBUG: Container dimensions:', { width, height });
+
     console.log('🔍 DEBUG: Canvas dimensions:', { 
       canvasWidth: renderer.domElement.width, 
       canvasHeight: renderer.domElement.height,
@@ -523,8 +523,8 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     renderer.domElement.style.width = '100%';
     renderer.domElement.style.height = '100%';
     
-    console.log('✅ Renderer resized to:', { width, height });
-    console.log('✅ Canvas style updated to fill container');
+
+
   }, [rendererRef, cameraRef, containerRef]);
 
   const animate = useCallback(() => {
@@ -682,7 +682,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
   );
 
   useEffect(() => {
-    console.log('🎬 DEBUG: Main useEffect running - initializing scene');
+
     ensureRenderer();
     resizeRenderer();
     animate();
@@ -693,7 +693,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     window.addEventListener('resize', handleResize);
 
     return () => {
-      console.log('🧹 DEBUG: Cleanup - disposing scene');
+
       window.removeEventListener('resize', handleResize);
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
       transformControlsRef.current?.dispose();
@@ -746,7 +746,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     // Update ref so animate function can access latest value
     cameraModeRef.current = cameraMode;
     
-    console.log('📷 DEBUG: Camera mode changed to:', cameraMode);
+
     
     if (!camera || !renderer) return;
     

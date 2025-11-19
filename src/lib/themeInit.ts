@@ -235,7 +235,7 @@ export function getCurrentTheme(): ThemeData {
  */
 export function clearThemeCache(): void {
   localStorage.removeItem(STORAGE_KEY);
-  console.log('🗑️ Theme cache cleared');
+
 }
 
 /**

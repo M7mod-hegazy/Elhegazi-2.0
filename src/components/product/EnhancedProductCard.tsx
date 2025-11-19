@@ -73,7 +73,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
   };
 
   const handleRatingSubmit = (rating: number, review?: string) => {
-    console.log('Rating submitted:', { productId: product.id, rating, review });
+
     setShowRatingModal(false);
   };
 

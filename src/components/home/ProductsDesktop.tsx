@@ -195,7 +195,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
   };
 
   const handleRatingSubmit = (rating: number, review?: string) => {
-    console.log('Rating submitted:', { productId: selectedProduct?.id, rating, review });
+
     // Here you would typically make an API call to save the rating
     // For now, just close the modal
     setShowCommentsModal(false);

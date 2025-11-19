@@ -577,11 +577,11 @@ const FloorplanCanvas: React.FC = () => {
     let nearestPoint: { x: number; y: number } | null = null;
     let nearestDistance = SNAP_THRESHOLD;
 
-    console.log('🔍 Checking snap for point:', point, 'Threshold:', SNAP_THRESHOLD);
+
 
     worldWalls.forEach(wall => {
       if (wall.id === excludeWallId) {
-        console.log('⏭️ Skipping self wall:', wall.id);
+
         return; // Don't snap to self
       }
 
@@ -591,7 +591,7 @@ const FloorplanCanvas: React.FC = () => {
       if (distToStart < nearestDistance) {
         nearestDistance = distToStart;
         nearestPoint = { x: wall.start.x, y: wall.start.y };
-        console.log('✅ New nearest: start point', nearestPoint);
+
       }
 
       // Check end point
@@ -600,11 +600,11 @@ const FloorplanCanvas: React.FC = () => {
       if (distToEnd < nearestDistance) {
         nearestDistance = distToEnd;
         nearestPoint = { x: wall.end.x, y: wall.end.y };
-        console.log('✅ New nearest: end point', nearestPoint);
+
       }
     });
 
-    console.log('🎯 Final snap point:', nearestPoint);
+
     return nearestPoint;
   }, [worldWalls]);
 
@@ -618,7 +618,7 @@ const FloorplanCanvas: React.FC = () => {
         event.preventDefault();
         // If in drawing mode, start new room (disconnect from last wall)
         if (isDrawingMode) {
-          console.log('🔴 RIGHT-CLICK: Starting new room, disabling snapping');
+
           // COMPLETE reset of drawing state
           setDrawingStartPoint(null);
           setDrawingPreviewPoint(null);
@@ -627,7 +627,7 @@ const FloorplanCanvas: React.FC = () => {
           setLengthInputValue('');
           // DISABLE SNAPPING for next wall to prevent connecting to previous room
           disableSnappingRef.current = true;
-          console.log('🔴 Snapping disabled:', disableSnappingRef.current);
+
           // Clear ALL drag states
           dragState.current = null;
           productDragState.current = null;
@@ -660,16 +660,16 @@ const FloorplanCanvas: React.FC = () => {
         // Check for snap to existing endpoints (but only if we have a start point)
         // Don't snap on first click OR if snapping is disabled (after right-click)
         let finalPos = worldPos;
-        console.log('🎯 Drawing click - disableSnapping:', disableSnappingRef.current, 'drawingStartPoint:', drawingStartPoint);
+
         if (drawingStartPoint && !disableSnappingRef.current) {
-          console.log('✅ Snapping enabled, checking for snap points');
+
           const snapPoint = findSnapPoint(worldPos, null);
           if (snapPoint) {
-            console.log('📌 Snapping to:', snapPoint);
+
             finalPos = snapPoint;
           }
         } else {
-          console.log('❌ Snapping disabled or no start point');
+
         }
         
         // Apply length snapping if Ctrl is pressed
@@ -710,13 +710,13 @@ const FloorplanCanvas: React.FC = () => {
           
           // Minimum 0.1 meters (10cm) to create a wall
           if (distance < 0.1) {
-            console.log('⚠️ Wall too short, ignoring click');
+
             return;
           }
           
           // Second click - create wall
-          console.log('🏗️ Creating wall from', drawingStartPoint, 'to', finalPos);
-          console.log('🔧 disableSnapping was:', disableSnappingRef.current);
+
+
           
           // Use global default texture, or texture from most recent wall, or default to 'painted_white'
           const defaultTexture = layout.defaultWallTexture || 
@@ -737,7 +737,7 @@ const FloorplanCanvas: React.FC = () => {
           setSnappedPoint(null);
           
           // NOW re-enable snapping after first wall is complete
-          console.log('✅ Re-enabling snapping after first wall');
+
           disableSnappingRef.current = false;
           
           // Select the newly created wall
@@ -974,7 +974,7 @@ const FloorplanCanvas: React.FC = () => {
         // Try to snap to nearby endpoints - this actually moves the point!
         const snapPoint = findSnapPoint(finalPos, wallId);
         if (snapPoint) {
-          console.log('🧲 Snapping to point:', snapPoint);
+
           // Smoothly snap to the exact position
           finalPos = { x: snapPoint.x, y: snapPoint.y };
         }

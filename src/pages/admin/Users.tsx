@@ -294,7 +294,7 @@ const AdminUsers = () => {
       }
       // Debug: log payload in dev only
       if (import.meta && (import.meta as any).env?.MODE === 'development' && typeof console !== 'undefined') {
-        console.log('Assigning permissions payload', body);
+
       }
       const resp = await apiPostJson<AssignOk | AssignErr, AssignCustomBody>('/api/rbac/assign-custom', body);
       if ('ok' in resp && resp.ok) {

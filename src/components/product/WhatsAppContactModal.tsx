@@ -68,8 +68,8 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
   
   // Debug logging
   useEffect(() => {
-    console.log('🔍 WhatsApp Modal - productCode:', productCode);
-    console.log('🔍 WhatsApp Modal - fullMessage:', fullMessage);
+
+
   }, [productCode, fullMessage]);
 
   const handleSend = async () => {

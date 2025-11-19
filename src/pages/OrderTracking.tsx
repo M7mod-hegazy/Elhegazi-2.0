@@ -221,7 +221,7 @@ const OrderTracking = () => {
       });
       
       // For now, we'll just show a message
-      console.log('Refer products from order', order.id);
+
     } catch (err) {
       toast({
         title: 'خطأ',

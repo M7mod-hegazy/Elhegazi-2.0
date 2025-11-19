@@ -74,13 +74,13 @@ const loadFromStorage = (): ShopBuilderLayout | null => {
         
         if (validProducts.length !== parsed.products.length) {
           parsed.products = validProducts;
-          console.log('🧹 Cleaned up invalid products. Valid products:', validProducts.length);
+
           // Save cleaned version
           saveToStorage(parsed);
         }
       }
       
-      console.log('✅ Loaded design from localStorage:', parsed);
+
       return parsed;
     }
   } catch (error) {
@@ -93,7 +93,7 @@ const loadFromStorage = (): ShopBuilderLayout | null => {
 const saveToStorage = (layout: ShopBuilderLayout) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(layout));
-    console.log('💾 Saved design to localStorage');
+
   } catch (error) {
     console.error('❌ Failed to save design to localStorage:', error);
   }
@@ -385,7 +385,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    console.log('📥 Exported design to file');
+
   }, [layout]);
 
   const importFromFile = useCallback(async (file: File): Promise<void> => {
@@ -396,7 +396,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
           const content = e.target?.result as string;
           const imported = JSON.parse(content);
           importLayout(imported);
-          console.log('📤 Imported design from file');
+
           resolve();
         } catch (error) {
           console.error('❌ Failed to import design:', error);
@@ -414,7 +414,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     setSelectedProductId(null);
     setSelectedWallId(null);
     localStorage.removeItem(STORAGE_KEY);
-    console.log('🔄 Reset design to default');
+
   }, []);
 
   const value = useMemo<ShopBuilderContextValue>(() => ({

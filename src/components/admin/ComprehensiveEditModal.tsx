@@ -93,7 +93,7 @@ export function ComprehensiveEditModal({
     const shareholder = shareholders.find(s => s.id === shareholderId);
     
     if (!report?._id) {
-      console.log(`📊 No report ID, using current amount for ${shareholder?.name}:`, shareholder?.amount);
+
       return shareholder?.amount || 0;
     }
     
@@ -284,8 +284,8 @@ export function ComprehensiveEditModal({
         totals: updatedTotals
       };
       
-      console.log('💾 Saving:', saveData.reportName || saveData.title);
-      console.log('📊 Totals:', { finalBalance, netProfit, totalProfits, totalExpenses });
+
+
       
       await onSave(saveData);
       toast({ title: 'تم الحفظ', description: 'تم تحديث التقرير بنجاح' });
@@ -731,15 +731,15 @@ export function ComprehensiveEditModal({
                                     key={`personal-${expenseIdx}-${branchIdx}-${row.values[expense]}`}
                                     onChange={(e) => {
                                       const inputValue = e.target.value;
-                                      console.log('🔢 Input value:', inputValue);
+
                                       const isValid = validateNumericInputWithNegative(inputValue);
-                                      console.log('✅ Is valid?', isValid);
+
                                       if (!isValid) {
-                                        console.log('❌ Validation failed, returning');
+
                                         return;
                                       }
                                       const value = parseNumber(inputValue);
-                                      console.log('💰 Parsed value:', value);
+
                                       {
                                         setBranchRows(prev => {
                                           const updated = [...prev];

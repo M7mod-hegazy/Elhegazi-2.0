@@ -109,13 +109,13 @@ const CategoryPage = () => {
     
     // Check if user is authenticated
     if (!isAuthenticated) {
-      console.log('User not authenticated - showing favorites auth modal');
+
       setAuthAction('favorites');
       setShowAuthModal(true);
       return;
     }
 
-    console.log('Toggling favorite for:', productId);
+
     toggleFavorite(productId);
   };
 
@@ -125,13 +125,13 @@ const CategoryPage = () => {
     
     // Check if user is authenticated
     if (!isAuthenticated) {
-      console.log('User not authenticated - showing cart auth modal');
+
       setAuthAction('cart');
       setShowAuthModal(true);
       return;
     }
 
-    console.log('Adding to cart:', product.nameAr);
+
     
     // Check if product is already in cart to show appropriate message
     const wasInCart = checkIsInCart(product.id);
@@ -140,7 +140,7 @@ const CategoryPage = () => {
     
     try {
       await addItem(product, 1);
-      console.log('Successfully added to cart');
+
       
       const newQuantity = previousQuantity + 1;
       
@@ -220,7 +220,7 @@ const CategoryPage = () => {
   };
 
   const handleRatingSubmit = (rating: number, review?: string) => {
-    console.log('Rating submitted:', { productId: selectedProduct?.id, rating, review });
+
     setShowRatingModal(false);
     setSelectedRating(0);
   };
