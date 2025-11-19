@@ -220,6 +220,70 @@ export default async function handler(req, res) {
       }
     }
 
+    // ===== PROFIT SETTINGS =====
+    if (pathname === '/api/profit-settings') {
+      const { default: ProfitSettings } = await import('../server/models/ProfitSettings.js');
+      if (req.method === 'GET') {
+        const settings = await ProfitSettings.findOne({}).lean().maxTimeMS(8000);
+        return res.json({ ok: true, item: settings || {} });
+      }
+      if (req.method === 'PUT') {
+        const updated = await ProfitSettings.findOneAndUpdate({}, req.body, { new: true, upsert: true }).maxTimeMS(8000);
+        return res.json({ ok: true, item: updated });
+      }
+    }
+
+    // ===== PROFIT REPORTS =====
+    if (pathname === '/api/profit-reports/:id' || pathname.match(/^\/api\/profit-reports\/[^/]+$/)) {
+      const { default: ProfitReport } = await import('../server/models/ProfitReport.js');
+      const id = pathname.split('/').pop();
+      
+      if (req.method === 'GET') {
+        const report = await ProfitReport.findById(id).lean().maxTimeMS(8000);
+        return res.json({ ok: true, item: report });
+      }
+      if (req.method === 'PUT') {
+        const updated = await ProfitReport.findByIdAndUpdate(id, req.body, { new: true }).maxTimeMS(8000);
+        return res.json({ ok: true, item: updated });
+      }
+      if (req.method === 'DELETE') {
+        await ProfitReport.findByIdAndDelete(id).maxTimeMS(8000);
+        return res.json({ ok: true });
+      }
+    }
+
+    // ===== PROFIT REPORTS LIST =====
+    if (pathname === '/api/profit-reports') {
+      const { default: ProfitReport } = await import('../server/models/ProfitReport.js');
+      
+      if (req.method === 'GET') {
+        const reports = await ProfitReport.find({}).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+        return res.json({ ok: true, items: reports });
+      }
+      if (req.method === 'POST') {
+        const report = new (await import('../server/models/ProfitReport.js')).default(req.body);
+        await report.save();
+        return res.json({ ok: true, item: report });
+      }
+    }
+
+    // ===== PROFIT AGGREGATE =====
+    if (pathname === '/api/profit-aggregate') {
+      const { default: ProfitReport } = await import('../server/models/ProfitReport.js');
+      const { from, to } = req.query;
+      
+      if (req.method === 'GET') {
+        const query = {};
+        if (from || to) {
+          query.createdAt = {};
+          if (from) query.createdAt.$gte = new Date(from);
+          if (to) query.createdAt.$lte = new Date(to);
+        }
+        const reports = await ProfitReport.find(query).lean().maxTimeMS(8000);
+        return res.json({ ok: true, items: reports });
+      }
+    }
+
     // 404 for unhandled routes
     return res.status(404).json({ ok: false, error: 'Not found' });
   } catch (error) {
