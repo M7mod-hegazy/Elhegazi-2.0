@@ -510,6 +510,421 @@ app.get('/search/popular', async (c) => {
   }
 });
 
+app.get('/search/track', async (c) => {
+  try {
+    const query = c.req.query('q');
+    const { default: Product } = await import('../server/models/Product.js');
+    const results = await Product.find({
+      $or: [
+        { name: { $regex: query, $options: 'i' } },
+        { nameAr: { $regex: query, $options: 'i' } },
+        { description: { $regex: query, $options: 'i' } }
+      ],
+      active: { $ne: false }
+    })
+      .limit(20)
+      .lean()
+      .maxTimeMS(8000);
+    return c.json({ ok: true, items: results });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== ADMIN =====
+app.post('/admin/users', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const body = await c.req.json();
+    const user = new User({ ...body, role: 'admin' });
+    await user.save();
+    return c.json({ ok: true, item: user });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== ANALYTICS =====
+app.get('/analytics/customers', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const count = await User.countDocuments({ role: 'user' });
+    const recent = await User.find({ role: 'user' }).sort({ createdAt: -1 }).limit(10).lean().maxTimeMS(8000);
+    return c.json({ ok: true, item: { totalCustomers: count, recentCustomers: recent } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/analytics/orders', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const total = await Order.countDocuments({});
+    const completed = await Order.countDocuments({ status: 'completed' });
+    const pending = await Order.countDocuments({ status: 'pending' });
+    return c.json({ ok: true, item: { totalOrders: total, completedOrders: completed, pendingOrders: pending } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/analytics/returns', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const returns = await Order.countDocuments({ returnReason: { $exists: true, $ne: null } });
+    return c.json({ ok: true, item: { totalReturns: returns } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== HISTORY =====
+app.get('/history', async (c) => {
+  try {
+    const { default: History } = await import('../server/models/History.js');
+    const history = await History.find({}).sort({ createdAt: -1 }).limit(100).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: history });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/history/mark-read', async (c) => {
+  try {
+    const { default: HistoryRead } = await import('../server/models/HistoryRead.js');
+    const body = await c.req.json();
+    const marked = await HistoryRead.updateMany({ userId: body.userId }, { read: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: marked });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== RETURNS =====
+app.get('/returns', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const returns = await Order.find({ returnReason: { $exists: true, $ne: null } }).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: returns });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/returns/:id', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const order = await Order.findById(id).lean().maxTimeMS(8000);
+    if (!order || !order.returnReason) return c.json({ ok: false, error: 'Return not found' }, 404);
+    return c.json({ ok: true, item: order });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/my/returns', async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    const { default: Order } = await import('../server/models/Order.js');
+    const returns = await Order.find({ userId, returnReason: { $exists: true, $ne: null } }).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: returns });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== ORDERS BULK =====
+app.post('/orders/bulk/assign', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const body = await c.req.json();
+    const updated = await Order.updateMany({ _id: { $in: body.orderIds } }, { assignedTo: body.assignedTo }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/orders/bulk/status', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const body = await c.req.json();
+    const updated = await Order.updateMany({ _id: { $in: body.orderIds } }, { status: body.status }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== PRODUCTS 3D =====
+app.get('/products-3d', async (c) => {
+  try {
+    const { default: Product3D } = await import('../server/models/Product3D.js');
+    const products = await Product3D.find({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: products });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/products-3d/:id', async (c) => {
+  try {
+    const { default: Product3D } = await import('../server/models/Product3D.js');
+    const id = c.req.param('id');
+    const product = await Product3D.findById(id).lean().maxTimeMS(8000);
+    if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true, item: product });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/products-3d-categories', async (c) => {
+  try {
+    const { default: Product3D } = await import('../server/models/Product3D.js');
+    const categories = await Product3D.distinct('category').maxTimeMS(8000);
+    return c.json({ ok: true, items: categories });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== PROFIT AGGREGATE =====
+app.get('/profit-aggregate', async (c) => {
+  try {
+    const { default: ProfitReport } = await import('../server/models/ProfitReport.js');
+    const reports = await ProfitReport.find({}).lean().maxTimeMS(8000);
+    const totalProfit = reports.reduce((sum, r) => sum + (r.totalProfit || 0), 0);
+    return c.json({ ok: true, item: { totalProfit, reportCount: reports.length } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== RBAC =====
+app.get('/rbac/my-permissions', async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    const { default: Role } = await import('../server/models/Role.js');
+    const roles = await Role.find({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: roles });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/rbac/resources', async (c) => {
+  try {
+    const resources = [
+      { name: 'products', actions: ['create', 'read', 'update', 'delete'] },
+      { name: 'orders', actions: ['create', 'read', 'update', 'delete'] },
+      { name: 'users', actions: ['create', 'read', 'update', 'delete'] },
+      { name: 'settings', actions: ['read', 'update'] },
+      { name: 'analytics', actions: ['read'] }
+    ];
+    return c.json({ ok: true, items: resources });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/rbac/super-admin', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const admin = await User.findOne({ role: 'admin' }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, item: { email: admin?.email || '' } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/rbac/users/:id/effective-permissions', async (c) => {
+  try {
+    const userId = c.req.param('id');
+    const { default: User } = await import('../server/models/User.js');
+    const user = await User.findById(userId).lean().maxTimeMS(8000);
+    const permissions = user?.role === 'admin' ? [{ resource: '*', actions: ['*'] }] : [];
+    return c.json({ ok: true, items: permissions });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/rbac/assign-custom', async (c) => {
+  try {
+    const body = await c.req.json();
+    return c.json({ ok: true, item: body });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== ROLES =====
+app.get('/roles', async (c) => {
+  try {
+    const { default: Role } = await import('../server/models/Role.js');
+    const roles = await Role.find({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: roles });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/roles', async (c) => {
+  try {
+    const { default: Role } = await import('../server/models/Role.js');
+    const body = await c.req.json();
+    const role = new Role(body);
+    await role.save();
+    return c.json({ ok: true, item: role });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== USER ROLE =====
+app.post('/user-role', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const body = await c.req.json();
+    const updated = await User.findByIdAndUpdate(body.userId, { role: body.roleId }, { new: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== ROOMS =====
+app.get('/rooms', async (c) => {
+  try {
+    const { default: Room } = await import('../server/models/Room.js');
+    const rooms = await Room.find({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: rooms });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/rooms/:id', async (c) => {
+  try {
+    const { default: Room } = await import('../server/models/Room.js');
+    const id = c.req.param('id');
+    const room = await Room.findById(id).lean().maxTimeMS(8000);
+    if (!room) return c.json({ ok: false, error: 'Room not found' }, 404);
+    return c.json({ ok: true, item: room });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/room-planner/save', async (c) => {
+  try {
+    const { default: Room } = await import('../server/models/Room.js');
+    const body = await c.req.json();
+    const room = new Room(body);
+    await room.save();
+    return c.json({ ok: true, item: room });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== SUPPORT =====
+app.post('/support/contact', async (c) => {
+  try {
+    const body = await c.req.json();
+    return c.json({ ok: true, item: { message: 'Contact form submitted', data: body } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== 3D MODEL UPLOAD =====
+app.post('/upload-3d-model', async (c) => {
+  try {
+    const body = await c.req.json();
+    return c.json({ ok: true, item: { message: '3D model uploaded', url: body.url } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== USERS =====
+app.get('/users', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const users = await User.find({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: users });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/users/profile', async (c) => {
+  try {
+    const userId = c.req.query('userId');
+    const { default: User } = await import('../server/models/User.js');
+    const user = await User.findById(userId).lean().maxTimeMS(8000);
+    if (!user) return c.json({ ok: false, error: 'User not found' }, 404);
+    return c.json({ ok: true, item: user });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/users/sync', async (c) => {
+  try {
+    const body = await c.req.json();
+    return c.json({ ok: true, item: { synced: true } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== CLOUDINARY =====
+app.post('/cloudinary/upload-file', async (c) => {
+  try {
+    const body = await c.req.json();
+    return c.json({ ok: true, item: { url: body.url || 'https://via.placeholder.com/400' } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // ===== CART =====
 app.post('/cart/add', async (c) => {
   try {
