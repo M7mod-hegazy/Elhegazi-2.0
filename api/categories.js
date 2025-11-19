@@ -33,10 +33,11 @@ export default async function handler(req, res) {
   try {
     await connectMongoDB();
     const { default: Category } = await import('../server/models/Category.js');
-    const { limit, featured } = req.query;
+    const { limit, featured, fields } = req.query;
 
     let query = Category.find({});
     if (featured === 'true') query = query.where('featured').equals(true);
+    if (fields) query = query.select(fields);
     if (limit) query = query.limit(parseInt(limit));
 
     const categories = await query.lean().maxTimeMS(8000);

@@ -124,6 +124,18 @@ export default async function handler(req, res) {
       }
     }
 
+    // ===== SETTINGS FOOTER =====
+    if (pathname === '/api/settings/footer') {
+      if (req.method === 'GET') {
+        const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
+        return res.json({ ok: true, item: settings?.footer || {} });
+      }
+      if (req.method === 'PUT') {
+        const updated = await Settings.findOneAndUpdate({}, { footer: req.body }, { new: true }).maxTimeMS(8000);
+        return res.json({ ok: true, item: updated?.footer || {} });
+      }
+    }
+
     // ===== HOME CONFIG =====
     if (pathname === '/api/home-config') {
       if (req.method === 'GET') {
