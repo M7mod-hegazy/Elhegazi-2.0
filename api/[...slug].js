@@ -33,12 +33,18 @@ export default async function handler(req, res) {
     const url = new URL(req.url, 'http://localhost');
     const pathname = url.pathname;
 
-    console.log(`[CATCH-ALL] CALLED - ${req.method} ${pathname}`);
+    console.log(`\n========== [CATCH-ALL] REQUEST ==========`);
+    console.log(`[CATCH-ALL] ✓ Handler called`);
+    console.log(`[CATCH-ALL] Method: ${req.method}`);
+    console.log(`[CATCH-ALL] Pathname: ${pathname}`);
     console.log(`[CATCH-ALL] Full URL: ${req.url}`);
-    console.log(`[CATCH-ALL] Query:`, req.query);
+    console.log(`[CATCH-ALL] Query params:`, req.query);
+    console.log(`[CATCH-ALL] Body type:`, typeof req.body);
 
     // Connect to MongoDB for all endpoints
+    console.log(`[CATCH-ALL] Connecting to MongoDB...`);
     await connectMongoDB();
+    console.log(`[CATCH-ALL] ✓ MongoDB connected`);
 
     // Import all models
     const { default: Product } = await import('../server/models/Product.js');
@@ -223,20 +229,29 @@ export default async function handler(req, res) {
 
     // ===== PROFIT SETTINGS =====
     if (pathname === '/api/profit-settings') {
-      console.log('[CATCH-ALL] Handling /api/profit-settings');
+      console.log(`[CATCH-ALL] ✓ Matched /api/profit-settings`);
+      console.log(`[CATCH-ALL] Method: ${req.method}`);
       try {
+        console.log(`[CATCH-ALL] Importing ProfitSettings model...`);
         const { default: ProfitSettings } = await import('../server/models/ProfitSettings.js');
+        console.log(`[CATCH-ALL] ✓ ProfitSettings model imported`);
+        
         if (req.method === 'GET') {
+          console.log(`[CATCH-ALL] Fetching profit settings from DB...`);
           const settings = await ProfitSettings.findOne({}).lean().maxTimeMS(8000);
-          console.log('[CATCH-ALL] Profit settings found:', settings ? 'YES' : 'NO');
+          console.log(`[CATCH-ALL] ✓ Profit settings found:`, settings ? 'YES (data exists)' : 'NO (empty DB)');
+          console.log(`[CATCH-ALL] Returning response...`);
           return res.json({ ok: true, item: settings || {} });
         }
         if (req.method === 'PUT') {
+          console.log(`[CATCH-ALL] Updating profit settings...`);
           const updated = await ProfitSettings.findOneAndUpdate({}, req.body, { new: true, upsert: true }).maxTimeMS(8000);
+          console.log(`[CATCH-ALL] ✓ Profit settings updated`);
           return res.json({ ok: true, item: updated });
         }
       } catch (err) {
-        console.error('[CATCH-ALL] Profit settings error:', err.message);
+        console.error(`[CATCH-ALL] ✗ Profit settings error:`, err.message);
+        console.error(`[CATCH-ALL] Stack:`, err.stack);
         return res.status(500).json({ ok: false, error: err.message });
       }
     }
@@ -376,10 +391,12 @@ export default async function handler(req, res) {
     }
 
     // 404 for unhandled routes
-    console.log('[CATCH-ALL] 404 - No handler for:', pathname);
+    console.log(`[CATCH-ALL] ✗ 404 - No handler matched for: ${pathname}`);
+    console.log(`[CATCH-ALL] Available routes: /api/profit-settings, /api/profit-reports, /api/products, /api/categories, etc.`);
     return res.status(404).json({ ok: false, error: 'Not found', pathname });
   } catch (error) {
-    console.error('[CATCH-ALL] Error:', error);
-    return res.status(500).json({ ok: false, error: error.message });
+    console.error(`[CATCH-ALL] ✗ EXCEPTION caught:`, error.message);
+    console.error(`[CATCH-ALL] Stack trace:`, error.stack);
+    return res.status(500).json({ ok: false, error: error.message, stack: error.stack });
   }
 }
