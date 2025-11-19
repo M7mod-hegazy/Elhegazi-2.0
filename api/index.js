@@ -347,6 +347,30 @@ app.put('/settings', async (c) => {
   }
 });
 
+// ===== SETTINGS FOOTER =====
+app.get('/settings/footer', async (c) => {
+  try {
+    const { default: Settings } = await import('../server/models/Settings.js');
+    const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, item: settings?.footer || {} });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/settings/footer', async (c) => {
+  try {
+    const { default: Settings } = await import('../server/models/Settings.js');
+    const body = await c.req.json();
+    const updated = await Settings.findOneAndUpdate({}, { footer: body }, { new: true, upsert: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated?.footer || {} });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // ===== ORDERS =====
 app.get('/orders', async (c) => {
   try {
@@ -463,6 +487,23 @@ app.patch('/users/:id', async (c) => {
     const body = await c.req.json();
     const updated = await User.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
     return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== SEARCH =====
+app.get('/search/popular', async (c) => {
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    // Get popular products (highest rated or most reviewed)
+    const popular = await Product.find({ active: { $ne: false } })
+      .sort({ rating: -1, reviews: -1 })
+      .limit(10)
+      .lean()
+      .maxTimeMS(8000);
+    return c.json({ ok: true, items: popular });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
