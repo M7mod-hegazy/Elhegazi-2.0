@@ -1,3 +1,5 @@
+import { Hono } from 'hono';
+import { handle } from 'hono/vercel';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 
@@ -22,32 +24,23 @@ async function connectMongoDB() {
   }
 }
 
-export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+const app = new Hono().basePath('/api');
 
-  if (req.method === 'OPTIONS') return res.status(200).end();
-
+// Middleware: Connect to MongoDB for all requests
+app.use('*', async (c, next) => {
   try {
-    const url = new URL(req.url, 'http://localhost');
-    const pathname = url.pathname;
-
-    console.log(`\n========== [ROOT-CATCH-ALL] REQUEST ==========`);
-    console.log(`[ROOT-CATCH-ALL] ✓ Handler called`);
-    console.log(`[ROOT-CATCH-ALL] Method: ${req.method}`);
-    console.log(`[ROOT-CATCH-ALL] Pathname: ${pathname}`);
-    console.log(`[ROOT-CATCH-ALL] Full URL: ${req.url}`);
-
-    // Only handle /api/* routes
-    if (!pathname.startsWith('/api/')) {
-      return res.status(404).json({ ok: false, error: 'Not found' });
-    }
-
-    // Connect to MongoDB for all endpoints
-    console.log(`[ROOT-CATCH-ALL] Connecting to MongoDB...`);
     await connectMongoDB();
-    console.log(`[ROOT-CATCH-ALL] ✓ MongoDB connected`);
+    await next();
+  } catch (error) {
+    console.error('[API] MongoDB connection error:', error.message);
+    return c.json({ ok: false, error: 'Database connection failed' }, 500);
+  }
+});
+
+// ===== HEALTH CHECK =====
+app.get('/health', (c) => {
+  return c.json({ ok: true, status: 'healthy', timestamp: new Date().toISOString() });
+});
 
     // Import all models
     const { default: Product } = await import('./server/models/Product.js');

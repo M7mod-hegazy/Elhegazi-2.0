@@ -1,15 +1,11 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "functions": {
-    "api/**": {
-      "runtime": "nodejs18.x"
-    },
-    "[...slug].js": {
-      "runtime": "nodejs18.x"
-    }
-  },
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index"
+    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
