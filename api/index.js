@@ -214,6 +214,277 @@ app.post('/debug/seed-products', async (c) => {
   }
 });
 
+// ===== PRODUCTS =====
+app.get('/products', async (c) => {
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const ids = c.req.query('ids');
+    const categorySlug = c.req.query('categorySlug');
+    
+    let query = { active: { $ne: false } };
+    if (ids) {
+      const idArray = ids.split(',').map(id => id.trim());
+      query._id = { $in: idArray };
+    }
+    if (categorySlug) {
+      query.categorySlug = categorySlug;
+    }
+    
+    const products = await Product.find(query).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: products });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/products/:id', async (c) => {
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const id = c.req.param('id');
+    const product = await Product.findById(id).lean().maxTimeMS(8000);
+    if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true, item: product });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/products/:id/ratings', async (c) => {
+  try {
+    const { default: Rating } = await import('../server/models/Rating.js');
+    const id = c.req.param('id');
+    const ratings = await Rating.find({ productId: id }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: ratings });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== CATEGORIES =====
+app.get('/categories', async (c) => {
+  try {
+    const { default: Category } = await import('../server/models/Category.js');
+    const categories = await Category.find({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: categories });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== HOME CONFIG =====
+app.get('/home-config', async (c) => {
+  try {
+    const { default: HomeConfig } = await import('../server/models/HomeConfig.js');
+    const config = await HomeConfig.findOne({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, item: config });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/home-config', async (c) => {
+  try {
+    const { default: HomeConfig } = await import('../server/models/HomeConfig.js');
+    const body = await c.req.json();
+    const updated = await HomeConfig.findOneAndUpdate({}, body, { new: true, upsert: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== SHOP SETUP =====
+app.get('/shop-setup', async (c) => {
+  try {
+    const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
+    const setup = await ShopSetup.findOne({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, item: setup });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/shop-setup', async (c) => {
+  try {
+    const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
+    const body = await c.req.json();
+    const updated = await ShopSetup.findOneAndUpdate({}, body, { new: true, upsert: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== SETTINGS =====
+app.get('/settings', async (c) => {
+  try {
+    const { default: Settings } = await import('../server/models/Settings.js');
+    const settings = await Settings.findOne({}).lean().maxTimeMS(8000);
+    return c.json({ ok: true, item: settings });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/settings', async (c) => {
+  try {
+    const { default: Settings } = await import('../server/models/Settings.js');
+    const body = await c.req.json();
+    const updated = await Settings.findOneAndUpdate({}, body, { new: true, upsert: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== ORDERS =====
+app.get('/orders', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const orders = await Order.find({}).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: orders });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/orders', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const body = await c.req.json();
+    const order = new Order(body);
+    await order.save();
+    return c.json({ ok: true, item: order });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/orders/:id', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const order = await Order.findById(id).lean().maxTimeMS(8000);
+    if (!order) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: order });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/orders/track', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const orderNumber = c.req.query('orderNumber');
+    const email = c.req.query('email');
+    
+    if (!orderNumber || !email) {
+      return c.json({ ok: false, error: 'orderNumber and email required' }, 400);
+    }
+    
+    const order = await Order.findOne({ orderNumber, email }).lean().maxTimeMS(8000);
+    if (!order) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: order });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/orders/:id/request-cancellation', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/orders/:id/request-return', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/orders/rate', async (c) => {
+  try {
+    const { default: Rating } = await import('../server/models/Rating.js');
+    const body = await c.req.json();
+    const rating = new Rating(body);
+    await rating.save();
+    return c.json({ ok: true, item: rating });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== USERS =====
+app.get('/users/:id/orders', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const userId = c.req.param('id');
+    const orders = await Order.find({ userId }).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: orders });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/users/:id', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await User.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== CART =====
+app.post('/cart/add', async (c) => {
+  try {
+    const body = await c.req.json();
+    // Cart is typically stored in session/local storage on client
+    // This endpoint can be used to validate cart items exist
+    const { default: Product } = await import('../server/models/Product.js');
+    const product = await Product.findById(body.productId).lean().maxTimeMS(8000);
+    if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true, item: product });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // Export for Vercel
 export const GET = handle(app);
 export const POST = handle(app);
