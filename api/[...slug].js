@@ -291,6 +291,11 @@ export default async function handler(req, res) {
       }
     }
 
+    // ===== HEALTH CHECK =====
+    if (pathname === '/api/health') {
+      return res.json({ ok: true, status: 'healthy', timestamp: new Date().toISOString() });
+    }
+
     // ===== DEBUG SEED PRODUCTS =====
     if (pathname === '/api/debug/seed-products') {
       const { default: Product } = await import('../server/models/Product.js');
