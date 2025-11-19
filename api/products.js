@@ -50,8 +50,13 @@ export default async function handler(req, res) {
     
     if (featured === 'true') query = query.where('featured').equals(true);
     if (fields) {
-      query = query.select(fields);
-      console.log('[DEBUG] Selecting fields:', fields);
+      // Ensure 'image' is always included in fields
+      const fieldArray = fields.split(',').map(f => f.trim());
+      if (!fieldArray.includes('image')) {
+        fieldArray.push('image');
+      }
+      query = query.select(fieldArray.join(' '));
+      console.log('[DEBUG] Selecting fields:', fieldArray.join(' '));
     }
 
     const products = await query.limit(parseInt(limit) || 60).lean().maxTimeMS(8000);

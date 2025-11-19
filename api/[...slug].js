@@ -70,10 +70,14 @@ export default async function handler(req, res) {
     }
 
     // ===== PRODUCTS =====
-    if (pathname === '/api/products/:id' || pathname.match(/^\/api\/products\/[^/]+$/)) {
+    if (pathname === '/api/products/:id' || pathname.match(/^\/api\/products\/[^/?]+$/)) {
       const id = pathname.split('/').pop();
+      console.log('[CATCH-ALL] GET /api/products/:id', { id });
       if (req.method === 'GET') {
         const prod = await Product.findById(id).lean().maxTimeMS(8000);
+        if (!prod) {
+          return res.status(404).json({ ok: false, error: 'Product not found' });
+        }
         return res.json({ ok: true, item: prod });
       }
       if (req.method === 'PUT') {
