@@ -222,14 +222,21 @@ export default async function handler(req, res) {
 
     // ===== PROFIT SETTINGS =====
     if (pathname === '/api/profit-settings') {
-      const { default: ProfitSettings } = await import('../server/models/ProfitSettings.js');
-      if (req.method === 'GET') {
-        const settings = await ProfitSettings.findOne({}).lean().maxTimeMS(8000);
-        return res.json({ ok: true, item: settings || {} });
-      }
-      if (req.method === 'PUT') {
-        const updated = await ProfitSettings.findOneAndUpdate({}, req.body, { new: true, upsert: true }).maxTimeMS(8000);
-        return res.json({ ok: true, item: updated });
+      console.log('[CATCH-ALL] Handling /api/profit-settings');
+      try {
+        const { default: ProfitSettings } = await import('../server/models/ProfitSettings.js');
+        if (req.method === 'GET') {
+          const settings = await ProfitSettings.findOne({}).lean().maxTimeMS(8000);
+          console.log('[CATCH-ALL] Profit settings found:', settings ? 'YES' : 'NO');
+          return res.json({ ok: true, item: settings || {} });
+        }
+        if (req.method === 'PUT') {
+          const updated = await ProfitSettings.findOneAndUpdate({}, req.body, { new: true, upsert: true }).maxTimeMS(8000);
+          return res.json({ ok: true, item: updated });
+        }
+      } catch (err) {
+        console.error('[CATCH-ALL] Profit settings error:', err.message);
+        return res.status(500).json({ ok: false, error: err.message });
       }
     }
 
