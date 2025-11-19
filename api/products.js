@@ -41,13 +41,21 @@ export default async function handler(req, res) {
     // GET single product by ID
     if (req.method === 'GET' && productId) {
       console.log('[PRODUCTS] Fetching single product:', productId);
-      const product = await Product.findById(productId).lean().maxTimeMS(8000);
-      if (!product) {
-        console.log('[PRODUCTS] Product not found:', productId);
-        return res.status(404).json({ ok: false, error: 'Product not found' });
+      try {
+        const product = await Product.findById(productId).lean().maxTimeMS(8000);
+        if (!product) {
+          console.log('[PRODUCTS] Product not found:', productId);
+          // Try to find ANY product to verify DB connection
+          const anyProduct = await Product.findOne({}).lean().maxTimeMS(8000);
+          console.log('[PRODUCTS] DB check - any product exists:', anyProduct ? 'YES' : 'NO');
+          return res.status(404).json({ ok: false, error: 'Product not found' });
+        }
+        console.log('[PRODUCTS] Product found:', { _id: product._id, name: product.name });
+        return res.json({ ok: true, item: product });
+      } catch (err) {
+        console.error('[PRODUCTS] Error fetching product:', err.message);
+        return res.status(500).json({ ok: false, error: err.message });
       }
-      console.log('[PRODUCTS] Product found:', { _id: product._id, name: product.name });
-      return res.json({ ok: true, item: product });
     }
 
     // GET list of products

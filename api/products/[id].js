@@ -44,15 +44,23 @@ export default async function handler(req, res) {
     // GET single product
     if (req.method === 'GET') {
       console.log('[PRODUCTS/ID] Fetching product:', id);
-      const product = await Product.findById(id).lean().maxTimeMS(8000);
-      
-      if (!product) {
-        console.log('[PRODUCTS/ID] Product not found:', id);
-        return res.status(404).json({ ok: false, error: 'Product not found' });
+      try {
+        const product = await Product.findById(id).lean().maxTimeMS(8000);
+        
+        if (!product) {
+          console.log('[PRODUCTS/ID] Product not found:', id);
+          // Debug: check if ANY products exist
+          const count = await Product.countDocuments({}).maxTimeMS(8000);
+          console.log('[PRODUCTS/ID] Total products in DB:', count);
+          return res.status(404).json({ ok: false, error: 'Product not found' });
+        }
+        
+        console.log('[PRODUCTS/ID] Product found:', { _id: product._id, name: product.name });
+        return res.json({ ok: true, item: product });
+      } catch (err) {
+        console.error('[PRODUCTS/ID] Error:', err.message);
+        return res.status(500).json({ ok: false, error: err.message });
       }
-      
-      console.log('[PRODUCTS/ID] Product found:', { _id: product._id, name: product.name });
-      return res.json({ ok: true, item: product });
     }
 
     // PUT update product
