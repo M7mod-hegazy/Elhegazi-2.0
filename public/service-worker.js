@@ -3,7 +3,7 @@
  * Caches critical assets for instant load and offline support
  */
 
-const CACHE_NAME = 'app-cache-v1';
+const CACHE_NAME = 'app-cache-v2';
 const RUNTIME_CACHE = 'runtime-cache-v1';
 const IMAGE_CACHE = 'image-cache-v1';
 
@@ -159,6 +159,12 @@ self.addEventListener('fetch', (event) => {
       return fetch(request).then((response) => {
         // Cache successful responses
         if (response.ok && (request.destination === 'style' || request.destination === 'script')) {
+          // STRICT CHECK: Never cache HTML for scripts or styles
+          const contentType = response.headers.get('content-type');
+          if (contentType && contentType.includes('text/html')) {
+            return response;
+          }
+
           const responseClone = response.clone();
           caches.open(RUNTIME_CACHE).then((cache) => {
             cache.put(request, responseClone);
