@@ -161,25 +161,21 @@ const Index = () => {
     </div>
   );
   const promoStripBlock = homeCfg?.promoEnabled && homeCfg?.promoText ? (
-    <EnhancedScrollAnimation animation="slideInDown" duration={700} delay={60}>
-      <Suspense fallback={<div className="h-12 bg-slate-100 animate-pulse" />}>
-        <PromoStrip text={homeCfg.promoText} icon={homeCfg.promoIcon} />
-      </Suspense>
-    </EnhancedScrollAnimation>
+    <Suspense fallback={<div className="h-12 bg-slate-100 animate-pulse" />}>
+      <PromoStrip text={homeCfg.promoText} icon={homeCfg.promoIcon} />
+    </Suspense>
   ) : null;
   const categoriesBlock = (
-    <EnhancedScrollAnimation animation="slideInUp" duration={900} delay={100}>
-      <Suspense fallback={<div className="h-40 bg-slate-100 animate-pulse rounded-xl" />}>
-        <CreativeCategoriesSlider selectedSlugs={homeCfg?.featuredCategorySlugs} />
-      </Suspense>
-    </EnhancedScrollAnimation>
+    <Suspense fallback={<div className="h-40 bg-slate-100 animate-pulse rounded-xl" />}>
+      <CreativeCategoriesSlider selectedSlugs={homeCfg?.featuredCategorySlugs} />
+    </Suspense>
   );
   const featuredBlock = toggles['featuredProducts'] !== false ? (
     <section className="relative py-8 md:py-12 bg-white overflow-hidden">
       {/* Simple gradient line divider */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
-      {/* MEGA Enhanced Background with Mesh Gradient */}
-      <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(var(--primary-rgb, 59, 130, 246), 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(var(--secondary-rgb, 168, 85, 247), 0.1) 0%, transparent 50%)' }}></div>
+      {/* MEGA Enhanced Background with Mesh Gradient - Hidden on Mobile */}
+      <div className="absolute inset-0 opacity-30 hidden md:block" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(var(--primary-rgb, 59, 130, 246), 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(var(--secondary-rgb, 168, 85, 247), 0.1) 0%, transparent 50%)' }}></div>
 
       {/* Multi-layer Parallax Orbs */}
       <ParallaxSection speed={-0.2} intensity="strong" scale className="absolute inset-0 opacity-50 hidden md:block">
@@ -232,26 +228,24 @@ const Index = () => {
           </div>
         ))}
       </div>
-      <EnhancedScrollAnimation animation="slideInRight" duration={1000} delay={120}>
-        <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
-          <CreativeProductsSlider
-            title={sectionCfg.featuredProducts?.title || 'المنتجات المميزة'}
-            subtitle={sectionCfg.featuredProducts?.subtitle || 'اكتشف أفضل منتجاتنا المختارة بعناية لتلبية احتياجاتك'}
-            filterType="featured"
-            gradientFrom="from-primary"
-            gradientTo="to-secondary"
-            icon={getIcon(sectionCfg.featuredProducts?.icon, <Crown className="w-12 h-12 text-white" />)}
-            selectedIds={homeCfg?.featuredProductIds}
-          />
-        </Suspense>
-      </EnhancedScrollAnimation>
+      <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
+        <CreativeProductsSlider
+          title={sectionCfg.featuredProducts?.title || 'المنتجات المميزة'}
+          subtitle={sectionCfg.featuredProducts?.subtitle || 'اكتشف أفضل منتجاتنا المختارة بعناية لتلبية احتياجاتك'}
+          filterType="featured"
+          gradientFrom="from-primary"
+          gradientTo="to-secondary"
+          icon={getIcon(sectionCfg.featuredProducts?.icon, <Crown className="w-12 h-12 text-white" />)}
+          selectedIds={homeCfg?.featuredProductIds}
+        />
+      </Suspense>
     </section>
   ) : null;
   const bestSellersBlock = toggles['bestSellers'] !== false ? (
     <section className="relative py-8 md:py-12 bg-slate-50 overflow-hidden">
       {/* Simple gradient line divider */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
-      {/* MEGA Grid Pattern with Parallax */}
+      {/* MEGA Grid Pattern with Parallax - Hidden on Mobile */}
       <ParallaxSection speed={-0.15} intensity="medium" className="absolute inset-0 opacity-[0.04] hidden md:block" style={{ backgroundImage: 'radial-gradient(circle, #000 1.5px, transparent 1.5px)', backgroundSize: '30px 30px' }}></ParallaxSection>
       <ParallaxSection speed={-0.25} intensity="medium" className="absolute inset-0 opacity-[0.02] hidden md:block" style={{ backgroundImage: 'linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)', backgroundSize: '50px 50px' }}></ParallaxSection>
 
@@ -299,19 +293,17 @@ const Index = () => {
           </div>
         ))}
       </div>
-      <EnhancedScrollAnimation animation="slideInLeft" duration={1000} delay={120}>
-        <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
-          <CreativeProductsSlider
-            title={sectionCfg.bestSellers?.title || 'الأكثر مبيعاً'}
-            subtitle={sectionCfg.bestSellers?.subtitle || 'المنتجات الأكثر طلباً من قبل عملائنا الكرام'}
-            filterType="trending"
-            gradientFrom="from-success"
-            gradientTo="to-success"
-            icon={getIcon(sectionCfg.bestSellers?.icon, <TrendingUp className="w-12 h-12 text-white" />)}
-            selectedIds={homeCfg?.bestSellerProductIds}
-          />
-        </Suspense>
-      </EnhancedScrollAnimation>
+      <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
+        <CreativeProductsSlider
+          title={sectionCfg.bestSellers?.title || 'الأكثر مبيعاً'}
+          subtitle={sectionCfg.bestSellers?.subtitle || 'المنتجات الأكثر طلباً من قبل عملائنا الكرام'}
+          filterType="trending"
+          gradientFrom="from-success"
+          gradientTo="to-success"
+          icon={getIcon(sectionCfg.bestSellers?.icon, <TrendingUp className="w-12 h-12 text-white" />)}
+          selectedIds={homeCfg?.bestSellerProductIds}
+        />
+      </Suspense>
     </section>
   ) : null;
   const aboutBlock = (
@@ -369,7 +361,7 @@ const Index = () => {
     <section className="relative py-8 md:py-12 bg-slate-50 overflow-hidden">
       {/* Simple gradient line divider */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-200 to-transparent"></div>
-      {/* MEGA SALE Background Effect */}
+      {/* MEGA SALE Background Effect - Hidden on Mobile */}
       <div className="absolute inset-0 opacity-20 hidden md:block" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(239, 68, 68, 0.05) 35px, rgba(239, 68, 68, 0.05) 70px)' }}></div>
 
       {/* Fire/Heat Wave Effect */}
@@ -443,26 +435,24 @@ const Index = () => {
           </div>
         ))}
       </div>
-      <EnhancedScrollAnimation animation="scaleIn" duration={1000}>
-        <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
-          <CreativeProductsSlider
-            title={sectionCfg.sale?.title || 'عروض خاصة'}
-            subtitle={sectionCfg.sale?.subtitle || 'خصومات حصرية وعروض لا تُفوت لفترة محدودة'}
-            filterType="sale"
-            gradientFrom="from-red-600"
-            gradientTo="to-pink-600"
-            icon={getIcon(sectionCfg.sale?.icon, <Flame className="w-12 h-12 text-white" />)}
-            selectedIds={homeCfg?.saleProductIds}
-          />
-        </Suspense>
-      </EnhancedScrollAnimation>
+      <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
+        <CreativeProductsSlider
+          title={sectionCfg.sale?.title || 'عروض خاصة'}
+          subtitle={sectionCfg.sale?.subtitle || 'خصومات حصرية وعروض لا تُفوت لفترة محدودة'}
+          filterType="sale"
+          gradientFrom="from-red-600"
+          gradientTo="to-pink-600"
+          icon={getIcon(sectionCfg.sale?.icon, <Flame className="w-12 h-12 text-white" />)}
+          selectedIds={homeCfg?.saleProductIds}
+        />
+      </Suspense>
     </section>
   ) : null;
   const newArrivalsBlock = toggles['newArrivals'] !== false ? (
     <section className="relative py-8 md:py-12 bg-white overflow-hidden">
       {/* Simple gradient line divider */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
-      {/* MEGA Pattern Overlay */}
+      {/* MEGA Pattern Overlay - Hidden on Mobile */}
       <ParallaxSection speed={-0.2} intensity="medium" className="absolute inset-0 opacity-[0.025] hidden md:block" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%)', backgroundSize: '25px 25px' }}></ParallaxSection>
       <ParallaxSection speed={-0.3} intensity="medium" className="absolute inset-0 opacity-[0.015] hidden md:block" style={{ backgroundImage: 'repeating-linear-gradient(-45deg, #000 0, #000 1px, transparent 0, transparent 50%)', backgroundSize: '25px 25px' }}></ParallaxSection>
 

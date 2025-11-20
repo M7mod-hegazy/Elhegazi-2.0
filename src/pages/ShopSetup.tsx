@@ -81,7 +81,8 @@ export default function ShopSetup() {
       if (resp.ok) {
         toast({ title: 'نجح', description: 'تم حفظ بيانات المتجر بنجاح' });
         window.dispatchEvent(new Event('shop-setup-updated'));
-        setTimeout(() => navigate('/shop-builder'), 500);
+        // Navigate with state to bypass redirect check
+        setTimeout(() => navigate('/shop-builder', { state: { fromSetup: true } }), 500);
       } else {
         toast({ title: 'خطأ', description: 'فشل حفظ البيانات', variant: 'destructive' });
       }

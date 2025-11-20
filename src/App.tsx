@@ -37,7 +37,12 @@ const Contact = lazy(() => import("./pages/Contact"));
 const Locations = lazy(() => import("./pages/Locations"));
 const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const EnhancedOrderTracking = lazy(() => import("./pages/EnhancedOrderTracking"));
-const ShopBuilder3DPage = lazy(() => import("@/features/shop-builder/ShopBuilder3DPage"));
+const ShopBuilder3DPage = lazy(() => 
+  import("@/features/shop-builder/ShopBuilder3DPage").catch(() => {
+    // Fallback if import fails
+    return { default: () => <div className="flex items-center justify-center h-screen"><p>Failed to load Shop Builder. Please refresh the page.</p></div> };
+  })
+);
 const ShopSetup = lazy(() => import("./pages/ShopSetup"));
 const PublicOrderTracking = lazy(() => import("./pages/PublicOrderTracking"));
 const OrderHistory = lazy(() => import("./pages/OrderHistory"));

@@ -135,8 +135,32 @@ const Belt: React.FC<{ products: Product[]; speedPxPerSec?: number; sets?: numbe
         className="relative overflow-hidden h-[calc(100vh-4rem)] max-h-[700px] min-h-[450px] flex items-center justify-center"
       >
         <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
-        <div className="relative z-10 px-6 py-8 bg-black/30 rounded-xl border border-white/10 text-white/90 text-center">
-          لا توجد شرائح مضافة بعد. يرجى إضافة شريحة من لوحة التحكم.
+        {/* Loading Skeleton */}
+        <div className="relative z-10 w-full h-full flex items-center justify-center px-4">
+          <div className="flex flex-col items-center gap-6">
+            {/* Animated Loading Spinner */}
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full border-4 border-slate-700"></div>
+              <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary border-r-primary animate-spin"></div>
+            </div>
+            
+            {/* Loading Pulse Dots */}
+            <div className="flex gap-2">
+              {[0, 1, 2].map((i) => (
+                <div
+                  key={i}
+                  className="w-2 h-2 rounded-full bg-primary"
+                  style={{
+                    animation: `pulse 1.5s ease-in-out infinite`,
+                    animationDelay: `${i * 0.2}s`
+                  }}
+                />
+              ))}
+            </div>
+            
+            {/* Loading Text */}
+            <p className="text-white/70 text-sm font-medium">جاري التحميل...</p>
+          </div>
         </div>
       </section>
     );
