@@ -3,7 +3,7 @@
  * Caches critical assets for instant load and offline support
  */
 
-const CACHE_NAME = 'app-cache-v2';
+const CACHE_NAME = 'app-cache-v3';
 const RUNTIME_CACHE = 'runtime-cache-v1';
 const IMAGE_CACHE = 'image-cache-v1';
 
@@ -11,7 +11,6 @@ const IMAGE_CACHE = 'image-cache-v1';
 const CRITICAL_ASSETS = [
   '/',
   '/index.html',
-  '/manifest.json',
   '/iconPng.png',
   '/favicon.ico',
 ];
@@ -150,6 +149,29 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Handle navigation requests (HTML) - Network First, Cache Fallback
+  // This ensures the user always gets the latest version of the app
+  if (request.mode === 'navigate') {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          // Cache the fresh version
+          if (response.ok) {
+            const responseClone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() => {
+          // Fallback to cache if offline
+          return caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
   // Handle other requests - cache first, network fallback
   event.respondWith(
     caches.match(request).then((response) => {
@@ -172,10 +194,6 @@ self.addEventListener('fetch', (event) => {
         }
         return response;
       }).catch(() => {
-        // Return offline page for navigation requests
-        if (request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
         return new Response('Offline', { status: 503 });
       });
     })
