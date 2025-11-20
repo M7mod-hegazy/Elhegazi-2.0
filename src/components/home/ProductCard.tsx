@@ -147,14 +147,21 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-700 ease-out"></div>
             </div>
             
-            <div className="flex items-center gap-1 mb-2" onMouseLeave={handleStarLeave}>
-              {renderStars(product.rating)}
-              <span 
-                className="text-xs text-white/60 ml-1 cursor-pointer hover:text-white/80 transition-colors"
-                onClick={(e) => handleRatingClick(e)}
-              >
-                ({product.reviews})
-              </span>
+            <div className="flex items-center gap-2 mb-2" onMouseLeave={handleStarLeave}>
+              <div className="flex items-center gap-1">
+                {renderStars(product.rating)}
+                <span 
+                  className="text-xs text-white/60 ml-1 cursor-pointer hover:text-white/80 transition-colors"
+                  onClick={(e) => handleRatingClick(e)}
+                >
+                  ({product.reviews})
+                </span>
+              </div>
+              {product.sku && (
+                <span className="text-xs font-semibold text-white bg-white/20 px-1.5 py-0.5 rounded-sm border border-white/30 hover:border-white/60 transition-colors">
+                  {product.sku}
+                </span>
+              )}
             </div>
             
             <div className="flex items-center justify-between">

@@ -35,6 +35,7 @@ type ApiCategory = {
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authAction, setAuthAction] = useState<'cart' | 'favorites' | 'general'>('general');
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
   const [hoveredCatId, setHoveredCatId] = useState<string | null>(null);
   const [loadingCategories, setLoadingCategories] = useState<boolean>(true);
@@ -128,453 +129,449 @@ const Navbar = () => {
 
   return (
     <>
-    <nav className="bg-card border-b border-border sticky top-0 z-50 shadow-card">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <div
-            className={
-              prefersReducedMotion
-                ? ''
-                : `transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`
-            }
-            style={prefersReducedMotion ? undefined : { transitionDelay: '120ms' }}
-          >
-            <Logo size="xl" showText={false} />
-          </div>
+      <nav className="bg-card border-b border-border sticky top-0 z-50 shadow-card">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo */}
+            <div
+              className={
+                prefersReducedMotion
+                  ? ''
+                  : `transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`
+              }
+              style={prefersReducedMotion ? undefined : { transitionDelay: '120ms' }}
+            >
+              <Logo size="xl" showText={false} />
+            </div>
 
-          {/* Desktop Navigation */}
-          <div className="hidden lg:flex items-center space-x-8 space-x-reverse">
-            {mainNavItems.map((item, idx) => {
-              // Special handling for products with categories dropdown
-              if (item.path === '/products') {
-                return (
-                  <DropdownMenu key={item.path}>
-                    <DropdownMenuTrigger
-                      className={`nav-link transition-all duration-300 ease-out flex items-center gap-1 ${
-                        isActivePath(item.path) || location.pathname.startsWith('/category') ? 'nav-link-active' : ''
-                      } ${mounted ? 'animate-in fade-in slide-in-from-top-2 duration-1100' : ''}`}
-                      style={mounted ? { animationDelay: `${idx * 160}ms` } : undefined}
-                    >
-                      {item.label}
-                      <ChevronDown className="w-4 h-4" />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-[560px] p-0 overflow-hidden">
-                      <div className="flex">
-                        {/* Left: list */}
-                        <div className="w-1/2 max-h-96 overflow-y-auto p-2">
-                          {/* Quick Links with Images */}
-                          <div className="px-2 mb-2">
-                            <DropdownMenuItem asChild>
-                              <Link to="/products" className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10">
-                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0">
-                                  <Package className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="font-semibold text-sm">جميع المنتجات</div>
-                                  <div className="text-xs text-muted-foreground">تصفح كامل المتجر</div>
-                                </div>
-                              </Link>
-                            </DropdownMenuItem>
-                          </div>
-                          
-                          <div className="px-2 mb-3">
-                            <DropdownMenuItem asChild>
-                              <Link to="/categories" className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10">
-                                <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-secondary to-primary flex items-center justify-center flex-shrink-0">
-                                  <Menu className="w-5 h-5 text-white" />
-                                </div>
-                                <div className="flex-1">
-                                  <div className="font-semibold text-sm">كل الأقسام</div>
-                                  <div className="text-xs text-muted-foreground">استعرض حسب القسم</div>
-                                </div>
-                              </Link>
-                            </DropdownMenuItem>
-                          </div>
-                          
-                          {/* Separator */}
-                          <DropdownMenuSeparator className="my-2" />
-                          
-                          {/* Categories List */}
-                          <div className="px-2 mb-1">
-                            <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">الأقسام</div>
-                          </div>
-                          
-                          {loadingCategories ? (
-                            Array.from({ length: 8 }).map((_, i) => (
-                              <div key={i} className="px-2 py-2">
-                                <div className="h-4 w-40 bg-muted animate-pulse rounded" />
-                              </div>
-                            ))
-                          ) : (
-                            liveCategories
-                              .slice()
-                              .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.nameAr.localeCompare(b.nameAr))
-                              .slice(0, 12)
-                              .map((category) => (
-                                <div
-                                  key={category.id}
-                                  onMouseEnter={() => setHoveredCatId(category.id)}
-                                  onMouseLeave={() => setHoveredCatId((prev) => (prev === category.id ? null : prev))}
-                                  className="px-2"
-                                >
-                                  <DropdownMenuItem asChild>
-                                    <Link to={`/category/${category.slug}`} className="w-full flex items-center justify-between">
-                                      <span>{category.nameAr}</span>
-                                      {typeof category.productCount === 'number' && (
-                                        <span className="text-xs text-muted-foreground">{category.productCount}</span>
-                                      )}
-                                    </Link>
-                                  </DropdownMenuItem>
+            {/* Desktop Navigation */}
+            <div className="hidden lg:flex items-center space-x-8 space-x-reverse">
+              {mainNavItems.map((item, idx) => {
+                // Special handling for products with categories dropdown
+                if (item.path === '/products') {
+                  return (
+                    <DropdownMenu key={item.path}>
+                      <DropdownMenuTrigger
+                        className={`nav-link transition-all duration-300 ease-out flex items-center gap-1 ${isActivePath(item.path) || location.pathname.startsWith('/category') ? 'nav-link-active' : ''
+                          } ${mounted ? 'animate-in fade-in slide-in-from-top-2 duration-1100' : ''}`}
+                        style={mounted ? { animationDelay: `${idx * 160}ms` } : undefined}
+                      >
+                        {item.label}
+                        <ChevronDown className="w-4 h-4" />
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-[560px] p-0 overflow-hidden">
+                        <div className="flex">
+                          {/* Left: list */}
+                          <div className="w-1/2 max-h-96 overflow-y-auto p-2">
+                            {/* Quick Links with Images */}
+                            <div className="px-2 mb-2">
+                              <DropdownMenuItem asChild>
+                                <Link to="/products" className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10">
+                                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary to-secondary flex items-center justify-center flex-shrink-0">
+                                    <Package className="w-5 h-5 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="font-semibold text-sm">جميع المنتجات</div>
+                                    <div className="text-xs text-muted-foreground">تصفح كامل المتجر</div>
+                                  </div>
+                                </Link>
+                              </DropdownMenuItem>
+                            </div>
+
+                            <div className="px-2 mb-3">
+                              <DropdownMenuItem asChild>
+                                <Link to="/categories" className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-primary/10">
+                                  <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-secondary to-primary flex items-center justify-center flex-shrink-0">
+                                    <Menu className="w-5 h-5 text-white" />
+                                  </div>
+                                  <div className="flex-1">
+                                    <div className="font-semibold text-sm">كل الأقسام</div>
+                                    <div className="text-xs text-muted-foreground">استعرض حسب القسم</div>
+                                  </div>
+                                </Link>
+                              </DropdownMenuItem>
+                            </div>
+
+                            {/* Separator */}
+                            <DropdownMenuSeparator className="my-2" />
+
+                            {/* Categories List */}
+                            <div className="px-2 mb-1">
+                              <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">الأقسام</div>
+                            </div>
+
+                            {loadingCategories ? (
+                              Array.from({ length: 8 }).map((_, i) => (
+                                <div key={i} className="px-2 py-2">
+                                  <div className="h-4 w-40 bg-muted animate-pulse rounded" />
                                 </div>
                               ))
-                          )}
-                        </div>
-                        {/* Right: preview */}
-                        <div className="w-1/2 relative bg-gradient-to-br from-purple-50 to-pink-50 hidden md:block">
-                          {(() => {
-                            const cat = (hoveredCatId && liveCategories.find(c => c.id === hoveredCatId)) || liveCategories[0];
-                            if (!cat) return null;
-                            return (
-                              <div className="h-96 p-3 flex items-center justify-center">
-                                <div className="relative w-full h-full rounded-lg overflow-hidden shadow-lg">
-                                  <img
-                                    src={cat.image}
-                                    alt={cat.nameAr}
-                                    className="w-full h-full object-cover transition-transform duration-700 ease-out will-change-transform"
-                                    style={{ transform: hoveredCatId ? 'scale(1.06) rotate(0.5deg)' : 'scale(1.02)' }}
-                                  />
-                                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
-                                  <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                                    <div className="text-white">
-                                      <div className="text-sm opacity-90">فئة</div>
-                                      <div className="text-lg font-bold drop-shadow">{cat.nameAr}</div>
-                                    </div>
-                                    {typeof cat.productCount === 'number' && (
-                                      <div className="bg-white/90 text-slate-800 text-xs px-2 py-1 rounded-full shadow">
-                                        {cat.productCount} منتج
-                                      </div>
-                                    )}
+                            ) : (
+                              liveCategories
+                                .slice()
+                                .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.nameAr.localeCompare(b.nameAr))
+                                .slice(0, 12)
+                                .map((category) => (
+                                  <div
+                                    key={category.id}
+                                    onMouseEnter={() => setHoveredCatId(category.id)}
+                                    onMouseLeave={() => setHoveredCatId((prev) => (prev === category.id ? null : prev))}
+                                    className="px-2"
+                                  >
+                                    <DropdownMenuItem asChild>
+                                      <Link to={`/category/${category.slug}`} className="w-full flex items-center justify-between">
+                                        <span>{category.nameAr}</span>
+                                        {typeof category.productCount === 'number' && (
+                                          <span className="text-xs text-muted-foreground">{category.productCount}</span>
+                                        )}
+                                      </Link>
+                                    </DropdownMenuItem>
                                   </div>
-                                  {/* shimmer */}
-                                  <div className="absolute inset-0 pointer-events-none">
-                                    <div className="absolute -inset-[40%] bg-gradient-to-r from-transparent via-white/10 to-transparent rotate-12 animate-[shimmer_2.2s_infinite]" />
+                                ))
+                            )}
+                          </div>
+                          {/* Right: preview */}
+                          <div className="w-1/2 relative bg-gradient-to-br from-purple-50 to-pink-50 hidden md:block">
+                            {(() => {
+                              const cat = (hoveredCatId && liveCategories.find(c => c.id === hoveredCatId)) || liveCategories[0];
+                              if (!cat) return null;
+                              return (
+                                <div className="h-96 p-3 flex items-center justify-center">
+                                  <div className="relative w-full h-full rounded-lg overflow-hidden shadow-lg">
+                                    <img
+                                      src={cat.image}
+                                      alt={cat.nameAr}
+                                      className="w-full h-full object-cover transition-transform duration-700 ease-out will-change-transform"
+                                      style={{ transform: hoveredCatId ? 'scale(1.06) rotate(0.5deg)' : 'scale(1.02)' }}
+                                    />
+                                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
+                                    <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                                      <div className="text-white">
+                                        <div className="text-sm opacity-90">فئة</div>
+                                        <div className="text-lg font-bold drop-shadow">{cat.nameAr}</div>
+                                      </div>
+                                      {typeof cat.productCount === 'number' && (
+                                        <div className="bg-white/90 text-slate-800 text-xs px-2 py-1 rounded-full shadow">
+                                          {cat.productCount} منتج
+                                        </div>
+                                      )}
+                                    </div>
+                                    {/* shimmer */}
+                                    <div className="absolute inset-0 pointer-events-none">
+                                      <div className="absolute -inset-[40%] bg-gradient-to-r from-transparent via-white/10 to-transparent rotate-12 animate-[shimmer_2.2s_infinite]" />
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })()}
+                              );
+                            })()}
+                          </div>
                         </div>
-                      </div>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                );
-              }
-
-              return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`nav-link transition-all duration-300 ease-out ${
-                    isActivePath(item.path) ? 'nav-link-active' : ''
-                  } ${mounted ? 'animate-in fade-in slide-in-from-top-2 duration-1100' : ''}`}
-                  style={mounted ? { animationDelay: `${idx * 160}ms` } : undefined}
-                >
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-
-          {/* Search Bar - Desktop */}
-          <div
-            className={`hidden md:block flex-1 max-w-md mx-8 ${
-              prefersReducedMotion ? '' : `transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`
-            }`}
-            style={prefersReducedMotion ? undefined : { transitionDelay: '280ms' }}
-          >
-            <SearchSuggestions
-              placeholder="البحث عن المنتجات..."
-              onSearch={() => setIsMobileMenuOpen(false)}
-            />
-          </div>
-
-          {/* Actions */}
-          <div
-            className={`flex items-center space-x-4 space-x-reverse ${
-              prefersReducedMotion ? '' : `transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`
-            }`}
-            style={prefersReducedMotion ? undefined : { transitionDelay: '360ms' }}
-          >
-            {/* Favorites Button - Available for all users */}
-            <Link
-              to={isAuthenticated && !isAdmin ? "/favorites" : "#"}
-              onClick={(e) => {
-                if (!isAuthenticated || isAdmin) {
-                  e.preventDefault();
-                  setShowAuthModal(true);
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  );
                 }
-              }}
-              className="relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out"
+
+                return (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    className={`nav-link transition-all duration-300 ease-out ${isActivePath(item.path) ? 'nav-link-active' : ''
+                      } ${mounted ? 'animate-in fade-in slide-in-from-top-2 duration-1100' : ''}`}
+                    style={mounted ? { animationDelay: `${idx * 160}ms` } : undefined}
+                  >
+                    {item.label}
+                  </Link>
+                );
+              })}
+            </div>
+
+            {/* Search Bar - Desktop */}
+            <div
+              className={`hidden md:block flex-1 max-w-md mx-8 ${prefersReducedMotion ? '' : `transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`
+                }`}
+              style={prefersReducedMotion ? undefined : { transitionDelay: '280ms' }}
             >
-              <Heart className="w-6 h-6 text-foreground" />
-              {isAuthenticated && !isAdmin && favoritesCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full px-1">
-                  {favoritesCount > 99 ? '99+' : favoritesCount}
-                </Badge>
-              )}
-            </Link>
-
-            {/* Cart Button - Hidden when prices are hidden */}
-            {!hidePrices && (
-              <Link
-                to="/cart"
-                className="relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out group"
-              >
-                <ShoppingCart className="w-6 h-6 text-foreground group-hover:scale-110 transition-transform duration-200" />
-                {itemCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full px-1 animate-in zoom-in duration-300 shadow-lg">
-                    {itemCount > 99 ? '99+' : itemCount}
-                  </Badge>
-                )}
-              </Link>
-            )}
-
-            {/* User Menu */}
-            {isAuthenticated ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="flex items-center space-x-2 space-x-reverse">
-                    <User className="w-5 h-5" />
-                    <span className="hidden md:inline">{displayName}</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuItem asChild>
-                    <Link to="/profile" className="flex items-center space-x-2 space-x-reverse">
-                      <User className="w-4 h-4" />
-                      <span>الملف الشخصي</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link to="/orders" className="flex items-center space-x-2 space-x-reverse">
-                      <Package className="w-4 h-4" />
-                      <span>طلباتي</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  {isAdmin && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem asChild>
-                        <Link to="/admin/dashboard" className="flex items-center space-x-2 space-x-reverse">
-                          <Settings className="w-4 h-4" />
-                          <span>لوحة الإدارة</span>
-                        </Link>
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                    <LogOut className="w-4 h-4 ml-2" />
-                    <span>تسجيل الخروج</span>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : (
-              <div className="hidden lg:flex items-center space-x-2 space-x-reverse">
-                <Button variant="ghost" size="sm" asChild>
-                  <Link to="/login">تسجيل الدخول</Link>
-                </Button>
-                <Button size="sm" asChild>
-                  <Link to="/register">إنشاء حساب</Link>
-                </Button>
-              </div>
-            )}
-
-            {/* Mobile Icons - Only show if prices are visible */}
-            {!hidePrices && (
-              <div className="lg:hidden flex items-center gap-2">
-                {/* Heart/Favorites */}
-                <Link
-                  to="/favorites"
-                  className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
-                >
-                  <Heart className="w-5 h-5" />
-                  {favoritesCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                      {favoritesCount}
-                    </Badge>
-                  )}
-                </Link>
-
-                {/* Cart */}
-                <Link
-                  to="/cart"
-                  className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
-                >
-                  <ShoppingCart className="w-5 h-5" />
-                  {itemCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                      {itemCount}
-                    </Badge>
-                  )}
-                </Link>
-              </div>
-            )}
-
-            {/* Mobile Menu Toggle */}
-            <button
-              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="lg:hidden p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out"
-            >
-              {isMobileMenuOpen ? (
-                <X className="w-6 h-6" />
-              ) : (
-                <Menu className="w-6 h-6" />
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMobileMenuOpen && (
-          <div className="lg:hidden border-t border-border bg-gradient-to-b from-background to-muted/30 py-4 animate-fade-in max-h-[calc(100vh-4rem)] overflow-y-auto">
-            {/* Mobile Search */}
-            <div className="mb-6 px-4">
               <SearchSuggestions
                 placeholder="البحث عن المنتجات..."
                 onSearch={() => setIsMobileMenuOpen(false)}
               />
             </div>
 
-            {/* Mobile Navigation Links */}
-            <div className="space-y-1 mb-6">
-              {mainNavItems.map((item) => (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={`block py-3 px-4 rounded-lg transition-all duration-300 ease-out font-medium ${
-                    isActivePath(item.path)
-                      ? 'bg-primary text-primary-foreground shadow-md'
-                      : 'hover:bg-muted/80 text-foreground'
-                  }`}
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </div>
-
-            {/* Divider */}
-            <div className="h-px bg-border my-4" />
-              
-            {/* Mobile Category Links */}
-            <div className="mb-6">
-              <div className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">الفئات</div>
-              <div className="space-y-1">
-                {loadingCategories ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="px-4 py-2">
-                      <div className="h-4 w-32 bg-muted animate-pulse rounded" />
-                    </div>
-                  ))
-                ) : (
-                  liveCategories
-                    .slice()
-                    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.nameAr.localeCompare(b.nameAr))
-                    .slice(0, 8)
-                    .map((category) => (
-                      <Link
-                        key={category.id}
-                        to={`/category/${category.slug}`}
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="block py-2 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out text-sm"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span>{category.nameAr}</span>
-                          {typeof category.productCount === 'number' && (
-                            <span className="text-xs text-slate-500 bg-muted px-2 py-1 rounded-full">{category.productCount}</span>
-                          )}
-                        </div>
-                      </Link>
-                    ))
+            {/* Actions */}
+            <div
+              className={`flex items-center space-x-4 space-x-reverse ${prefersReducedMotion ? '' : `transition-all duration-1000 ease-out ${mounted ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-6'}`
+                }`}
+              style={prefersReducedMotion ? undefined : { transitionDelay: '360ms' }}
+            >
+              {/* Favorites Button - Available for all users */}
+              <Link
+                to={isAuthenticated && !isAdmin ? "/favorites" : "#"}
+                onClick={(e) => {
+                  if (!isAuthenticated || isAdmin) {
+                    e.preventDefault();
+                    setAuthAction('favorites');
+                    setShowAuthModal(true);
+                  }
+                }}
+                className="relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out"
+              >
+                <Heart className="w-6 h-6 text-foreground" />
+                {isAuthenticated && !isAdmin && favoritesCount > 0 && (
+                  <Badge className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full px-1">
+                    {favoritesCount > 99 ? '99+' : favoritesCount}
+                  </Badge>
                 )}
-              </div>
-            </div>
+              </Link>
 
-            {/* Divider */}
-            <div className="h-px bg-border my-4" />
-              
-            {/* User Section */}
-            <div className="space-y-2">
+              {/* Cart Button - Hidden when prices are hidden */}
+              {!hidePrices && (
+                <Link
+                  to="/cart"
+                  className="relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out group"
+                >
+                  <ShoppingCart className="w-6 h-6 text-foreground group-hover:scale-110 transition-transform duration-200" />
+                  {itemCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full px-1 animate-in zoom-in duration-300 shadow-lg">
+                      {itemCount > 99 ? '99+' : itemCount}
+                    </Badge>
+                  )}
+                </Link>
+              )}
+
+              {/* User Menu */}
               {isAuthenticated ? (
-                <>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="flex items-center space-x-2 space-x-reverse">
+                      <User className="w-5 h-5" />
+                      <span className="hidden md:inline">{displayName}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem asChild>
+                      <Link to="/profile" className="flex items-center space-x-2 space-x-reverse">
+                        <User className="w-4 h-4" />
+                        <span>الملف الشخصي</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link to="/orders" className="flex items-center space-x-2 space-x-reverse">
+                        <Package className="w-4 h-4" />
+                        <span>طلباتي</span>
+                      </Link>
+                    </DropdownMenuItem>
+                    {isAdmin && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem asChild>
+                          <Link to="/admin/dashboard" className="flex items-center space-x-2 space-x-reverse">
+                            <Settings className="w-4 h-4" />
+                            <span>لوحة الإدارة</span>
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                      <LogOut className="w-4 h-4 ml-2" />
+                      <span>تسجيل الخروج</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : (
+                <div className="hidden lg:flex items-center space-x-2 space-x-reverse">
+                  <Button variant="ghost" size="sm" asChild>
+                    <Link to="/login">تسجيل الدخول</Link>
+                  </Button>
+                  <Button size="sm" asChild>
+                    <Link to="/register">إنشاء حساب</Link>
+                  </Button>
+                </div>
+              )}
+
+              {/* Mobile Icons - Only show if prices are visible */}
+              {!hidePrices && (
+                <div className="lg:hidden flex items-center gap-2">
+                  {/* Heart/Favorites */}
                   <Link
-                    to="/profile"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
+                    to="/favorites"
+                    className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
                   >
-                    <User className="w-4 h-4" />
-                    <span className="font-medium">الملف الشخصي</span>
+                    <Heart className="w-5 h-5" />
+                    {favoritesCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                        {favoritesCount}
+                      </Badge>
+                    )}
                   </Link>
+
+                  {/* Cart */}
                   <Link
-                    to="/orders"
-                    onClick={() => setIsMobileMenuOpen(false)}
-                    className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
+                    to="/cart"
+                    className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
                   >
-                    <Package className="w-4 h-4" />
-                    <span className="font-medium">طلباتي</span>
+                    <ShoppingCart className="w-5 h-5" />
+                    {itemCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                        {itemCount}
+                      </Badge>
+                    )}
                   </Link>
-                  {isAdmin && (
+                </div>
+              )}
+
+              {/* Mobile Menu Toggle */}
+              <button
+                onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                className="lg:hidden p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out"
+              >
+                {isMobileMenuOpen ? (
+                  <X className="w-6 h-6" />
+                ) : (
+                  <Menu className="w-6 h-6" />
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Mobile Menu */}
+          {isMobileMenuOpen && (
+            <div className="lg:hidden border-t border-border bg-gradient-to-b from-background to-muted/30 py-4 animate-fade-in max-h-[calc(100vh-4rem)] overflow-y-auto">
+              {/* Mobile Search */}
+              <div className="mb-6 px-4">
+                <SearchSuggestions
+                  placeholder="البحث عن المنتجات..."
+                  onSearch={() => setIsMobileMenuOpen(false)}
+                />
+              </div>
+
+              {/* Mobile Navigation Links */}
+              <div className="space-y-1 mb-6">
+                {mainNavItems.filter(item => item.path !== '/shop-builder').map((item) => (
+                  <Link
+                    key={item.path}
+                    to={item.path}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={`block py-3 px-4 rounded-lg transition-all duration-300 ease-out font-medium ${isActivePath(item.path)
+                        ? 'bg-primary text-primary-foreground shadow-md'
+                        : 'hover:bg-muted/80 text-foreground'
+                      }`}
+                  >
+                    {item.label}
+                  </Link>
+                ))}
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-border my-4" />
+
+              {/* Mobile Category Links */}
+              <div className="mb-6">
+                <div className="px-4 py-2 text-xs font-bold text-slate-500 uppercase tracking-wider">الفئات</div>
+                <div className="space-y-1">
+                  {loadingCategories ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="px-4 py-2">
+                        <div className="h-4 w-32 bg-muted animate-pulse rounded" />
+                      </div>
+                    ))
+                  ) : (
+                    liveCategories
+                      .slice()
+                      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.nameAr.localeCompare(b.nameAr))
+                      .slice(0, 8)
+                      .map((category) => (
+                        <Link
+                          key={category.id}
+                          to={`/category/${category.slug}`}
+                          onClick={() => setIsMobileMenuOpen(false)}
+                          className="block py-2 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out text-sm"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span>{category.nameAr}</span>
+                            {typeof category.productCount === 'number' && (
+                              <span className="text-xs text-slate-500 bg-muted px-2 py-1 rounded-full">{category.productCount}</span>
+                            )}
+                          </div>
+                        </Link>
+                      ))
+                  )}
+                </div>
+              </div>
+
+              {/* Divider */}
+              <div className="h-px bg-border my-4" />
+
+              {/* User Section */}
+              <div className="space-y-2">
+                {isAuthenticated ? (
+                  <>
                     <Link
-                      to="/admin/dashboard"
+                      to="/profile"
                       onClick={() => setIsMobileMenuOpen(false)}
                       className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
                     >
-                      <Settings className="w-4 h-4" />
-                      <span className="font-medium">لوحة الإدارة</span>
+                      <User className="w-4 h-4" />
+                      <span className="font-medium">الملف الشخصي</span>
                     </Link>
-                  )}
-                  <button
-                    onClick={() => {
-                      handleLogout();
-                      setIsMobileMenuOpen(false);
-                    }}
-                    className="flex items-center gap-2 w-full py-3 px-4 rounded-lg hover:bg-destructive/10 transition-all duration-300 ease-out text-destructive font-medium"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>تسجيل الخروج</span>
-                  </button>
-                </>
-              ) : (
-                <div className="space-y-3">
-                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-2">الحساب</p>
-                  <div className="flex gap-2 px-4">
-                    <Button variant="outline" size="sm" asChild className="flex-1">
-                      <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>
-                        تسجيل الدخول
+                    <Link
+                      to="/orders"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
+                    >
+                      <Package className="w-4 h-4" />
+                      <span className="font-medium">طلباتي</span>
+                    </Link>
+                    {isAdmin && (
+                      <Link
+                        to="/admin/dashboard"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
+                      >
+                        <Settings className="w-4 h-4" />
+                        <span className="font-medium">لوحة الإدارة</span>
                       </Link>
-                    </Button>
-                    <Button size="sm" asChild className="flex-1 bg-primary hover:bg-primary/90">
-                      <Link to="/register" onClick={() => setIsMobileMenuOpen(false)}>
-                        إنشاء حساب
-                      </Link>
-                    </Button>
+                    )}
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 w-full py-3 px-4 rounded-lg hover:bg-destructive/10 transition-all duration-300 ease-out text-destructive font-medium"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>تسجيل الخروج</span>
+                    </button>
+                  </>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-2">الحساب</p>
+                    <div className="flex gap-2 px-4">
+                      <Button variant="outline" size="sm" asChild className="flex-1">
+                        <Link to="/login" onClick={() => setIsMobileMenuOpen(false)}>
+                          تسجيل الدخول
+                        </Link>
+                      </Button>
+                      <Button size="sm" asChild className="flex-1 bg-primary hover:bg-primary/90">
+                        <Link to="/register" onClick={() => setIsMobileMenuOpen(false)}>
+                          إنشاء حساب
+                        </Link>
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          </div>
-        )}
-      </div>
-    </nav>
-    {showAuthModal && (
-      <AuthModal
-        isOpen={showAuthModal}
-        onClose={() => setShowAuthModal(false)}
-        action="cart"
-      />
-    )}
+          )}
+        </div>
+      </nav>
+      {showAuthModal && (
+        <AuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          action={authAction}
+        />
+      )}
     </>
   );
 };

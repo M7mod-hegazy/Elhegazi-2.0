@@ -58,6 +58,8 @@ const CreativeProductsSlider = ({
     stock?: number;
     featured?: boolean;
     active?: boolean;
+    rating?: number;
+    reviews?: number;
     createdAt: string;
     updatedAt: string;
   };
@@ -72,7 +74,7 @@ const CreativeProductsSlider = ({
             return;
           }
           const idsParam = encodeURIComponent(selectedIds.join(','));
-          const fields = ['_id','name','nameAr','price','image','images','categorySlug','featured','active','createdAt','updatedAt','stock'].join(',');
+          const fields = ['_id', 'name', 'nameAr', 'price', 'image', 'images', 'categorySlug', 'featured', 'active', 'createdAt', 'updatedAt', 'stock', 'sku', 'rating', 'reviews'].join(',');
           const res = await apiGet<ApiProduct>(`/api/products?ids=${idsParam}&fields=${fields}`);
           const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
           const mapped: Product[] = items.map((p) => ({
@@ -91,8 +93,8 @@ const CreativeProductsSlider = ({
             isHidden: p.active === false,
             featured: !!p.featured,
             discount: undefined,
-            rating: 0,
-            reviews: 0,
+            rating: p.rating ?? 0,
+            reviews: p.reviews ?? 0,
             tags: [],
             sku: p.sku ?? '',
             weight: undefined,
@@ -107,6 +109,8 @@ const CreativeProductsSlider = ({
         const params = new URLSearchParams();
         params.set('limit', '60');
         if (filterType === 'featured') params.set('featured', 'true');
+        const fields = ['_id', 'name', 'nameAr', 'price', 'image', 'images', 'categorySlug', 'featured', 'active', 'createdAt', 'updatedAt', 'stock', 'sku', 'rating', 'reviews'].join(',');
+        params.set('fields', fields);
         const res = await apiGet<ApiProduct>(`/api/products?${params.toString()}`);
         const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
         const mapped: Product[] = items.map((p) => ({
@@ -125,8 +129,8 @@ const CreativeProductsSlider = ({
           isHidden: p.active === false,
           featured: !!p.featured,
           discount: undefined,
-          rating: 0,
-          reviews: 0,
+          rating: p.rating ?? 0,
+          reviews: p.reviews ?? 0,
           tags: [],
           sku: p.sku ?? '',
           weight: undefined,
@@ -182,7 +186,7 @@ const CreativeProductsSlider = ({
   return (
     <section className="relative">
       <div className="container mx-auto px-4 max-w-7xl">
-        <ScrollAnimation animation="fadeIn" className="mb-6 md:mb-8">
+        <div className="mb-6 md:mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex-1">
               <div className="flex items-center gap-4 mb-4">
@@ -201,19 +205,19 @@ const CreativeProductsSlider = ({
                 {subtitle}
               </p>
             </div>
-            <Link 
-              to={getRedirectUrl()} 
+            <Link
+              to={getRedirectUrl()}
               className="hidden md:flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-primary hover:bg-primary/90 rounded-xl transition-all duration-300 hover:shadow-xl hover:scale-105 group"
             >
               عرض الكل
               <ChevronLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
             </Link>
           </div>
-        </ScrollAnimation>
+        </div>
 
-        <ScrollAnimation animation="slideUp" delay={300}>
+        <div>
           <div className="hidden md:block">
-            <ProductsDesktop 
+            <ProductsDesktop
               products={filteredProducts}
               loading={loading}
               hoveredProduct={hoveredProduct}
@@ -222,14 +226,14 @@ const CreativeProductsSlider = ({
             />
           </div>
           <div className="md:hidden">
-            <ProductsMobile 
+            <ProductsMobile
               products={filteredProducts}
               loading={loading}
               redirectUrl={getRedirectUrl()}
               hidePrices={hidePrices}
             />
           </div>
-        </ScrollAnimation>
+        </div>
       </div>
     </section>
   );

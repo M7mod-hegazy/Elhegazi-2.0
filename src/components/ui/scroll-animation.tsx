@@ -8,6 +8,9 @@ interface ScrollAnimationProps {
   duration?: number;
   threshold?: number;
   rootMargin?: string;
+  staggerIndex?: number;
+  staggerDelay?: number;
+  disabled?: boolean; // NEW: Disable animation for main sections
 }
 
 const ScrollAnimation = ({
@@ -17,18 +20,40 @@ const ScrollAnimation = ({
   delay = 0,
   duration = 400,
   threshold = 0.01,
-  rootMargin = '100px 0px -10% 0px'
+  rootMargin = '200px 0px 0px 0px',
+  staggerIndex = 0,
+  staggerDelay = 50,
+  disabled = false
 }: ScrollAnimationProps) => {
-  const [isVisible, setIsVisible] = useState(false);
+  const [isVisible, setIsVisible] = useState(disabled); // Show immediately if disabled
   const elementRef = useRef<HTMLDivElement>(null);
+  
+  // Check if user prefers reduced motion
+  const prefersReducedMotion = typeof window !== 'undefined' && 
+    window.matchMedia && 
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
   useEffect(() => {
+    // If animation is disabled, show immediately (no animation)
+    if (disabled) {
+      setIsVisible(true);
+      return;
+    }
+
+    // If user prefers reduced motion, show immediately
+    if (prefersReducedMotion) {
+      setIsVisible(true);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
+          // Add stagger delay if provided
+          const totalDelay = delay + (staggerIndex * staggerDelay);
           setTimeout(() => {
             setIsVisible(true);
-          }, delay);
+          }, totalDelay);
         }
       },
       { threshold, rootMargin }
@@ -44,38 +69,42 @@ const ScrollAnimation = ({
         observer.unobserve(currentElement);
       }
     };
-  }, [delay, threshold, rootMargin]);
+  }, [delay, threshold, rootMargin, prefersReducedMotion, staggerIndex, staggerDelay, disabled]);
 
-  const getAnimationClasses = () => {
-    const baseClasses = `transition-all ease-out`;
-    const durationClass = `duration-${duration}`;
-    
+  const getAnimationStyle = (): React.CSSProperties => {
+    const animDuration = prefersReducedMotion ? '0ms' : `${duration}ms`;
+    const baseStyle: React.CSSProperties = {
+      transition: `all ${animDuration} cubic-bezier(0.4, 0, 0.2, 1)`,
+      willChange: 'transform, opacity',
+    };
+
     if (!isVisible) {
       switch (animation) {
         case 'fadeIn':
-          return `${baseClasses} ${durationClass} opacity-0 translate-y-8`;
+          return { ...baseStyle, opacity: 0, transform: 'translateY(32px)' };
         case 'slideUp':
-          return `${baseClasses} ${durationClass} opacity-0 translate-y-16`;
+          return { ...baseStyle, opacity: 0, transform: 'translateY(64px)' };
         case 'slideLeft':
-          return `${baseClasses} ${durationClass} opacity-0 translate-x-16`;
+          return { ...baseStyle, opacity: 0, transform: 'translateX(64px)' };
         case 'slideRight':
-          return `${baseClasses} ${durationClass} opacity-0 -translate-x-16`;
+          return { ...baseStyle, opacity: 0, transform: 'translateX(-64px)' };
         case 'scaleIn':
-          return `${baseClasses} ${durationClass} opacity-0 scale-75`;
+          return { ...baseStyle, opacity: 0, transform: 'scale(0.75)' };
         case 'rotateIn':
-          return `${baseClasses} ${durationClass} opacity-0 rotate-12 scale-75`;
+          return { ...baseStyle, opacity: 0, transform: 'rotate(12deg) scale(0.75)' };
         default:
-          return `${baseClasses} ${durationClass} opacity-0`;
+          return { ...baseStyle, opacity: 0 };
       }
     } else {
-      return `${baseClasses} ${durationClass} opacity-100 translate-y-0 translate-x-0 scale-100 rotate-0`;
+      return { ...baseStyle, opacity: 1, transform: 'translateY(0) translateX(0) scale(1) rotate(0)' };
     }
   };
 
   return (
     <div
       ref={elementRef}
-      className={`${getAnimationClasses()} ${className}`}
+      style={getAnimationStyle()}
+      className={className}
     >
       {children}
     </div>

@@ -326,15 +326,22 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
               </div>
               
               <div 
-                className="flex items-center gap-0.5 hover:opacity-80 transition-opacity"
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                 onMouseLeave={() => setHoveredRating(0)}
               >
-                {renderStars(product.rating || 0)}
-                <span 
-                  className="text-xs text-slate-500 cursor-pointer hover:text-primary transition-colors"
-                >
-                  ({product.reviews || 0})
-                </span>
+                <div className="flex items-center gap-0.5">
+                  {renderStars(product.rating || 0)}
+                  <span 
+                    className="text-xs text-slate-500 cursor-pointer hover:text-primary transition-colors"
+                  >
+                    ({product.reviews || 0})
+                  </span>
+                </div>
+                {product.sku && (
+                  <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/30 hover:border-primary/60 transition-colors">
+                    {product.sku}
+                  </span>
+                )}
               </div>
             </div>
 

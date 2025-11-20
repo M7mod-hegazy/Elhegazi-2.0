@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
-import { 
-  ArrowLeft, 
-  Star, 
-  ShoppingCart, 
-  Plus, 
-  Minus, 
-  Heart, 
-  Truck, 
-  Shield, 
+import {
+  ArrowLeft,
+  Star,
+  ShoppingCart,
+  Plus,
+  Minus,
+  Heart,
+  Truck,
+  Shield,
   RotateCw,
   Ruler,
   Scale,
@@ -123,12 +123,12 @@ const formatDate = (dateString: string) => {
 };
 
 // Add this new component for image gallery modal
-const ImageGalleryModal = ({ 
-  images, 
-  currentIndex, 
-  onClose, 
-  onNext, 
-  onPrev 
+const ImageGalleryModal = ({
+  images,
+  currentIndex,
+  onClose,
+  onNext,
+  onPrev
 }: {
   images: string[];
   currentIndex: number;
@@ -138,37 +138,37 @@ const ImageGalleryModal = ({
 }) => {
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-lg z-[100] flex items-center justify-center p-4">
-      <button 
+      <button
         onClick={onClose}
         className="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
       >
         <X className="w-6 h-6 text-white" />
       </button>
-      
-      <button 
+
+      <button
         onClick={onPrev}
         className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
       >
         <ChevronLeftIcon className="w-6 h-6 text-white" />
       </button>
-      
-      <button 
+
+      <button
         onClick={onNext}
         className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
       >
         <ChevronRight className="w-6 h-6 text-white" />
       </button>
-      
+
       <div className="relative max-w-4xl max-h-[90vh] w-full">
         <img
           src={images[currentIndex]}
           alt={`Product image ${currentIndex + 1}`}
           className="w-full h-auto max-h-[90vh] object-contain"
         />
-        
+
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
           {images.map((_, index) => (
-            <div 
+            <div
               key={index}
               className={cn(
                 "w-3 h-3 rounded-full transition-all",
@@ -183,16 +183,16 @@ const ImageGalleryModal = ({
 };
 
 // Mobile Product Detail Component
-const MobileProductDetail = ({ 
-  product, 
-  relatedProducts, 
+const MobileProductDetail = ({
+  product,
+  relatedProducts,
   ratingHistory,
-  selectedImage, 
-  setSelectedImage, 
-  quantity, 
-  setQuantity, 
-  addingToCart, 
-  handleAddToCart, 
+  selectedImage,
+  setSelectedImage,
+  quantity,
+  setQuantity,
+  addingToCart,
+  handleAddToCart,
   inCart,
   setShowAuthModal,
   sendMessageToMessenger,
@@ -224,7 +224,7 @@ const MobileProductDetail = ({
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [activeTab, setActiveTab] = useState<'details' | 'specs' | 'reviews'>('details');
   const [showGallery, setShowGallery] = useState(false);
-  
+
   const discountPercentage = product.discount || (product.originalPrice && product.originalPrice > product.price)
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
@@ -263,11 +263,11 @@ const MobileProductDetail = ({
               <ArrowLeft className="w-6 h-6" />
             </Link>
           </Button>
-          
+
           <h1 className="text-lg font-bold text-slate-900 truncate max-w-[60%]">
             {product.nameAr}
           </h1>
-          
+
           <div className="flex items-center gap-2">
             <FavoriteButton
               productId={product._id}
@@ -280,7 +280,7 @@ const MobileProductDetail = ({
           </div>
         </div>
       </div>
-      
+
       {/* Breadcrumb for mobile */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200">
         <div className="container mx-auto px-4">
@@ -300,11 +300,11 @@ const MobileProductDetail = ({
 
       {/* Image Gallery */}
       <div className="relative aspect-square overflow-hidden bg-white" onClick={handleImageClick}>
-        <div 
+        <div
           className="flex transition-transform duration-300 ease-in-out h-full cursor-pointer"
           style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
         >
-          {product.images.map((image, index) => (
+          {(product.images || []).map((image, index) => (
             <div key={index} className="w-full flex-shrink-0 h-full">
               <img
                 src={optimizeImage(image, { w: 800 })}
@@ -316,21 +316,21 @@ const MobileProductDetail = ({
             </div>
           ))}
         </div>
-        
+
         {/* Navigation Arrows */}
-        {product.images.length > 1 && (
+        {(product.images?.length || 0) > 1 && (
           <>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg hover:bg-white"
               onClick={prevImage}
             >
               <ChevronLeftIcon className="w-6 h-6" />
             </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
+            <Button
+              variant="ghost"
+              size="icon"
               className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg hover:bg-white"
               onClick={nextImage}
             >
@@ -338,11 +338,11 @@ const MobileProductDetail = ({
             </Button>
           </>
         )}
-        
+
         {/* Image Indicators */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-          {product.images.map((_, index) => (
-            <div 
+          {(product.images || []).map((_, index) => (
+            <div
               key={index}
               className={cn(
                 "w-2 h-2 rounded-full transition-all",
@@ -378,23 +378,27 @@ const MobileProductDetail = ({
           </h1>
         </div>
 
-        {/* Rating and Reviews - Fixed to not show fake records */}
+        {/* Rating and Reviews - Clickable stars to open comments modal */}
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-1">
+          <button
+            onClick={() => setShowCommentsModal(true)}
+            className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+            aria-label="انقر للتقييم"
+          >
             {[...Array(5)].map((_, i) => (
               <Star
                 key={i}
                 className={cn(
-                  "w-5 h-5",
+                  "w-5 h-5 transition-transform hover:scale-110",
                   i < Math.floor(product.rating || 0)
                     ? "text-amber-500 fill-amber-500"
                     : "text-slate-300"
                 )}
               />
             ))}
-          </div>
-          <Button 
-            variant="ghost" 
+          </button>
+          <Button
+            variant="ghost"
             className="text-base text-slate-600 p-0 h-auto"
             onClick={() => setShowCommentsModal(true)}
           >
@@ -402,34 +406,26 @@ const MobileProductDetail = ({
           </Button>
         </div>
 
-        {/* Price and Discount */}
-        {hidePrices ? (
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-bold text-slate-500">
-              السعر مخفي
+        {/* Price and Discount - Always show price */}
+        <div className="flex items-center gap-3">
+          <span className="text-2xl font-bold text-primary">
+            {product.price.toLocaleString()} ج.م
+          </span>
+          {product.originalPrice && product.originalPrice > product.price && (
+            <span className="text-lg text-slate-500 line-through">
+              {product.originalPrice.toLocaleString()} ج.م
             </span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            <span className="text-2xl font-bold text-primary">
-              {product.price.toLocaleString()} ج.م
-            </span>
-            {product.originalPrice && product.originalPrice > product.price && (
-              <span className="text-lg text-slate-500 line-through">
-                {product.originalPrice.toLocaleString()} ج.م
-              </span>
-            )}
-            {discountPercentage > 0 && (
-              <Badge className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-2 py-1 text-sm font-bold">
-                -{discountPercentage}%
-              </Badge>
-            )}
-          </div>
-        )}
+          )}
+          {discountPercentage > 0 && (
+            <Badge className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-2 py-1 text-sm font-bold">
+              -{discountPercentage}%
+            </Badge>
+          )}
+        </div>
 
         {/* Action Hub - Completely redesigned for better integration */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-          
+
           {/* Communication Button - WhatsApp Only */}
           {social?.whatsappUrl && (
             <div className="p-4">
@@ -444,41 +440,40 @@ const MobileProductDetail = ({
           )}
         </div>
 
-        {/* Price and Quantity - Only show if prices are visible */}
-        {!hidePrices && (
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-            {/* Price Summary */}
-            <div className="p-4 border-b border-slate-200">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-600">السعر</span>
-                <div className="text-right">
-                  <div className="text-xl font-bold text-primary">
-                    {product.price.toLocaleString()} ج.م
+        {/* Price and Quantity - Always show */}
+        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+          {/* Price Summary */}
+          <div className="p-4 border-b border-slate-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm text-slate-600">السعر</span>
+              <div className="text-right">
+                <div className="text-xl font-bold text-primary">
+                  {product.price.toLocaleString()} ج.م
+                </div>
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <div className="text-sm text-slate-500 line-through">
+                    {product.originalPrice.toLocaleString()} ج.م
                   </div>
-                  {product.originalPrice && product.originalPrice > product.price && (
-                    <div className="text-sm text-slate-500 line-through">
-                      {product.originalPrice.toLocaleString()} ج.م
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
-              
-              {product.originalPrice && product.originalPrice > product.price && (
-                <div className="flex items-center justify-between bg-green-50 p-2 rounded-lg">
-                  <span className="text-sm font-medium text-green-700">توفير</span>
-                  <span className="text-sm font-bold text-green-700">
-                    {(product.originalPrice - product.price).toLocaleString()} ج.م
-                  </span>
-                </div>
-              )}
             </div>
-            
-            {/* Quantity Selector and Add to Cart Button */}
-            <div className="p-4">
+
+            {product.originalPrice && product.originalPrice > product.price && (
+              <div className="flex items-center justify-between bg-green-50 p-2 rounded-lg">
+                <span className="text-sm font-medium text-green-700">توفير</span>
+                <span className="text-sm font-bold text-green-700">
+                  {(product.originalPrice - product.price).toLocaleString()} ج.م
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Quantity Selector and Add to Cart Button */}
+          <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <span className="text-base font-semibold text-slate-900">الكمية</span>
             </div>
-            
+
             <div className="flex flex-col sm:flex-row gap-4">
               <div className="flex items-center border-2 border-slate-300 rounded-lg overflow-hidden">
                 <Button
@@ -500,14 +495,14 @@ const MobileProductDetail = ({
                   <Plus className="w-4 h-4" />
                 </Button>
               </div>
-              
+
               <Button
                 onClick={handleAddToCart}
                 disabled={addingToCart}
                 className={cn(
                   "flex-1 py-3 rounded-lg font-bold text-base",
-                  inCart 
-                    ? "bg-green-500 hover:bg-green-600" 
+                  inCart
+                    ? "bg-green-500 hover:bg-green-600"
                     : "bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary"
                 )}
               >
@@ -530,16 +525,16 @@ const MobileProductDetail = ({
               </Button>
             </div>
           </div>
-          </div>
-        )}
+        </div>
+
 
         {/* Tabs - Keeping the existing tabs for التفاصيل والتقييمات */}
         <div className="flex border-b border-slate-200">
           <button
             className={cn(
               "flex-1 py-3 text-center font-medium",
-              activeTab === 'details' 
-                ? "text-primary border-b-2 border-primary" 
+              activeTab === 'details'
+                ? "text-primary border-b-2 border-primary"
                 : "text-slate-500"
             )}
             onClick={() => setActiveTab('details')}
@@ -549,8 +544,8 @@ const MobileProductDetail = ({
           <button
             className={cn(
               "flex-1 py-3 text-center font-medium",
-              activeTab === 'specs' 
-                ? "text-primary border-b-2 border-primary" 
+              activeTab === 'specs'
+                ? "text-primary border-b-2 border-primary"
                 : "text-slate-500"
             )}
             onClick={() => setActiveTab('specs')}
@@ -560,8 +555,8 @@ const MobileProductDetail = ({
           <button
             className={cn(
               "flex-1 py-3 text-center font-medium",
-              activeTab === 'reviews' 
-                ? "text-primary border-b-2 border-primary" 
+              activeTab === 'reviews'
+                ? "text-primary border-b-2 border-primary"
                 : "text-slate-500"
             )}
             onClick={() => setActiveTab('reviews')}
@@ -576,14 +571,14 @@ const MobileProductDetail = ({
             <div>
               <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
               <p className="text-sm text-slate-700 leading-relaxed">
-                {showFullDescription 
-                  ? (product.descriptionAr || product.description) 
+                {showFullDescription
+                  ? (product.descriptionAr || product.description)
                   : (product.descriptionAr || product.description)?.slice(0, 150) + '...'}
               </p>
               {(product.descriptionAr || product.description)?.length > 150 && (
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="p-0 h-auto text-primary font-medium mt-2"
                   onClick={() => setShowFullDescription(!showFullDescription)}
                 >
@@ -592,7 +587,7 @@ const MobileProductDetail = ({
               )}
             </div>
           )}
-          
+
           {activeTab === 'specs' && (
             <div className="space-y-4">
               <h3 className="font-bold text-slate-900 mb-3">تفاصيل المنتج</h3>
@@ -601,14 +596,14 @@ const MobileProductDetail = ({
                   <span className="text-slate-600">رقم المنتج:</span>
                   <span className="font-medium">{product.sku || 'N/A'}</span>
                 </div>
-                
+
                 {product.weight && (
                   <div className="flex items-center justify-between py-2 border-b border-slate-100">
                     <span className="text-slate-600">الوزن:</span>
                     <span className="font-medium">{product.weight} كجم</span>
                   </div>
                 )}
-                
+
                 {product.dimensions && (
                   <div className="flex items-center justify-between py-2 border-b border-slate-100">
                     <span className="text-slate-600">الأبعاد:</span>
@@ -620,7 +615,7 @@ const MobileProductDetail = ({
               </div>
             </div>
           )}
-          
+
           {activeTab === 'reviews' && (
             <div>
               <h3 className="font-bold text-slate-900 mb-4">تقييم العملاء</h3>
@@ -652,7 +647,7 @@ const MobileProductDetail = ({
                         <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                       </div>
                       <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className="h-full bg-amber-500 rounded-full"
                           style={{ width: `${star === 5 ? 70 : star === 4 ? 20 : star === 3 ? 7 : star === 2 ? 2 : 1}%` }}
                         ></div>
@@ -661,21 +656,21 @@ const MobileProductDetail = ({
                   ))}
                 </div>
               </div>
-              
+
               {/* Rating History button */}
               <div className="border-t border-slate-200 pt-6 mb-6">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="w-full"
                   onClick={() => setShowCommentsModal(true)}
                 >
                   عرض جميع التقييمات
                 </Button>
               </div>
-              
+
               <div className="border-t border-slate-200 pt-6">
-                <Rating 
-                  productId={product._id} 
+                <Rating
+                  productId={product._id}
                   onRatingSubmit={(rating, review) => {
                     // In a real implementation, you would update the product rating
 
@@ -696,7 +691,7 @@ const MobileProductDetail = ({
           <span className="bg-gradient-to-br from-slate-50 to-primary/5 px-4 text-lg font-bold text-slate-900">منتجات ذات صلة</span>
         </div>
       </div>
-      
+
       {/* Related Products */}
       {relatedProducts.length > 0 && (
         <div className="px-4 py-6">
@@ -727,7 +722,7 @@ const MobileProductDetail = ({
                 createdAt: relatedProduct.createdAt,
                 updatedAt: relatedProduct.updatedAt
               };
-              
+
               return (
                 <div key={relatedProduct.id} className="w-full">
                   <ProductCard product={productForCard} showQuickView={false} showFavorite={false} />
@@ -742,16 +737,16 @@ const MobileProductDetail = ({
 };
 
 // Desktop Product Detail Component
-const DesktopProductDetail = ({ 
-  product, 
-  relatedProducts, 
+const DesktopProductDetail = ({
+  product,
+  relatedProducts,
   ratingHistory,
-  selectedImage, 
-  setSelectedImage, 
-  quantity, 
-  setQuantity, 
-  addingToCart, 
-  handleAddToCart, 
+  selectedImage,
+  setSelectedImage,
+  quantity,
+  setQuantity,
+  addingToCart,
+  handleAddToCart,
   inCart,
   setShowAuthModal,
   sendMessageToMessenger,
@@ -783,7 +778,7 @@ const DesktopProductDetail = ({
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  
+
   const discountPercentage = product.discount || (product.originalPrice && product.originalPrice > product.price)
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
@@ -810,14 +805,14 @@ const DesktopProductDetail = ({
       {/* Image Gallery Modal */}
       {showGallery && (
         <ImageGalleryModal
-          images={product.images}
+          images={product.images || []}
           currentIndex={currentImageIndex}
           onClose={closeGallery}
           onNext={nextGalleryImage}
           onPrev={prevGalleryImage}
         />
       )}
-      
+
       {/* Header */}
       {/* Breadcrumb */}
       <div className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-10">
@@ -842,23 +837,23 @@ const DesktopProductDetail = ({
           <div className="space-y-3">
             <div className="aspect-square overflow-hidden rounded-xl bg-white shadow border border-slate-200 cursor-pointer" onClick={handleImageClick}>
               <img
-                src={optimizeImage(product.images[selectedImage], { w: 800 })}
+                src={optimizeImage((product.images || [])[selectedImage], { w: 800 })}
                 alt={product.nameAr}
                 className="w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"
               />
             </div>
-            
+
             <div className="grid grid-cols-4 gap-2">
-              {product.images.map((image, index) => (
+              {(product.images || []).map((image, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
                   className={cn(
                     "aspect-square overflow-hidden rounded border-2 transition-all",
                     selectedImage === index
-                      ? "border-primary ring-2 ring-primary/30" 
+                      ? "border-primary ring-2 ring-primary/30"
                       : "border-slate-200 hover:border-primary/30"
                   )}
                 >
@@ -908,26 +903,30 @@ const DesktopProductDetail = ({
                 {product.nameAr}
               </h1>
 
-              {/* Rating and Reviews - Fixed to not show fake records */}
+              {/* Rating and Reviews - Clickable stars to open comments modal */}
               <div className="flex items-center gap-2">
-                <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setShowCommentsModal(true)}
+                  className="flex items-center gap-1 cursor-pointer hover:opacity-80 transition-opacity"
+                  aria-label="انقر للتقييم"
+                >
                   {[...Array(5)].map((_, i) => (
                     <Star
                       key={i}
                       className={cn(
-                        "w-4 h-4",
+                        "w-4 h-4 transition-transform hover:scale-110",
                         i < Math.floor(product.rating || 0)
                           ? "text-amber-500 fill-amber-500"
                           : "text-slate-300"
                       )}
                     />
                   ))}
-                </div>
+                </button>
                 <span className="text-sm font-bold text-slate-900">
                   {product.rating || 0}
                 </span>
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   className="text-slate-600 p-0 h-auto text-xs"
                   onClick={() => setShowCommentsModal(true)}
                 >
@@ -949,41 +948,40 @@ const DesktopProductDetail = ({
               </div>
             )}
 
-            {/* Price and Quantity - Only show if prices are visible */}
-            {!hidePrices && (
-              <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-                {/* Price Summary */}
-                <div className="p-4 border-b border-slate-200">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-base text-slate-600">السعر</span>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">
-                        {product.price.toLocaleString()} ج.م
+            {/* Price and Quantity - Always show */}
+            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+              {/* Price Summary */}
+              <div className="p-4 border-b border-slate-200">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-base text-slate-600">السعر</span>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-primary">
+                      {product.price.toLocaleString()} ج.م
+                    </div>
+                    {product.originalPrice && product.originalPrice > product.price && (
+                      <div className="text-base text-slate-500 line-through">
+                        {product.originalPrice.toLocaleString()} ج.م
                       </div>
-                      {product.originalPrice && product.originalPrice > product.price && (
-                        <div className="text-base text-slate-500 line-through">
-                          {product.originalPrice.toLocaleString()} ج.م
-                        </div>
-                      )}
-                    </div>
+                    )}
                   </div>
-                  
-                  {product.originalPrice && product.originalPrice > product.price && (
-                    <div className="flex items-center justify-between bg-green-50 p-2 rounded-lg">
-                      <span className="text-sm font-medium text-green-700">توفير</span>
-                      <span className="text-sm font-bold text-green-700">
-                        {(product.originalPrice - product.price).toLocaleString()} ج.م
-                      </span>
-                    </div>
-                  )}
                 </div>
-              
+
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <div className="flex items-center justify-between bg-green-50 p-2 rounded-lg">
+                    <span className="text-sm font-medium text-green-700">توفير</span>
+                    <span className="text-sm font-bold text-green-700">
+                      {(product.originalPrice - product.price).toLocaleString()} ج.م
+                    </span>
+                  </div>
+                )}
+              </div>
+
               {/* Quantity Selector and Add to Cart Button */}
               <div className="p-4">
                 <div className="flex items-center justify-between mb-4">
                   <span className="text-base font-semibold text-slate-900">الكمية</span>
                 </div>
-                
+
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex items-center border-2 border-slate-300 rounded-lg overflow-hidden">
                     <Button
@@ -1005,14 +1003,14 @@ const DesktopProductDetail = ({
                       <Plus className="w-4 h-4" />
                     </Button>
                   </div>
-                  
+
                   <Button
                     onClick={handleAddToCart}
                     disabled={addingToCart}
                     className={cn(
                       "flex-1 py-3 rounded-lg font-bold text-base",
-                      inCart 
-                        ? "bg-green-500 hover:bg-green-600" 
+                      inCart
+                        ? "bg-green-500 hover:bg-green-600"
                         : "bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary"
                     )}
                   >
@@ -1035,16 +1033,15 @@ const DesktopProductDetail = ({
                   </Button>
                 </div>
               </div>
-              </div>
-            )}
+            </div>
 
             {/* Tabs - Keeping the existing tabs for التفاصيل والتقييمات */}
             <div className="flex border-b border-slate-200">
               <button
                 className={cn(
                   "flex-1 py-3 text-center font-medium",
-                  activeTab === 'details' 
-                    ? "text-primary border-b-2 border-primary" 
+                  activeTab === 'details'
+                    ? "text-primary border-b-2 border-primary"
                     : "text-slate-500"
                 )}
                 onClick={() => setActiveTab('details')}
@@ -1054,8 +1051,8 @@ const DesktopProductDetail = ({
               <button
                 className={cn(
                   "flex-1 py-3 text-center font-medium",
-                  activeTab === 'specs' 
-                    ? "text-primary border-b-2 border-primary" 
+                  activeTab === 'specs'
+                    ? "text-primary border-b-2 border-primary"
                     : "text-slate-500"
                 )}
                 onClick={() => setActiveTab('specs')}
@@ -1065,8 +1062,8 @@ const DesktopProductDetail = ({
               <button
                 className={cn(
                   "flex-1 py-3 text-center font-medium",
-                  activeTab === 'reviews' 
-                    ? "text-primary border-b-2 border-primary" 
+                  activeTab === 'reviews'
+                    ? "text-primary border-b-2 border-primary"
                     : "text-slate-500"
                 )}
                 onClick={() => setActiveTab('reviews')}
@@ -1081,14 +1078,14 @@ const DesktopProductDetail = ({
                 <div>
                   <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
                   <p className="text-sm text-slate-700 leading-relaxed">
-                    {showFullDescription 
-                      ? (product.descriptionAr || product.description) 
+                    {showFullDescription
+                      ? (product.descriptionAr || product.description)
                       : (product.descriptionAr || product.description)?.slice(0, 150) + '...'}
                   </p>
                   {(product.descriptionAr || product.description)?.length > 150 && (
-                    <Button 
-                      variant="ghost" 
-                      size="sm" 
+                    <Button
+                      variant="ghost"
+                      size="sm"
                       className="p-0 h-auto text-primary font-medium mt-2"
                       onClick={() => setShowFullDescription(!showFullDescription)}
                     >
@@ -1097,7 +1094,7 @@ const DesktopProductDetail = ({
                   )}
                 </div>
               )}
-              
+
               {activeTab === 'specs' && (
                 <div className="space-y-4">
                   <h3 className="font-bold text-slate-900 mb-3">تفاصيل المنتج</h3>
@@ -1106,14 +1103,14 @@ const DesktopProductDetail = ({
                       <span className="text-slate-600">رقم المنتج:</span>
                       <span className="font-medium">{product.sku || 'N/A'}</span>
                     </div>
-                    
+
                     {product.weight && (
                       <div className="flex items-center justify-between py-2 border-b border-slate-100">
                         <span className="text-slate-600">الوزن:</span>
                         <span className="font-medium">{product.weight} كجم</span>
                       </div>
                     )}
-                    
+
                     {product.dimensions && (
                       <div className="flex items-center justify-between py-2 border-b border-slate-100">
                         <span className="text-slate-600">الأبعاد:</span>
@@ -1125,7 +1122,7 @@ const DesktopProductDetail = ({
                   </div>
                 </div>
               )}
-              
+
               {activeTab === 'reviews' && (
                 <div>
                   <h3 className="font-bold text-slate-900 mb-4">تقييم العملاء</h3>
@@ -1157,7 +1154,7 @@ const DesktopProductDetail = ({
                             <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
                           </div>
                           <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div 
+                            <div
                               className="h-full bg-amber-500 rounded-full"
                               style={{ width: `${star === 5 ? 70 : star === 4 ? 20 : star === 3 ? 7 : star === 2 ? 2 : 1}%` }}
                             ></div>
@@ -1166,21 +1163,21 @@ const DesktopProductDetail = ({
                       ))}
                     </div>
                   </div>
-                  
+
                   {/* Rating History button */}
                   <div className="border-t border-slate-200 pt-6 mb-6">
-                    <Button 
-                      variant="outline" 
+                    <Button
+                      variant="outline"
                       className="w-full"
                       onClick={() => setShowCommentsModal(true)}
                     >
                       عرض جميع التقييمات
                     </Button>
                   </div>
-                  
+
                   <div className="border-t border-slate-200 pt-6">
-                    <Rating 
-                      productId={product._id} 
+                    <Rating
+                      productId={product._id}
                       onRatingSubmit={(rating, review) => {
                         // In a real implementation, you would update the product rating
 
@@ -1192,7 +1189,7 @@ const DesktopProductDetail = ({
             </div>
           </div>
         </div>
-        
+
         {/* Divider with decorative element */}
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center" aria-hidden="true">
@@ -1202,7 +1199,7 @@ const DesktopProductDetail = ({
             <span className="bg-gradient-to-br from-slate-50 to-primary/5 px-4 text-lg font-bold text-slate-900">منتجات ذات صلة</span>
           </div>
         </div>
-        
+
         {/* Related Products */}
         {relatedProducts.length > 0 && (
           <section className="mt-6">
@@ -1233,7 +1230,7 @@ const DesktopProductDetail = ({
                   createdAt: relatedProduct.createdAt,
                   updatedAt: relatedProduct.updatedAt
                 };
-                
+
                 return (
                   <div key={relatedProduct.id} className="w-full">
                     <ProductCard product={productForCard} />
@@ -1261,7 +1258,7 @@ const ProductDetail = () => {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
-  
+
   const [product, setProduct] = useState<ApiProduct | null>(null);
   const [related, setRelated] = useState<ApiProduct[]>([]);
   const [selectedImage, setSelectedImage] = useState(0);
@@ -1280,16 +1277,16 @@ const ProductDetail = () => {
     (async () => {
       try {
         setLoading(true);
-        
+
         // Try to get product from location state first (passed from product list)
         let item: ApiProduct | undefined = (location.state as any)?.product;
-        
+
         // If not in state, fetch from API
         if (!item) {
           const res = await apiGet<ApiProduct>(`/api/products/${id}`);
           item = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).item as ApiProduct | undefined;
         }
-        
+
         if (!item) throw new Error('Product not found');
 
         // Fetch categories to resolve Arabic name and fetch related products by category slug
@@ -1307,6 +1304,7 @@ const ProductDetail = () => {
           nameAr: item.nameAr ?? item.name,
           description: item.description ?? '',
           descriptionAr: item.descriptionAr ?? item.description ?? '',
+          images: item.images || [],
           category: item.categorySlug ?? '',
           categoryAr: catBySlug.get(item.categorySlug ?? '')?.nameAr ?? (item.categorySlug ?? ''),
           rating: item.rating || 0,
@@ -1342,23 +1340,25 @@ const ProductDetail = () => {
         let realRatingHistory: RatingHistory[] = [];
         try {
 
-          const ratingsRes = await apiGet<RatingHistory>(`/api/products/${item._id}/ratings`);
+          if (item._id && item._id !== 'undefined') {
+            const ratingsRes = await apiGet<RatingHistory>(`/api/products/${item._id}/ratings`);
 
-          
-          // Check if the response has items
-          if ('items' in ratingsRes && ratingsRes.ok) {
-            const ratingsItems = ratingsRes.items ?? [];
 
-            
-            realRatingHistory = ratingsItems.map(rating => ({
-              ...rating,
-              // Ensure date is in the correct format
-              date: new Date(rating.date).toISOString()
-            }));
-            
+            // Check if the response has items
+            if ('items' in ratingsRes && ratingsRes.ok) {
+              const ratingsItems = ratingsRes.items ?? [];
 
-          } else {
 
+              realRatingHistory = ratingsItems.map(rating => ({
+                ...rating,
+                // Ensure date is in the correct format
+                date: new Date(rating.date).toISOString()
+              }));
+
+
+            } else {
+
+            }
           }
         } catch (ratingError) {
           console.warn('Failed to fetch ratings from backend:', ratingError);
@@ -1449,14 +1449,14 @@ const ProductDetail = () => {
       setShowAuthModal(true);
       return;
     }
-    
+
     setAddingToCart(true);
-    
+
     // Check if product is already in cart
     const wasInCart = isInCart(product._id);
     const currentItem = getItemByProductId(product._id);
     const previousQuantity = currentItem?.quantity || 0;
-    
+
     // Convert ApiProduct to Product for addItem
     const productForCart: Product = {
       id: product.id,
@@ -1483,12 +1483,12 @@ const ProductDetail = () => {
       createdAt: product.createdAt,
       updatedAt: product.updatedAt
     };
-    
+
     const result = await addItem(productForCart, quantity);
-    
+
     if (result.success) {
       const newQuantity = previousQuantity + quantity;
-      
+
       // Show enhanced toast with product image and quantity info
       toast({
         title: wasInCart ? "تمت إضافة المزيد ✓" : "تمت الإضافة للسلة ✓",
@@ -1522,7 +1522,7 @@ const ProductDetail = () => {
                 </div>
               </div>
             </div>
-            
+
             {/* Quick Actions */}
             <div className="flex gap-2 pt-2 border-t border-slate-100">
               <button
@@ -1532,7 +1532,7 @@ const ProductDetail = () => {
                 عرض السلة
               </button>
               <button
-                onClick={() => {}}
+                onClick={() => { }}
                 className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-2 px-3 rounded-lg transition-colors"
               >
                 متابعة التسوق
@@ -1548,7 +1548,7 @@ const ProductDetail = () => {
         variant: "destructive"
       });
     }
-    
+
     setAddingToCart(false);
   };
 
@@ -1559,7 +1559,7 @@ const ProductDetail = () => {
     if (!product) return;
     const message = `أود الاستفسار عن المنتج: ${product.nameAr || product.name}\n${window.location.href}`;
     const encodedMessage = encodeURIComponent(message);
-    
+
     // Use configured Messenger URL if available, otherwise use default
     if (social?.messengerUrl) {
       window.open(`${social.messengerUrl}?text=${encodedMessage}`, '_blank');
@@ -1617,7 +1617,7 @@ const ProductDetail = () => {
           hidePrices={hidePrices}
         />
       )}
-      
+
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}

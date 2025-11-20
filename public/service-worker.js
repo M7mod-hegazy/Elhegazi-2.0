@@ -19,7 +19,7 @@ const CRITICAL_ASSETS = [
 // Install event - cache critical assets
 self.addEventListener('install', (event) => {
   console.log('🔧 Service Worker: Installing...');
-  
+
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       console.log('📦 Service Worker: Caching critical assets');
@@ -36,14 +36,14 @@ self.addEventListener('install', (event) => {
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
   console.log('✅ Service Worker: Activating...');
-  
+
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME && 
-              cacheName !== RUNTIME_CACHE && 
-              cacheName !== IMAGE_CACHE) {
+          if (cacheName !== CACHE_NAME &&
+            cacheName !== RUNTIME_CACHE &&
+            cacheName !== IMAGE_CACHE) {
             console.log('🗑️ Service Worker: Deleting old cache:', cacheName);
             return caches.delete(cacheName);
           }
@@ -71,6 +71,23 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Skip Vite HMR and development files
+  if (
+    url.pathname.includes('/@vite') ||
+    url.pathname.includes('/@fs') ||
+    url.pathname.includes('/@id') ||
+    url.pathname.includes('/node_modules/') ||
+    url.pathname.includes('/__vite') ||
+    url.pathname.endsWith('.tsx') ||
+    url.pathname.endsWith('.ts') ||
+    url.pathname.endsWith('.jsx') ||
+    url.pathname.endsWith('.map') ||
+    url.search.includes('?v=') || // Vite versioned imports
+    url.search.includes('?t=')    // Vite timestamp imports
+  ) {
+    return;
+  }
+
   // Handle API requests - network first, cache fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(
@@ -87,7 +104,20 @@ self.addEventListener('fetch', (event) => {
         })
         .catch(() => {
           // Fallback to cache on network error
-          return caches.match(request);
+          return caches.match(request).then((cachedResponse) => {
+            if (cachedResponse) {
+              return cachedResponse;
+            }
+            // Return a proper error response if no cache available
+            return new Response(
+              JSON.stringify({ error: 'Network error and no cached data available' }),
+              {
+                status: 503,
+                statusText: 'Service Unavailable',
+                headers: { 'Content-Type': 'application/json' }
+              }
+            );
+          });
         })
     );
     return;

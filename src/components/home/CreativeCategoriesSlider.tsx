@@ -24,7 +24,7 @@ const CreativeCategoriesSlider = ({ selectedSlugs }: CreativeCategoriesSliderPro
 
       <div className="container mx-auto px-4 max-w-7xl relative z-10">
         {/* Premium Modern Header */}
-        <ScrollAnimation animation="fadeIn" className="mb-6 md:mb-8">
+        <div className="mb-6 md:mb-8">
           <div className="flex items-center justify-between mb-6">
             <div className="flex-1">
               {/* Animated accent bar */}
@@ -45,16 +45,16 @@ const CreativeCategoriesSlider = ({ selectedSlugs }: CreativeCategoriesSliderPro
               </p>
             </div>
           </div>
-        </ScrollAnimation>
+        </div>
 
-        <ScrollAnimation animation="slideUp" delay={200}>
+        <div>
           <div className="hidden md:block">
             <CategoriesDesktop selectedSlugs={selectedSlugs} />
           </div>
           <div className="md:hidden">
             <CategoriesMobile selectedSlugs={selectedSlugs} />
           </div>
-        </ScrollAnimation>
+        </div>
       </div>
     </section>
   );

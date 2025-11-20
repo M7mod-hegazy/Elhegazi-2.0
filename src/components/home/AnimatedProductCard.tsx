@@ -149,13 +149,18 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
         <div className="flex items-center gap-2 mb-2" onMouseLeave={handleStarLeave}>
           <div className="flex items-center gap-1">
             {renderStars(product.rating)}
+            <span 
+              className="text-sm text-white/60 cursor-pointer hover:text-white/80 transition-colors"
+              onClick={(e) => handleRatingClick(e)}
+            >
+              ({product.reviews})
+            </span>
           </div>
-          <span 
-            className="text-sm text-white/60 cursor-pointer hover:text-white/80 transition-colors"
-            onClick={(e) => handleRatingClick(e)}
-          >
-            ({product.reviews})
-          </span>
+          {product.sku && (
+            <span className="text-xs font-semibold text-white bg-white/20 px-1.5 py-0.5 rounded-sm border border-white/30 hover:border-white/60 transition-colors ml-auto">
+              {product.sku}
+            </span>
+          )}
         </div>
         
         {!hidePrices && (

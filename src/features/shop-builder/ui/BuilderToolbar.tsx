@@ -113,7 +113,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   const [wallSettingsOpen, setWallSettingsOpen] = useState(false);
   const [floorTextureOpen, setFloorTextureOpen] = useState(false);
   const [wallTextureOpen, setWallTextureOpen] = useState(false);
-  
+
   // 3D Products from database
   const [products3D, setProducts3D] = useState<Product3D[]>([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
@@ -127,7 +127,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
   const itemsPerPage = 12;
-  
+
   // Search suggestions and recommendations
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<Product3D[]>([]);
@@ -153,7 +153,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       params.append('isActive', 'true'); // Only show active products
       if (selectedCategory !== 'all') params.append('category', selectedCategory);
       if (searchTerm) params.append('search', searchTerm);
-      
+
       const response = await apiGet<{ items: Product3D[] }>(`/api/products-3d?${params.toString()}`);
       if (response.ok && response.items) {
 
@@ -188,7 +188,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       fetchCategories();
       loadRecommendations();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addProductOpen]);
 
   // Load recommended products (most popular)
@@ -198,7 +198,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       params.append('isActive', 'true');
       params.append('sort', 'popular');
       params.append('limit', '6');
-      
+
       const response = await apiGet<{ items: Product3D[] }>(`/api/products-3d?${params.toString()}`);
       if (response.ok && response.items) {
         setRecommendedProducts(response.items as unknown as Product3D[]);
@@ -213,16 +213,16 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
 
     setSearchTerm(value);
-    
+
     if (value.trim().length >= 2) {
       // Filter products for suggestions
-      const filtered = products3D.filter(p => 
+      const filtered = products3D.filter(p =>
         p.name.toLowerCase().includes(value.toLowerCase()) ||
         p.nameEn?.toLowerCase().includes(value.toLowerCase()) ||
         p.tags?.some(tag => tag.toLowerCase().includes(value.toLowerCase())) ||
         p.category.toLowerCase().includes(value.toLowerCase())
       ).slice(0, 5);
-      
+
 
       setSearchSuggestions(filtered);
       setShowSuggestions(true);
@@ -266,18 +266,18 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(p => p.category === selectedCategory);
     }
-    
+
     // Filter by search term
     if (searchTerm.trim()) {
       const search = searchTerm.toLowerCase();
-      filtered = filtered.filter(p => 
+      filtered = filtered.filter(p =>
         p.name.toLowerCase().includes(search) ||
         p.nameEn?.toLowerCase().includes(search) ||
         p.category.toLowerCase().includes(search) ||
         p.description?.toLowerCase().includes(search)
       );
     }
-    
+
     // Sort
     switch (sortBy) {
       case 'name':
@@ -290,11 +290,11 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
         filtered.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
         break;
     }
-    
+
     // Paginate
     const startIndex = (currentPage - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
-    
+
     return {
       items: filtered.slice(startIndex, endIndex),
       total: filtered.length,
@@ -396,10 +396,10 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     try {
       // Validate model URL
       if (!product.modelUrl || product.modelUrl.trim() === '') {
-        toast({ 
-          title: 'خطأ', 
-          description: 'هذا المنتج لا يحتوي على نموذج ثلاثي الأبعاد', 
-          variant: 'destructive' 
+        toast({
+          title: 'خطأ',
+          description: 'هذا المنتج لا يحتوي على نموذج ثلاثي الأبعاد',
+          variant: 'destructive'
         });
         setIsAdding(false);
         return;
@@ -409,12 +409,12 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       const url = product.modelUrl.toLowerCase();
       const validFormats = ['.glb', '.gltf', '.obj', '.fbx'];
       const hasValidFormat = validFormats.some(format => url.endsWith(format));
-      
+
       if (!hasValidFormat) {
-        toast({ 
-          title: 'خطأ', 
-          description: 'صيغة النموذج غير مدعومة. يجب أن يكون GLB أو GLTF أو OBJ أو FBX', 
-          variant: 'destructive' 
+        toast({
+          title: 'خطأ',
+          description: 'صيغة النموذج غير مدعومة. يجب أن يكون GLB أو GLTF أو OBJ أو FBX',
+          variant: 'destructive'
         });
         setIsAdding(false);
         return;
@@ -422,7 +422,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
       // Increment usage count
       await apiPostJson(`/api/products-3d/${product._id}/use`, {});
-      
+
       const id = upsertProduct({
         name: product.name,
         modelUrl: product.modelUrl,
@@ -452,15 +452,15 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   }, [onClearSelection, toast]);
 
   return (
-    <div className="flex items-center justify-between gap-4 rounded-2xl border bg-white/95 px-4 py-3 shadow-lg backdrop-blur-sm" style={{ borderColor: primaryColor }}>
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 rounded-2xl border bg-white/95 px-4 py-3 shadow-lg backdrop-blur-sm" style={{ borderColor: primaryColor }}>
       {/* Right Side - Main Actions */}
-      <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
         {/* Modern Wall System - Two buttons with divider */}
-        <div className="flex items-center gap-0 bg-white rounded-xl overflow-hidden shadow-sm" style={{ border: `2px solid ${primaryColor}` }}>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-0 bg-white rounded-xl overflow-hidden shadow-sm" style={{ border: `2px solid ${primaryColor}` }}>
           {/* Wall Mode / Quit Button */}
-          <Button 
-            onClick={() => setDrawingMode(!isDrawingMode)} 
-            className="flex items-center gap-2 font-semibold rounded-none h-11 px-5 transition-all duration-700 border-0"
+          <Button
+            onClick={() => setDrawingMode(!isDrawingMode)}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold text-base sm:text-sm rounded-none h-12 sm:h-11 px-5 transition-all duration-700 border-0"
             style={{
               background: isDrawingMode ? `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` : 'white',
               color: isDrawingMode ? 'white' : primaryColor,
@@ -469,22 +469,22 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
           >
             {isDrawingMode ? (
               <>
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5 sm:h-4 sm:w-4" />
                 إنهاء وضع الرسم
               </>
             ) : (
               <>
-                <Edit2 className="h-4 w-4" />
+                <Edit2 className="h-5 w-5 sm:h-4 sm:w-4" />
                 وضع الرسم
               </>
             )}
           </Button>
-          
+
           {/* Divider */}
-          <div className="w-px h-8" style={{ backgroundColor: primaryColor }} />
-          
+          <div className="hidden sm:block w-px h-8" style={{ backgroundColor: primaryColor }} />
+
           {/* Direct Wall Length Input */}
-          <div className="flex items-center gap-2 bg-white px-3 py-1 rounded-lg">
+          <div className="flex items-center justify-center gap-2 bg-white px-3 py-2 sm:py-1 border-t sm:border-t-0" style={{ borderColor: primaryColor }}>
             <span className="text-xs font-semibold" style={{ color: primaryColor }}>الطول (م)</span>
             <Input
               type="number"
@@ -493,7 +493,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
               min="0.5"
               step="0.5"
             />
-            <Button 
+            <Button
               onClick={handleAddWall}
               size="sm"
               className="h-8 w-8 p-0 text-white transition-all"
@@ -503,7 +503,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
             </Button>
           </div>
         </div>
-        
+
 
         <Dialog open={addProductOpen} onOpenChange={setAddProductOpen}>
           <DialogTrigger asChild>
@@ -533,7 +533,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     }}
                     className="pr-10 h-9 text-sm border-2 border-slate-200 focus:border-primary shadow-sm"
                   />
-                  
+
                   {/* Live Search Suggestions with Images */}
                   {showSuggestions && (searchSuggestions.length > 0 || (searchTerm.length === 0 && recommendedProducts.length > 0)) && (
                     <div className="absolute top-full left-0 right-0 mt-2 bg-white border-2 border-slate-200 rounded-xl shadow-2xl z-50 max-h-[280px] overflow-y-auto">
@@ -587,7 +587,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                           ))}
                         </>
                       )}
-                      
+
                       {searchTerm.length >= 2 && searchSuggestions.length > 0 && (
                         <>
                           <div className="p-2 border-b bg-slate-50 sticky top-0 z-10">
@@ -646,16 +646,16 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                   </SelectContent>
                 </Select>
                 <div className="flex border-2 rounded-lg overflow-hidden">
-                  <Button 
-                    variant={viewMode === 'grid' ? 'default' : 'ghost'} 
+                  <Button
+                    variant={viewMode === 'grid' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('grid')}
                     className="rounded-none h-9 px-2"
                   >
                     <Grid3x3 className="h-4 w-4" />
                   </Button>
-                  <Button 
-                    variant={viewMode === 'list' ? 'default' : 'ghost'} 
+                  <Button
+                    variant={viewMode === 'list' ? 'default' : 'ghost'}
                     size="sm"
                     onClick={() => setViewMode('list')}
                     className="rounded-none h-9 px-2"
@@ -701,117 +701,30 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
               {/* Right Side - Products Grid */}
               <div className="flex-1 overflow-y-auto py-4 px-4 bg-white">
-              {loadingProducts ? (
-                <div className="flex flex-col items-center justify-center h-96">
-                  <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent"></div>
-                  <p className="mt-4 text-slate-600 font-medium">جاري التحميل...</p>
-                </div>
-              ) : sortedAndPaginatedProducts.total === 0 ? (
-                <div className="flex flex-col items-center justify-center h-96 text-center">
-                  <div className="w-24 h-24 bg-slate-200 rounded-full flex items-center justify-center mb-6">
-                    <Package className="h-12 w-12 text-slate-400" />
+                {loadingProducts ? (
+                  <div className="flex flex-col items-center justify-center h-96">
+                    <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent"></div>
+                    <p className="mt-4 text-slate-600 font-medium">جاري التحميل...</p>
                   </div>
-                  <h3 className="text-xl font-bold text-slate-700 mb-2">لا توجد نتائج</h3>
-                  <p className="text-slate-500">جرب تغيير الفئة أو البحث عن منتج آخر</p>
-                </div>
-              ) : (
-                <>
-                  {viewMode === 'grid' ? (
-                    <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
-                      {sortedAndPaginatedProducts.items.map((product) => (
-                    <div
-                      key={product._id}
-                      className="group bg-slate-50 rounded-lg border-2 border-slate-200 overflow-hidden hover:border-primary hover:bg-white hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-                    >
-                      {/* 3D Preview - Always show 3D model */}
-                      <div className="relative aspect-[4/3] bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 flex items-center justify-center overflow-hidden">
-                        <Model3DPreview
-                          modelUrl={product.modelUrl}
-                          thumbnailUrl={product.thumbnailUrl}
-                          className="w-full h-full"
-                          autoRotate={true}
-                          showThumbnail={false}
-                        />
-                        
-                        {/* Thumbnail overlay - bottom left */}
-                        {product.thumbnailUrl && (
-                          <div className="absolute bottom-2 left-2 w-12 h-12 rounded-lg overflow-hidden border-2 border-white shadow-lg bg-white">
-                            <img 
-                              src={product.thumbnailUrl} 
-                              alt={product.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                        )}
-                        
-                        {/* Badges Overlay */}
-                        <div className="absolute top-3 right-3 flex flex-col gap-2">
-                          {product.isPremium && (
-                            <Badge className="bg-gradient-to-r from-amber-400 to-amber-600 text-white shadow-lg border-0">
-                              <Star className="h-3 w-3 mr-1" />
-                              مميز
-                            </Badge>
-                          )}
-                          {product.usageCount > 5 && (
-                            <Badge className="bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-lg border-0">
-                              <TrendingUp className="h-3 w-3 mr-1" />
-                              شائع
-                            </Badge>
-                          )}
-                        </div>
-
-                        {/* Removed hover overlay button */}
-                      </div>
-
-                      {/* Info Section - Compact */}
-                      <div className="p-2 space-y-1.5">
-                        <div>
-                          <h4 className="font-semibold text-xs text-slate-900 truncate group-hover:text-primary transition-colors leading-tight">{product.name}</h4>
-                        </div>
-                        
-                        <div className="flex items-center gap-1">
-                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{product.category}</Badge>
-                        </div>
-                        
-                        {/* Action Buttons */}
-                        <div className="flex gap-1 pt-0.5">
-                          <Button 
-                            size="sm" 
-                            variant="outline" 
-                            className="flex-1 h-7 text-[10px] px-1 border hover:border-primary hover:text-primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPreviewProduct(product);
-                              setIsPreviewOpen(true);
-                            }}
-                          >
-                            <Eye className="h-3 w-3" />
-                          </Button>
-                          <Button 
-                            size="sm" 
-                            className="flex-1 h-7 text-[10px] px-1 bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleAddProduct(product);
-                            }}
-                          >
-                            <Plus className="h-3 w-3 ml-0.5" />
-                            إضافة
-                          </Button>
-                        </div>
-                      </div>
+                ) : sortedAndPaginatedProducts.total === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-96 text-center">
+                    <div className="w-24 h-24 bg-slate-200 rounded-full flex items-center justify-center mb-6">
+                      <Package className="h-12 w-12 text-slate-400" />
                     </div>
-                  ))}
-                </div>
-                  ) : (
-                    /* List View - Enhanced */
-                    <div className="space-y-4">
-                      {sortedAndPaginatedProducts.items.map((product) => (
-                        <div key={product._id} className="flex gap-6 p-5 bg-white rounded-2xl border-2 border-slate-200 hover:border-primary hover:shadow-xl transition-all group">
-                          <div className="w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-md">
-                            {product.thumbnailUrl ? (
-                              <img src={product.thumbnailUrl} alt={product.name} className="w-full h-full object-cover" />
-                            ) : (
+                    <h3 className="text-xl font-bold text-slate-700 mb-2">لا توجد نتائج</h3>
+                    <p className="text-slate-500">جرب تغيير الفئة أو البحث عن منتج آخر</p>
+                  </div>
+                ) : (
+                  <>
+                    {viewMode === 'grid' ? (
+                      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                        {sortedAndPaginatedProducts.items.map((product) => (
+                          <div
+                            key={product._id}
+                            className="group bg-slate-50 rounded-lg border-2 border-slate-200 overflow-hidden hover:border-primary hover:bg-white hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                          >
+                            {/* 3D Preview - Always show 3D model */}
+                            <div className="relative aspect-[4/3] bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 flex items-center justify-center overflow-hidden">
                               <Model3DPreview
                                 modelUrl={product.modelUrl}
                                 thumbnailUrl={product.thumbnailUrl}
@@ -819,66 +732,153 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                                 autoRotate={true}
                                 showThumbnail={false}
                               />
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0 flex flex-col justify-between">
-                            <div>
-                              <h4 className="font-bold text-lg text-slate-900 group-hover:text-primary transition-colors">{product.name}</h4>
-                              <p className="text-sm text-slate-600 line-clamp-2 mt-2">{product.description || 'منتج ثلاثي الأبعاد عالي الجودة'}</p>
-                              <div className="flex items-center gap-3 mt-3 flex-wrap">
-                                <Badge variant="secondary" className="text-sm">{product.category}</Badge>
-                                {product.isPremium && <Badge className="bg-amber-500 text-sm"><Star className="h-3 w-3 mr-1" />مميز</Badge>}
-                                <span className="text-sm text-slate-500">{product.dimensions.width}×{product.dimensions.height}×{product.dimensions.depth}م</span>
-                                {product.usageCount > 0 && (
-                                  <span className="text-sm text-slate-500 flex items-center gap-1">
-                                    <TrendingUp className="h-4 w-4" />
-                                    استخدم {product.usageCount} مرة
-                                  </span>
+
+                              {/* Thumbnail overlay - bottom left */}
+                              {product.thumbnailUrl && (
+                                <div className="absolute bottom-2 left-2 w-12 h-12 rounded-lg overflow-hidden border-2 border-white shadow-lg bg-white">
+                                  <img
+                                    src={product.thumbnailUrl}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover"
+                                  />
+                                </div>
+                              )}
+
+                              {/* Badges Overlay */}
+                              <div className="absolute top-3 right-3 flex flex-col gap-2">
+                                {product.isPremium && (
+                                  <Badge className="bg-gradient-to-r from-amber-400 to-amber-600 text-white shadow-lg border-0">
+                                    <Star className="h-3 w-3 mr-1" />
+                                    مميز
+                                  </Badge>
                                 )}
+                                {product.usageCount > 5 && (
+                                  <Badge className="bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-lg border-0">
+                                    <TrendingUp className="h-3 w-3 mr-1" />
+                                    شائع
+                                  </Badge>
+                                )}
+                              </div>
+
+                              {/* Removed hover overlay button */}
+                            </div>
+
+                            {/* Info Section - Compact */}
+                            <div className="p-2 space-y-1.5">
+                              <div>
+                                <h4 className="font-semibold text-xs text-slate-900 truncate group-hover:text-primary transition-colors leading-tight">{product.name}</h4>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{product.category}</Badge>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex gap-1 pt-0.5">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 h-7 text-[10px] px-1 border hover:border-primary hover:text-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewProduct(product);
+                                    setIsPreviewOpen(true);
+                                  }}
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="flex-1 h-7 text-[10px] px-1 bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddProduct(product);
+                                  }}
+                                >
+                                  <Plus className="h-3 w-3 ml-0.5" />
+                                  إضافة
+                                </Button>
                               </div>
                             </div>
                           </div>
-                          <div className="flex flex-col gap-3 justify-center">
-                            <Button size="default" variant="outline" className="border-2 hover:border-primary" onClick={() => { setPreviewProduct(product); setIsPreviewOpen(true); }}>
-                              <Eye className="h-4 w-4 ml-2" />
-                              معاينة
-                            </Button>
-                            <Button size="default" className="bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary" onClick={() => handleAddProduct(product)}>
-                              <Plus className="h-4 w-4 ml-2" />
-                              إضافة للمتجر
-                            </Button>
+                        ))}
+                      </div>
+                    ) : (
+                      /* List View - Enhanced */
+                      <div className="space-y-4">
+                        {sortedAndPaginatedProducts.items.map((product) => (
+                          <div key={product._id} className="flex gap-6 p-5 bg-white rounded-2xl border-2 border-slate-200 hover:border-primary hover:shadow-xl transition-all group">
+                            <div className="w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-md">
+                              {product.thumbnailUrl ? (
+                                <img src={product.thumbnailUrl} alt={product.name} className="w-full h-full object-cover" />
+                              ) : (
+                                <Model3DPreview
+                                  modelUrl={product.modelUrl}
+                                  thumbnailUrl={product.thumbnailUrl}
+                                  className="w-full h-full"
+                                  autoRotate={true}
+                                  showThumbnail={false}
+                                />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0 flex flex-col justify-between">
+                              <div>
+                                <h4 className="font-bold text-lg text-slate-900 group-hover:text-primary transition-colors">{product.name}</h4>
+                                <p className="text-sm text-slate-600 line-clamp-2 mt-2">{product.description || 'منتج ثلاثي الأبعاد عالي الجودة'}</p>
+                                <div className="flex items-center gap-3 mt-3 flex-wrap">
+                                  <Badge variant="secondary" className="text-sm">{product.category}</Badge>
+                                  {product.isPremium && <Badge className="bg-amber-500 text-sm"><Star className="h-3 w-3 mr-1" />مميز</Badge>}
+                                  <span className="text-sm text-slate-500">{product.dimensions.width}×{product.dimensions.height}×{product.dimensions.depth}م</span>
+                                  {product.usageCount > 0 && (
+                                    <span className="text-sm text-slate-500 flex items-center gap-1">
+                                      <TrendingUp className="h-4 w-4" />
+                                      استخدم {product.usageCount} مرة
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-3 justify-center">
+                              <Button size="default" variant="outline" className="border-2 hover:border-primary" onClick={() => { setPreviewProduct(product); setIsPreviewOpen(true); }}>
+                                <Eye className="h-4 w-4 ml-2" />
+                                معاينة
+                              </Button>
+                              <Button size="default" className="bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary" onClick={() => handleAddProduct(product)}>
+                                <Plus className="h-4 w-4 ml-2" />
+                                إضافة للمتجر
+                              </Button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                        ))}
+                      </div>
+                    )}
 
-                  {/* Pagination */}
-                  {sortedAndPaginatedProducts.totalPages > 1 && (
-                    <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                        disabled={currentPage === 1}
-                      >
-                        <ChevronRight className="h-4 w-4" />
-                      </Button>
-                      <span className="text-sm text-slate-600">
-                        صفحة {currentPage} من {sortedAndPaginatedProducts.totalPages}
-                      </span>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setCurrentPage(p => Math.min(sortedAndPaginatedProducts.totalPages, p + 1))}
-                        disabled={currentPage === sortedAndPaginatedProducts.totalPages}
-                      >
-                        <ChevronLeft className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </>
-              )}
+                    {/* Pagination */}
+                    {sortedAndPaginatedProducts.totalPages > 1 && (
+                      <div className="flex items-center justify-center gap-2 mt-4 pt-4 border-t">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <span className="text-sm text-slate-600">
+                          صفحة {currentPage} من {sortedAndPaginatedProducts.totalPages}
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setCurrentPage(p => Math.min(sortedAndPaginatedProducts.totalPages, p + 1))}
+                          disabled={currentPage === sortedAndPaginatedProducts.totalPages}
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             </div>
 
@@ -950,8 +950,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     <div>
                       <Label className="text-slate-600">اللون</Label>
                       <div className="flex items-center gap-2">
-                        <div 
-                          className="w-6 h-6 rounded border border-slate-300" 
+                        <div
+                          className="w-6 h-6 rounded border border-slate-300"
                           style={{ backgroundColor: previewProduct.color }}
                         />
                         <span className="text-sm font-mono">{previewProduct.color}</span>
@@ -986,7 +986,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
               <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
                 إغلاق
               </Button>
-              <Button 
+              <Button
                 onClick={() => {
                   if (previewProduct) {
                     handleAddProduct(previewProduct);
@@ -1007,9 +1007,10 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
 
       {/* Left Side - Utility Actions */}
-      <div className="flex items-center gap-2">
-        <Button 
-          className="flex items-center gap-2 rounded-xl h-10 px-3 transition-all duration-300 font-medium disabled:opacity-50"
+      {/* Left Side - Utility Actions */}
+      <div className="flex flex-row items-center gap-2 w-full sm:w-auto">
+        <Button
+          className="flex-1 sm:flex-none flex items-center justify-center gap-2 rounded-xl h-10 px-3 transition-all duration-300 font-medium disabled:opacity-50"
           style={{
             border: `2px solid ${primaryColor}`,
             color: primaryColor,
@@ -1108,8 +1109,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                       )}
                     >
                       <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-slate-300 flex-shrink-0 shadow-sm">
-                        <img 
-                          src={texture.preview} 
+                        <img
+                          src={texture.preview}
                           alt={key}
                           className="w-full h-full object-cover"
                           crossOrigin="anonymous"
@@ -1171,8 +1172,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     >
                       <div className="w-16 h-16 rounded-lg overflow-hidden border-2 border-slate-300 flex-shrink-0 shadow-sm">
                         {option.preview ? (
-                          <img 
-                            src={option.preview} 
+                          <img
+                            src={option.preview}
                             alt={option.label}
                             className="w-full h-full object-cover"
                             crossOrigin="anonymous"
@@ -1195,16 +1196,16 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
               <div>
                 <Label className="text-base font-semibold text-slate-900 mb-3 block">لون الجدران</Label>
                 <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
-                  <input 
-                    type="color" 
-                    value={layout.walls[0]?.color || '#64748b'} 
+                  <input
+                    type="color"
+                    value={layout.walls[0]?.color || '#64748b'}
                     onChange={(e) => {
                       // Apply color to all walls
                       layout.walls.forEach(w => {
                         upsertWall({ id: w.id, color: e.target.value });
                       });
-                    }} 
-                    className="w-20 h-20 rounded-lg border-2 border-slate-300 cursor-pointer shadow-md" 
+                    }}
+                    className="w-20 h-20 rounded-lg border-2 border-slate-300 cursor-pointer shadow-md"
                     title="اختر لون الجدران"
                   />
                   <div className="flex-1">
@@ -1223,11 +1224,11 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
             </DialogFooter>
           </DialogContent>
         </Dialog>
-        
+
         {/* Settings Dropdown Menu */}
         <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" className="flex items-center gap-2 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 rounded-xl h-10 px-3">
+            <Button variant="outline" className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 rounded-xl h-10 px-3">
               <Settings className="h-4 w-4" />
               <span className="hidden sm:inline">الإعدادات</span>
             </Button>
@@ -1247,9 +1248,9 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 </button>
               </div>
             )}
-            
+
             {/* Floor Settings Button */}
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => {
                 setFloorSettingsOpen(true);
                 setSettingsOpen(false);
@@ -1266,7 +1267,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
             </DropdownMenuItem>
 
             {/* Wall Settings Button */}
-            <DropdownMenuItem 
+            <DropdownMenuItem
               onClick={() => {
                 setWallSettingsOpen(true);
                 setSettingsOpen(false);
@@ -1281,11 +1282,11 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 </div>
               </div>
             </DropdownMenuItem>
-            
+
             {!floorTextureOpen && !wallTextureOpen && (
               <>
                 <DropdownMenuSeparator />
-                
+
                 <DropdownMenuItem onClick={handleExportDesign} className="cursor-pointer">
                   <Download className="h-4 w-4 ml-2" />
                   <span>تصدير التصميم</span>
@@ -1329,12 +1330,12 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 معاينة الصورة
               </DialogTitle>
             </DialogHeader>
-            
+
             <div className="flex-1 overflow-auto p-6 flex items-center justify-center bg-slate-50">
               {previewImage && (
-                <img 
-                  src={previewImage} 
-                  alt="Preview" 
+                <img
+                  src={previewImage}
+                  alt="Preview"
                   className="max-w-full max-h-full rounded-lg shadow-xl border-2"
                   style={{ borderColor: primaryColor }}
                 />
@@ -1353,7 +1354,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
               >
                 إغلاق
               </Button>
-              
+
               <Button
                 className="flex items-center gap-2 text-white"
                 style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}

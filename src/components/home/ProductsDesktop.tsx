@@ -522,16 +522,23 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                             </div>
                             
                             <div 
-                              className="flex items-center gap-0.5 hover:opacity-80 transition-opacity"
+                              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                               onMouseLeave={() => handleStarLeave(product.id)}
                             >
-                              {renderStars(product)}
-                              <span 
-                                className="text-xs text-slate-500 cursor-pointer hover:text-primary transition-colors"
-                                onClick={(e) => handleRatingClick(e, product)}
-                              >
-                                ({product.reviews || 0})
-                              </span>
+                              <div className="flex items-center gap-0.5">
+                                {renderStars(product)}
+                                <span 
+                                  className="text-xs text-slate-500 cursor-pointer hover:text-primary transition-colors"
+                                  onClick={(e) => handleRatingClick(e, product)}
+                                >
+                                  ({product.reviews || 0})
+                                </span>
+                              </div>
+                              {(product.sku || product.id) && (
+                                <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/30 hover:border-primary/60 transition-colors" title={product.sku ? 'Product Code' : 'Product ID'}>
+                                  {product.sku || product.id.substring(0, 8)}
+                                </span>
+                              )}
                             </div>
                           </div>
 

@@ -290,13 +290,18 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
             </div>
             
             {/* Interactive Rating Section */}
-            <div className="flex items-center justify-between mb-4" onMouseLeave={() => setHoveredRating(0)}>
+            <div className="flex items-center justify-between mb-4 gap-2" onMouseLeave={() => setHoveredRating(0)}>
               <div className="flex items-center gap-0.5 hover:opacity-80 transition-opacity">
                 {renderStars(product.rating || 0)}
                 <span className="text-xs text-slate-500 cursor-pointer hover:text-primary transition-colors">
                   ({product.reviews || 0})
                 </span>
               </div>
+              {product.sku && (
+                <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/30 hover:border-primary/60 transition-colors ml-auto">
+                  {product.sku}
+                </span>
+              )}
             </div>
             
             {/* Bottom action buttons - Eye + Action button */}

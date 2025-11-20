@@ -24,13 +24,13 @@ export const SceneItemsList: React.FC = () => {
     products: true,
     walls: true,
   });
-  
+
   const [expandedWalls, setExpandedWalls] = useState<Set<string>>(new Set());
 
   const toggleSection = (section: 'products' | 'walls') => {
     setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
   };
-  
+
   const toggleWall = (wallId: string) => {
     setExpandedWalls(prev => {
       const newSet = new Set(prev);
@@ -46,7 +46,7 @@ export const SceneItemsList: React.FC = () => {
   const totalColumns = layout.walls.reduce((sum, wall) => sum + (wall.columns?.length || 0), 0);
 
   return (
-    <div className="w-full bg-white rounded-2xl border-2 shadow-xl overflow-hidden" style={{ borderColor: primaryColor }}>
+    <div className="w-full max-w-3xl mx-auto bg-white rounded-2xl border-2 shadow-xl overflow-hidden" style={{ borderColor: primaryColor }}>
       <div className="px-4 py-3 text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
         <h3 className="text-lg font-bold flex items-center gap-2">
           <Layers className="h-5 w-5" />
@@ -55,7 +55,7 @@ export const SceneItemsList: React.FC = () => {
       </div>
 
       {/* Two Column Layout */}
-      <div className="grid grid-cols-2 divide-x" style={{ borderColor: primaryColor }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x" style={{ borderColor: primaryColor }}>
         {/* Products Section - RIGHT COLUMN */}
         <div className="order-2" style={{ background: `linear-gradient(135deg, ${secondaryColor}08 0%, white 100%)` }}>
           <button
@@ -88,32 +88,31 @@ export const SceneItemsList: React.FC = () => {
               ) : (
                 layout.products.map((product) => {
                   // Try to get thumbnail from metadata or use modelUrl
-                  const thumbnailUrl = (product.metadata?.thumbnailUrl as string) || 
-                                     (product.metadata?.imageUrl as string) || 
-                                     product.modelUrl;
+                  const thumbnailUrl = (product.metadata?.thumbnailUrl as string) ||
+                    (product.metadata?.imageUrl as string) ||
+                    product.modelUrl;
                   const isImageUrl = thumbnailUrl && (
-                    thumbnailUrl.endsWith('.jpg') || 
-                    thumbnailUrl.endsWith('.jpeg') || 
-                    thumbnailUrl.endsWith('.png') || 
+                    thumbnailUrl.endsWith('.jpg') ||
+                    thumbnailUrl.endsWith('.jpeg') ||
+                    thumbnailUrl.endsWith('.png') ||
                     thumbnailUrl.endsWith('.webp')
                   );
-                  
+
                   return (
                     <div
                       key={product.id}
-                      className={`group flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${
-                        selectedProductId === product.id
-                          ? 'border-purple-500 bg-purple-50 shadow-md'
-                          : 'border-slate-200 hover:border-purple-300 hover:bg-purple-50/50'
-                      }`}
+                      className={`group flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${selectedProductId === product.id
+                        ? 'border-purple-500 bg-purple-50 shadow-md'
+                        : 'border-slate-200 hover:border-purple-300 hover:bg-purple-50/50'
+                        }`}
                       onClick={() => selectProduct(product.id)}
                     >
                       {/* Product Image/Icon */}
                       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center overflow-hidden border-2 border-purple-300 flex-shrink-0">
                         {isImageUrl ? (
-                          <img 
-                            src={thumbnailUrl} 
-                            alt={product.name} 
+                          <img
+                            src={thumbnailUrl}
+                            alt={product.name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
                               // Fallback to icon if image fails to load
@@ -124,7 +123,7 @@ export const SceneItemsList: React.FC = () => {
                         ) : null}
                         <Box className={`h-5 w-5 text-purple-600 ${isImageUrl ? 'hidden' : ''}`} />
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-900 truncate text-xs">{product.name}</p>
                         <div className="flex items-center gap-1 mt-0.5">
@@ -189,16 +188,15 @@ export const SceneItemsList: React.FC = () => {
                   );
                   const hasColumns = wall.columns && wall.columns.length > 0;
                   const isExpanded = expandedWalls.has(wall.id);
-                  
+
                   return (
                     <div key={wall.id} className="space-y-1">
                       {/* Wall Item */}
                       <div
-                        className={`group flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${
-                          selectedWallId === wall.id
-                            ? 'border-blue-500 bg-blue-50 shadow-md'
-                            : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
-                        }`}
+                        className={`group flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${selectedWallId === wall.id
+                          ? 'border-blue-500 bg-blue-50 shadow-md'
+                          : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                          }`}
                         onClick={() => selectWall(wall.id)}
                       >
                         {/* Expand/Collapse Button for Columns */}
@@ -217,7 +215,7 @@ export const SceneItemsList: React.FC = () => {
                             )}
                           </button>
                         )}
-                        
+
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-1">
                             <p className="font-semibold text-slate-900 text-xs">جدار {index + 1}</p>
@@ -248,18 +246,17 @@ export const SceneItemsList: React.FC = () => {
                           <Trash2 className="h-3 w-3" />
                         </Button>
                       </div>
-                      
+
                       {/* Nested Columns */}
                       {hasColumns && isExpanded && (
                         <div className="mr-6 space-y-1">
                           {wall.columns!.map((column, colIndex) => (
                             <div
                               key={column.id}
-                              className={`group flex items-center gap-1.5 p-1.5 rounded-lg border-2 transition-all cursor-pointer ${
-                                selectedColumnId === column.id
-                                  ? 'border-amber-500 bg-amber-50 shadow-md'
-                                  : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
-                              }`}
+                              className={`group flex items-center gap-1.5 p-1.5 rounded-lg border-2 transition-all cursor-pointer ${selectedColumnId === column.id
+                                ? 'border-amber-500 bg-amber-50 shadow-md'
+                                : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
+                                }`}
                               onClick={() => selectColumn(column.id)}
                             >
                               <div className="w-6 h-6 rounded bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center border-2 border-amber-300 flex-shrink-0">

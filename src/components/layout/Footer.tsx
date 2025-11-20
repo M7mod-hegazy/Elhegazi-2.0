@@ -60,6 +60,8 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
   const location = useLocation();
   const [footerSettings, setFooterSettings] = useState<FooterSettings | null>(null);
+  const [whatsappUrl, setWhatsappUrl] = useState<string>('');
+  const [messengerUrl, setMessengerUrl] = useState<string>('');
   const [expandedSection, setExpandedSection] = useState<string | null>('products');
   // Helper function to check if link is active
   const isLinkActive = (path: string) => {
@@ -69,8 +71,8 @@ const Footer = () => {
   // Get active link class
   const getActiveLinkClass = (path: string) => {
     const isActive = isLinkActive(path);
-    return isActive 
-      ? 'bg-primary/25 border-l-4 border-primary text-white pl-2 font-semibold' 
+    return isActive
+      ? 'bg-primary/25 border-l-4 border-primary text-white pl-2 font-semibold'
       : '';
   };
 
@@ -88,6 +90,24 @@ const Footer = () => {
       }
     };
     fetchFooterSettings();
+  }, []);
+
+  // Fetch social settings for WhatsApp and Messenger
+  useEffect(() => {
+    const fetchSocialSettings = async () => {
+      try {
+        const res = await fetch('/api/settings');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.ok && data.item?.social) {
+          setWhatsappUrl(data.item.social.whatsappUrl || '');
+          setMessengerUrl(data.item.social.messengerUrl || '');
+        }
+      } catch (error) {
+        // Silently fail
+      }
+    };
+    fetchSocialSettings();
   }, []);
 
   // Main navigation links
@@ -119,6 +139,57 @@ const Footer = () => {
     fetchCategories();
   }, []);
 
+  // Helper function to build WhatsApp URL
+  const getWhatsAppUrl = () => {
+    if (!whatsappUrl) return '';
+
+    let phoneNumber = '';
+
+    if (whatsappUrl.includes('wa.me/')) {
+      // Extract from full URL
+      const phoneMatch = whatsappUrl.match(/wa\.me\/(\d+)/);
+      phoneNumber = phoneMatch ? phoneMatch[1] : '';
+    } else if (/^\d+$/.test(whatsappUrl)) {
+      // It's just a phone number
+      let phone = whatsappUrl.trim();
+      // If it starts with 0, replace with 20 (Egypt country code)
+      if (phone.startsWith('0')) {
+        phone = '20' + phone.substring(1);
+      }
+      // If it doesn't start with country code, add 20
+      if (!phone.startsWith('20') && phone.length === 10) {
+        phone = '20' + phone;
+      }
+      phoneNumber = phone;
+    }
+
+    return phoneNumber ? `https://wa.me/${phoneNumber}` : '';
+  };
+
+  // Helper function to build Messenger URL
+  const getMessengerUrl = () => {
+    if (!messengerUrl) return '';
+
+    // If it's already a Messenger link (https://m.me/...)
+    if (messengerUrl.includes('m.me/')) {
+      return messengerUrl;
+    }
+    // If it's a Facebook page URL
+    else if (messengerUrl.includes('facebook.com')) {
+      const match = messengerUrl.match(/facebook\.com\/([^/?]+)/);
+      if (match && match[1]) {
+        const pageId = match[1];
+        return `https://m.me/${pageId}`;
+      }
+    }
+    // If it's just a page ID or name
+    else if (messengerUrl.trim()) {
+      return `https://m.me/${messengerUrl}`;
+    }
+
+    return '';
+  };
+
   return (
     <footer className="bg-gradient-to-b from-slate-900 to-slate-800 text-slate-100 border-t border-slate-700">
       <div className="container mx-auto px-4 py-8 md:py-12">
@@ -134,14 +205,14 @@ const Footer = () => {
 
             {/* Auth Buttons - Under Description */}
             <div className="flex gap-3">
-              <Link 
+              <Link
                 to="/login"
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-slate-700/50 hover:bg-slate-600 text-slate-200 hover:text-white transition-all duration-300 border border-slate-600 hover:border-slate-500 group"
               >
                 <LogIn className="w-4 h-4 group-hover:scale-110 transition-transform" />
                 <span className="text-sm font-medium">دخول</span>
               </Link>
-              <Link 
+              <Link
                 to="/register"
                 className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary/80 hover:bg-primary text-white transition-all duration-300 border border-primary/50 hover:border-primary group shadow-lg hover:shadow-primary/20"
               >
@@ -154,31 +225,39 @@ const Footer = () => {
             <div className="space-y-3">
               <h4 className="text-sm font-bold text-white">تواصل معنا</h4>
               <div className="flex gap-2 w-full">
-                <a
-                  href="https://wa.me/201001234567"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-800/30 hover:bg-green-600/20 text-slate-300 hover:text-white transition-all duration-300 border border-slate-700/50 hover:border-green-600/50 text-xs font-medium group"
-                >
-                  <MessageCircle className="w-4 h-4 text-green-500 group-hover:scale-110 transition-transform" />
-                  <span>واتس</span>
-                </a>
-                <a
-                  href="https://m.me/elhegazi"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-800/30 hover:bg-blue-600/20 text-slate-300 hover:text-white transition-all duration-300 border border-slate-700/50 hover:border-blue-600/50 text-xs font-medium group"
-                >
-                  <MessageCircle className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
-                  <span>ماسنجر</span>
-                </a>
+                {getWhatsAppUrl() && (
+                  <a
+                    href={getWhatsAppUrl()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open(getWhatsAppUrl(), '_blank', 'noopener,noreferrer');
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-800/30 hover:bg-green-600/20 text-slate-300 hover:text-white transition-all duration-300 border border-slate-700/50 hover:border-green-600/50 text-xs font-medium group cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 text-green-500 group-hover:scale-110 transition-transform" />
+                    <span>واتس</span>
+                  </a>
+                )}
+                {getMessengerUrl() && (
+                  <a
+                    href={getMessengerUrl()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open(getMessengerUrl(), '_blank', 'noopener,noreferrer');
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-slate-800/30 hover:bg-blue-600/20 text-slate-300 hover:text-white transition-all duration-300 border border-slate-700/50 hover:border-blue-600/50 text-xs font-medium group cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4 text-blue-500 group-hover:scale-110 transition-transform" />
+                    <span>ماسنجر</span>
+                  </a>
+                )}
               </div>
             </div>
-            
+
             {/* Contact Info */}
             <div className="space-y-3">
               {footerSettings?.phone && (
-                <a 
+                <a
                   href={`tel:${footerSettings.phone}`}
                   className="flex items-center space-x-3 space-x-reverse group"
                 >
@@ -189,7 +268,7 @@ const Footer = () => {
                 </a>
               )}
               {footerSettings?.email && (
-                <a 
+                <a
                   href={`mailto:${footerSettings.email}`}
                   className="flex items-center space-x-3 space-x-reverse group"
                 >
@@ -217,9 +296,9 @@ const Footer = () => {
               {mainLinks.map((link) => {
                 const IconComponent = link.icon;
                 return (
-                  <Link 
+                  <Link
                     key={link.path}
-                    to={link.path} 
+                    to={link.path}
                     className={`${footerLinkClass} ${getActiveLinkClass(link.path)}`}
                   >
                     <IconComponent className={`${iconAnimationClass} w-5 h-5`} />
@@ -231,34 +310,12 @@ const Footer = () => {
             </div>
           </div>
 
-          {/* Product Categories */}
-          <div>
-            <h3 className="text-lg font-bold text-white mb-6 pb-2 border-b border-slate-700">الأقسام</h3>
-            <div className="space-y-3">
-              {categories.length > 0 ? (
-                categories.map((cat) => (
-                  <Link 
-                    key={cat.slug}
-                    to={`/category/${cat.slug}`} 
-                    className={`${footerLinkClass} ${getActiveLinkClass(`/category/${cat.slug}`)}`}
-                  >
-                    <span className="w-2 h-2 bg-primary rounded-full group-hover:scale-150 group-hover:shadow-lg group-hover:shadow-primary/50 transition-all relative z-10"></span>
-                    <span className={textAnimationClass}>{cat.nameAr}</span>
-                    <ArrowRight className={arrowAnimationClass} />
-                  </Link>
-                ))
-              ) : (
-                <p className="text-sm text-slate-400">جاري التحميل...</p>
-              )}
-            </div>
-          </div>
-
           {/* Product Details & Links */}
           <div>
             <h3 className="text-lg font-bold text-white mb-6 pb-2 border-b border-slate-700">المنتجات</h3>
             <div className="space-y-2">
-              <Link 
-                to="/products" 
+              <Link
+                to="/products"
                 className={`${footerLinkClass} ${getActiveLinkClass('/products')}`}
               >
                 <ShoppingBag className={`${iconAnimationClass} group-hover:rotate-12`} />
@@ -276,38 +333,60 @@ const Footer = () => {
                 <ArrowRight className={arrowAnimationClass} />
               </Link>
 
-              <Link 
-                to="/featured" 
+              <Link
+                to="/featured"
                 className={`${footerLinkClass} ${getActiveLinkClass('/featured')}`}
               >
                 <Star className={`${iconAnimationClass} group-hover:animate-spin`} />
                 <span className={textAnimationClass}>المنتجات المميزة</span>
                 <ArrowRight className={arrowAnimationClass} />
               </Link>
-              <Link 
-                to="/best-sellers" 
+              <Link
+                to="/best-sellers"
                 className={`${footerLinkClass} ${getActiveLinkClass('/best-sellers')}`}
               >
                 <Flame className={`${iconAnimationClass} group-hover:animate-pulse`} />
                 <span className={textAnimationClass}>الأفضل مبيعاً</span>
                 <ArrowRight className={arrowAnimationClass} />
               </Link>
-              <Link 
-                to="/special-offers" 
+              <Link
+                to="/special-offers"
                 className={`${footerLinkClass} ${getActiveLinkClass('/special-offers')}`}
               >
                 <Gift className={`${iconAnimationClass} group-hover:bounce`} />
                 <span className={textAnimationClass}>العروض الخاصة</span>
                 <ArrowRight className={arrowAnimationClass} />
               </Link>
-              <Link 
-                to="/latest" 
+              <Link
+                to="/latest"
                 className={`${footerLinkClass} ${getActiveLinkClass('/latest')}`}
               >
                 <Sparkles className={iconAnimationClass} />
                 <span className={textAnimationClass}>الجديد</span>
                 <ArrowRight className={arrowAnimationClass} />
               </Link>
+            </div>
+          </div>
+
+          {/* Product Categories - 2 Columns */}
+          <div>
+            <h3 className="text-lg font-bold text-white mb-6 pb-2 border-b border-slate-700">الأقسام</h3>
+            <div className="grid grid-cols-2 gap-3">
+              {categories.length > 0 ? (
+                categories.map((cat) => (
+                  <Link
+                    key={cat.slug}
+                    to={`/category/${cat.slug}`}
+                    className={`${footerLinkClass} ${getActiveLinkClass(`/category/${cat.slug}`)}`}
+                  >
+                    <span className="w-2 h-2 bg-primary rounded-full group-hover:scale-150 group-hover:shadow-lg group-hover:shadow-primary/50 transition-all relative z-10"></span>
+                    <span className={textAnimationClass}>{cat.nameAr}</span>
+                    <ArrowRight className={arrowAnimationClass} />
+                  </Link>
+                ))
+              ) : (
+                <p className="text-sm text-slate-400">جاري التحميل...</p>
+              )}
             </div>
           </div>
         </div>
@@ -323,14 +402,14 @@ const Footer = () => {
 
             {/* Mobile Auth Buttons */}
             <div className="flex gap-2">
-              <Link 
+              <Link
                 to="/login"
                 className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-slate-700/50 hover:bg-slate-600 text-slate-200 hover:text-white transition-all duration-300 border border-slate-600 hover:border-slate-500 group text-xs"
               >
                 <LogIn className="w-3 h-3" />
                 <span>دخول</span>
               </Link>
-              <Link 
+              <Link
                 to="/register"
                 className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-primary/80 hover:bg-primary text-white transition-all duration-300 border border-primary/50 hover:border-primary group text-xs"
               >
@@ -343,24 +422,32 @@ const Footer = () => {
             <div className="space-y-2">
               <h4 className="text-xs font-bold text-white px-2">تواصل معنا</h4>
               <div className="flex gap-2 w-full">
-                <a
-                  href="https://wa.me/201001234567"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-slate-800/30 hover:bg-green-600/20 text-slate-300 hover:text-white transition-all duration-300 border border-slate-700/50 hover:border-green-600/50 text-xs font-medium group"
-                >
-                  <MessageCircle className="w-3 h-3 text-green-500 group-hover:scale-110 transition-transform" />
-                  <span>واتس</span>
-                </a>
-                <a
-                  href="https://m.me/elhegazi"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-slate-800/30 hover:bg-blue-600/20 text-slate-300 hover:text-white transition-all duration-300 border border-slate-700/50 hover:border-blue-600/50 text-xs font-medium group"
-                >
-                  <MessageCircle className="w-3 h-3 text-blue-500 group-hover:scale-110 transition-transform" />
-                  <span>ماسنجر</span>
-                </a>
+                {getWhatsAppUrl() && (
+                  <a
+                    href={getWhatsAppUrl()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open(getWhatsAppUrl(), '_blank', 'noopener,noreferrer');
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-slate-800/30 hover:bg-green-600/20 text-slate-300 hover:text-white transition-all duration-300 border border-slate-700/50 hover:border-green-600/50 text-xs font-medium group cursor-pointer"
+                  >
+                    <MessageCircle className="w-3 h-3 text-green-500 group-hover:scale-110 transition-transform" />
+                    <span>واتس</span>
+                  </a>
+                )}
+                {getMessengerUrl() && (
+                  <a
+                    href={getMessengerUrl()}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open(getMessengerUrl(), '_blank', 'noopener,noreferrer');
+                    }}
+                    className="flex-1 inline-flex items-center justify-center gap-1 px-3 py-2 rounded-lg bg-slate-800/30 hover:bg-blue-600/20 text-slate-300 hover:text-white transition-all duration-300 border border-slate-700/50 hover:border-blue-600/50 text-xs font-medium group cursor-pointer"
+                  >
+                    <MessageCircle className="w-3 h-3 text-blue-500 group-hover:scale-110 transition-transform" />
+                    <span>ماسنجر</span>
+                  </a>
+                )}
               </div>
             </div>
 
@@ -445,57 +532,29 @@ const Footer = () => {
             </div>
           )}
 
-          {/* Mobile Sections - 2 Column Layout */}
+          {/* Mobile Sections - Stacked Layout */}
           <div className="space-y-4">
-            {/* الروابط & الأقسام - 2 Columns */}
-            <div className="grid grid-cols-2 gap-3">
-              {/* الروابط الرئيسية */}
-              <div className="space-y-2">
-                <h4 className="text-xs font-bold text-white px-2">الروابط</h4>
-              {mainLinks.map((link) => {
-                const IconComponent = link.icon;
-                const isActive = isLinkActive(link.path);
-                return (
-                  <Link
-                    key={link.path}
-                    to={link.path}
-                    className={`relative flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-all group border border-slate-700/50 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.15)] active:scale-95 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/0 before:via-primary/10 before:to-primary/0 before:translate-x-[-100%] hover:before:translate-x-[100%] before:transition-transform before:duration-500 ${
-                      isActive 
-                        ? 'bg-primary/25 text-white border-l-4 border-primary pl-1 font-semibold' 
-                        : 'text-slate-300 hover:text-white hover:bg-slate-800/30 hover:bg-primary/15 bg-slate-800/30'
-                    }`}
-                  >
-                    <IconComponent className="w-3 h-3 text-primary group-hover:text-white group-hover:scale-110 transition-all duration-300 relative z-10" />
-                    <span className="relative z-10">{link.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-
-            {/* الأقسام */}
+            {/* الروابط الرئيسية - 3 Columns */}
             <div className="space-y-2">
-              <h4 className="text-xs font-bold text-white px-2">الأقسام</h4>
-              {categories.length > 0 ? (
-                categories.map((cat) => {
-                  const isActive = isLinkActive(`/category/${cat.slug}`);
+              <h4 className="text-xs font-bold text-white px-2">الروابط</h4>
+              <div className="grid grid-cols-3 gap-2">
+                {mainLinks.filter(link => link.path !== '/shop-setup').map((link) => {
+                  const IconComponent = link.icon;
+                  const isActive = isLinkActive(link.path);
                   return (
                     <Link
-                      key={cat.slug}
-                      to={`/category/${cat.slug}`}
-                      className={`relative flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-all group border border-slate-700/50 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.15)] active:scale-95 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/0 before:via-primary/10 before:to-primary/0 before:translate-x-[-100%] hover:before:translate-x-[100%] before:transition-transform before:duration-500 ${
-                        isActive 
-                          ? 'bg-primary/25 text-white border-l-4 border-primary pl-1 font-semibold' 
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/30 hover:bg-primary/15 bg-slate-800/30'
-                      }`}
+                      key={link.path}
+                      to={link.path}
+                      className={`relative flex flex-col items-center gap-1 px-2 py-1.5 rounded text-xs transition-all group border border-slate-700/50 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.15)] active:scale-95 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/0 before:via-primary/10 before:to-primary/0 before:translate-x-[-100%] hover:before:translate-x-[100%] before:transition-transform before:duration-500 ${isActive
+                        ? 'bg-primary/25 text-white border-l-4 border-primary pl-1 font-semibold'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/30 hover:bg-primary/15 bg-slate-800/30'
+                        }`}
                     >
-                      <span className="w-1.5 h-1.5 bg-primary rounded-full group-hover:scale-125 transition-transform relative z-10"></span>
-                      <span className="relative z-10">{cat.nameAr}</span>
+                      <IconComponent className="w-3 h-3 text-primary group-hover:text-white group-hover:scale-110 transition-all duration-300 relative z-10" />
+                      <span className="relative z-10 text-center line-clamp-2">{link.label}</span>
                     </Link>
                   );
-                })
-              ) : (
-                <p className="text-xs text-slate-400 p-2">جاري التحميل...</p>
-              )}
+                })}
               </div>
             </div>
 
@@ -513,20 +572,46 @@ const Footer = () => {
                 ].map((item) => {
                   const isActive = isLinkActive(item.path);
                   return (
-                    <Link 
+                    <Link
                       key={item.path}
-                      to={item.path} 
-                      className={`relative flex items-center gap-1 px-2 py-1.5 rounded text-xs transition-all group border border-slate-700/50 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.15)] active:scale-95 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/0 before:via-primary/10 before:to-primary/0 before:translate-x-[-100%] hover:before:translate-x-[100%] before:transition-transform before:duration-500 ${
-                        isActive 
-                          ? 'bg-primary/25 text-white border-l-4 border-primary pl-1 font-semibold' 
-                          : 'text-slate-300 hover:text-white hover:bg-slate-800/30 hover:bg-primary/15 bg-slate-800/30'
-                      }`}
+                      to={item.path}
+                      className={`relative flex items-center gap-1 px-2 py-1.5 rounded text-xs transition-all group border border-slate-700/50 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.15)] active:scale-95 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/0 before:via-primary/10 before:to-primary/0 before:translate-x-[-100%] hover:before:translate-x-[100%] before:transition-transform before:duration-500 ${isActive
+                        ? 'bg-primary/25 text-white border-l-4 border-primary pl-1 font-semibold'
+                        : 'text-slate-300 hover:text-white hover:bg-slate-800/30 hover:bg-primary/15 bg-slate-800/30'
+                        }`}
                     >
                       <item.Icon className="w-3 h-3 text-primary group-hover:text-white group-hover:scale-110 transition-all duration-300 flex-shrink-0 relative z-10" />
                       <span className="truncate relative z-10">{item.label}</span>
                     </Link>
                   );
                 })}
+              </div>
+            </div>
+
+            {/* الأقسام - 2 Column Grid */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-bold text-white px-2">الأقسام</h4>
+              <div className="grid grid-cols-2 gap-2">
+                {categories.length > 0 ? (
+                  categories.map((cat) => {
+                    const isActive = isLinkActive(`/category/${cat.slug}`);
+                    return (
+                      <Link
+                        key={cat.slug}
+                        to={`/category/${cat.slug}`}
+                        className={`relative flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-all group border border-slate-700/50 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.15)] active:scale-95 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/0 before:via-primary/10 before:to-primary/0 before:translate-x-[-100%] hover:before:translate-x-[100%] before:transition-transform before:duration-500 ${isActive
+                          ? 'bg-primary/25 text-white border-l-4 border-primary pl-1 font-semibold'
+                          : 'text-slate-300 hover:text-white hover:bg-slate-800/30 hover:bg-primary/15 bg-slate-800/30'
+                          }`}
+                      >
+                        <span className="w-1.5 h-1.5 bg-primary rounded-full group-hover:scale-125 transition-transform relative z-10"></span>
+                        <span className="relative z-10">{cat.nameAr}</span>
+                      </Link>
+                    );
+                  })
+                ) : (
+                  <p className="text-xs text-slate-400 p-2">جاري التحميل...</p>
+                )}
               </div>
             </div>
           </div>

@@ -47,7 +47,7 @@ export const ShopBuilderDefaultsModal: React.FC<ShopBuilderDefaultsModalProps> =
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
-  
+
   const [floorTexture, setFloorTexture] = useState('tiles_white');
   const [wallTexture, setWallTexture] = useState('painted_white');
   const [wallColor, setWallColor] = useState('#ffffff');
@@ -65,7 +65,7 @@ export const ShopBuilderDefaultsModal: React.FC<ShopBuilderDefaultsModalProps> =
       setLoading(true);
       const response = await apiGet('/api/settings');
       const settings = (response as any).item || (response as any).settings || response;
-      
+
       if (settings.shopBuilderDefaults) {
         setFloorTexture(settings.shopBuilderDefaults.floorTexture || 'tiles_white');
         setWallTexture(settings.shopBuilderDefaults.wallTexture || 'painted_white');
@@ -86,7 +86,7 @@ export const ShopBuilderDefaultsModal: React.FC<ShopBuilderDefaultsModalProps> =
   const handleSave = async () => {
     try {
       setSaving(true);
-      
+
       await apiPutJson('/api/settings', {
         shopBuilderDefaults: {
           floorTexture,
@@ -142,8 +142,8 @@ export const ShopBuilderDefaultsModal: React.FC<ShopBuilderDefaultsModalProps> =
                     onClick={() => setFloorTexture(key)}
                     className={`
                       relative p-4 rounded-lg border-2 transition-all
-                      ${floorTexture === key 
-                        ? 'border-primary bg-primary/10 shadow-md' 
+                      ${floorTexture === key
+                        ? 'border-primary bg-primary/10 shadow-md'
                         : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
                       }
                     `}
@@ -175,8 +175,8 @@ export const ShopBuilderDefaultsModal: React.FC<ShopBuilderDefaultsModalProps> =
                     onClick={() => setWallTexture(key)}
                     className={`
                       relative p-4 rounded-lg border-2 transition-all
-                      ${wallTexture === key 
-                        ? 'border-primary bg-primary/10 shadow-md' 
+                      ${wallTexture === key
+                        ? 'border-primary bg-primary/10 shadow-md'
                         : 'border-gray-200 hover:border-primary/50 hover:bg-gray-50'
                       }
                     `}

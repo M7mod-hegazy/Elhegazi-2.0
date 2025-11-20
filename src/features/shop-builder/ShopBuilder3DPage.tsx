@@ -35,79 +35,79 @@ const WALL_TEXTURE_OPTIONS = [
 // Product texture options - Using simple color-based textures (data URLs for guaranteed loading)
 const TEXTURE_OPTIONS = [
   { value: '', label: 'افتراضي', preview: null },
-  { 
-    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id29vZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiM4QjczNTIiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjEwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjxyZWN0IHg9IjIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjMwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZCkiLz48L3N2Zz4=', 
-    label: 'خشب بني', 
-    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id29vZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiM4QjczNTIiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjEwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjxyZWN0IHg9IjIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjMwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZCkiLz48L3N2Zz4=' 
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id29vZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiM4QjczNTIiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjEwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjxyZWN0IHg9IjIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjMwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZCkiLz48L3N2Zz4=',
+    label: 'خشب بني',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id29vZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiM4QjczNTIiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjEwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjxyZWN0IHg9IjIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjMwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZCkiLz48L3N2Zz4='
   },
-  { 
-    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWFyYmxlIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMCw1MCBRMjUsMzAgNTAsNTAgVDEwMCw1MCIgc3Ryb2tlPSIjREREIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMCw3MCBRMzAsNjAgNjAsNzAgVDEwMCw3MCIgc3Ryb2tlPSIjRTBFMEUwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI21hcmJsZSkiLz48L3N2Zz4=', 
-    label: 'رخام أبيض', 
-    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWFyYmxlIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMCw1MCBRMjUsMzAgNTAsNTAgVDEwMCw1MCIgc3Ryb2tlPSIjREREIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMCw3MCBRMzAsNjAgNjAsNzAgVDEwMCw3MCIgc3Ryb2tlPSIjRTBFMEUwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI21hcmJsZSkiLz48L3N2Zz4=' 
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWFyYmxlIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMCw1MCBRMjUsMzAgNTAsNTAgVDEwMCw1MCIgc3Ryb2tlPSIjREREIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMCw3MCBRMzAsNjAgNjAsNzAgVDEwMCw3MCIgc3Ryb2tlPSIjRTBFMEUwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI21hcmJsZSkiLz48L3N2Zz4=',
+    label: 'رخام أبيض',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWFyYmxlIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMCw1MCBRMjUsMzAgNTAsNTAgVDEwMCw1MCIgc3Ryb2tlPSIjREREIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMCw3MCBRMzAsNjAgNjAsNzAgVDEwMCw3MCIgc3Ryb2tlPSIjRTBFMEUwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI21hcmJsZSkiLz48L3N2Zz4='
   },
-  { 
-    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYnJpY2siIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjQjI0QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iMjgiIGhlaWdodD0iMTQiIGZpbGw9IiNDOTVBNEIiIHN0cm9rZT0iIzhBMzMyOCIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iLTE0IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjYnJpY2spIi8+PC9zdmc+', 
-    label: 'طوب أحمر', 
-    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYnJpY2siIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjQjI0QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iMjgiIGhlaWdodD0iMTQiIGZpbGw9IiNDOTVBNEIiIHN0cm9rZT0iIzhBMzMyOCIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iLTE0IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjYnJpY2spIi8+PC9zdmc+' 
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYnJpY2siIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjQjI0QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iMjgiIGhlaWdodD0iMTQiIGZpbGw9IiNDOTVBNEIiIHN0cm9rZT0iIzhBMzMyOCIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iLTE0IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjYnJpY2spIi8+PC9zdmc+',
+    label: 'طوب أحمر',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYnJpY2siIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjQjI0QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iMjgiIGhlaWdodD0iMTQiIGZpbGw9IiNDOTVBNEIiIHN0cm9rZT0iIzhBMzMyOCIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iLTE0IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjYnJpY2spIi8+PC9zdmc+'
   },
-  { 
-    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iY29uY3JldGUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjQTBBMEEwIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMiIgZmlsbD0iIzg4ODg4OCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0iIzk1OTU5NSIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIiIGZpbGw9IiM4ODg4ODgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjM1IiByPSIxIiBmaWxsPSIjOTU5NTk1Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNjb25jcmV0ZSkiLz48L3N2Zz4=', 
-    label: 'خرسانة', 
-    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iY29uY3JldGUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjQTBBMEEwIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMiIgZmlsbD0iIzg4ODg4OCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0iIzk1OTU5NSIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIiIGZpbGw9IiM4ODg4ODgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjM1IiByPSIxIiBmaWxsPSIjOTU5NTk1Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNjb25jcmV0ZSkiLz48L3N2Zz4=' 
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iY29uY3JldGUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjQTBBMEEwIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMiIgZmlsbD0iIzg4ODg4OCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0iIzk1OTU5NSIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIiIGZpbGw9IiM4ODg4ODgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjM1IiByPSIxIiBmaWxsPSIjOTU5NTk1Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNjb25jcmV0ZSkiLz48L3N2Zz4=',
+    label: 'خرسانة',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iY29uY3JldGUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjQTBBMEEwIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMiIgZmlsbD0iIzg4ODg4OCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0iIzk1OTU5NSIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIiIGZpbGw9IiM4ODg4ODgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjM1IiByPSIxIiBmaWxsPSIjOTU5NTk1Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNjb25jcmV0ZSkiLz48L3N2Zz4='
   },
-  { 
-    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWV0YWwiIHdpZHRoPSI0IiBoZWlnaHQ9IjUxMiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjQiIGhlaWdodD0iNTEyIiBmaWxsPSIjQzBDMEMwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjRDBEMEQwIi8+PHJlY3QgeD0iMyIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjQjBCMEIwIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNtZXRhbCkiLz48L3N2Zz4=', 
-    label: 'معدن', 
-    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWV0YWwiIHdpZHRoPSI0IiBoZWlnaHQ9IjUxMiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjQiIGhlaWdodD0iNTEyIiBmaWxsPSIjQzBDMEMwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjRDBEMEQwIi8+PHJlY3QgeD0iMyIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjQjBCMEIwIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNtZXRhbCkiLz48L3N2Zz4=' 
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWV0YWwiIHdpZHRoPSI0IiBoZWlnaHQ9IjUxMiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjQiIGhlaWdodD0iNTEyIiBmaWxsPSIjQzBDMEMwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjRDBEMEQwIi8+PHJlY3QgeD0iMyIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjQjBCMEIwIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNtZXRhbCkiLz48L3N2Zz4=',
+    label: 'معدن',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWV0YWwiIHdpZHRoPSI0IiBoZWlnaHQ9IjUxMiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjQiIGhlaWdodD0iNTEyIiBmaWxsPSIjQzBDMEMwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjRDBEMEQwIi8+PHJlY3QgeD0iMyIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjQjBCMEIwIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNtZXRhbCkiLz48L3N2Zz4='
   },
 ];
 
 const ShopBuilderContent = () => {
   const [transformMode, setTransformMode] = useState<TransformMode>(DEFAULT_TRANSFORM_MODE);
   const threeRef = useRef<ThreeSceneHandle | null>(null);
-  
+
   // Scrubby slider state
-  const scrubbyState = useRef<{ 
-    active: boolean; 
-    startX: number; 
-    startValue: number; 
+  const scrubbyState = useRef<{
+    active: boolean;
+    startX: number;
+    startValue: number;
     field: string;
     step: number;
     callback: (value: number) => void;
   } | null>(null);
-  
+
   // Texture dropdown state
   const [showProductTextureDropdown, setShowProductTextureDropdown] = useState(false);
   const [showWallTextureDropdown, setShowWallTextureDropdown] = useState(false);
-  
+
   const { toast } = useToast();
-  
-  const { 
-    layout, 
-    selectProduct, 
-    selectWall, 
-    selectedProductId, 
+
+  const {
+    layout,
+    selectProduct,
+    selectWall,
+    selectedProductId,
     selectedWallId,
     selectedColumnId,
     selectColumn,
     upsertProduct,
     cameraMode,
-    setCameraMode, 
+    setCameraMode,
     removeProduct,
     upsertWall,
     removeWall,
     addColumnToWall,
     removeColumn,
     isDrawingMode,
-    setDrawingMode 
+    setDrawingMode
   } = useShopBuilder();
-  
+
   // Undo/Redo history - Track complete layout snapshots
   const [history, setHistory] = useState<any[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const isUndoRedoingRef = useRef(false);
   const lastSavedStateRef = useRef<string>('');
-  
+
   // Initialize history with first state
   useEffect(() => {
     if (history.length === 0) {
@@ -117,13 +117,13 @@ const ShopBuilderContent = () => {
       lastSavedStateRef.current = JSON.stringify(initialState);
     }
   }, []);
-  
+
   // Save state to history when layout changes (but not during undo/redo)
   useEffect(() => {
     if (isUndoRedoingRef.current || history.length === 0) return;
-    
+
     const newStateStr = JSON.stringify(layout);
-    
+
     // Only save if state actually changed
     if (newStateStr !== lastSavedStateRef.current) {
       const newState = JSON.parse(newStateStr);
@@ -136,18 +136,18 @@ const ShopBuilderContent = () => {
       lastSavedStateRef.current = newStateStr;
     }
   }, [layout, historyIndex, history.length]);
-  
+
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
       isUndoRedoingRef.current = true;
       const prevState = history[historyIndex - 1];
-      
+
       // Clear current state
       const currentWalls = [...layout.walls];
       const currentProducts = [...layout.products];
       currentWalls.forEach(w => removeWall(w.id));
       currentProducts.forEach(p => removeProduct(p.id));
-      
+
       // Apply previous state
       setTimeout(() => {
         prevState.walls.forEach((w: any) => upsertWall(w));
@@ -160,18 +160,18 @@ const ShopBuilderContent = () => {
       }, 50);
     }
   }, [historyIndex, history, layout, upsertWall, upsertProduct, removeWall, removeProduct]);
-  
+
   const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       isUndoRedoingRef.current = true;
       const nextState = history[historyIndex + 1];
-      
+
       // Clear current state
       const currentWalls = [...layout.walls];
       const currentProducts = [...layout.products];
       currentWalls.forEach(w => removeWall(w.id));
       currentProducts.forEach(p => removeProduct(p.id));
-      
+
       // Apply next state
       setTimeout(() => {
         nextState.walls.forEach((w: any) => upsertWall(w));
@@ -184,15 +184,15 @@ const ShopBuilderContent = () => {
       }, 50);
     }
   }, [historyIndex, history, layout, upsertWall, upsertProduct, removeWall, removeProduct]);
-  
+
   // Auto-enter fullscreen when wall mode is activated (only on initial entry)
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
   const shouldExitFullscreenRef = useRef(false);
-  
+
   useEffect(() => {
     const floorplanDiv = floorplan2DRef.current;
     if (!floorplanDiv) return;
-    
+
     if (isDrawingMode && !hasEnteredFullscreen) {
       // Enter fullscreen only on first entry
       if (floorplanDiv.requestFullscreen) {
@@ -212,20 +212,20 @@ const ShopBuilderContent = () => {
       }
     }
   }, [isDrawingMode, hasEnteredFullscreen]);
-  
+
   // Exit wall mode when fullscreen is exited via ESC
   useEffect(() => {
     const handleFullscreenChange = () => {
       const floorplanDiv = floorplan2DRef.current;
       if (!floorplanDiv) return;
-      
+
       // If fullscreen was exited (ESC pressed), exit drawing mode
       if (document.fullscreenElement !== floorplanDiv && hasEnteredFullscreen) {
         shouldExitFullscreenRef.current = true;
         setDrawingMode(false);
       }
     };
-    
+
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, [hasEnteredFullscreen, setDrawingMode]);
@@ -293,23 +293,23 @@ const ShopBuilderContent = () => {
     try {
       // Dynamically import html2canvas
       const html2canvas = (await import('html2canvas')).default;
-      
+
       // Get the 3D snapshot first
       const threeSnapshot = threeRef.current?.snapshot();
-      
+
       // Get the main container
       const container = (document.querySelector('[data-shop-builder-container]') || document.body) as HTMLElement;
-      
+
       // Get the 3D container element
       const threeContainer = container.querySelector('[data-three-container]') as HTMLElement;
-      
+
       // Hide the 3D container temporarily
       let originalDisplay = '';
       if (threeContainer) {
         originalDisplay = threeContainer.style.display;
         threeContainer.style.display = 'none';
       }
-      
+
       // Capture the page without the 3D view
       const pageCanvas = await html2canvas(container, {
         allowTaint: true,
@@ -325,26 +325,26 @@ const ShopBuilderContent = () => {
           });
         },
       });
-      
+
       // Restore the 3D container
       if (threeContainer) {
         threeContainer.style.display = originalDisplay;
       }
-      
+
       // If we have a 3D snapshot, create a combined image
       if (threeSnapshot) {
         // Create a new canvas to combine both images
         const combinedCanvas = document.createElement('canvas');
         const ctx = combinedCanvas.getContext('2d');
         if (!ctx) return pageCanvas.toDataURL('image/png');
-        
+
         // Set canvas size to match page canvas
         combinedCanvas.width = pageCanvas.width;
         combinedCanvas.height = pageCanvas.height;
-        
+
         // Draw the page canvas
         ctx.drawImage(pageCanvas, 0, 0);
-        
+
         // Find where the 3D container is and draw the 3D snapshot there
         const threeImg = new Image();
         threeImg.onload = () => {
@@ -353,20 +353,20 @@ const ShopBuilderContent = () => {
             const rect = threeContainer.getBoundingClientRect();
             const containerRect = container.getBoundingClientRect();
             const scale = 1.2; // Same scale as html2canvas
-            
+
             const x = (rect.left - containerRect.left) * scale;
             const y = (rect.top - containerRect.top) * scale;
             const width = rect.width * scale;
             const height = rect.height * scale;
-            
+
             ctx.drawImage(threeImg, x, y, width, height);
           }
         };
         threeImg.src = threeSnapshot;
-        
+
         return combinedCanvas.toDataURL('image/png');
       }
-      
+
       return pageCanvas.toDataURL('image/png');
     } catch (error) {
       // Fallback to 3D canvas snapshot
@@ -430,7 +430,7 @@ const ShopBuilderContent = () => {
   const handleFocusOnProduct = useCallback((productId: string) => {
     const product = layout.products.find(p => p.id === productId);
     if (!product || !threeRef.current) return;
-    
+
     threeRef.current.focusOnProduct(productId);
   }, [layout.products]);
 
@@ -452,10 +452,10 @@ const ShopBuilderContent = () => {
     <div className="min-h-screen text-slate-900 relative overflow-y-auto" style={{ background: `linear-gradient(135deg, ${primaryColor}08 0%, ${secondaryColor}08 100%)` }} dir="rtl" data-shop-builder-container>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 relative">
         {/* Modern Professional Header */}
-        <header className="pt-6 pb-4">
+        <header className="pt-4 pb-2 lg:pt-6 lg:pb-4">
           <div className="rounded-2xl shadow-lg overflow-hidden" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
-            <div className="p-6 text-white">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="p-4 lg:p-6 text-white">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
                 {/* Left: Shop Info */}
                 <div className="space-y-4">
                   <div>
@@ -500,14 +500,14 @@ const ShopBuilderContent = () => {
           />
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-2">
+        <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
           <div ref={floorplan2DRef} className={cn(
-            "rounded-2xl border-2 bg-white p-4 shadow-xl h-[600px] flex flex-col relative transition-all duration-300",
-            isDrawingMode 
-              ? `ring-2 shadow-lg` 
+            "rounded-2xl border-2 bg-white p-4 shadow-xl h-[400px] lg:h-[600px] flex flex-col relative transition-all duration-300",
+            isDrawingMode
+              ? `ring-2 shadow-lg`
               : "border-slate-300"
           )}
-          style={isDrawingMode ? { borderColor: primaryColor, backgroundColor: `${primaryColor}05`, boxShadow: `0 0 20px ${primaryColor}30` } : {}}>
+            style={isDrawingMode ? { borderColor: primaryColor, backgroundColor: `${primaryColor}05`, boxShadow: `0 0 20px ${primaryColor}30` } : {}}>
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-bold" style={{ color: primaryColor }}>مُحرِّر المخطط ثنائي الأبعاد</h2>
@@ -531,7 +531,7 @@ const ShopBuilderContent = () => {
             <div className="flex-1 min-h-0">
               <FloorplanCanvas />
             </div>
-            
+
             {/* Fullscreen Controls Overlay - Visible when fullscreen is active */}
             {(is2DFullscreen || hasEnteredFullscreen) && (
               <div className="absolute top-16 right-4 flex items-center gap-2 z-50 pointer-events-auto">
@@ -561,7 +561,7 @@ const ShopBuilderContent = () => {
                     <RotateCcw className="h-4 w-4 scale-x-[-1]" />
                   </Button>
                 </div>
-                
+
                 {/* Edit Mode Toggle */}
                 <Button
                   onClick={() => {
@@ -577,23 +577,23 @@ const ShopBuilderContent = () => {
                 </Button>
               </div>
             )}
-            
+
             {/* Selection Panel Copy - Visible when fullscreen is active and wall is selected */}
             {(is2DFullscreen || hasEnteredFullscreen) && selectedWallId && !selectedColumnId && !selectedProductId && (() => {
               const wall = layout.walls.find(w => w.id === selectedWallId);
               if (!wall) return null;
-              
+
               return (
-                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-auto">
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-auto w-full max-w-3xl px-4">
                   <div className="bg-white rounded-xl shadow-2xl overflow-visible" style={{ border: `2px solid ${primaryColor}` }}>
-                    <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
                       {/* Wall Name Badge */}
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-sm text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
                         <span className="text-sm font-bold">🧱 جدار</span>
                       </div>
-                      
-                      <div className="h-8 w-px" style={{ backgroundColor: primaryColor }} />
-                      
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+
                       {/* Height Control */}
                       <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>📏 ارتفاع (م)</label>
@@ -610,9 +610,9 @@ const ShopBuilderContent = () => {
                           style={{ border: `1px solid ${primaryColor}40`, focusRing: `1px solid ${primaryColor}` }}
                         />
                       </div>
-                      
-                      <div className="h-8 w-px" style={{ backgroundColor: primaryColor }} />
-                      
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+
                       {/* Thickness Control */}
                       <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>📐 سمك (م)</label>
@@ -629,23 +629,23 @@ const ShopBuilderContent = () => {
                           style={{ border: `1px solid ${primaryColor}40`, focusRing: `1px solid ${primaryColor}` }}
                         />
                       </div>
-                      
-                      <div className="h-8 w-px" style={{ backgroundColor: primaryColor }} />
-                      
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+
                       {/* Color Picker */}
                       <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>🎨 لون</label>
-                        <input 
-                          type="color" 
-                          value={wall.color || '#64748b'} 
-                          onChange={(e) => upsertWall({ id: wall.id, color: e.target.value })} 
-                          className="w-12 h-9 rounded-lg cursor-pointer shadow-sm" 
+                        <input
+                          type="color"
+                          value={wall.color || '#64748b'}
+                          onChange={(e) => upsertWall({ id: wall.id, color: e.target.value })}
+                          className="w-12 h-9 rounded-lg cursor-pointer shadow-sm"
                           style={{ border: `1px solid ${primaryColor}40` }}
                         />
                       </div>
-                      
-                      <div className="h-8 w-px" style={{ backgroundColor: primaryColor }} />
-                      
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+
                       {/* Delete Button */}
                       <button
                         onClick={() => {
@@ -665,7 +665,7 @@ const ShopBuilderContent = () => {
             })()}
           </div>
 
-          <div ref={three3DRef} className="rounded-2xl border-2 bg-white shadow-xl h-[600px] flex flex-col relative overflow-hidden" style={{ borderColor: secondaryColor }} data-three-container>
+          <div ref={three3DRef} className="rounded-2xl border-2 bg-white shadow-xl h-[400px] lg:h-[600px] flex flex-col relative overflow-hidden" style={{ borderColor: secondaryColor }} data-three-container>
             <div className="flex items-center justify-between p-3 bg-white border-b" style={{ borderColor: secondaryColor }}>
               <h2 className="text-lg font-bold" style={{ color: secondaryColor }}>معاينة ثلاثية الأبعاد تفاعلية</h2>
               <div className="flex items-center gap-2">
@@ -696,7 +696,7 @@ const ShopBuilderContent = () => {
                     ✈️ طيران
                   </button>
                 </div>
-                
+
                 <Button
                   size="sm"
                   variant="ghost"
@@ -709,10 +709,10 @@ const ShopBuilderContent = () => {
                 </Button>
               </div>
             </div>
-            
+
             <div className="flex-1 relative" style={{ minHeight: 0 }}>
               <ThreeScene ref={threeRef} transformMode={transformMode} cameraMode={cameraMode} />
-              
+
               {/* Free Move Instructions Overlay */}
               {cameraMode === 'freeMove' && (
                 <div className="absolute top-4 left-4 text-white p-4 rounded-lg text-sm shadow-lg z-10 backdrop-blur-sm" style={{ backgroundColor: `${primaryColor}dd` }}>
@@ -752,7 +752,7 @@ const ShopBuilderContent = () => {
                   </ul>
                 </div>
               )}
-              
+
               {/* Crosshair */}
               {cameraMode === 'freeMove' && (
                 <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
@@ -771,17 +771,17 @@ const ShopBuilderContent = () => {
           const product = layout.products.find(p => p.id === selectedProductId);
           if (!product) return null;
           const similarCount = layout.products.filter(p => p.modelUrl === product.modelUrl).length;
-          
+
           return (
-            <div className="w-full bg-white border-2 border-purple-300 rounded-xl shadow-lg overflow-visible">
-              <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
+            <div className="w-full max-w-3xl mx-auto bg-white border-2 border-purple-300 rounded-xl shadow-lg overflow-hidden">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
                 {/* Product Name Badge */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-sm">
                   <span className="text-sm font-bold text-white">📦 {product.name}</span>
                 </div>
-                
-                <div className="h-8 w-px bg-purple-200" />
-                
+
+                <div className="hidden sm:block h-8 w-px bg-purple-200" />
+
                 {/* Focus Camera Button */}
                 <button
                   onClick={() => handleFocusOnProduct(product.id)}
@@ -791,31 +791,31 @@ const ShopBuilderContent = () => {
                   <Focus className="h-4 w-4" />
                   <span>تركيز</span>
                 </button>
-                
+
                 {/* Place on Floor Button */}
                 <button
                   onClick={() => {
                     // Remove and re-add the product to trigger the smart positioning logic
                     // This forces the Three.js scene to recalculate the floor position
                     const tempProduct = { ...product };
-                    
+
                     // First remove the product
                     removeProduct(product.id);
-                    
+
                     // Then add it back with Y=0.5 to trigger auto-calculation
                     setTimeout(() => {
-                      upsertProduct({ 
+                      upsertProduct({
                         ...tempProduct,
-                        position: { 
-                          x: tempProduct.position.x, 
-                          y: 0.5, 
-                          z: tempProduct.position.z 
-                        } 
+                        position: {
+                          x: tempProduct.position.x,
+                          y: 0.5,
+                          z: tempProduct.position.z
+                        }
                       });
-                      
-                      toast({ 
-                        title: 'تم وضع المنتج على الأرضية', 
-                        description: 'تم حساب الموضع الصحيح تلقائياً بناءً على أبعاد المنتج' 
+
+                      toast({
+                        title: 'تم وضع المنتج على الأرضية',
+                        description: 'تم حساب الموضع الصحيح تلقائياً بناءً على أبعاد المنتج'
                       });
                     }, 50);
                   }}
@@ -825,9 +825,9 @@ const ShopBuilderContent = () => {
                   <ArrowDown className="h-4 w-4" />
                   <span>على الأرضية</span>
                 </button>
-                
+
                 <div className="h-8 w-px bg-purple-200" />
-                
+
                 {/* Texture Selector */}
                 <div className="flex flex-col gap-1 relative texture-dropdown">
                   <label className="text-[10px] font-semibold text-purple-600">🖼️ نسيج</label>
@@ -871,28 +871,28 @@ const ShopBuilderContent = () => {
                     </div>
                   )}
                 </div>
-                
+
                 <div className="h-8 w-px bg-purple-200" />
-                
+
                 {/* Color Picker */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-semibold text-purple-600">
                     🎨 لون {product.texture && <span className="text-[8px] opacity-70">(تأثير)</span>}
                   </label>
-                  <input 
-                    type="color" 
-                    value={product.color || '#ffffff'} 
-                    onChange={(e) => upsertProduct({ id: product.id, color: e.target.value })} 
-                    className="w-12 h-9 rounded-lg border border-purple-200 cursor-pointer shadow-sm" 
+                  <input
+                    type="color"
+                    value={product.color || '#ffffff'}
+                    onChange={(e) => upsertProduct({ id: product.id, color: e.target.value })}
+                    className="w-12 h-9 rounded-lg border border-purple-200 cursor-pointer shadow-sm"
                     title={product.texture ? 'لون كتأثير على النسيج' : product.color || '#ffffff'}
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-purple-200" />
-                
+
                 {/* Rotation Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-purple-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-purple-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -919,12 +919,12 @@ const ShopBuilderContent = () => {
                     className="w-16 h-9 text-center text-xs border border-purple-200 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-purple-200" />
-                
+
                 {/* Scale Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-purple-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-purple-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -951,7 +951,7 @@ const ShopBuilderContent = () => {
                     className="w-16 h-9 text-center text-xs border border-purple-200 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-400 bg-white"
                   />
                 </div>
-                
+
                 {/* Apply to Similar Button */}
                 {similarCount > 1 && (
                   <>
@@ -962,10 +962,10 @@ const ShopBuilderContent = () => {
                         if (confirm(`تطبيق اللون والنسيج على ${similarProducts.length} منتج مشابه؟`)) {
                           similarProducts.forEach(p => {
                             if (p.id !== product.id) {
-                              upsertProduct({ 
-                                id: p.id, 
-                                color: product.color, 
-                                texture: product.texture 
+                              upsertProduct({
+                                id: p.id,
+                                color: product.color,
+                                texture: product.texture
                               });
                             }
                           });
@@ -979,26 +979,26 @@ const ShopBuilderContent = () => {
                     </button>
                   </>
                 )}
-                
+
                 <div className="h-8 w-px bg-purple-200" />
-                
+
                 {/* Delete Button */}
-                <button 
-                  onClick={() => { 
-                    if (confirm('هل تريد حذف هذا الكائن؟')) { 
-                      removeProduct(product.id); 
-                      selectProduct(null); 
+                <button
+                  onClick={() => {
+                    if (confirm('هل تريد حذف هذا الكائن؟')) {
+                      removeProduct(product.id);
+                      selectProduct(null);
                     }
-                  }} 
+                  }}
                   className="h-9 px-4 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>حذف</span>
                 </button>
-                
+
                 {/* Close Button */}
-                <button 
-                  onClick={() => selectProduct(null)} 
+                <button
+                  onClick={() => selectProduct(null)}
                   className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   title="إغلاق"
                 >
@@ -1013,7 +1013,7 @@ const ShopBuilderContent = () => {
         {selectedWallId && !selectedColumnId && !selectedProductId && (() => {
           const wall = layout.walls.find(w => w.id === selectedWallId);
           if (!wall) return null;
-          
+
           return (
             <div className="w-full bg-white border-2 border-emerald-300 rounded-xl shadow-lg overflow-visible">
               <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
@@ -1021,12 +1021,12 @@ const ShopBuilderContent = () => {
                 <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg shadow-sm">
                   <span className="text-sm font-bold text-white">🧱 جدار</span>
                 </div>
-                
+
                 <div className="h-8 w-px bg-emerald-200" />
-                
+
                 {/* Height Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-emerald-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-emerald-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -1053,12 +1053,12 @@ const ShopBuilderContent = () => {
                     className="w-16 h-9 text-center text-xs border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-emerald-200" />
-                
+
                 {/* Thickness Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-emerald-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-emerald-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -1085,12 +1085,12 @@ const ShopBuilderContent = () => {
                     className="w-16 h-9 text-center text-xs border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-emerald-200" />
-                
+
                 {/* Length Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-emerald-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-emerald-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -1140,12 +1140,12 @@ const ShopBuilderContent = () => {
                     className="w-16 h-9 text-center text-xs border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-emerald-200" />
-                
+
                 {/* Angle Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-emerald-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-emerald-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -1185,9 +1185,9 @@ const ShopBuilderContent = () => {
                     className="w-14 h-9 text-center text-xs border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-emerald-200" />
-                
+
                 {/* Texture Selector */}
                 <div className="flex flex-col gap-1 relative texture-dropdown">
                   <label className="text-[10px] font-semibold text-emerald-600">🖼️ نسيج</label>
@@ -1231,7 +1231,7 @@ const ShopBuilderContent = () => {
                     </div>
                   )}
                 </div>
-                
+
                 {/* Apply to All Walls Button */}
                 <button
                   onClick={() => {
@@ -1248,51 +1248,51 @@ const ShopBuilderContent = () => {
                   <Palette className="h-4 w-4" />
                   <span>تطبيق على الكل</span>
                 </button>
-                
+
                 <div className="h-8 w-px bg-emerald-200" />
-                
+
                 {/* Color Picker */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-semibold text-emerald-600">🎨 لون</label>
-                  <input 
-                    type="color" 
-                    value={wall.color || '#64748b'} 
-                    onChange={(e) => upsertWall({ id: wall.id, color: e.target.value })} 
-                    className="w-12 h-9 rounded-lg border border-emerald-200 cursor-pointer shadow-sm" 
+                  <input
+                    type="color"
+                    value={wall.color || '#64748b'}
+                    onChange={(e) => upsertWall({ id: wall.id, color: e.target.value })}
+                    className="w-12 h-9 rounded-lg border border-emerald-200 cursor-pointer shadow-sm"
                     title={wall.color || '#64748b'}
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-emerald-200" />
-                
+
                 {/* Add Column Button */}
-                <button 
-                  onClick={() => addColumnToWall(wall.id, 0.5)} 
+                <button
+                  onClick={() => addColumnToWall(wall.id, 0.5)}
                   className="h-9 px-4 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                   title="إضافة عمود"
                 >
                   <span>🏛️ عمود</span>
                 </button>
-                
+
                 <div className="h-8 w-px bg-emerald-200" />
-                
+
                 {/* Delete Button */}
-                <button 
-                  onClick={() => { 
-                    if (confirm('هل تريد حذف هذا الجدار؟')) { 
-                      removeWall(wall.id); 
-                      selectWall(null); 
+                <button
+                  onClick={() => {
+                    if (confirm('هل تريد حذف هذا الجدار؟')) {
+                      removeWall(wall.id);
+                      selectWall(null);
                     }
-                  }} 
+                  }}
                   className="h-9 px-4 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>حذف</span>
                 </button>
-                
+
                 {/* Close Button */}
-                <button 
-                  onClick={() => selectWall(null)} 
+                <button
+                  onClick={() => selectWall(null)}
                   className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   title="إغلاق"
                 >
@@ -1308,7 +1308,7 @@ const ShopBuilderContent = () => {
           const wall = layout.walls.find(w => w.columns?.some(c => c.id === selectedColumnId));
           const column = wall?.columns?.find(c => c.id === selectedColumnId);
           if (!wall || !column) return null;
-          
+
           return (
             <div className="w-full bg-white border-2 border-amber-300 rounded-xl shadow-lg overflow-x-auto">
               <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
@@ -1316,12 +1316,12 @@ const ShopBuilderContent = () => {
                 <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg shadow-sm">
                   <span className="text-sm font-bold text-white">🏛️ عمود</span>
                 </div>
-                
+
                 <div className="h-8 w-px bg-amber-200" />
-                
+
                 {/* Width Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-amber-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-amber-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -1329,7 +1329,7 @@ const ShopBuilderContent = () => {
                       0.1,
                       (width) => {
                         const newWidth = Math.max(0.1, width);
-                        const updatedColumns = wall.columns?.map(c => 
+                        const updatedColumns = wall.columns?.map(c =>
                           c.id === column.id ? { ...c, width: newWidth } : c
                         );
                         upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1346,7 +1346,7 @@ const ShopBuilderContent = () => {
                     value={(column.width || 0.4).toFixed(1)}
                     onChange={(e) => {
                       const width = Number(e.target.value);
-                      const updatedColumns = wall.columns?.map(c => 
+                      const updatedColumns = wall.columns?.map(c =>
                         c.id === column.id ? { ...c, width } : c
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1354,12 +1354,12 @@ const ShopBuilderContent = () => {
                     className="w-16 h-9 text-center text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-amber-200" />
-                
+
                 {/* Position Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-amber-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-amber-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -1367,7 +1367,7 @@ const ShopBuilderContent = () => {
                       0.1,
                       (position) => {
                         const newPosition = Math.max(0, Math.min(1, position));
-                        const updatedColumns = wall.columns?.map(c => 
+                        const updatedColumns = wall.columns?.map(c =>
                           c.id === column.id ? { ...c, position: newPosition } : c
                         );
                         upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1385,7 +1385,7 @@ const ShopBuilderContent = () => {
                     value={(column.position || 0.5).toFixed(2)}
                     onChange={(e) => {
                       const position = Math.max(0, Math.min(1, Number(e.target.value)));
-                      const updatedColumns = wall.columns?.map(c => 
+                      const updatedColumns = wall.columns?.map(c =>
                         c.id === column.id ? { ...c, position } : c
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1393,12 +1393,12 @@ const ShopBuilderContent = () => {
                     className="w-14 h-9 text-center text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-amber-200" />
-                
+
                 {/* Depth Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-amber-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-amber-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -1406,7 +1406,7 @@ const ShopBuilderContent = () => {
                       0.05,
                       (depth) => {
                         const newDepth = Math.max(0.05, depth);
-                        const updatedColumns = wall.columns?.map(c => 
+                        const updatedColumns = wall.columns?.map(c =>
                           c.id === column.id ? { ...c, depth: newDepth } : c
                         );
                         upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1423,7 +1423,7 @@ const ShopBuilderContent = () => {
                     value={(column.depth || 0.4).toFixed(2)}
                     onChange={(e) => {
                       const depth = Number(e.target.value);
-                      const updatedColumns = wall.columns?.map(c => 
+                      const updatedColumns = wall.columns?.map(c =>
                         c.id === column.id ? { ...c, depth } : c
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1431,12 +1431,12 @@ const ShopBuilderContent = () => {
                     className="w-14 h-9 text-center text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-amber-200" />
-                
+
                 {/* Height Control */}
                 <div className="flex flex-col gap-1">
-                  <label 
+                  <label
                     className="text-[10px] font-semibold text-amber-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-amber-100"
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
@@ -1444,7 +1444,7 @@ const ShopBuilderContent = () => {
                       0.1,
                       (height) => {
                         const newHeight = Math.max(0.1, height);
-                        const updatedColumns = wall.columns?.map(c => 
+                        const updatedColumns = wall.columns?.map(c =>
                           c.id === column.id ? { ...c, height: newHeight } : c
                         );
                         upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1461,7 +1461,7 @@ const ShopBuilderContent = () => {
                     value={(column.height || 3).toFixed(1)}
                     onChange={(e) => {
                       const height = Number(e.target.value);
-                      const updatedColumns = wall.columns?.map(c => 
+                      const updatedColumns = wall.columns?.map(c =>
                         c.id === column.id ? { ...c, height } : c
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1469,9 +1469,9 @@ const ShopBuilderContent = () => {
                     className="w-14 h-9 text-center text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-amber-200" />
-                
+
                 {/* Side Control */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-semibold text-amber-600">↔️ جانب</label>
@@ -1479,7 +1479,7 @@ const ShopBuilderContent = () => {
                     value={column.side || 'center'}
                     onChange={(e) => {
                       const side = e.target.value as 'center' | 'left' | 'right';
-                      const updatedColumns = wall.columns?.map(c => 
+                      const updatedColumns = wall.columns?.map(c =>
                         c.id === column.id ? { ...c, side } : c
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
@@ -1491,45 +1491,45 @@ const ShopBuilderContent = () => {
                     <option value="right">يمين</option>
                   </select>
                 </div>
-                
+
                 <div className="h-8 w-px bg-amber-200" />
-                
+
                 {/* Color Picker */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-semibold text-amber-600">🎨 لون</label>
-                  <input 
-                    type="color" 
-                    value={column.color || '#64748b'} 
+                  <input
+                    type="color"
+                    value={column.color || '#64748b'}
                     onChange={(e) => {
                       const color = e.target.value;
-                      const updatedColumns = wall.columns?.map(c => 
+                      const updatedColumns = wall.columns?.map(c =>
                         c.id === column.id ? { ...c, color } : c
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
-                    }} 
-                    className="w-12 h-9 rounded-lg border border-amber-200 cursor-pointer shadow-sm" 
+                    }}
+                    className="w-12 h-9 rounded-lg border border-amber-200 cursor-pointer shadow-sm"
                     title={column.color || '#64748b'}
                   />
                 </div>
-                
+
                 <div className="h-8 w-px bg-amber-200" />
-                
+
                 {/* Delete Button */}
-                <button 
-                  onClick={() => { 
-                    if (confirm('هل تريد حذف هذا العمود؟')) { 
-                      removeColumn(wall.id, column.id); 
+                <button
+                  onClick={() => {
+                    if (confirm('هل تريد حذف هذا العمود؟')) {
+                      removeColumn(wall.id, column.id);
                     }
-                  }} 
+                  }}
                   className="h-9 px-4 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>حذف</span>
                 </button>
-                
+
                 {/* Close Button */}
-                <button 
-                  onClick={() => selectWall(null)} 
+                <button
+                  onClick={() => selectWall(null)}
                   className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   title="إغلاق"
                 >

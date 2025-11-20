@@ -291,6 +291,14 @@
     --primary-ultra-light: 215 100% 85%;  /* Ultra light blue */
     --primary-glow: 217 91% 60% / 0.5;  /* Primary with opacity for glow effects */
     
+    /* Animation Duration Variables */
+    --animation-duration-fast: 200ms;
+    --animation-duration-normal: 400ms;
+    --animation-duration-slow: 600ms;
+    --animation-duration-slower: 800ms;
+    --animation-easing-out: cubic-bezier(0.4, 0, 0.2, 1);
+    --animation-easing-spring: cubic-bezier(0.23, 1, 0.32, 1);
+    
     /* Gradient Variables */
     --gradient-primary-enhanced: linear-gradient(135deg, hsl(217 91% 40%), hsl(215 100% 70%), hsl(217 91% 60%));
     --gradient-rainbow: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #96ceb4, #feca57, #ff9ff3);
@@ -1692,19 +1700,16 @@
 [class*="debug"],
 [id*="debug"] {
   display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
+    opacity: 0 !important;
 }
 
 /* Ensure full height without overflow */
 html, body {
   height: 100%;
-  overflow-x: hidden;
 }
 
 #root {
   height: 100%;
-  overflow-x: hidden;
 }
 
 /* Hero Navigation Styles */

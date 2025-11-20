@@ -34,7 +34,7 @@ interface MobileSlide {
 }
 
 // Single-track infinite belt powered by GSAP (matches PC hero approach)
-const Belt: React.FC<{ products: Product[]; speedPxPerSec?: number; sets?: number; hidePrices?: boolean }> = ({ products, speedPxPerSec = 140, sets, hidePrices = false }) => {
+const Belt: React.FC<{ products: Product[]; speedPxPerSec?: number; sets?: number; hidePrices?: boolean }> = ({ products, speedPxPerSec = 40, sets, hidePrices = false }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const layerRef = useRef<HTMLDivElement | null>(null);
   const itemRefs = useRef<Array<HTMLDivElement | null>>([]);
@@ -453,7 +453,7 @@ const MobileHeroSection: React.FC = () => {
     };
   }, []);
 
-  // Auto-play for mobile with progress tracking (keep same timing as desktop feel)
+  // Auto-play for mobile with progress tracking (slowed down to 5 seconds per slide)
   useEffect(() => {
     if (isAutoPlaying && mounted) {
       const progressInterval = setInterval(() => {
@@ -462,7 +462,7 @@ const MobileHeroSection: React.FC = () => {
             setCurrentSlide((prevSlide) => (prevSlide + 1) % mobileSlides.length);
             return 0;
           }
-          return prev + (100 / (30000 / 50)); // 30 seconds total, update every 50ms
+          return prev + (100 / (5000 / 50)); // 5 seconds total, update every 50ms
         });
       }, 50);
       return () => clearInterval(progressInterval);

@@ -335,14 +335,21 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                         )}
                       </div>
                       
-                      <Link 
-                        to={`/product/${getCleanProductId(product.id)}#reviews`}
-                        className="flex items-center gap-0.5"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {renderStars(product.rating || 0)}
-                        <span className="text-[9px] text-slate-500">({product.reviews || 0})</span>
-                      </Link>
+                      <div className="flex items-center gap-1">
+                        <Link 
+                          to={`/product/${getCleanProductId(product.id)}#reviews`}
+                          className="flex items-center gap-0.5"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {renderStars(product.rating || 0)}
+                          <span className="text-[9px] text-slate-500">({product.reviews || 0})</span>
+                        </Link>
+                        {(product.sku || product.id) && (
+                          <span className="text-[9px] font-semibold text-primary bg-primary/10 px-1.5 py-0.5 rounded-sm border border-primary/30" title={product.sku ? 'Product Code' : 'Product ID'}>
+                            {product.sku || product.id.substring(0, 8)}
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     {/* Buttons */}
