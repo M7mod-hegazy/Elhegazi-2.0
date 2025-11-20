@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+import { useEffect, useMemo, useState, useCallback, Suspense, lazy } from 'react';
 import { Link } from 'react-router-dom';
 import { ArrowLeft, Truck, Shield, Award, Eye, TrendingUp, Crown, Flame, Gift, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ModernHeroSlider from '@/components/home/ModernHeroSlider';
-import CreativeCategoriesSlider from '@/components/home/CreativeCategoriesSlider';
-import CreativeProductsSlider from '@/components/home/CreativeProductsSlider';
-import PromoStrip from '@/components/home/PromoStrip';
+const CreativeCategoriesSlider = lazy(() => import('@/components/home/CreativeCategoriesSlider'));
+const CreativeProductsSlider = lazy(() => import('@/components/home/CreativeProductsSlider'));
+const PromoStrip = lazy(() => import('@/components/home/PromoStrip'));
 import ScrollAnimation from '@/components/ui/scroll-animation';
 import EnhancedScrollAnimation from '@/components/ui/enhanced-scroll-animation';
 import ParallaxSection from '@/components/ui/parallax-section';
 import InteractiveBackground from '@/components/ui/interactive-background';
-import SectionDivider from '@/components/ui/section-divider';
+const SectionDivider = lazy(() => import('@/components/ui/section-divider'));
 import { useHomeConfig } from '@/hooks/useHomeConfig';
 import { useSettings } from '@/hooks/useSettings';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -162,12 +162,16 @@ const Index = () => {
   );
   const promoStripBlock = homeCfg?.promoEnabled && homeCfg?.promoText ? (
     <EnhancedScrollAnimation animation="slideInDown" duration={700} delay={60}>
-      <PromoStrip text={homeCfg.promoText} icon={homeCfg.promoIcon} />
+      <Suspense fallback={<div className="h-12 bg-slate-100 animate-pulse" />}>
+        <PromoStrip text={homeCfg.promoText} icon={homeCfg.promoIcon} />
+      </Suspense>
     </EnhancedScrollAnimation>
   ) : null;
   const categoriesBlock = (
     <EnhancedScrollAnimation animation="slideInUp" duration={900} delay={100}>
-      <CreativeCategoriesSlider selectedSlugs={homeCfg?.featuredCategorySlugs} />
+      <Suspense fallback={<div className="h-40 bg-slate-100 animate-pulse rounded-xl" />}>
+        <CreativeCategoriesSlider selectedSlugs={homeCfg?.featuredCategorySlugs} />
+      </Suspense>
     </EnhancedScrollAnimation>
   );
   const featuredBlock = toggles['featuredProducts'] !== false ? (
@@ -178,18 +182,18 @@ const Index = () => {
       <div className="absolute inset-0 opacity-30" style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(var(--primary-rgb, 59, 130, 246), 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(var(--secondary-rgb, 168, 85, 247), 0.1) 0%, transparent 50%)' }}></div>
 
       {/* Multi-layer Parallax Orbs */}
-      <ParallaxSection speed={-0.2} intensity="strong" scale className="absolute inset-0 opacity-50">
+      <ParallaxSection speed={-0.2} intensity="strong" scale className="absolute inset-0 opacity-50 hidden md:block">
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-gradient-to-br from-primary/10 via-primary/5 to-transparent rounded-full blur-3xl animate-pulse"></div>
       </ParallaxSection>
-      <ParallaxSection speed={-0.4} intensity="strong" scale className="absolute inset-0 opacity-40">
+      <ParallaxSection speed={-0.4} intensity="strong" scale className="absolute inset-0 opacity-40 hidden md:block">
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tl from-secondary/10 via-secondary/5 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </ParallaxSection>
-      <ParallaxSection speed={-0.6} className="absolute inset-0 opacity-30">
+      <ParallaxSection speed={-0.6} className="absolute inset-0 opacity-30 hidden md:block">
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-gradient-to-r from-primary/8 to-secondary/8 rounded-full blur-2xl"></div>
       </ParallaxSection>
 
       {/* Floating Particles System */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none hidden md:block">
         {[...Array(25)].map((_, i) => (
           <div
             key={i}
@@ -209,10 +213,10 @@ const Index = () => {
       </div>
 
       {/* Interactive Crown/Star Effect */}
-      <InteractiveBackground type="featured" className="opacity-60" />
+      <InteractiveBackground type="featured" className="opacity-60 hidden md:block" />
 
       {/* Geometric Shapes Instead of Icons */}
-      <div className="absolute inset-0 pointer-events-none opacity-5">
+      <div className="absolute inset-0 pointer-events-none opacity-5 hidden md:block">
         {[...Array(8)].map((_, i) => (
           <div
             key={i}
@@ -229,15 +233,17 @@ const Index = () => {
         ))}
       </div>
       <EnhancedScrollAnimation animation="slideInRight" duration={1000} delay={120}>
-        <CreativeProductsSlider
-          title={sectionCfg.featuredProducts?.title || 'المنتجات المميزة'}
-          subtitle={sectionCfg.featuredProducts?.subtitle || 'اكتشف أفضل منتجاتنا المختارة بعناية لتلبية احتياجاتك'}
-          filterType="featured"
-          gradientFrom="from-primary"
-          gradientTo="to-secondary"
-          icon={getIcon(sectionCfg.featuredProducts?.icon, <Crown className="w-12 h-12 text-white" />)}
-          selectedIds={homeCfg?.featuredProductIds}
-        />
+        <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
+          <CreativeProductsSlider
+            title={sectionCfg.featuredProducts?.title || 'المنتجات المميزة'}
+            subtitle={sectionCfg.featuredProducts?.subtitle || 'اكتشف أفضل منتجاتنا المختارة بعناية لتلبية احتياجاتك'}
+            filterType="featured"
+            gradientFrom="from-primary"
+            gradientTo="to-secondary"
+            icon={getIcon(sectionCfg.featuredProducts?.icon, <Crown className="w-12 h-12 text-white" />)}
+            selectedIds={homeCfg?.featuredProductIds}
+          />
+        </Suspense>
       </EnhancedScrollAnimation>
     </section>
   ) : null;
@@ -246,11 +252,11 @@ const Index = () => {
       {/* Simple gradient line divider */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
       {/* MEGA Grid Pattern with Parallax */}
-      <ParallaxSection speed={-0.15} intensity="medium" className="absolute inset-0 opacity-[0.04]" style={{ backgroundImage: 'radial-gradient(circle, #000 1.5px, transparent 1.5px)', backgroundSize: '30px 30px' }}></ParallaxSection>
-      <ParallaxSection speed={-0.25} intensity="medium" className="absolute inset-0 opacity-[0.02]" style={{ backgroundImage: 'linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)', backgroundSize: '50px 50px' }}></ParallaxSection>
+      <ParallaxSection speed={-0.15} intensity="medium" className="absolute inset-0 opacity-[0.04] hidden md:block" style={{ backgroundImage: 'radial-gradient(circle, #000 1.5px, transparent 1.5px)', backgroundSize: '30px 30px' }}></ParallaxSection>
+      <ParallaxSection speed={-0.25} intensity="medium" className="absolute inset-0 opacity-[0.02] hidden md:block" style={{ backgroundImage: 'linear-gradient(90deg, rgba(0,0,0,0.02) 1px, transparent 1px), linear-gradient(rgba(0,0,0,0.02) 1px, transparent 1px)', backgroundSize: '50px 50px' }}></ParallaxSection>
 
       {/* Trending Fire Effect */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none hidden md:block">
         {[...Array(8)].map((_, i) => (
           <div
             key={i}
@@ -266,18 +272,18 @@ const Index = () => {
       </div>
 
       {/* Multi-layer Success Orbs */}
-      <ParallaxSection speed={-0.35} scale className="absolute inset-0 opacity-25">
+      <ParallaxSection speed={-0.35} scale className="absolute inset-0 opacity-25 hidden md:block">
         <div className="absolute top-1/4 left-1/4 w-[400px] h-[400px] bg-gradient-to-br from-success/40 via-success/20 to-transparent rounded-full blur-3xl animate-pulse"></div>
       </ParallaxSection>
-      <ParallaxSection speed={-0.5} scale className="absolute inset-0 opacity-20">
+      <ParallaxSection speed={-0.5} scale className="absolute inset-0 opacity-20 hidden md:block">
         <div className="absolute bottom-1/4 right-1/4 w-[500px] h-[500px] bg-gradient-to-tl from-primary/30 via-success/15 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </ParallaxSection>
 
       {/* Interactive Trophy Trail */}
-      <InteractiveBackground type="bestseller" className="opacity-70" />
+      <InteractiveBackground type="bestseller" className="opacity-70 hidden md:block" />
 
       {/* Success Circles */}
-      <div className="absolute inset-0 pointer-events-none opacity-8">
+      <div className="absolute inset-0 pointer-events-none opacity-8 hidden md:block">
         {[...Array(10)].map((_, i) => (
           <div
             key={i}
@@ -294,15 +300,17 @@ const Index = () => {
         ))}
       </div>
       <EnhancedScrollAnimation animation="slideInLeft" duration={1000} delay={120}>
-        <CreativeProductsSlider
-          title={sectionCfg.bestSellers?.title || 'الأكثر مبيعاً'}
-          subtitle={sectionCfg.bestSellers?.subtitle || 'المنتجات الأكثر طلباً من قبل عملائنا الكرام'}
-          filterType="trending"
-          gradientFrom="from-success"
-          gradientTo="to-success"
-          icon={getIcon(sectionCfg.bestSellers?.icon, <TrendingUp className="w-12 h-12 text-white" />)}
-          selectedIds={homeCfg?.bestSellerProductIds}
-        />
+        <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
+          <CreativeProductsSlider
+            title={sectionCfg.bestSellers?.title || 'الأكثر مبيعاً'}
+            subtitle={sectionCfg.bestSellers?.subtitle || 'المنتجات الأكثر طلباً من قبل عملائنا الكرام'}
+            filterType="trending"
+            gradientFrom="from-success"
+            gradientTo="to-success"
+            icon={getIcon(sectionCfg.bestSellers?.icon, <TrendingUp className="w-12 h-12 text-white" />)}
+            selectedIds={homeCfg?.bestSellerProductIds}
+          />
+        </Suspense>
       </EnhancedScrollAnimation>
     </section>
   ) : null;
@@ -362,21 +370,21 @@ const Index = () => {
       {/* Simple gradient line divider */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-red-200 to-transparent"></div>
       {/* MEGA SALE Background Effect */}
-      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(239, 68, 68, 0.05) 35px, rgba(239, 68, 68, 0.05) 70px)' }}></div>
+      <div className="absolute inset-0 opacity-20 hidden md:block" style={{ backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 35px, rgba(239, 68, 68, 0.05) 35px, rgba(239, 68, 68, 0.05) 70px)' }}></div>
 
       {/* Fire/Heat Wave Effect */}
-      <ParallaxSection speed={-0.3} intensity="strong" scale className="absolute inset-0 opacity-50">
+      <ParallaxSection speed={-0.3} intensity="strong" scale className="absolute inset-0 opacity-50 hidden md:block">
         <div className="absolute top-0 left-1/4 w-[500px] h-[500px] bg-gradient-to-br from-red-500/20 via-orange-500/15 to-transparent rounded-full blur-3xl animate-pulse"></div>
       </ParallaxSection>
-      <ParallaxSection speed={-0.45} intensity="strong" scale className="absolute inset-0 opacity-45">
+      <ParallaxSection speed={-0.45} intensity="strong" scale className="absolute inset-0 opacity-45 hidden md:block">
         <div className="absolute bottom-0 right-1/4 w-[600px] h-[600px] bg-gradient-to-tl from-pink-500/20 via-red-500/15 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
       </ParallaxSection>
-      <ParallaxSection speed={-0.6} className="absolute inset-0 opacity-35">
+      <ParallaxSection speed={-0.6} className="absolute inset-0 opacity-35 hidden md:block">
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-gradient-to-r from-orange-500/15 to-pink-500/15 rounded-full blur-2xl"></div>
       </ParallaxSection>
 
       {/* Explosive Sparkles */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none hidden md:block">
         {[...Array(30)].map((_, i) => (
           <div
             key={i}
@@ -396,10 +404,10 @@ const Index = () => {
       </div>
 
       {/* Interactive Fire/Explosion Effect */}
-      <InteractiveBackground type="sale" className="opacity-80" />
+      <InteractiveBackground type="sale" className="opacity-80 hidden md:block" />
 
       {/* Star Burst Shapes */}
-      <div className="absolute inset-0 pointer-events-none opacity-10">
+      <div className="absolute inset-0 pointer-events-none opacity-10 hidden md:block">
         {[...Array(10)].map((_, i) => (
           <div
             key={i}
@@ -419,7 +427,7 @@ const Index = () => {
       </div>
 
       {/* Percentage Signs */}
-      <div className="absolute inset-0 pointer-events-none opacity-5">
+      <div className="absolute inset-0 pointer-events-none opacity-5 hidden md:block">
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
@@ -436,15 +444,17 @@ const Index = () => {
         ))}
       </div>
       <EnhancedScrollAnimation animation="scaleIn" duration={1000}>
-        <CreativeProductsSlider
-          title={sectionCfg.sale?.title || 'عروض خاصة'}
-          subtitle={sectionCfg.sale?.subtitle || 'خصومات حصرية وعروض لا تُفوت لفترة محدودة'}
-          filterType="sale"
-          gradientFrom="from-red-600"
-          gradientTo="to-pink-600"
-          icon={getIcon(sectionCfg.sale?.icon, <Flame className="w-12 h-12 text-white" />)}
-          selectedIds={homeCfg?.saleProductIds}
-        />
+        <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
+          <CreativeProductsSlider
+            title={sectionCfg.sale?.title || 'عروض خاصة'}
+            subtitle={sectionCfg.sale?.subtitle || 'خصومات حصرية وعروض لا تُفوت لفترة محدودة'}
+            filterType="sale"
+            gradientFrom="from-red-600"
+            gradientTo="to-pink-600"
+            icon={getIcon(sectionCfg.sale?.icon, <Flame className="w-12 h-12 text-white" />)}
+            selectedIds={homeCfg?.saleProductIds}
+          />
+        </Suspense>
       </EnhancedScrollAnimation>
     </section>
   ) : null;
@@ -453,28 +463,28 @@ const Index = () => {
       {/* Simple gradient line divider */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-200 to-transparent"></div>
       {/* MEGA Pattern Overlay */}
-      <ParallaxSection speed={-0.2} intensity="medium" className="absolute inset-0 opacity-[0.025]" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%)', backgroundSize: '25px 25px' }}></ParallaxSection>
-      <ParallaxSection speed={-0.3} intensity="medium" className="absolute inset-0 opacity-[0.015]" style={{ backgroundImage: 'repeating-linear-gradient(-45deg, #000 0, #000 1px, transparent 0, transparent 50%)', backgroundSize: '25px 25px' }}></ParallaxSection>
+      <ParallaxSection speed={-0.2} intensity="medium" className="absolute inset-0 opacity-[0.025] hidden md:block" style={{ backgroundImage: 'repeating-linear-gradient(45deg, #000 0, #000 1px, transparent 0, transparent 50%)', backgroundSize: '25px 25px' }}></ParallaxSection>
+      <ParallaxSection speed={-0.3} intensity="medium" className="absolute inset-0 opacity-[0.015] hidden md:block" style={{ backgroundImage: 'repeating-linear-gradient(-45deg, #000 0, #000 1px, transparent 0, transparent 50%)', backgroundSize: '25px 25px' }}></ParallaxSection>
 
       {/* New Badge Glow */}
-      <div className="absolute inset-0 pointer-events-none">
+      <div className="absolute inset-0 pointer-events-none hidden md:block">
         <div className="absolute top-10 right-10 w-32 h-32 bg-gradient-to-r from-primary to-secondary rounded-full blur-2xl opacity-30 animate-pulse"></div>
         <div className="absolute bottom-10 left-10 w-32 h-32 bg-gradient-to-r from-secondary to-primary rounded-full blur-2xl opacity-30 animate-pulse" style={{ animationDelay: '1s' }}></div>
       </div>
 
       {/* Multi-layer Gradient Orbs */}
-      <ParallaxSection speed={-0.4} scale className="absolute inset-0 opacity-30">
+      <ParallaxSection speed={-0.4} scale className="absolute inset-0 opacity-30 hidden md:block">
         <div className="absolute top-1/3 right-1/3 w-[450px] h-[450px] bg-gradient-to-br from-primary/25 via-primary/12 to-transparent rounded-full blur-3xl animate-pulse"></div>
       </ParallaxSection>
-      <ParallaxSection speed={-0.6} scale className="absolute inset-0 opacity-25">
+      <ParallaxSection speed={-0.6} scale className="absolute inset-0 opacity-25 hidden md:block">
         <div className="absolute bottom-1/3 left-1/3 w-[500px] h-[500px] bg-gradient-to-tl from-secondary/25 via-secondary/12 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
       </ParallaxSection>
 
       {/* Interactive Gift Unwrapping */}
-      <InteractiveBackground type="new" className="opacity-65" />
+      <InteractiveBackground type="new" className="opacity-65 hidden md:block" />
 
       {/* Diamond Shapes */}
-      <div className="absolute inset-0 pointer-events-none opacity-8">
+      <div className="absolute inset-0 pointer-events-none opacity-8 hidden md:block">
         {[...Array(10)].map((_, i) => (
           <div
             key={i}
@@ -492,7 +502,7 @@ const Index = () => {
       </div>
 
       {/* NEW Badge Stamps */}
-      <div className="absolute inset-0 pointer-events-none opacity-5">
+      <div className="absolute inset-0 pointer-events-none opacity-5 hidden md:block">
         {[...Array(4)].map((_, i) => (
           <div
             key={i}
@@ -509,15 +519,17 @@ const Index = () => {
         ))}
       </div>
       <EnhancedScrollAnimation animation="scaleIn" duration={1000}>
-        <CreativeProductsSlider
-          title={sectionCfg.newArrivals?.title || 'أحدث المنتجات'}
-          subtitle={sectionCfg.newArrivals?.subtitle || 'آخر الإضافات إلى مجموعتنا من المنتجات المتميزة'}
-          filterType="new"
-          gradientFrom="from-primary"
-          gradientTo="to-secondary"
-          icon={getIcon(sectionCfg.newArrivals?.icon, <Gift className="w-12 h-12 text-white" />)}
-          selectedIds={homeCfg?.newArrivalProductIds}
-        />
+        <Suspense fallback={<div className="h-96 bg-slate-100 animate-pulse rounded-xl" />}>
+          <CreativeProductsSlider
+            title={sectionCfg.newArrivals?.title || 'أحدث المنتجات'}
+            subtitle={sectionCfg.newArrivals?.subtitle || 'آخر الإضافات إلى مجموعتنا من المنتجات المتميزة'}
+            filterType="new"
+            gradientFrom="from-primary"
+            gradientTo="to-secondary"
+            icon={getIcon(sectionCfg.newArrivals?.icon, <Gift className="w-12 h-12 text-white" />)}
+            selectedIds={homeCfg?.newArrivalProductIds}
+          />
+        </Suspense>
       </EnhancedScrollAnimation>
     </section>
   ) : null;
@@ -526,7 +538,7 @@ const Index = () => {
       {/* Simple gradient line divider */}
       <div className="absolute bottom-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-slate-300 to-transparent"></div>
       {/* MEGA Map-Inspired Background */}
-      <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.1) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
+      <div className="absolute inset-0 opacity-10 hidden md:block" style={{ backgroundImage: 'radial-gradient(circle, rgba(0,0,0,0.1) 1px, transparent 1px)', backgroundSize: '40px 40px' }}></div>
 
       {/* Enhanced Border System */}
       <div className="absolute inset-0">
@@ -535,21 +547,21 @@ const Index = () => {
       </div>
 
       {/* 3-Layer Location Orbs */}
-      <ParallaxSection speed={-0.25} intensity="strong" scale className="absolute inset-0 pointer-events-none">
+      <ParallaxSection speed={-0.25} intensity="strong" scale className="absolute inset-0 pointer-events-none hidden md:block">
         <div className="absolute top-10 right-20 w-[500px] h-[500px] bg-gradient-to-br from-primary/15 via-primary/8 to-transparent rounded-full blur-3xl animate-pulse"></div>
       </ParallaxSection>
-      <ParallaxSection speed={-0.4} intensity="strong" scale className="absolute inset-0 pointer-events-none">
+      <ParallaxSection speed={-0.4} intensity="strong" scale className="absolute inset-0 pointer-events-none hidden md:block">
         <div className="absolute bottom-10 left-20 w-[600px] h-[600px] bg-gradient-to-tl from-secondary/15 via-secondary/8 to-transparent rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </ParallaxSection>
-      <ParallaxSection speed={-0.6} className="absolute inset-0 pointer-events-none opacity-50">
+      <ParallaxSection speed={-0.6} className="absolute inset-0 pointer-events-none opacity-50 hidden md:block">
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-[450px] h-[450px] bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 rounded-full blur-2xl"></div>
       </ParallaxSection>
 
       {/* Interactive Map Routes */}
-      <InteractiveBackground type="location" className="opacity-60" />
+      <InteractiveBackground type="location" className="opacity-60 hidden md:block" />
 
       {/* Map Pin Shapes */}
-      <div className="absolute inset-0 pointer-events-none opacity-10">
+      <div className="absolute inset-0 pointer-events-none opacity-10 hidden md:block">
         {[...Array(8)].map((_, i) => (
           <div
             key={i}
@@ -570,7 +582,7 @@ const Index = () => {
       </div>
 
       {/* Compass Rings */}
-      <div className="absolute inset-0 pointer-events-none opacity-5">
+      <div className="absolute inset-0 pointer-events-none opacity-5 hidden md:block">
         <div className="absolute top-1/4 left-1/4 w-48 h-48 border-8 border-dashed border-primary rounded-full animate-spin" style={{ animationDuration: '30s' }}></div>
         <div className="absolute bottom-1/4 right-1/4 w-64 h-64 border-8 border-dashed border-secondary rounded-full animate-spin" style={{ animationDuration: '40s', animationDirection: 'reverse' }}></div>
       </div>
@@ -702,11 +714,7 @@ const Index = () => {
               className={
                 prefersReducedMotion
                   ? ''
-                  : key === 'hero'
-                    ? ''
-                    : key === 'about'
-                      ? `transition-opacity duration-900 ease-out ${pageEnter ? 'opacity-100' : 'opacity-0'}`
-                      : `transition-all duration-900 ease-out ${pageEnter ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10'}`
+                  : ''
               }
               style={prefersReducedMotion ? undefined : { transitionDelay: `${delayMs}ms` }}
             >

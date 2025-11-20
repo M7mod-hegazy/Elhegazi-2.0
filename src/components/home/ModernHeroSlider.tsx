@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-import { 
+import {
   Users, Package, Star, Percent, Clock, Gift, Shield, Zap, Crown
 } from 'lucide-react';
 import SlideContent from './SlideContent';
@@ -57,9 +57,9 @@ const ModernHeroSlider: React.FC = () => {
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const { homeConfig } = useHomeConfig();
+  const { homeConfig, loading } = useHomeConfig();
   const HERO_CACHE_KEY = 'hero_slides_cache_v1';
-  
+
   // Data used by slides must be declared before any callbacks that might reference them
   const fakeProducts: Product[] = [
     {
@@ -195,7 +195,7 @@ const ModernHeroSlider: React.FC = () => {
       ]
     }
   ];
-  
+
   const cfgSlides = useMemo<HeroSlide[]>(() => {
     const s: ConfigSlide[] = (homeConfig?.slides || []) as ConfigSlide[];
     if (!s.length) return [];
@@ -304,11 +304,12 @@ const ModernHeroSlider: React.FC = () => {
 
   // Also dispatch readiness if there are slides but no products required
   useEffect(() => {
-    if (heroSlides.length > 0 && !heroReadyDispatchedRef.current) {
+    // Only dispatch if NOT loading (waiting for config)
+    if (!loading && heroSlides.length > 0 && !heroReadyDispatchedRef.current) {
       heroReadyDispatchedRef.current = true;
       window.dispatchEvent(new Event('hero-ready'));
     }
-  }, [heroSlides.length]);
+  }, [heroSlides.length, loading]);
 
   // Ensure currentSlide is always within range when slides change
   useEffect(() => {
@@ -324,6 +325,7 @@ const ModernHeroSlider: React.FC = () => {
     return Array.from(new Set(slides.flatMap(s => (s.productIds || []).filter(Boolean)))).map(String);
   }, [homeConfig?.slides]);
   const { map: productMapRQ, products: listRQ } = useProductsByIds(slideIds);
+
   const slideProducts = useMemo<Record<number, Product[]>>(() => {
     const slides = homeConfig?.slides || [];
     const out: Record<number, Product[]> = {};
@@ -351,11 +353,13 @@ const ModernHeroSlider: React.FC = () => {
     const slides = homeConfig?.slides || [];
     const need = slides.flatMap(s => (s.productIds || [])).length;
     const have = listRQ.length;
-    if (!heroReadyDispatchedRef.current && (need === 0 || have > 0)) {
+
+    // Only dispatch if NOT loading config
+    if (!loading && !heroReadyDispatchedRef.current && (need === 0 || have > 0)) {
       heroReadyDispatchedRef.current = true;
       window.dispatchEvent(new Event('hero-ready'));
     }
-  }, [homeConfig?.slides, listRQ.length]);
+  }, [homeConfig?.slides, listRQ.length, loading]);
 
   // Detect mobile
   useEffect(() => {
@@ -410,7 +414,7 @@ const ModernHeroSlider: React.FC = () => {
 
   const handleTouchEnd = useCallback(() => {
     if (!touchStart || !touchEnd) return;
-    
+
     const distance = touchStart - touchEnd;
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
@@ -435,16 +439,47 @@ const ModernHeroSlider: React.FC = () => {
     return fakeProducts.slice(0, 3);
   })();
 
-  // Empty state when no slides configured
-  if (noSlides) {
+  // Loading state or empty state with skeleton
+  if (loading || noSlides) {
     return (
-      <section 
-        className="relative overflow-hidden flex items-center justify-center"
-        style={{ height: 'calc(100vh - 64px)' }}
-      >
-        <div className="text-center text-white/90 bg-gradient-to-br from-slate-800 to-slate-900 w-full h-full flex items-center justify-center">
-          <div className="px-6 py-8 bg-black/30 rounded-xl border border-white/10">
-            لا توجد شرائح مضافة بعد. يرجى إضافة شريحة من لوحة التحكم.
+      <section className="relative h-[calc(100vh-64px)] overflow-hidden bg-slate-50">
+        <div className="container mx-auto px-4 h-full">
+          <div className="grid grid-cols-1 lg:grid-cols-12 h-full gap-8 items-center">
+            {/* Left Column Skeleton (Product Marquee) */}
+            <div className="hidden lg:block lg:col-span-5 h-[80%] relative">
+              <div className="absolute inset-0 bg-slate-200/50 rounded-3xl animate-pulse overflow-hidden">
+                <div className="h-full w-full flex flex-col gap-4 p-4 opacity-50">
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} className="flex gap-4 items-center p-3 bg-white/40 rounded-xl">
+                      <div className="w-16 h-16 bg-slate-300 rounded-lg" />
+                      <div className="flex-1 space-y-2">
+                        <div className="h-4 bg-slate-300 rounded w-3/4" />
+                        <div className="h-3 bg-slate-300 rounded w-1/2" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column Skeleton (Content) */}
+            <div className="col-span-1 lg:col-span-7 space-y-8 text-center lg:text-right px-4 lg:px-12">
+              <div className="space-y-4">
+                <div className="h-4 bg-slate-200 rounded-full w-32 mx-auto lg:mx-0 animate-pulse" />
+                <div className="h-12 md:h-16 bg-slate-200 rounded-2xl w-3/4 mx-auto lg:mx-0 animate-pulse" />
+                <div className="h-12 md:h-16 bg-slate-200 rounded-2xl w-1/2 mx-auto lg:mx-0 animate-pulse" />
+              </div>
+
+              <div className="space-y-3 pt-4">
+                <div className="h-4 bg-slate-200 rounded-full w-full animate-pulse" />
+                <div className="h-4 bg-slate-200 rounded-full w-5/6 animate-pulse" />
+              </div>
+
+              <div className="pt-8 flex gap-4 justify-center lg:justify-start">
+                <div className="h-14 w-40 bg-slate-200 rounded-xl animate-pulse" />
+                <div className="h-14 w-40 bg-slate-200 rounded-xl animate-pulse" />
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -452,9 +487,9 @@ const ModernHeroSlider: React.FC = () => {
   }
 
   return (
-    <section 
+    <section
       className="relative overflow-hidden"
-      style={{ 
+      style={{
         height: isMobile ? 'min(100vh, 600px)' : 'calc(100vh - 64px)'
       }}
       onTouchStart={handleTouchStart}
@@ -466,11 +501,10 @@ const ModernHeroSlider: React.FC = () => {
         {heroSlides.map((slide, index) => (
           <div
             key={slide.id}
-            className={`absolute inset-0 transition-all duration-1000 ease-in-out ${
-              index === currentSlide 
-                ? 'opacity-100 scale-100 rotate-0' 
-                : 'opacity-0 scale-105 rotate-1'
-            }`}
+            className={`absolute inset-0 transition-all duration-1000 ease-in-out ${index === currentSlide
+              ? 'opacity-100 scale-100 rotate-0'
+              : 'opacity-0 scale-105 rotate-1'
+              }`}
           >
             {(() => {
               const cfgSlide = homeConfig?.slides?.[index] as ConfigSlide | undefined;
@@ -478,22 +512,26 @@ const ModernHeroSlider: React.FC = () => {
               if (col && col.trim()) {
                 return <div className="w-full h-full" style={{ backgroundColor: col }} />;
               }
-              return <div className={`w-full h-full bg-gradient-to-br ${slide.bgGradient}`} />;
+              return (
+                <div 
+                  className={`w-full h-full bg-gradient-to-br ${slide.bgGradient}`} 
+                  style={{ backgroundAttachment: 'fixed' }}
+                />
+              );
             })()}
-            
+
             {/* Subtle overlay */}
-            <div className={`absolute inset-0 bg-black/20 transition-opacity duration-1000 ${
-              index === currentSlide ? 'opacity-100' : 'opacity-0'
-            }`} />
-            
+            <div className={`absolute inset-0 bg-black/20 transition-opacity duration-1000 ${index === currentSlide ? 'opacity-100' : 'opacity-0'
+              }`} />
+
             {/* Background Pattern per slide based on configured pattern key (deferred until mount) */}
             {mounted && (() => {
-              const key = homeConfig?.slides?.[index]?.pattern as ("grid"|"circles"|"waves"|"custom"|undefined);
+              const key = homeConfig?.slides?.[index]?.pattern as ("grid" | "circles" | "waves" | "custom" | undefined);
               if (key === 'custom') return null;
               const map: Record<string, number> = { grid: 0, circles: 1, waves: 2, dots: 3, diagonals: 4 };
               const pIndex = key ? map[key] : index % 3;
               return (
-                <BackgroundPattern 
+                <BackgroundPattern
                   slideIndex={pIndex}
                   isActive={index === currentSlide}
                 />
@@ -535,7 +573,6 @@ const ModernHeroSlider: React.FC = () => {
                         <AnimatedProductCard
                           product={product}
                           index={index}
-                          hidePrices={hidePrices}
                         />
                       </div>
                     ))}
@@ -547,9 +584,9 @@ const ModernHeroSlider: React.FC = () => {
             {/* Right Content - Text, vertically centered */}
             <div className="md:col-start-6 md:col-end-13 flex items-center h-full" dir="rtl">
               {currentSlideData && (
-                <SlideContent 
-                  slide={currentSlideData} 
-                  isActive={!isTransitioning} 
+                <SlideContent
+                  slide={currentSlideData}
+                  isActive={!isTransitioning}
                   isMobile={false}
                 />
               )}

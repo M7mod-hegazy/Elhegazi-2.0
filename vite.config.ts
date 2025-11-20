@@ -35,4 +35,14 @@ export default defineConfig(({ mode }) => ({
       "@radix-ui/react-tooltip",
     ],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['lucide-react', 'clsx', 'tailwind-merge'],
+        },
+      },
+    },
+  },
 }));

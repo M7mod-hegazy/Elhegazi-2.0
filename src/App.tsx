@@ -77,24 +77,24 @@ const AppInner = () => {
   const { siteName } = useSiteName();
   const { toast } = useToast();
   const [docLoaded, setDocLoaded] = useState(false);
-  
+
   // Update favicon and loading screen logo dynamically
   useFavicon();
   const [showSplash, setShowSplash] = useState(true);
   const location = useLocation();
-  
+
   // Use loading coordinator to wait for all critical data
   const { allReady, isLoading } = useLoadingCoordinator();
-  
+
   // Register Service Worker for offline support
   useServiceWorker();
-  
+
   // Handle Service Worker updates
   useServiceWorkerUpdate();
-  
+
   // Prefetch resources on idle
   usePrefetchOnIdle();
-  
+
   // Preload critical resources
   usePreloadCritical();
 
@@ -112,17 +112,41 @@ const AppInner = () => {
   }, [siteName]);
 
   useEffect(() => {
-    // Remove the static pre-splash from index.html to avoid double overlays
-    const pre = document.getElementById('pre-splash');
-    if (pre && pre.parentElement) pre.parentElement.removeChild(pre);
-
-    const onDomReady = () => requestAnimationFrame(() => setDocLoaded(true));
-    if (document.readyState === 'interactive' || document.readyState === 'complete') {
+    // Remove the static pre-splash from index.html ONLY after hero is ready or timeout
+    const removeSplash = () => {
+      const pre = document.getElementById('pre-splash');
+      if (pre && pre.parentElement) {
+        pre.style.opacity = '0';
+        pre.style.transition = 'opacity 0.5s ease';
+        setTimeout(() => {
+          if (pre.parentElement) pre.parentElement.removeChild(pre);
+        }, 500);
+      }
       requestAnimationFrame(() => setDocLoaded(true));
+    };
+
+    // Listen for hero-ready event from ModernHeroSlider
+    window.addEventListener('hero-ready', removeSplash, { once: true });
+
+    // Fallback timeout in case hero takes too long or isn't present
+    const fallbackTimer = setTimeout(removeSplash, 3500);
+
+    const onDomReady = () => {
+      // We don't remove splash here anymore, we wait for hero-ready
+      // But we still ensure docLoaded is set eventually
+    };
+
+    if (document.readyState === 'interactive' || document.readyState === 'complete') {
+      // requestAnimationFrame(() => setDocLoaded(true)); // Moved to removeSplash
     } else {
       document.addEventListener('DOMContentLoaded', onDomReady, { once: true });
     }
-    
+
+    return () => {
+      window.removeEventListener('hero-ready', removeSplash);
+      clearTimeout(fallbackTimer);
+    };
+
     // Prevent React Router from hijacking external links (WhatsApp, etc.)
     const handleClickCapture = (e: Event) => {
       const target = (e.target as HTMLElement).closest('a');
@@ -130,7 +154,7 @@ const AppInner = () => {
         const href = target.getAttribute('href');
         // If it's an external protocol or WhatsApp link, prevent React Router from hijacking it
         if (href && (
-          href.startsWith('http://wa.me/') || 
+          href.startsWith('http://wa.me/') ||
           href.startsWith('https://wa.me/') ||
           href.startsWith('https://web.whatsapp.com/') ||
           href.startsWith('whatsapp://') ||
@@ -140,7 +164,7 @@ const AppInner = () => {
           // Prevent React Router from intercepting
           e.preventDefault();
           e.stopPropagation();
-          
+
           // Let the browser handle it natively
           const newWindow = window.open(href, '_blank', 'noopener,noreferrer');
           if (!newWindow) {
@@ -150,13 +174,13 @@ const AppInner = () => {
         }
       }
     };
-    
+
     // Intercept window.open calls for WhatsApp links
     const originalWindowOpen = window.open;
-    (window as any).open = function(url: string, target?: string, features?: string) {
+    (window as any).open = function (url: string, target?: string, features?: string) {
       // If it's a WhatsApp link, open it directly without React Router interference
       if (url && (
-        url.startsWith('http://wa.me/') || 
+        url.startsWith('http://wa.me/') ||
         url.startsWith('https://wa.me/') ||
         url.startsWith('https://web.whatsapp.com/') ||
         url.startsWith('whatsapp://')
@@ -167,9 +191,9 @@ const AppInner = () => {
       // For other URLs, use the original window.open
       return originalWindowOpen.call(window, url, target, features);
     };
-    
+
     document.addEventListener('click', handleClickCapture, true);
-    
+
     // Faster fallback to avoid long waits (max 5 seconds)
     const fallback = setTimeout(() => setShowSplash(false), 5000);
     return () => {
@@ -208,7 +232,7 @@ const AppInner = () => {
     <>
       {/* Scroll Progress Bar */}
       <ScrollProgressBar />
-      
+
       {/* Global Splash overlay (desktop + mobile) */}
       {showSplash && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-slate-900 to-black">
@@ -222,165 +246,165 @@ const AppInner = () => {
       <Layout>
         <Suspense fallback={<div className="p-6 text-center text-white/90">جارٍ تحميل الصفحة...</div>}>
           <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/product/:id" element={<ProductDetail />} />
-              <Route path="/product/:productId/rating" element={<RatingMessage />} />
-              <Route path="/categories" element={<Categories />} />
-              <Route path="/category/:slug" element={<CategoryPage />} />
-              <Route path="/featured" element={<FeaturedProducts />} />
-              <Route path="/best-sellers" element={<BestSellers />} />
-              <Route path="/special-offers" element={<SpecialOffers />} />
-              <Route path="/latest" element={<LatestProducts />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/checkout" element={<ModernCheckout />} />
-              <Route path="/checkout/legacy" element={<Checkout />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/register" element={<Register />} />
-              <Route path="/profile" element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              } />
-              <Route path="/orders" element={
-                <ProtectedRoute>
-                  <Orders />
-                </ProtectedRoute>
-              } />
-              <Route path="/order-history" element={
-                <ProtectedRoute>
-                  <OrderHistory />
-                </ProtectedRoute>
-              } />
-              <Route path="/order-confirmation" element={
-                <ProtectedRoute>
-                  <OrderConfirmation />
-                </ProtectedRoute>
-              } />
-              <Route path="/order/:id" element={
-                <ProtectedRoute>
-                  <EnhancedOrderTracking />
-                </ProtectedRoute>
-              } />
-              <Route path="/order/:id/legacy" element={
-                <ProtectedRoute>
-                  <OrderTracking />
-                </ProtectedRoute>
-              } />
-              <Route path="/track" element={<PublicOrderTracking />} />
-              <Route path="/favorites" element={
-                <ProtectedRoute>
-                  <Favorites />
-                </ProtectedRoute>
-              } />
-              <Route path="/returns/:id" element={
-                <ProtectedRoute>
-                  <Returns />
-                </ProtectedRoute>
-              } />
-              <Route path="/addresses" element={
-                <ProtectedRoute>
-                  <Addresses />
-                </ProtectedRoute>
-              } />
-              <Route path="/payment-methods" element={
-                <ProtectedRoute>
-                  <PaymentMethods />
-                </ProtectedRoute>
-              } />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
-              <Route path="/locations" element={<Locations />} />
-              <Route path="/shop-setup" element={<ShopSetup />} />
-              <Route path="/shop-builder" element={<ShopBuilder3DPage />} />
-              
-              
-              {/* Admin Routes */}
-              <Route path="/admin" element={<AdminLogin />} />
-              <Route path="/admin/login" element={<AdminLogin />} />
-              <Route path="/admin/dashboard" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminDashboard />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/products" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminProducts />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/products-3d" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminProducts3D />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/models-3d-analytics" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminModels3DAnalytics />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/categories" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminCategories />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/orders" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminOrders />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/users" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminUsers />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/locations" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminLocations />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/qr-codes" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminQRCodes />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/home-config" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminHomeConfig />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/settings" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminSettings />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/history" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminHistory />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/order/:id" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminOrderTracking />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/profit" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminProfit />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/profit-analytics" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminProfitAnalytics />
-                </DualProtectedRoute>
-              } />
-              <Route path="/admin/shareholders" element={
-                <DualProtectedRoute requireAdmin={true}>
-                  <AdminShareholders />
-                </DualProtectedRoute>
-              } />
-              
-              {/* Catch-all route */}
-              <Route path="*" element={<NotFound />} />
+            <Route path="/" element={<HomePage />} />
+            <Route path="/products" element={<Products />} />
+            <Route path="/product/:id" element={<ProductDetail />} />
+            <Route path="/product/:productId/rating" element={<RatingMessage />} />
+            <Route path="/categories" element={<Categories />} />
+            <Route path="/category/:slug" element={<CategoryPage />} />
+            <Route path="/featured" element={<FeaturedProducts />} />
+            <Route path="/best-sellers" element={<BestSellers />} />
+            <Route path="/special-offers" element={<SpecialOffers />} />
+            <Route path="/latest" element={<LatestProducts />} />
+            <Route path="/cart" element={<Cart />} />
+            <Route path="/checkout" element={<ModernCheckout />} />
+            <Route path="/checkout/legacy" element={<Checkout />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/register" element={<Register />} />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            } />
+            <Route path="/orders" element={
+              <ProtectedRoute>
+                <Orders />
+              </ProtectedRoute>
+            } />
+            <Route path="/order-history" element={
+              <ProtectedRoute>
+                <OrderHistory />
+              </ProtectedRoute>
+            } />
+            <Route path="/order-confirmation" element={
+              <ProtectedRoute>
+                <OrderConfirmation />
+              </ProtectedRoute>
+            } />
+            <Route path="/order/:id" element={
+              <ProtectedRoute>
+                <EnhancedOrderTracking />
+              </ProtectedRoute>
+            } />
+            <Route path="/order/:id/legacy" element={
+              <ProtectedRoute>
+                <OrderTracking />
+              </ProtectedRoute>
+            } />
+            <Route path="/track" element={<PublicOrderTracking />} />
+            <Route path="/favorites" element={
+              <ProtectedRoute>
+                <Favorites />
+              </ProtectedRoute>
+            } />
+            <Route path="/returns/:id" element={
+              <ProtectedRoute>
+                <Returns />
+              </ProtectedRoute>
+            } />
+            <Route path="/addresses" element={
+              <ProtectedRoute>
+                <Addresses />
+              </ProtectedRoute>
+            } />
+            <Route path="/payment-methods" element={
+              <ProtectedRoute>
+                <PaymentMethods />
+              </ProtectedRoute>
+            } />
+            <Route path="/about" element={<About />} />
+            <Route path="/contact" element={<Contact />} />
+            <Route path="/locations" element={<Locations />} />
+            <Route path="/shop-setup" element={<ShopSetup />} />
+            <Route path="/shop-builder" element={<ShopBuilder3DPage />} />
+
+
+            {/* Admin Routes */}
+            <Route path="/admin" element={<AdminLogin />} />
+            <Route path="/admin/login" element={<AdminLogin />} />
+            <Route path="/admin/dashboard" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminDashboard />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/products" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminProducts />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/products-3d" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminProducts3D />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/models-3d-analytics" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminModels3DAnalytics />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/categories" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminCategories />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/orders" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminOrders />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/users" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminUsers />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/locations" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminLocations />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/qr-codes" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminQRCodes />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/home-config" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminHomeConfig />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/settings" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminSettings />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/history" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminHistory />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/order/:id" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminOrderTracking />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/profit" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminProfit />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/profit-analytics" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminProfitAnalytics />
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/shareholders" element={
+              <DualProtectedRoute requireAdmin={true}>
+                <AdminShareholders />
+              </DualProtectedRoute>
+            } />
+
+            {/* Catch-all route */}
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </Suspense>
       </Layout>
