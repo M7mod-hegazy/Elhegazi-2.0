@@ -220,6 +220,8 @@ app.get('/products', async (c) => {
     const { default: Product } = await import('../server/models/Product.js');
     const ids = c.req.query('ids');
     const categorySlug = c.req.query('categorySlug');
+    const search = c.req.query('search');
+    const limitParam = c.req.query('limit');
 
     let query = { active: { $ne: false } };
     if (ids) {
@@ -229,8 +231,26 @@ app.get('/products', async (c) => {
     if (categorySlug) {
       query.categorySlug = categorySlug;
     }
+    // Search filter - search in name, nameAr, sku, and description
+    if (search && search.trim()) {
+      const searchRegex = { $regex: search.trim(), $options: 'i' };
+      query.$or = [
+        { name: searchRegex },
+        { nameAr: searchRegex },
+        { sku: searchRegex },
+        { description: searchRegex },
+        { descriptionAr: searchRegex }
+      ];
+    }
 
-    const products = await Product.find(query).lean().maxTimeMS(8000);
+    // Only apply limit if explicitly passed, otherwise fetch all
+    let productsQuery = Product.find(query);
+    if (limitParam) {
+      const limit = parseInt(limitParam);
+      if (limit > 0) productsQuery = productsQuery.limit(limit);
+    }
+
+    const products = await productsQuery.lean().maxTimeMS(15000);
     return c.json({ ok: true, items: products });
   } catch (err) {
     console.error('[API] Error:', err.message);

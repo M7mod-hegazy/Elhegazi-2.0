@@ -192,7 +192,7 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
               معلومات المنتج الأساسية
             </h3>
           </div>
-          
+
           <div className="space-y-3">
             <Label htmlFor="name" className="text-base font-semibold text-slate-700 flex items-center gap-2">
               <Package className="w-4 h-4 text-primary" />
@@ -233,7 +233,7 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
                 </Label>
               </div>
             </div>
-            
+
             <div className="space-y-3">
               <Label htmlFor="price" className="text-base font-semibold text-slate-700 flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-green-600" />
@@ -290,161 +290,161 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
           </div>
         </div>
 
-      {/* Category and SKU Section */}
-      <div className="bg-gradient-to-r from-purple-50/60 via-pink-50/40 to-rose-50/60 backdrop-blur-sm rounded-2xl p-6 border border-purple-200/30 shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-            <Tag className="w-5 h-5 text-white" />
+        {/* Category and SKU Section */}
+        <div className="bg-gradient-to-r from-purple-50/60 via-pink-50/40 to-rose-50/60 backdrop-blur-sm rounded-2xl p-6 border border-purple-200/30 shadow-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
+              <Tag className="w-5 h-5 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
+              تصنيف والترميز
+            </h3>
           </div>
-          <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-            تصنيف والترميز
-          </h3>
-        </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <Label htmlFor="category" className="text-base font-semibold text-slate-700 flex items-center gap-2">
-              <Package className="w-4 h-4 text-purple-600" />
-              الفئة
-            </Label>
-            <select
-              id="category"
-              className="w-full border-purple-200/50 rounded-xl h-12 px-4 bg-white/80 backdrop-blur shadow-sm text-lg focus:border-purple-500 focus:ring-purple-500/20 transition-all duration-200 hover:shadow-md"
-              value={formData.category}
-              onChange={(e) => {
-                const value = e.target.value;
-                if (!value) {
-                  setFormData((prev) => ({ ...prev, category: '', categoryAr: '' }));
-                  return;
-                }
-                const selectedCat = categories.find((c) => String(c.id) === String(value));
-                setFormData((prev) => ({
-                  ...prev,
-                  category: value,
-                  categoryAr: selectedCat?.nameAr || selectedCat?.name || '',
-                }));
-              }}
-            >
-              <option value="">
-                {categories.length === 0 ? 'لا توجد فئات متاحة — أنشئ فئة أولاً' : 'اختر الفئة'}
-              </option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>
-                  {category.nameAr || category.name}
-                </option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="space-y-3">
-            <Label htmlFor="sku" className="text-base font-semibold text-slate-700 flex items-center gap-2">
-              <Tag className="w-4 h-4 text-purple-600" />
-              كود المنتج
-            </Label>
-            <div className="flex gap-3">
-              <Input
-                id="sku"
-                value={formData.sku}
-                onChange={(e) => setFormData((prev) => ({ ...prev, sku: e.target.value }))}
-                required
-                className="h-12 text-lg bg-white/80 backdrop-blur border-purple-200/50 focus:border-purple-500 focus:ring-purple-500/20 shadow-sm transition-all duration-200 hover:shadow-md"
-                placeholder="SKU123"
-              />
-              <Button 
-                type="button" 
-                variant="outline" 
-                onClick={() => setFormData((prev) => ({ ...prev, sku: generateSKU() }))}
-                className="h-12 px-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-pink-100 shadow-sm transition-all duration-200 hover:shadow-md"
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <Label htmlFor="category" className="text-base font-semibold text-slate-700 flex items-center gap-2">
+                <Package className="w-4 h-4 text-purple-600" />
+                الفئة
+              </Label>
+              <select
+                id="category"
+                className="w-full border-purple-200/50 rounded-xl h-12 px-4 bg-white/80 backdrop-blur shadow-sm text-lg focus:border-purple-500 focus:ring-purple-500/20 transition-all duration-200 hover:shadow-md"
+                value={formData.category}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (!value) {
+                    setFormData((prev) => ({ ...prev, category: '', categoryAr: '' }));
+                    return;
+                  }
+                  const selectedCat = categories.find((c) => String(c.id) === String(value));
+                  setFormData((prev) => ({
+                    ...prev,
+                    category: value,
+                    categoryAr: selectedCat?.nameAr || selectedCat?.name || '',
+                  }));
+                }}
               >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                توليد تلقائي
-              </Button>
+                <option value="">
+                  {categories.length === 0 ? 'لا توجد فئات متاحة — أنشئ فئة أولاً' : 'اختر الفئة'}
+                </option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>
+                    {category.nameAr || category.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-3">
+              <Label htmlFor="sku" className="text-base font-semibold text-slate-700 flex items-center gap-2">
+                <Tag className="w-4 h-4 text-purple-600" />
+                كود المنتج
+              </Label>
+              <div className="flex gap-3">
+                <Input
+                  id="sku"
+                  value={formData.sku}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, sku: e.target.value }))}
+                  required
+                  className="h-12 text-lg bg-white/80 backdrop-blur border-purple-200/50 focus:border-purple-500 focus:ring-purple-500/20 shadow-sm transition-all duration-200 hover:shadow-md"
+                  placeholder="SKU123"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setFormData((prev) => ({ ...prev, sku: generateSKU() }))}
+                  className="h-12 px-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-pink-100 shadow-sm transition-all duration-200 hover:shadow-md"
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  توليد تلقائي
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Image Upload Section */}
-      <div className="bg-gradient-to-r from-green-50/60 via-emerald-50/40 to-teal-50/60 backdrop-blur-sm rounded-2xl p-6 border border-green-200/30 shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-            <FileImage className="w-5 h-5 text-white" />
+        {/* Image Upload Section */}
+        <div className="bg-gradient-to-r from-green-50/60 via-emerald-50/40 to-teal-50/60 backdrop-blur-sm rounded-2xl p-6 border border-green-200/30 shadow-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
+              <FileImage className="w-5 h-5 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+              صور المنتج
+            </h3>
           </div>
-          <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-            صور المنتج
-          </h3>
-        </div>
-        
-        <div className="space-y-4">
-          <ImageUpload
-            onImagesChange={(images) =>
-              setFormData((prev) => ({
-                ...prev,
-                images: images,
-                image: images[0] || '',
-              }))
-            }
-            maxImages={5}
-            multiple={true}
-            initialImages={formData.images}
-            className="rounded-xl border-2 border-dashed border-green-300 bg-green-50/30 hover:bg-green-50/50 transition-all duration-200"
-          />
-          <div className="bg-green-100/50 border border-green-200 rounded-xl p-4">
-            <p className="text-sm text-green-800 font-medium flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              يمكنك رفع حتى 5 صور للمنتج. الصورة الأولى ستكون الصورة الرئيسية.
-            </p>
-          </div>
-        </div>
-      </div>
 
-      {/* Description Section */}
-      <div className="bg-gradient-to-r from-slate-50/60 via-gray-50/40 to-zinc-50/60 backdrop-blur-sm rounded-2xl p-6 border border-slate-200/30 shadow-lg">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 bg-gradient-to-r from-slate-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
-            <FileText className="w-5 h-5 text-white" />
+          <div className="space-y-4">
+            <ImageUpload
+              onImagesChange={(images) =>
+                setFormData((prev) => ({
+                  ...prev,
+                  images: images,
+                  image: images[0] || '',
+                }))
+              }
+              maxImages={5}
+              multiple={true}
+              initialImages={formData.images}
+              className="rounded-xl border-2 border-dashed border-green-300 bg-green-50/30 hover:bg-green-50/50 transition-all duration-200"
+            />
+            <div className="bg-green-100/50 border border-green-200 rounded-xl p-4">
+              <p className="text-sm text-green-800 font-medium flex items-center gap-2">
+                <CheckCircle className="w-4 h-4" />
+                يمكنك رفع حتى 5 صور للمنتج. الصورة الأولى ستكون الصورة الرئيسية.
+              </p>
+            </div>
           </div>
-          <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-slate-600 to-gray-600 bg-clip-text text-transparent">
-            وصف المنتج
-          </h3>
         </div>
-        
-        <div className="space-y-3">
-          <Label htmlFor="description" className="text-base font-semibold text-slate-700 flex items-center gap-2">
-            <FileText className="w-4 h-4 text-slate-600" />
-            الوصف
-          </Label>
-          <Textarea
-            id="description"
-            value={formData.description}
-            onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-            rows={4}
-            className="text-lg bg-white/80 backdrop-blur border-slate-200/50 focus:border-slate-500 focus:ring-slate-500/20 shadow-sm transition-all duration-200 hover:shadow-md rounded-xl"
-            placeholder="اكتب وصفاً مفصلاً للمنتج..."
-          />
-        </div>
-      </div>
 
-      <DialogFooter className="pt-6 border-t border-slate-200/50">
-        <Button 
-          type="submit"
-          className="h-12 px-8 text-lg bg-gradient-to-r from-primary via-secondary to-primary hover:from-primary hover:via-secondary hover:to-primary shadow-xl transition-all duration-300 hover:shadow-2xl transform hover:scale-105"
-        >
-          <div className="flex items-center gap-3">
-            {editingProduct ? (
-              <>
-                <Edit className="w-5 h-5" />
-                تحديث المنتج
-              </>
-            ) : (
-              <>
-                <Plus className="w-5 h-5" />
-                إضافة المنتج
-              </>
-            )}
+        {/* Description Section */}
+        <div className="bg-gradient-to-r from-slate-50/60 via-gray-50/40 to-zinc-50/60 backdrop-blur-sm rounded-2xl p-6 border border-slate-200/30 shadow-lg">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 bg-gradient-to-r from-slate-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
+              <FileText className="w-5 h-5 text-white" />
+            </div>
+            <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-slate-600 to-gray-600 bg-clip-text text-transparent">
+              وصف المنتج
+            </h3>
           </div>
-        </Button>
-      </DialogFooter>
+
+          <div className="space-y-3">
+            <Label htmlFor="description" className="text-base font-semibold text-slate-700 flex items-center gap-2">
+              <FileText className="w-4 h-4 text-slate-600" />
+              الوصف
+            </Label>
+            <Textarea
+              id="description"
+              value={formData.description}
+              onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+              rows={4}
+              className="text-lg bg-white/80 backdrop-blur border-slate-200/50 focus:border-slate-500 focus:ring-slate-500/20 shadow-sm transition-all duration-200 hover:shadow-md rounded-xl"
+              placeholder="اكتب وصفاً مفصلاً للمنتج..."
+            />
+          </div>
+        </div>
+
+        <DialogFooter className="pt-6 border-t border-slate-200/50">
+          <Button
+            type="submit"
+            className="h-12 px-8 text-lg bg-gradient-to-r from-primary via-secondary to-primary hover:from-primary hover:via-secondary hover:to-primary shadow-xl transition-all duration-300 hover:shadow-2xl transform hover:scale-105"
+          >
+            <div className="flex items-center gap-3">
+              {editingProduct ? (
+                <>
+                  <Edit className="w-5 h-5" />
+                  تحديث المنتج
+                </>
+              ) : (
+                <>
+                  <Plus className="w-5 h-5" />
+                  إضافة المنتج
+                </>
+              )}
+            </div>
+          </Button>
+        </DialogFooter>
       </div>
     </form>
   );
@@ -453,7 +453,7 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
 const AdminProducts = () => {
   // Set page title
   usePageTitle('إدارة المنتجات');
-  
+
   const navigate = useNavigate();
   const { toast } = useToast();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -462,7 +462,7 @@ const AdminProducts = () => {
   const didInitFromParams = useRef(false);
   const lastBulkDeleteIdsRef = useRef<string[]>([]);
   const { hidePrices } = usePricingSettings();
-  
+
   // State
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState<boolean>(false);
@@ -778,7 +778,7 @@ const AdminProducts = () => {
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [importFile, setImportFile] = useState<File | null>(null);
   const [extractedData, setExtractedData] = useState<string[][]>([]);
-  const [columnMapping, setColumnMapping] = useState<{[key: number]: string}>({});
+  const [columnMapping, setColumnMapping] = useState<{ [key: number]: string }>({});
   const [importPreview, setImportPreview] = useState<ImportItem[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'preview' | 'complete'>('upload');
@@ -1044,8 +1044,8 @@ const AdminProducts = () => {
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
       const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           product.nameAr.includes(searchTerm) ||
-                           product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+        product.nameAr.includes(searchTerm) ||
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category === selectedCategory;
       return matchesSearch && matchesCategory;
     });
@@ -1101,7 +1101,7 @@ const AdminProducts = () => {
     setExpandedRows(newExpanded);
   }, [expandedRows]);
 
-  const enhancePreviewFromTable = (tableData: TableData, mapping: {[key:number]: string}, formattedData: ImportItem[]): ImportItem[] => {
+  const enhancePreviewFromTable = (tableData: TableData, mapping: { [key: number]: string }, formattedData: ImportItem[]): ImportItem[] => {
     const lcHeaders = tableData.headers.map(h => h.trim().toLowerCase());
     const text64Index = lcHeaders.findIndex(h => /\btext\s*64\b/i.test(h));
     const text62Index = lcHeaders.findIndex(h => /\btext\s*62\b/i.test(h));
@@ -1271,9 +1271,9 @@ const AdminProducts = () => {
   const confirmDelete = async () => {
     const product = deleteConfirmModal.product;
     if (!product) return;
-    
+
     setDeleteConfirmModal(prev => ({ ...prev, loading: true }));
-    
+
     // schedule delete with undo window
     void logHistory({
       section: 'products',
@@ -1318,7 +1318,7 @@ const AdminProducts = () => {
         });
       }
     }, 6000);
-    
+
     setScheduledDeletes(map => new Map(map).set(product.id, timer));
     toast({
       title: 'تم جدولة حذف المنتج',
@@ -1334,7 +1334,7 @@ const AdminProducts = () => {
         </ToastAction>
       ),
     });
-    
+
     closeDeleteConfirm();
   };
 
@@ -1424,7 +1424,7 @@ const AdminProducts = () => {
       ['ID', 'Name', 'Category', 'Price', 'Hidden', 'SKU'].join(','),
       ...products.map(p => [p.id, p.name, p.category, p.price, p.isHidden ? 'true' : 'false', p.sku].join(','))
     ].join('\n');
-    
+
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -1573,8 +1573,8 @@ const AdminProducts = () => {
     if (!s) return NaN;
     // Convert Arabic-Indic digits to Western 0-9
     const arabicIndicMap: Record<string, string> = {
-      '٠':'0','١':'1','٢':'2','٣':'3','٤':'4','٥':'5','٦':'6','٧':'7','٨':'8','٩':'9',
-      '۰':'0','۱':'1','۲':'2','۳':'3','۴':'4','۵':'5','۶':'6','۷':'7','۸':'8','۹':'9'
+      '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
+      '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9'
     };
     s = s.replace(/[٠-٩۰-۹]/g, ch => arabicIndicMap[ch] || ch);
     if (!s) return NaN;
@@ -1846,7 +1846,7 @@ const AdminProducts = () => {
     } catch {
       // ignore malformed URL params
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sync state -> URL params
@@ -1949,8 +1949,8 @@ const AdminProducts = () => {
             <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-medium mt-1 sm:mt-2">إدارة كتالوج المنتجات والمخزون</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size={isMobile ? "sm" : "default"}
               onClick={() => window.location.reload()}
               className="flex-1 sm:flex-none bg-gradient-to-r from-green-50 to-green-100 border-green-200 text-green-700 hover:from-green-100 hover:to-green-200 shadow-md text-xs sm:text-sm"
@@ -1959,8 +1959,8 @@ const AdminProducts = () => {
               <span className="hidden sm:inline">تحديث البيانات</span>
               <span className="sm:hidden">تحديث</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size={isMobile ? "sm" : "default"}
               onClick={() => navigate('/admin/categories')}
               className="flex-1 sm:flex-none bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 text-primary hover:from-primary/10 hover:to-primary/20 shadow-md text-xs sm:text-sm"
@@ -1992,7 +1992,7 @@ const AdminProducts = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex-shrink-0 w-64 bg-gradient-to-br from-green-500 to-emerald-600 text-white rounded-2xl p-4 shadow-xl">
                 <div className="flex items-center justify-between mb-3">
                   <DollarSign className="w-8 h-8 text-green-100" />
@@ -2008,7 +2008,7 @@ const AdminProducts = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex-shrink-0 w-64 bg-gradient-to-br from-purple-500 to-violet-600 text-white rounded-2xl p-4 shadow-xl">
                 <div className="flex items-center justify-between mb-3">
                   <Tag className="w-8 h-8 text-purple-100" />
@@ -2024,7 +2024,7 @@ const AdminProducts = () => {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex-shrink-0 w-64 bg-gradient-to-br from-orange-500 to-red-600 text-white rounded-2xl p-4 shadow-xl">
                 <div className="flex items-center justify-between mb-3">
                   <AlertTriangle className="w-8 h-8 text-orange-100" />
@@ -2044,167 +2044,235 @@ const AdminProducts = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6 md:mb-8">
-          <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-primary text-xs md:text-sm font-semibold">إجمالي المنتجات</p>
-                  <p className="text-2xl md:text-3xl font-black text-primary">{filteredProducts.length}</p>
+            <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-primary text-xs md:text-sm font-semibold">إجمالي المنتجات</p>
+                    <p className="text-2xl md:text-3xl font-black text-primary">{filteredProducts.length}</p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-primary to-primary rounded-xl flex items-center justify-center shadow-lg">
+                    <ShoppingBag className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
                 </div>
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-primary to-primary rounded-xl flex items-center justify-center shadow-lg">
-                  <ShoppingBag className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-green-600 text-xs md:text-sm font-semibold">المنتجات المرئية</p>
+                    <p className="text-2xl md:text-3xl font-black text-green-900">
+                      {filteredProducts.filter(p => !p.isHidden).length}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Eye className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-green-600 text-xs md:text-sm font-semibold">المنتجات المرئية</p>
-                  <p className="text-2xl md:text-3xl font-black text-green-900">
-                    {filteredProducts.filter(p => !p.isHidden).length}
-                  </p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-amber-600 text-xs md:text-sm font-semibold">المنتجات المميزة</p>
+                    <p className="text-2xl md:text-3xl font-black text-amber-900">
+                      {filteredProducts.filter(p => p.featured).length}
+                    </p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Star className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
                 </div>
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Eye className="w-5 h-5 md:w-6 md:h-6 text-white" />
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-purple-600 text-xs md:text-sm font-semibold">الفئات النشطة</p>
+                    <p className="text-2xl md:text-3xl font-black text-purple-900">{categories.length}</p>
+                  </div>
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <Tag className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-amber-50 to-amber-100 border-amber-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-amber-600 text-xs md:text-sm font-semibold">المنتجات المميزة</p>
-                  <p className="text-2xl md:text-3xl font-black text-amber-900">
-                    {filteredProducts.filter(p => p.featured).length}
-                  </p>
-                </div>
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Star className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          
-          <Card className="bg-gradient-to-br from-purple-50 to-purple-100 border-purple-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-            <CardContent className="p-4 md:p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-purple-600 text-xs md:text-sm font-semibold">الفئات النشطة</p>
-                  <p className="text-2xl md:text-3xl font-black text-purple-900">{categories.length}</p>
-                </div>
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <Tag className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
           </div>
         )}
 
-        {/* Enhanced Mobile-First Toolbar */}
-        <div className="sticky-toolbar bg-white/80 backdrop-blur-xl border border-slate-200/50 rounded-xl md:rounded-2xl shadow-lg px-3 md:px-6 py-3 md:py-4 mb-4 md:mb-6">
-          <div className="space-y-3 md:space-y-0 md:grid md:grid-cols-1 lg:grid-cols-3 md:gap-4">
-            {/* Mobile-First Actions */}
-            <div className="flex flex-wrap items-center gap-2 md:gap-3 order-1 md:order-1">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { resetImportState(); setIsUpdateModalOpen(true); }}
-                className="bg-gradient-to-r from-amber-50 to-amber-100 border-amber-200 text-amber-700 hover:from-amber-100 hover:to-amber-200 shadow-md text-xs md:text-sm flex-1 md:flex-none min-w-0"
-              >
-                <RefreshCw className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                <span className="hidden sm:inline">تحديث ذكي</span>
-                <span className="sm:hidden">تحديث</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { resetImportState(); setIsImportModalOpen(true); }}
-                className="bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-purple-200 shadow-md text-xs md:text-sm flex-1 md:flex-none min-w-0"
-              >
-                <Scan className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                <span className="hidden sm:inline">استيراد ذكي</span>
-                <span className="sm:hidden">استيراد</span>
-              </Button>
-              <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} modal={false}>
-                <Button 
-                  onClick={() => {resetForm(); setIsCreateModalOpen(true);}}
-                  className="bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary shadow-lg text-white transform transition-all duration-200 hover:scale-105 text-xs md:text-sm flex-1 md:flex-none min-w-0"
-                >
-                  <Plus className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                  <span className="hidden sm:inline">إضافة منتج</span>
-                  <span className="sm:hidden">إضافة</span>
-                </Button>
-                <DialogContent
-                  className="max-w-4xl max-h-[95vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-slate-200/50 shadow-2xl rounded-3xl"
-                  onOpenAutoFocus={(e) => e.preventDefault()}
-                >
-                  <DialogHeader className="pb-6 border-b border-slate-200/50">
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gradient-to-r from-primary to-secondary rounded-2xl flex items-center justify-center shadow-lg">
-                        <Plus className="w-6 h-6 text-white" />
-                      </div>
-                      <div>
-                        <DialogTitle className="text-3xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                          إضافة منتج جديد
-                        </DialogTitle>
-                        <DialogDescription className="text-lg text-slate-600 font-medium mt-1">
-                          أدخل تفاصيل المنتج الجديد وقم بإضافته إلى المتجر
-                        </DialogDescription>
-                      </div>
-                    </div>
-                  </DialogHeader>
-                  <ProductForm
-                    formData={formData}
-                    setFormData={setFormData}
-                    categories={categories}
-                    editingProduct={editingProduct}
-                    handleSubmit={handleSubmit}
-                    generateSKU={generateSKU}
-                    hidePrices={hidePrices}
-                    key="create"
-                  />
-                </DialogContent>
-              </Dialog>
-            </div>
+        {/* Redesigned Control Section - Clean & Organized */}
+        <div className="bg-white/95 backdrop-blur-xl border border-slate-200/60 rounded-2xl shadow-xl mb-6 overflow-hidden">
+          {/* Top Row: Title + Product Count + Primary Actions */}
+          <div className="p-4 md:p-5 border-b border-slate-100">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              {/* Title & Count */}
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
+                  <Package className="w-5 h-5 md:w-6 md:h-6 text-white" />
+                </div>
+                <div>
+                  <h2 className="text-lg md:text-xl font-bold text-slate-900">جدول المنتجات</h2>
+                  <p className="text-xs md:text-sm text-slate-500">
+                    {filteredProducts.length} منتج {selectedCategory && selectedCategory !== 'all' ? 'في الفئة المحددة' : 'إجمالي'}
+                  </p>
+                </div>
+              </div>
 
-            {/* Mobile-Optimized Search */}
-            <div className="order-3 md:order-2">
-              <div className="relative">
-                <Search className="absolute right-3 top-3 h-4 w-4 md:h-5 md:w-5 text-primary" />
-                <Input
-                  placeholder="البحث بالاسم أو الكود..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pr-10 md:pr-12 h-10 md:h-12 bg-white/80 border-primary/20 focus:border-primary focus:ring-primary/20 shadow-md text-sm md:text-base"
-                  ref={searchInputRef}
-                />
+              {/* Primary Actions - Desktop */}
+              <div className="hidden md:flex items-center gap-3">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => { resetImportState(); setIsImportModalOpen(true); }}
+                  className="bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 shadow-sm"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  استيراد
+                </Button>
+                <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} modal={false}>
+                  <Button
+                    onClick={() => { resetForm(); setIsCreateModalOpen(true); }}
+                    className="bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg text-white font-medium px-5"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    إضافة منتج
+                  </Button>
+                  <DialogContent
+                    className="max-w-4xl max-h-[95vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-slate-200/50 shadow-2xl rounded-3xl"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <DialogHeader className="pb-6 border-b border-slate-200/50">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-r from-primary to-secondary rounded-2xl flex items-center justify-center shadow-lg">
+                          <Plus className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <DialogTitle className="text-3xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                            إضافة منتج جديد
+                          </DialogTitle>
+                          <DialogDescription className="text-lg text-slate-600 font-medium mt-1">
+                            أدخل تفاصيل المنتج الجديد وقم بإضافته إلى المتجر
+                          </DialogDescription>
+                        </div>
+                      </div>
+                    </DialogHeader>
+                    <ProductForm
+                      formData={formData}
+                      setFormData={setFormData}
+                      categories={categories}
+                      editingProduct={editingProduct}
+                      handleSubmit={handleSubmit}
+                      generateSKU={generateSKU}
+                      hidePrices={hidePrices}
+                      key="create"
+                    />
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
+          </div>
 
-            {/* Mobile-Responsive Controls */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 order-2 md:order-3">
-              <div className="flex-1 sm:w-32 md:w-48">
+          {/* Bottom Row: Filters & Search */}
+          <div className="p-4 md:p-5 bg-slate-50/50">
+            <div className="flex flex-col md:flex-row gap-3">
+              {/* Category Filter */}
+              <div className="w-full md:w-48">
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                  <SelectTrigger className="h-10 md:h-12 bg-white/80 border-slate-200 shadow-md text-sm md:text-base">
+                  <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm">
                     <SelectValue placeholder="جميع الفئات" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">جميع الفئات</SelectItem>
                     {categories.map(category => (
                       <SelectItem key={category.id} value={category.id}>
-                        {category.nameAr} ({category.productCount ?? 0})
+                        {category.nameAr}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              
+
+              {/* Search */}
+              <div className="flex-1 relative">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <Input
+                  placeholder="البحث بالاسم أو الكود..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pr-10 h-10 bg-white border-slate-200 shadow-sm"
+                  ref={searchInputRef}
+                />
+              </div>
+
+              {/* Per Page Selector */}
+              <div className="w-full md:w-28">
+                <Select value={String(itemsPerPage)} onValueChange={(val) => setItemsPerPage(Number(val))}>
+                  <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="10">10 / صفحة</SelectItem>
+                    <SelectItem value="25">25 / صفحة</SelectItem>
+                    <SelectItem value="50">50 / صفحة</SelectItem>
+                    <SelectItem value="100">100 / صفحة</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Export Button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-10 w-10 bg-white border-slate-200 shadow-sm hidden md:flex"
+                      onClick={() => {
+                        const data = filteredProducts.map(p => ({
+                          الاسم: p.nameAr,
+                          الكود: p.sku,
+                          السعر: p.price,
+                          الفئة: categories.find(c => c.id === p.category)?.nameAr || '',
+                          الحالة: p.isHidden ? 'مخفي' : 'ظاهر'
+                        }));
+                        const ws = XLSX.utils.json_to_sheet(data);
+                        const wb = XLSX.utils.book_new();
+                        XLSX.utils.book_append_sheet(wb, ws, 'Products');
+                        XLSX.writeFile(wb, 'products-export.xlsx');
+                      }}
+                    >
+                      <FileSpreadsheet className="w-4 h-4 text-slate-600" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>تصدير Excel</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
+            {/* Mobile Actions Row */}
+            <div className="flex md:hidden gap-2 mt-3">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { resetImportState(); setIsImportModalOpen(true); }}
+                className="flex-1 h-10 bg-white border-slate-200"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                استيراد
+              </Button>
+              <Button
+                onClick={() => { resetForm(); setIsCreateModalOpen(true); }}
+                className="flex-1 h-10 bg-gradient-to-r from-primary to-secondary text-white"
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                إضافة منتج
+              </Button>
             </div>
           </div>
         </div>
@@ -2247,7 +2315,7 @@ const AdminProducts = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Product Details Section */}
                   <div className="flex-1 p-4 flex flex-col justify-between">
                     {/* Top Row: Name, Price, and Status in same line */}
@@ -2258,7 +2326,7 @@ const AdminProducts = () => {
                           <p className="text-xs text-slate-500 font-mono">{product.sku}</p>
                         </div>
                       </div>
-                      
+
                       {/* Second Row: Price and Active Status with Featured Flag */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
@@ -2272,19 +2340,18 @@ const AdminProducts = () => {
                               مميز
                             </Badge>
                           )}
-                          <Badge 
+                          <Badge
                             variant={!product.isHidden ? "default" : "secondary"}
-                            className={`text-xs ${
-                              !product.isHidden 
-                                ? 'bg-green-500 hover:bg-green-600 text-white' 
+                            className={`text-xs ${!product.isHidden
+                                ? 'bg-green-500 hover:bg-green-600 text-white'
                                 : 'bg-slate-400 text-white'
-                            }`}
+                              }`}
                           >
                             {!product.isHidden ? 'نشط' : 'غير نشط'}
                           </Badge>
                         </div>
                       </div>
-                      
+
                       {/* Third Row: Category */}
                       <div className="flex items-center">
                         <Badge variant="secondary" className="text-xs">
@@ -2292,15 +2359,15 @@ const AdminProducts = () => {
                         </Badge>
                       </div>
                     </div>
-                    
+
                     {/* Bottom Row: All Action Buttons */}
                     <div className="flex items-center gap-1 mt-3">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const newProducts = products.map(p => 
-                            p.id === product.id 
+                          const newProducts = products.map(p =>
+                            p.id === product.id
                               ? { ...p, isHidden: !p.isHidden, updatedAt: new Date().toISOString() }
                               : p
                           );
@@ -2314,8 +2381,8 @@ const AdminProducts = () => {
                         size="sm"
                         variant="outline"
                         onClick={() => {
-                          const newProducts = products.map(p => 
-                            p.id === product.id 
+                          const newProducts = products.map(p =>
+                            p.id === product.id
                               ? { ...p, featured: !p.featured, updatedAt: new Date().toISOString() }
                               : p
                           );
@@ -2354,738 +2421,738 @@ const AdminProducts = () => {
         ) : (
           /* Desktop: Traditional Table Layout */
           <Card className="bg-white/90 backdrop-blur-xl border-slate-200/50 shadow-2xl rounded-xl md:rounded-2xl overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-slate-50 via-primary/5 to-secondary/5 border-b border-slate-200/50 p-4 md:p-6">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4">
-              <div className="flex items-center gap-3 md:gap-4">
-                <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-primary to-secondary rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg">
-                  <ShoppingBag className="w-5 h-5 md:w-6 md:h-6 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg md:text-2xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                    جدول المنتجات ({filteredProducts.length})
-                  </CardTitle>
-                  <CardDescription className="text-sm md:text-lg text-slate-600 font-medium">
-                    <span className="hidden sm:inline">
-                      عرض {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredProducts.length)} من أصل {filteredProducts.length} منتج
-                    </span>
-                    <span className="sm:hidden">
-                      {filteredProducts.length} منتج
-                    </span>
-                  </CardDescription>
-                </div>
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-4 w-full sm:w-auto">
-                <div className="flex items-center gap-2">
-                  <Label className="text-xs md:text-sm font-semibold text-slate-700 whitespace-nowrap">لكل صفحة:</Label>
-                  <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
-                    <SelectTrigger className="w-16 md:w-20 bg-white/80 border-slate-300 shadow-md text-xs md:text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5</SelectItem>
-                      <SelectItem value="10">10</SelectItem>
-                      <SelectItem value="20">20</SelectItem>
-                      <SelectItem value="50">50</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button
-                  variant="outline"
-                  onClick={handleExport}
-                  className="bg-gradient-to-r from-green-50 to-green-100 border-green-200 text-green-700 hover:from-green-100 hover:to-green-200 shadow-md"
-                >
-                  <FileSpreadsheet className="w-4 h-4 mr-2" />
-                  تصدير
-                </Button>
-              </div>
-            </div>
-          </CardHeader>
-
-          <CardContent className="p-6">
-            {selectedIds.size > 0 && (
-              <div className="sticky top-0 z-20 mb-6 p-4 rounded-2xl border-2 border-primary/20 bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/10 backdrop-blur-sm shadow-xl flex flex-wrap items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center shadow-lg">
-                    <span className="text-white text-sm font-bold">{selectedIds.size}</span>
+            <CardHeader className="bg-gradient-to-r from-slate-50 via-primary/5 to-secondary/5 border-b border-slate-200/50 p-4 md:p-6">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-primary to-secondary rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg">
+                    <ShoppingBag className="w-5 h-5 md:w-6 md:h-6 text-white" />
                   </div>
-                  <span className="text-lg font-bold text-primary">تم تحديد {selectedIds.size} منتج</span>
-                </div>
-                <Select value={bulkAction} onValueChange={(v: string) => setBulkAction(v === 'delete' ? 'delete' : v === 'change_category' ? 'change_category' : v === 'price_adjust' ? 'price_adjust' : 'none')}>
-                  <SelectTrigger className="w-48 bg-white/80 border-primary/20 shadow-md">
-                    <SelectValue placeholder="اختر إجراءً" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="delete">حذف</SelectItem>
-                    <SelectItem value="change_category">تغيير الفئة</SelectItem>
-                    <SelectItem value="price_adjust">تعديل السعر</SelectItem>
-                  </SelectContent>
-                </Select>
-
-                {bulkAction === 'change_category' && (
-                  <Select value={bulkListCategoryId} onValueChange={setBulkListCategoryId}>
-                    <SelectTrigger className="w-60 bg-white/80 border-slate-200 shadow-md">
-                      <SelectValue placeholder="اختر الفئة الجديدة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {categories.map((cat) => (
-                        <SelectItem key={String(cat.id)} value={String(cat.id)}>
-                          {cat.nameAr || cat.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                {bulkAction === 'price_adjust' && (
-                  <div className="flex items-center gap-2">
-                    <Select value={priceAdjustSign} onValueChange={(v) => setPriceAdjustSign(v as 'increase' | 'decrease')}>
-                      <SelectTrigger className="w-24">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="increase">زيادة</SelectItem>
-                        <SelectItem value="decrease">تخفيض</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={priceAdjustMode} onValueChange={(v) => setPriceAdjustMode(v as 'percent' | 'absolute')}>
-                      <SelectTrigger className="w-28">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="percent">٪ نسبة</SelectItem>
-                        <SelectItem value="absolute">قيمة ثابتة</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <div className="relative">
-                      <Input
-                        type="number"
-                        className="w-28 text-center pr-6"
-                        value={priceAdjustValue}
-                        onChange={(e) => setPriceAdjustValue(e.target.value)}
-                        placeholder={priceAdjustMode === 'percent' ? '10' : '5'}
-                        min={0}
-                        step={priceAdjustMode === 'percent' ? 1 : 0.5}
-                      />
-                      <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">
-                        {priceAdjustMode === 'percent' ? '%' : 'ج.م'}
+                  <div>
+                    <CardTitle className="text-lg md:text-2xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                      جدول المنتجات ({filteredProducts.length})
+                    </CardTitle>
+                    <CardDescription className="text-sm md:text-lg text-slate-600 font-medium">
+                      <span className="hidden sm:inline">
+                        عرض {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredProducts.length)} من أصل {filteredProducts.length} منتج
                       </span>
-                    </div>
+                      <span className="sm:hidden">
+                        {filteredProducts.length} منتج
+                      </span>
+                    </CardDescription>
                   </div>
-                )}
+                </div>
 
-                <Button
-                  onClick={() => bulkAction === 'delete' ? applyBulkDelete() : bulkAction === 'change_category' ? applyBulkChangeCategoryList() : applyBulkPriceAdjust()}
-                  disabled={isApplyingBulk || bulkAction === 'none' || (bulkAction === 'change_category' && !bulkListCategoryId)}
-                  className="bg-slate-900 hover:bg-slate-800"
-                >
-                  {isApplyingBulk ? (
-                    <span className="inline-flex items-center gap-2">
-                      <RefreshCw className="w-4 h-4 animate-spin" />
-                      جاري التنفيذ
-                    </span>
-                  ) : (
-                    'تنفيذ'
-                  )}
-                </Button>
-                <Button variant="outline" onClick={() => { setSelectedIds(new Set()); setBulkAction('none'); setBulkListCategoryId(''); }}>إلغاء التحديد</Button>
-              </div>
-            )}
-            {/* Mobile-Responsive Table Container */}
-            <div className="overflow-x-auto rounded-xl md:rounded-2xl border border-slate-200/50 shadow-lg">
-              <div className="min-w-[800px] md:min-w-0"> {/* Ensure minimum width for mobile horizontal scroll */}
-              <TooltipProvider>
-                <Table className={`table-zebra table-fixed bg-white/50 ${density === 'compact' ? 'density-compact' : 'density-comfortable'}`}>
-                  <TableHeader className="sticky-thead bg-gradient-to-r from-slate-100 via-primary/5 to-secondary/5">
-                  <TableRow className="border-b-2 border-slate-200/50">
-                    <TableHead className="w-12 text-center whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold"></TableHead>
-                    <TableHead className="w-10 text-center whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold">
-                      <input
-                        type="checkbox"
-                        aria-label="تحديد الكل"
-                        checked={paginatedProducts.length > 0 && paginatedProducts.every(p => selectedIds.has(String(p.id)))}
-                        onChange={toggleSelectAllOnPage}
-                        className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
-                      />
-                    </TableHead>
-                    <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                      style={{ width: columnWidths.image }}>
-                      <div className="flex items-center justify-center gap-2">
-                        <FileImage className="w-4 h-4 text-primary" />
-                        <span>صورة المنتج</span>
-                      </div>
-                      <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('image')} />
-                    </TableHead>
-                    <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                      style={{ width: columnWidths.name }}>
-                      <div className="flex items-center justify-center gap-2">
-                        <Package className="w-4 h-4 text-primary" />
-                        <span>اسم المنتج</span>
-                      </div>
-                      <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('name')} />
-                    </TableHead>
-                    <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                      style={{ width: columnWidths.sku }}>
-
-                      <div className="flex items-center justify-center gap-2">
-                        <Tag className="w-4 h-4 text-primary" />
-                        <span>الكود</span>
-                      </div>
-                      <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('sku')} />
-                    </TableHead>
-                    <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                      style={{ width: columnWidths.category }}>
-                      <div className="flex items-center justify-center gap-2">
-                        <FileText className="w-4 h-4 text-primary" />
-                        <span>الفئة</span>
-                      </div>
-                      <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('category')} />
-                    </TableHead>
-                    <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                      style={{ width: columnWidths.price }}>
-                      <div className="flex items-center justify-center gap-2">
-                        <DollarSign className="w-4 h-4 text-primary" />
-                        <span>السعر</span>
-                      </div>
-                      <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('price')} />
-                    </TableHead>
-                    <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                      style={{ width: columnWidths.visibility }}>
-                      <div className="flex items-center justify-center gap-2">
-                        <EyeOff className="w-4 h-4 text-primary" />
-                        <span>الظهور</span>
-                      </div>
-                      <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('visibility')} />
-                    </TableHead>
-                    <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                      style={{ width: columnWidths.status }}>
-                      <div className="flex items-center justify-center gap-2">
-                        <Clock className="w-4 h-4 text-primary" />
-                        <span>الحالة</span>
-                      </div>
-                      <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('status')} />
-                    </TableHead>
-                    <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                      style={{ width: columnWidths.actions }}>
-                      <span>الإجراءات</span>
-                      <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('actions')} />
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {paginatedProducts.map((product) => (
-                    <Fragment key={product.id}>
-                      {/* Enhanced Main Row */}
-                      <TableRow
-                        key={product.id}
-                        className={`hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 border-l-4 ${expandedRows.has(product.id) ? 'bg-gradient-to-r from-primary/5 to-secondary/5 border-l-primary shadow-md' : 'border-l-transparent hover:border-l-primary/30'}`}
-                      >
-                        <TableCell className="w-12">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleRowExpansion(product.id)}
-                            className="p-2 hover:bg-primary/10 rounded-xl transition-all duration-200 hover:shadow-md"
-                          >
-                            {expandedRows.has(product.id) ? (
-                              <ChevronDown className="w-4 h-4 text-primary" />
-                            ) : (
-                              <ChevronRight className="w-4 h-4 text-slate-600 hover:text-primary" />
-                            )}
-                          </Button>
-                        </TableCell>
-                        <TableCell className="w-10 text-center">
-                          <input
-                            type="checkbox"
-                            aria-label={`تحديد ${product.nameAr}`}
-                            checked={selectedIds.has(String(product.id))}
-                            onChange={() => toggleSelectOne(String(product.id))}
-                            className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
-                          />
-                        </TableCell>
-
-                        <TableCell className="text-center" style={{ width: columnWidths.image }}>
-                          <div className="relative inline-block group">
-                            <img
-                              src={optimizeImage(getProductPrimaryImage(product) || '', { w: 64 })}
-                              alt={product.nameAr}
-                              className="w-14 h-14 object-cover rounded-2xl border-2 border-slate-200 shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl cursor-zoom-in ring-2 ring-transparent group-hover:ring-blue-200"
-                              loading="lazy"
-                              decoding="async"
-                              srcSet={buildSrcSet(getProductPrimaryImage(product) || '', 64)}
-                              sizes="64px"
-                              onClick={() => {
-                                const src = getProductPrimaryImage(product);
-                                if (src) setImagePreview(src);
-                              }}
-                            />
-                            {product.featured && (
-                              <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
-                                <Star className="w-3 h-3 text-white" />
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-center" style={{ width: columnWidths.name }}>
-                          <div className="space-y-1">
-                            {editingField && editingField.id === product.id && editingField.field === 'name' ? (
-                              <Input
-                                autoFocus
-                                value={editingField.value}
-                                onChange={(e) => setEditingField({ ...editingField, value: e.target.value })}
-                                onBlur={commitInlineEdit}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') commitInlineEdit();
-                                  if (e.key === 'Escape') cancelInlineEdit();
-                                }}
-                                className="h-8 text-center"
-                              />
-                            ) : (
-                              <div
-                                className="group inline-flex items-center justify-center gap-1 cursor-text"
-                                onClick={() => startInlineEdit(product, 'name')}
-                                title="انقر للتعديل"
-                              >
-                                <p className="font-medium text-slate-900 whitespace-nowrap overflow-hidden text-ellipsis">
-                                  {product.nameAr || product.name}
-                                </p>
-                                <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </div>
-                            )}
-                            {product.tags && product.tags.length > 0 && (
-                              <div className="flex gap-1 justify-center">
-                                {product.tags.slice(0, 2).map((tag, index) => (
-                                  <Badge key={index} variant="secondary" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                                {product.tags.length > 2 && (
-                                  <Badge variant="secondary" className="text-xs">
-                                    +{product.tags.length - 2}
-                                  </Badge>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-center" style={{ width: columnWidths.sku }}>
-                          {editingField && editingField.id === product.id && editingField.field === 'sku' ? (
-                            <Input
-                              autoFocus
-                              value={editingField.value}
-                              onChange={(e) => setEditingField({ ...editingField, value: e.target.value })}
-                              onBlur={commitInlineEdit}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter') commitInlineEdit();
-                                if (e.key === 'Escape') cancelInlineEdit();
-                              }}
-                              className="h-8 text-center font-mono"
-                            />
-                          ) : (
-                            <div className="group inline-flex items-center justify-center gap-1 cursor-text" onClick={() => startInlineEdit(product, 'sku')} title="انقر للتعديل">
-                              <Badge variant="outline" className="font-mono">
-                                {product.sku}
-                              </Badge>
-                              <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </div>
-                          )}
-                        </TableCell>
-
-                        <TableCell className="text-center" style={{ width: columnWidths.category }}>
-                          <div className="space-y-1">
-                            {(() => {
-                              const cat = categories.find(c => String(c.id) === String(product.category) || c.slug === product.category);
-                              const displayName = cat ? (cat.nameAr || cat.name) : (product.categoryAr || '—');
-                              const displayCode = cat ? (cat.slug || String(cat.id)) : String(product.category || '');
-                              return (
-                                <>
-                                  <p className="text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis">{displayName}</p>
-                                  <p className="text-xs text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">{displayCode}</p>
-                                </>
-                              );
-                            })()}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-center" style={{ width: columnWidths.price }}>
-                          <div className="space-y-1">
-                            {editingField && editingField.id === product.id && editingField.field === 'price' ? (
-                              <Input
-                                autoFocus
-                                type="number"
-                                value={editingField.value}
-                                onChange={(e) => setEditingField({ ...editingField, value: e.target.value })}
-                                onBlur={commitInlineEdit}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') commitInlineEdit();
-                                  if (e.key === 'Escape') cancelInlineEdit();
-                                }}
-                                className="h-8 text-center"
-                              />
-                            ) : (
-                              <div className="group inline-flex items-center justify-center gap-1 cursor-text" onClick={() => startInlineEdit(product, 'price')} title="انقر للتعديل">
-                                <p className="font-medium text-green-600">{product.price.toLocaleString()} ج.م</p>
-                                <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </div>
-                            )}
-                            {product.originalPrice && (
-                              <p className="text-sm text-slate-500 line-through">
-                                {product.originalPrice.toLocaleString()} ج.م
-                              </p>
-                            )}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-center" style={{ width: columnWidths.visibility }}>
-                          <div className="flex items-center justify-center gap-2">
-                            <Checkbox
-                              id={`hidden-${product.id}`}
-                              checked={!!product.isHidden}
-                              onCheckedChange={(checked) => handleToggleVisibility(product.id, Boolean(checked))}
-                            />
-                            <Label htmlFor={`hidden-${product.id}`}>مخفي</Label>
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-center" style={{ width: columnWidths.status }}>
-                          <div className="flex items-center justify-center gap-2">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <span className={`dot ${product.isHidden ? 'dot-warning' : 'dot-success'}`} />
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                {product.isHidden ? 'هذا المنتج مخفي' : 'هذا المنتج ظاهر'}
-                              </TooltipContent>
-                            </Tooltip>
-                            <span className="text-sm">
-                              {product.isHidden ? 'مخفي' : 'ظاهر'}
-                            </span>
-                            {product.featured && (
-                              <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">
-                                مميز
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-
-                        <TableCell className="text-center" style={{ width: columnWidths.actions }}>
-                          <div className="flex items-center justify-center gap-1">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleEdit(product)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit className="w-3 h-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>تحرير</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDuplicate(product)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>نسخ</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => window.open(`/product/${product.id}`, '_blank')}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Eye className="w-3 h-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>عرض</TooltipContent>
-                            </Tooltip>
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleDelete(product.id)}
-                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </Button>
-                              </TooltipTrigger>
-                              <TooltipContent>حذف</TooltipContent>
-                            </Tooltip>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-
-                      {/* Expanded Row Details */}
-                      {expandedRows.has(product.id) && (
-                        <TableRow className="bg-primary/5">
-                          <TableCell colSpan={10} className="p-0">
-                            <div className="p-6 space-y-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {/* Product Details */}
-                                <div className="space-y-3">
-                                  <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                                    <FileText className="w-4 h-4" />
-                                    تفاصيل المنتج
-                                  </h4>
-                                  <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                      <span className="text-slate-600">الوصف:</span>
-                                      <span className="font-medium max-w-48 truncate">{product.description || product.descriptionAr || 'غير محدد'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-slate-600">الوزن:</span>
-                                      <span className="font-medium">{product.weight || 'غير محدد'}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-slate-600">منتج مميز:</span>
-                                      <Badge variant={product.featured ? "default" : "secondary"}>
-                                        {product.featured ? 'نعم' : 'لا'}
-                                      </Badge>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Timestamps */}
-                                <div className="space-y-3">
-                                  <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                                    <Clock className="w-4 h-4" />
-                                    التواريخ
-                                  </h4>
-                                  <div className="space-y-2 text-sm">
-                                    <div className="flex justify-between">
-                                      <span className="text-slate-600">تاريخ الإنشاء:</span>
-                                      <span className="font-medium">
-                                        {product.createdAt ? new Date(product.createdAt).toLocaleDateString('ar-EG-u-ca-gregory') : 'غير محدد'}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-slate-600">آخر تحديث:</span>
-                                      <span className="font-medium">
-                                        {product.updatedAt ? new Date(product.updatedAt).toLocaleDateString('ar-EG-u-ca-gregory') : 'غير محدد'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </div>
-
-                                {/* Additional Images */}
-                                <div className="space-y-3">
-                                  <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                                    <FileImage className="w-4 h-4" />
-                                    الصور الإضافية
-                                  </h4>
-                                  {product.images && product.images.length > 0 ? (
-                                    <div className="flex gap-2 flex-wrap">
-                                      {product.images.slice(0, 4).map((image, index) => (
-                                        <img
-                                          key={index}
-                                          src={optimizeImage(image || '', { w: 120 })}
-                                          alt={product.nameAr}
-                                          className="w-14 h-14 object-cover rounded-md border"
-                                          loading="lazy"
-                                          decoding="async"
-                                          srcSet={buildSrcSet(image || '', 120)}
-                                          sizes="120px"
-                                        />
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-slate-500">لا توجد صور إضافية</p>
-                                  )}
-                                </div>
-
-                                {/* Actions */}
-                                <div className="space-y-3">
-                                  <h4 className="font-semibold text-slate-900 flex items-center gap-2">
-                                    <Tag className="w-4 h-4" />
-                                    الوسوم
-                                  </h4>
-                                  {product.tags && product.tags.length > 0 ? (
-                                    <div className="flex gap-2 flex-wrap">
-                                      {product.tags.map((tag, index) => (
-                                        <Badge key={index} variant="secondary">
-                                          {tag}
-                                        </Badge>
-                                      ))}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-slate-500">لا توجد وسوم</p>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                    </Fragment>
-                  ))}
-                </TableBody>
-              </Table>
-              </TooltipProvider>
-              </div> {/* End min-width container */}
-            </div>
-
-            {/* Mobile-Responsive Pagination */}
-            {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 md:mt-6 pt-3 md:pt-4 border-t">
-                <div className="text-xs md:text-sm text-slate-600 flex flex-col sm:flex-row items-center gap-2 md:gap-3">
-                  <span className="text-center sm:text-left">
-                    صفحة {currentPage} من {totalPages} • إجمالي {filteredProducts.length} منتج
-                  </span>
-                  {/* Mobile-friendly per-page control */}
-                  <div className="flex items-center gap-1 md:gap-2">
-                    <span className="text-slate-600 text-xs md:text-sm whitespace-nowrap">لكل صفحة:</span>
-                    <Select
-                      value={String(itemsPerPage)}
-                      onValueChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }}
-                    >
-                      <SelectTrigger className="h-7 md:h-8 w-16 md:w-[88px] text-xs md:text-sm">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-4 w-full sm:w-auto">
+                  <div className="flex items-center gap-2">
+                    <Label className="text-xs md:text-sm font-semibold text-slate-700 whitespace-nowrap">لكل صفحة:</Label>
+                    <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+                      <SelectTrigger className="w-16 md:w-20 bg-white/80 border-slate-300 shadow-md text-xs md:text-sm">
                         <SelectValue />
                       </SelectTrigger>
-                      <SelectContent align="end">
+                      <SelectContent>
+                        <SelectItem value="5">5</SelectItem>
                         <SelectItem value="10">10</SelectItem>
                         <SelectItem value="20">20</SelectItem>
                         <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="100">100</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  <Button
+                    variant="outline"
+                    onClick={handleExport}
+                    className="bg-gradient-to-r from-green-50 to-green-100 border-green-200 text-green-700 hover:from-green-100 hover:to-green-200 shadow-md"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 mr-2" />
+                    تصدير
+                  </Button>
                 </div>
+              </div>
+            </CardHeader>
 
-                <div className="flex items-center gap-1 md:gap-2">
-                  {/* Mobile: Show only essential navigation */}
-                  <div className="flex sm:hidden items-center gap-1">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="h-8 px-2 text-xs"
-                    >
-                      السابق
-                    </Button>
-                    <span className="px-2 py-1 text-xs bg-primary/10 text-primary rounded">
-                      {currentPage}/{totalPages}
+            <CardContent className="p-6">
+              {selectedIds.size > 0 && (
+                <div className="sticky top-0 z-20 mb-6 p-4 rounded-2xl border-2 border-primary/20 bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/10 backdrop-blur-sm shadow-xl flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-full flex items-center justify-center shadow-lg">
+                      <span className="text-white text-sm font-bold">{selectedIds.size}</span>
+                    </div>
+                    <span className="text-lg font-bold text-primary">تم تحديد {selectedIds.size} منتج</span>
+                  </div>
+                  <Select value={bulkAction} onValueChange={(v: string) => setBulkAction(v === 'delete' ? 'delete' : v === 'change_category' ? 'change_category' : v === 'price_adjust' ? 'price_adjust' : 'none')}>
+                    <SelectTrigger className="w-48 bg-white/80 border-primary/20 shadow-md">
+                      <SelectValue placeholder="اختر إجراءً" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="delete">حذف</SelectItem>
+                      <SelectItem value="change_category">تغيير الفئة</SelectItem>
+                      <SelectItem value="price_adjust">تعديل السعر</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  {bulkAction === 'change_category' && (
+                    <Select value={bulkListCategoryId} onValueChange={setBulkListCategoryId}>
+                      <SelectTrigger className="w-60 bg-white/80 border-slate-200 shadow-md">
+                        <SelectValue placeholder="اختر الفئة الجديدة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map((cat) => (
+                          <SelectItem key={String(cat.id)} value={String(cat.id)}>
+                            {cat.nameAr || cat.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {bulkAction === 'price_adjust' && (
+                    <div className="flex items-center gap-2">
+                      <Select value={priceAdjustSign} onValueChange={(v) => setPriceAdjustSign(v as 'increase' | 'decrease')}>
+                        <SelectTrigger className="w-24">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="increase">زيادة</SelectItem>
+                          <SelectItem value="decrease">تخفيض</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={priceAdjustMode} onValueChange={(v) => setPriceAdjustMode(v as 'percent' | 'absolute')}>
+                        <SelectTrigger className="w-28">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percent">٪ نسبة</SelectItem>
+                          <SelectItem value="absolute">قيمة ثابتة</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <div className="relative">
+                        <Input
+                          type="number"
+                          className="w-28 text-center pr-6"
+                          value={priceAdjustValue}
+                          onChange={(e) => setPriceAdjustValue(e.target.value)}
+                          placeholder={priceAdjustMode === 'percent' ? '10' : '5'}
+                          min={0}
+                          step={priceAdjustMode === 'percent' ? 1 : 0.5}
+                        />
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-500">
+                          {priceAdjustMode === 'percent' ? '%' : 'ج.م'}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={() => bulkAction === 'delete' ? applyBulkDelete() : bulkAction === 'change_category' ? applyBulkChangeCategoryList() : applyBulkPriceAdjust()}
+                    disabled={isApplyingBulk || bulkAction === 'none' || (bulkAction === 'change_category' && !bulkListCategoryId)}
+                    className="bg-slate-900 hover:bg-slate-800"
+                  >
+                    {isApplyingBulk ? (
+                      <span className="inline-flex items-center gap-2">
+                        <RefreshCw className="w-4 h-4 animate-spin" />
+                        جاري التنفيذ
+                      </span>
+                    ) : (
+                      'تنفيذ'
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => { setSelectedIds(new Set()); setBulkAction('none'); setBulkListCategoryId(''); }}>إلغاء التحديد</Button>
+                </div>
+              )}
+              {/* Mobile-Responsive Table Container */}
+              <div className="overflow-x-auto rounded-xl md:rounded-2xl border border-slate-200/50 shadow-lg">
+                <div className="min-w-[800px] md:min-w-0"> {/* Ensure minimum width for mobile horizontal scroll */}
+                  <TooltipProvider>
+                    <Table className={`table-zebra table-fixed bg-white/50 ${density === 'compact' ? 'density-compact' : 'density-comfortable'}`}>
+                      <TableHeader className="sticky-thead bg-gradient-to-r from-slate-100 via-primary/5 to-secondary/5">
+                        <TableRow className="border-b-2 border-slate-200/50">
+                          <TableHead className="w-12 text-center whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold"></TableHead>
+                          <TableHead className="w-10 text-center whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold">
+                            <input
+                              type="checkbox"
+                              aria-label="تحديد الكل"
+                              checked={paginatedProducts.length > 0 && paginatedProducts.every(p => selectedIds.has(String(p.id)))}
+                              onChange={toggleSelectAllOnPage}
+                              className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
+                            />
+                          </TableHead>
+                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
+                            style={{ width: columnWidths.image }}>
+                            <div className="flex items-center justify-center gap-2">
+                              <FileImage className="w-4 h-4 text-primary" />
+                              <span>صورة المنتج</span>
+                            </div>
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('image')} />
+                          </TableHead>
+                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
+                            style={{ width: columnWidths.name }}>
+                            <div className="flex items-center justify-center gap-2">
+                              <Package className="w-4 h-4 text-primary" />
+                              <span>اسم المنتج</span>
+                            </div>
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('name')} />
+                          </TableHead>
+                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
+                            style={{ width: columnWidths.sku }}>
+
+                            <div className="flex items-center justify-center gap-2">
+                              <Tag className="w-4 h-4 text-primary" />
+                              <span>الكود</span>
+                            </div>
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('sku')} />
+                          </TableHead>
+                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
+                            style={{ width: columnWidths.category }}>
+                            <div className="flex items-center justify-center gap-2">
+                              <FileText className="w-4 h-4 text-primary" />
+                              <span>الفئة</span>
+                            </div>
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('category')} />
+                          </TableHead>
+                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
+                            style={{ width: columnWidths.price }}>
+                            <div className="flex items-center justify-center gap-2">
+                              <DollarSign className="w-4 h-4 text-primary" />
+                              <span>السعر</span>
+                            </div>
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('price')} />
+                          </TableHead>
+                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
+                            style={{ width: columnWidths.visibility }}>
+                            <div className="flex items-center justify-center gap-2">
+                              <EyeOff className="w-4 h-4 text-primary" />
+                              <span>الظهور</span>
+                            </div>
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('visibility')} />
+                          </TableHead>
+                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
+                            style={{ width: columnWidths.status }}>
+                            <div className="flex items-center justify-center gap-2">
+                              <Clock className="w-4 h-4 text-primary" />
+                              <span>الحالة</span>
+                            </div>
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('status')} />
+                          </TableHead>
+                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
+                            style={{ width: columnWidths.actions }}>
+                            <span>الإجراءات</span>
+                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('actions')} />
+                          </TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {paginatedProducts.map((product) => (
+                          <Fragment key={product.id}>
+                            {/* Enhanced Main Row */}
+                            <TableRow
+                              key={product.id}
+                              className={`hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 border-l-4 ${expandedRows.has(product.id) ? 'bg-gradient-to-r from-primary/5 to-secondary/5 border-l-primary shadow-md' : 'border-l-transparent hover:border-l-primary/30'}`}
+                            >
+                              <TableCell className="w-12">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => toggleRowExpansion(product.id)}
+                                  className="p-2 hover:bg-primary/10 rounded-xl transition-all duration-200 hover:shadow-md"
+                                >
+                                  {expandedRows.has(product.id) ? (
+                                    <ChevronDown className="w-4 h-4 text-primary" />
+                                  ) : (
+                                    <ChevronRight className="w-4 h-4 text-slate-600 hover:text-primary" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="w-10 text-center">
+                                <input
+                                  type="checkbox"
+                                  aria-label={`تحديد ${product.nameAr}`}
+                                  checked={selectedIds.has(String(product.id))}
+                                  onChange={() => toggleSelectOne(String(product.id))}
+                                  className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
+                                />
+                              </TableCell>
+
+                              <TableCell className="text-center" style={{ width: columnWidths.image }}>
+                                <div className="relative inline-block group">
+                                  <img
+                                    src={optimizeImage(getProductPrimaryImage(product) || '', { w: 64 })}
+                                    alt={product.nameAr}
+                                    className="w-14 h-14 object-cover rounded-2xl border-2 border-slate-200 shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl cursor-zoom-in ring-2 ring-transparent group-hover:ring-blue-200"
+                                    loading="lazy"
+                                    decoding="async"
+                                    srcSet={buildSrcSet(getProductPrimaryImage(product) || '', 64)}
+                                    sizes="64px"
+                                    onClick={() => {
+                                      const src = getProductPrimaryImage(product);
+                                      if (src) setImagePreview(src);
+                                    }}
+                                  />
+                                  {product.featured && (
+                                    <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
+                                      <Star className="w-3 h-3 text-white" />
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+
+                              <TableCell className="text-center" style={{ width: columnWidths.name }}>
+                                <div className="space-y-1">
+                                  {editingField && editingField.id === product.id && editingField.field === 'name' ? (
+                                    <Input
+                                      autoFocus
+                                      value={editingField.value}
+                                      onChange={(e) => setEditingField({ ...editingField, value: e.target.value })}
+                                      onBlur={commitInlineEdit}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') commitInlineEdit();
+                                        if (e.key === 'Escape') cancelInlineEdit();
+                                      }}
+                                      className="h-8 text-center"
+                                    />
+                                  ) : (
+                                    <div
+                                      className="group inline-flex items-center justify-center gap-1 cursor-text"
+                                      onClick={() => startInlineEdit(product, 'name')}
+                                      title="انقر للتعديل"
+                                    >
+                                      <p className="font-medium text-slate-900 whitespace-nowrap overflow-hidden text-ellipsis">
+                                        {product.nameAr || product.name}
+                                      </p>
+                                      <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  )}
+                                  {product.tags && product.tags.length > 0 && (
+                                    <div className="flex gap-1 justify-center">
+                                      {product.tags.slice(0, 2).map((tag, index) => (
+                                        <Badge key={index} variant="secondary" className="text-xs">
+                                          {tag}
+                                        </Badge>
+                                      ))}
+                                      {product.tags.length > 2 && (
+                                        <Badge variant="secondary" className="text-xs">
+                                          +{product.tags.length - 2}
+                                        </Badge>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </TableCell>
+
+                              <TableCell className="text-center" style={{ width: columnWidths.sku }}>
+                                {editingField && editingField.id === product.id && editingField.field === 'sku' ? (
+                                  <Input
+                                    autoFocus
+                                    value={editingField.value}
+                                    onChange={(e) => setEditingField({ ...editingField, value: e.target.value })}
+                                    onBlur={commitInlineEdit}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') commitInlineEdit();
+                                      if (e.key === 'Escape') cancelInlineEdit();
+                                    }}
+                                    className="h-8 text-center font-mono"
+                                  />
+                                ) : (
+                                  <div className="group inline-flex items-center justify-center gap-1 cursor-text" onClick={() => startInlineEdit(product, 'sku')} title="انقر للتعديل">
+                                    <Badge variant="outline" className="font-mono">
+                                      {product.sku}
+                                    </Badge>
+                                    <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                )}
+                              </TableCell>
+
+                              <TableCell className="text-center" style={{ width: columnWidths.category }}>
+                                <div className="space-y-1">
+                                  {(() => {
+                                    const cat = categories.find(c => String(c.id) === String(product.category) || c.slug === product.category);
+                                    const displayName = cat ? (cat.nameAr || cat.name) : (product.categoryAr || '—');
+                                    const displayCode = cat ? (cat.slug || String(cat.id)) : String(product.category || '');
+                                    return (
+                                      <>
+                                        <p className="text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis">{displayName}</p>
+                                        <p className="text-xs text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">{displayCode}</p>
+                                      </>
+                                    );
+                                  })()}
+                                </div>
+                              </TableCell>
+
+                              <TableCell className="text-center" style={{ width: columnWidths.price }}>
+                                <div className="space-y-1">
+                                  {editingField && editingField.id === product.id && editingField.field === 'price' ? (
+                                    <Input
+                                      autoFocus
+                                      type="number"
+                                      value={editingField.value}
+                                      onChange={(e) => setEditingField({ ...editingField, value: e.target.value })}
+                                      onBlur={commitInlineEdit}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') commitInlineEdit();
+                                        if (e.key === 'Escape') cancelInlineEdit();
+                                      }}
+                                      className="h-8 text-center"
+                                    />
+                                  ) : (
+                                    <div className="group inline-flex items-center justify-center gap-1 cursor-text" onClick={() => startInlineEdit(product, 'price')} title="انقر للتعديل">
+                                      <p className="font-medium text-green-600">{product.price.toLocaleString()} ج.م</p>
+                                      <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  )}
+                                  {product.originalPrice && (
+                                    <p className="text-sm text-slate-500 line-through">
+                                      {product.originalPrice.toLocaleString()} ج.م
+                                    </p>
+                                  )}
+                                </div>
+                              </TableCell>
+
+                              <TableCell className="text-center" style={{ width: columnWidths.visibility }}>
+                                <div className="flex items-center justify-center gap-2">
+                                  <Checkbox
+                                    id={`hidden-${product.id}`}
+                                    checked={!!product.isHidden}
+                                    onCheckedChange={(checked) => handleToggleVisibility(product.id, Boolean(checked))}
+                                  />
+                                  <Label htmlFor={`hidden-${product.id}`}>مخفي</Label>
+                                </div>
+                              </TableCell>
+
+                              <TableCell className="text-center" style={{ width: columnWidths.status }}>
+                                <div className="flex items-center justify-center gap-2">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className={`dot ${product.isHidden ? 'dot-warning' : 'dot-success'}`} />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      {product.isHidden ? 'هذا المنتج مخفي' : 'هذا المنتج ظاهر'}
+                                    </TooltipContent>
+                                  </Tooltip>
+                                  <span className="text-sm">
+                                    {product.isHidden ? 'مخفي' : 'ظاهر'}
+                                  </span>
+                                  {product.featured && (
+                                    <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">
+                                      مميز
+                                    </Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+
+                              <TableCell className="text-center" style={{ width: columnWidths.actions }}>
+                                <div className="flex items-center justify-center gap-1">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleEdit(product)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Edit className="w-3 h-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>تحرير</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleDuplicate(product)}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Copy className="w-3 h-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>نسخ</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => window.open(`/product/${product.id}`, '_blank')}
+                                        className="h-8 w-8 p-0"
+                                      >
+                                        <Eye className="w-3 h-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>عرض</TooltipContent>
+                                  </Tooltip>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleDelete(product.id)}
+                                        className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+                                      >
+                                        <Trash2 className="w-3 h-3" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>حذف</TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Expanded Row Details */}
+                            {expandedRows.has(product.id) && (
+                              <TableRow className="bg-primary/5">
+                                <TableCell colSpan={10} className="p-0">
+                                  <div className="p-6 space-y-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                      {/* Product Details */}
+                                      <div className="space-y-3">
+                                        <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                                          <FileText className="w-4 h-4" />
+                                          تفاصيل المنتج
+                                        </h4>
+                                        <div className="space-y-2 text-sm">
+                                          <div className="flex justify-between">
+                                            <span className="text-slate-600">الوصف:</span>
+                                            <span className="font-medium max-w-48 truncate">{product.description || product.descriptionAr || 'غير محدد'}</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-slate-600">الوزن:</span>
+                                            <span className="font-medium">{product.weight || 'غير محدد'}</span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-slate-600">منتج مميز:</span>
+                                            <Badge variant={product.featured ? "default" : "secondary"}>
+                                              {product.featured ? 'نعم' : 'لا'}
+                                            </Badge>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Timestamps */}
+                                      <div className="space-y-3">
+                                        <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                                          <Clock className="w-4 h-4" />
+                                          التواريخ
+                                        </h4>
+                                        <div className="space-y-2 text-sm">
+                                          <div className="flex justify-between">
+                                            <span className="text-slate-600">تاريخ الإنشاء:</span>
+                                            <span className="font-medium">
+                                              {product.createdAt ? new Date(product.createdAt).toLocaleDateString('ar-EG-u-ca-gregory') : 'غير محدد'}
+                                            </span>
+                                          </div>
+                                          <div className="flex justify-between">
+                                            <span className="text-slate-600">آخر تحديث:</span>
+                                            <span className="font-medium">
+                                              {product.updatedAt ? new Date(product.updatedAt).toLocaleDateString('ar-EG-u-ca-gregory') : 'غير محدد'}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Additional Images */}
+                                      <div className="space-y-3">
+                                        <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                                          <FileImage className="w-4 h-4" />
+                                          الصور الإضافية
+                                        </h4>
+                                        {product.images && product.images.length > 0 ? (
+                                          <div className="flex gap-2 flex-wrap">
+                                            {product.images.slice(0, 4).map((image, index) => (
+                                              <img
+                                                key={index}
+                                                src={optimizeImage(image || '', { w: 120 })}
+                                                alt={product.nameAr}
+                                                className="w-14 h-14 object-cover rounded-md border"
+                                                loading="lazy"
+                                                decoding="async"
+                                                srcSet={buildSrcSet(image || '', 120)}
+                                                sizes="120px"
+                                              />
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-slate-500">لا توجد صور إضافية</p>
+                                        )}
+                                      </div>
+
+                                      {/* Actions */}
+                                      <div className="space-y-3">
+                                        <h4 className="font-semibold text-slate-900 flex items-center gap-2">
+                                          <Tag className="w-4 h-4" />
+                                          الوسوم
+                                        </h4>
+                                        {product.tags && product.tags.length > 0 ? (
+                                          <div className="flex gap-2 flex-wrap">
+                                            {product.tags.map((tag, index) => (
+                                              <Badge key={index} variant="secondary">
+                                                {tag}
+                                              </Badge>
+                                            ))}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-slate-500">لا توجد وسوم</p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </Fragment>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TooltipProvider>
+                </div> {/* End min-width container */}
+              </div>
+
+              {/* Mobile-Responsive Pagination */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 md:mt-6 pt-3 md:pt-4 border-t">
+                  <div className="text-xs md:text-sm text-slate-600 flex flex-col sm:flex-row items-center gap-2 md:gap-3">
+                    <span className="text-center sm:text-left">
+                      صفحة {currentPage} من {totalPages} • إجمالي {filteredProducts.length} منتج
                     </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className="h-8 px-2 text-xs"
-                    >
-                      التالي
-                    </Button>
+                    {/* Mobile-friendly per-page control */}
+                    <div className="flex items-center gap-1 md:gap-2">
+                      <span className="text-slate-600 text-xs md:text-sm whitespace-nowrap">لكل صفحة:</span>
+                      <Select
+                        value={String(itemsPerPage)}
+                        onValueChange={(val) => { setItemsPerPage(Number(val)); setCurrentPage(1); }}
+                      >
+                        <SelectTrigger className="h-7 md:h-8 w-16 md:w-[88px] text-xs md:text-sm">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent align="end">
+                          <SelectItem value="10">10</SelectItem>
+                          <SelectItem value="20">20</SelectItem>
+                          <SelectItem value="50">50</SelectItem>
+                          <SelectItem value="100">100</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
 
-                  {/* Desktop: Full pagination controls */}
-                  <div className="hidden sm:flex items-center gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(1)}
-                      disabled={currentPage === 1}
-                      className="text-xs md:text-sm"
-                    >
-                      الأولى
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className="text-xs md:text-sm"
-                    >
-                      السابق
-                    </Button>
-
-                    {/* Page Numbers - Responsive */}
-                    <div className="flex gap-1">
-                      {Array.from({ length: Math.min(window.innerWidth < 640 ? 3 : 5, totalPages) }, (_, i) => {
-                        let pageNum;
-                        const maxVisible = window.innerWidth < 640 ? 3 : 5;
-                        if (totalPages <= maxVisible) {
-                          pageNum = i + 1;
-                        } else if (currentPage <= Math.floor(maxVisible/2) + 1) {
-                          pageNum = i + 1;
-                        } else if (currentPage >= totalPages - Math.floor(maxVisible/2)) {
-                          pageNum = totalPages - maxVisible + 1 + i;
-                        } else {
-                          pageNum = currentPage - Math.floor(maxVisible/2) + i;
-                        }
-
-                        return (
-                          <Button
-                            key={pageNum}
-                            variant={currentPage === pageNum ? "default" : "outline"}
-                            size="sm"
-                            onClick={() => setCurrentPage(pageNum)}
-                            className="w-7 h-7 md:w-8 md:h-8 p-0 text-xs md:text-sm"
-                          >
-                            {pageNum}
-                          </Button>
-                        );
-                      })}
+                  <div className="flex items-center gap-1 md:gap-2">
+                    {/* Mobile: Show only essential navigation */}
+                    <div className="flex sm:hidden items-center gap-1">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="h-8 px-2 text-xs"
+                      >
+                        السابق
+                      </Button>
+                      <span className="px-2 py-1 text-xs bg-primary/10 text-primary rounded">
+                        {currentPage}/{totalPages}
+                      </span>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="h-8 px-2 text-xs"
+                      >
+                        التالي
+                      </Button>
                     </div>
 
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className="text-xs md:text-sm"
-                    >
-                      التالي
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(totalPages)}
-                      disabled={currentPage === totalPages}
-                      className="text-xs md:text-sm"
-                    >
-                      الأخيرة
-                    </Button>
+                    {/* Desktop: Full pagination controls */}
+                    <div className="hidden sm:flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(1)}
+                        disabled={currentPage === 1}
+                        className="text-xs md:text-sm"
+                      >
+                        الأولى
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(currentPage - 1)}
+                        disabled={currentPage === 1}
+                        className="text-xs md:text-sm"
+                      >
+                        السابق
+                      </Button>
+
+                      {/* Page Numbers - Responsive */}
+                      <div className="flex gap-1">
+                        {Array.from({ length: Math.min(window.innerWidth < 640 ? 3 : 5, totalPages) }, (_, i) => {
+                          let pageNum;
+                          const maxVisible = window.innerWidth < 640 ? 3 : 5;
+                          if (totalPages <= maxVisible) {
+                            pageNum = i + 1;
+                          } else if (currentPage <= Math.floor(maxVisible / 2) + 1) {
+                            pageNum = i + 1;
+                          } else if (currentPage >= totalPages - Math.floor(maxVisible / 2)) {
+                            pageNum = totalPages - maxVisible + 1 + i;
+                          } else {
+                            pageNum = currentPage - Math.floor(maxVisible / 2) + i;
+                          }
+
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(pageNum)}
+                              className="w-7 h-7 md:w-8 md:h-8 p-0 text-xs md:text-sm"
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        })}
+                      </div>
+
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(currentPage + 1)}
+                        disabled={currentPage === totalPages}
+                        className="text-xs md:text-sm"
+                      >
+                        التالي
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(totalPages)}
+                        disabled={currentPage === totalPages}
+                        className="text-xs md:text-sm"
+                      >
+                        الأخيرة
+                      </Button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Empty State */}
-            {filteredProducts.length === 0 && (
-              <div className="text-center py-12">
-                <ShoppingBag className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-slate-600 mb-2">لا توجد منتجات</h3>
-                <p className="text-slate-500 mb-4">
-                  {searchTerm || selectedCategory !== 'all'
-                    ? 'لم يتم العثور على منتجات تطابق البحث أو الفلتر المحدد'
-                    : 'لم يتم إضافة أي منتجات بعد'
-                  }
-                </p>
-                {!searchTerm && selectedCategory === 'all' && (
-                  <Button onClick={() => {resetForm(); setIsCreateModalOpen(true);}}>
-                    <Plus className="w-4 h-4 mr-2" />
-                    إضافة أول منتج
-                  </Button>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              {/* Empty State */}
+              {filteredProducts.length === 0 && (
+                <div className="text-center py-12">
+                  <ShoppingBag className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-lg font-medium text-slate-600 mb-2">لا توجد منتجات</h3>
+                  <p className="text-slate-500 mb-4">
+                    {searchTerm || selectedCategory !== 'all'
+                      ? 'لم يتم العثور على منتجات تطابق البحث أو الفلتر المحدد'
+                      : 'لم يتم إضافة أي منتجات بعد'
+                    }
+                  </p>
+                  {!searchTerm && selectedCategory === 'all' && (
+                    <Button onClick={() => { resetForm(); setIsCreateModalOpen(true); }}>
+                      <Plus className="w-4 h-4 mr-2" />
+                      إضافة أول منتج
+                    </Button>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         )}
 
         {/* Mobile-Responsive Sticky bulk action footer */}
@@ -3102,7 +3169,7 @@ const AdminProducts = () => {
                   onClick={applyBulkDelete}
                   className="gap-1 md:gap-2 flex-1 sm:flex-none text-xs md:text-sm"
                 >
-                  <Trash2 className="w-3 h-3 md:w-4 md:h-4" /> 
+                  <Trash2 className="w-3 h-3 md:w-4 md:h-4" />
                   <span className="hidden sm:inline">حذف المحدد</span>
                   <span className="sm:hidden">حذف</span>
                 </Button>
@@ -3136,7 +3203,7 @@ const AdminProducts = () => {
                 تأكيد حذف المنتج
               </DialogTitle>
               <DialogDescription className="text-lg text-slate-600 font-medium leading-relaxed">
-                هل أنت متأكد من حذف هذا المنتج؟<br/>
+                هل أنت متأكد من حذف هذا المنتج؟<br />
                 <span className="text-red-600 font-bold">لا يمكن التراجع عن هذه العملية!</span>
               </DialogDescription>
             </DialogHeader>
@@ -3146,8 +3213,8 @@ const AdminProducts = () => {
                 <div className="bg-gradient-to-r from-slate-50/80 to-primary/5 backdrop-blur-sm rounded-2xl p-4 border border-slate-200/50">
                   <div className="flex items-center gap-4">
                     {deleteConfirmModal.product.image && (
-                      <img 
-                        src={optimizeImage(deleteConfirmModal.product.image || '', { w: 64 })} 
+                      <img
+                        src={optimizeImage(deleteConfirmModal.product.image || '', { w: 64 })}
                         alt={deleteConfirmModal.product.nameAr}
                         className="w-16 h-16 object-cover rounded-xl border-2 border-slate-200 shadow-md"
                         loading="lazy"
@@ -3204,8 +3271,8 @@ const AdminProducts = () => {
 
         {/* Edit Modal */}
         <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen} modal={false}>
-          <DialogContent 
-            className="max-w-4xl max-h-[95vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-slate-200/50 shadow-2xl rounded-3xl" 
+          <DialogContent
+            className="max-w-4xl max-h-[95vh] overflow-y-auto bg-white/95 backdrop-blur-xl border border-slate-200/50 shadow-2xl rounded-3xl"
             onOpenAutoFocus={(e) => e.preventDefault()}
           >
             <DialogHeader className="pb-6 border-b border-slate-200/50">
@@ -3750,60 +3817,60 @@ const AdminProducts = () => {
                           </div>
                         ) : (
                           <div className="max-h-64 overflow-y-auto border rounded-lg">
-                          <Table>
-                            <TableHeader>
-                              <TableRow>
-                                <TableHead>اسم المنتج</TableHead>
-                                <TableHead>الكود</TableHead>
-                                <TableHead>السعر القديم</TableHead>
-                                <TableHead>السعر الجديد</TableHead>
-                                <TableHead>التغيير</TableHead>
-                                <TableHead className="w-20 text-center">إزالة</TableHead>
-                              </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                              {changedOnly.map((row, index) => {
-                                const { item, idx, oldPrice, incomingPrice } = row;
-                                const delta = (incomingPrice ?? 0) - (oldPrice ?? 0);
-                                const percent = oldPrice && oldPrice !== 0 ? (delta / oldPrice) * 100 : 0;
-                                const isIncrease = delta > 0;
-                                const badgeClass = isIncrease ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700';
-                                const sign = isIncrease ? '+' : '';
-                                return (
-                                  <TableRow key={idx}>
-                                    <TableCell>{item.nameAr || item.name || 'غير محدد'}</TableCell>
-                                    <TableCell>{item.sku || 'غير محدد'}</TableCell>
-                                    <TableCell>{oldPrice ?? '-'} ج.م</TableCell>
-                                    <TableCell>{Number.isFinite(incomingPrice) ? incomingPrice : '-'} ج.م</TableCell>
-                                    <TableCell>
-                                      <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${badgeClass}`}>
-                                        {sign}{delta.toFixed(2)} ج.م ({sign}{percent.toFixed(1)}%)
-                                      </span>
-                                    </TableCell>
-                                    <TableCell className="text-center">
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="icon"
-                                        className="rounded-full hover:bg-red-50 hover:text-red-600 border-red-200/60"
-                                        onClick={() => setImportPreview(prev => prev.filter((_, i) => i !== idx))}
-                                        aria-label="حذف الصف"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </Button>
-                                    </TableCell>
-                                  </TableRow>
-                                );
-                              })}
-                            </TableBody>
-                          </Table>
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>اسم المنتج</TableHead>
+                                  <TableHead>الكود</TableHead>
+                                  <TableHead>السعر القديم</TableHead>
+                                  <TableHead>السعر الجديد</TableHead>
+                                  <TableHead>التغيير</TableHead>
+                                  <TableHead className="w-20 text-center">إزالة</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {changedOnly.map((row, index) => {
+                                  const { item, idx, oldPrice, incomingPrice } = row;
+                                  const delta = (incomingPrice ?? 0) - (oldPrice ?? 0);
+                                  const percent = oldPrice && oldPrice !== 0 ? (delta / oldPrice) * 100 : 0;
+                                  const isIncrease = delta > 0;
+                                  const badgeClass = isIncrease ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700';
+                                  const sign = isIncrease ? '+' : '';
+                                  return (
+                                    <TableRow key={idx}>
+                                      <TableCell>{item.nameAr || item.name || 'غير محدد'}</TableCell>
+                                      <TableCell>{item.sku || 'غير محدد'}</TableCell>
+                                      <TableCell>{oldPrice ?? '-'} ج.م</TableCell>
+                                      <TableCell>{Number.isFinite(incomingPrice) ? incomingPrice : '-'} ج.م</TableCell>
+                                      <TableCell>
+                                        <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${badgeClass}`}>
+                                          {sign}{delta.toFixed(2)} ج.م ({sign}{percent.toFixed(1)}%)
+                                        </span>
+                                      </TableCell>
+                                      <TableCell className="text-center">
+                                        <Button
+                                          type="button"
+                                          variant="outline"
+                                          size="icon"
+                                          className="rounded-full hover:bg-red-50 hover:text-red-600 border-red-200/60"
+                                          onClick={() => setImportPreview(prev => prev.filter((_, i) => i !== idx))}
+                                          aria-label="حذف الصف"
+                                        >
+                                          <Trash2 className="w-4 h-4" />
+                                        </Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
                           </div>
                         )}
                       </>
                     );
                   })()}
                 </div>
-                
+
                 <div className="flex gap-2">
                   <Button onClick={() => setImportStep('mapping')} variant="outline">
                     رجوع
@@ -3829,19 +3896,19 @@ const AdminProducts = () => {
           </DialogContent>
         </Dialog>
       </div>
-        <Dialog open={!!imagePreview} onOpenChange={(open) => { if (!open) setImagePreview(null); }}>
-          <DialogContent className="max-w-[92vw] md:max-w-4xl p-2">
-            <DialogHeader>
-              <VisuallyHidden>
-                <DialogTitle>معاينة الصورة</DialogTitle>
-              </VisuallyHidden>
-            </DialogHeader>
-            <div className="w-full h-full flex items-center justify-center">
-              <img src={imagePreview ?? ''} alt="معاينة الصورة" className="max-h-[85vh] w-auto object-contain rounded-md" />
-            </div>
-          </DialogContent>
-        </Dialog>
-      </AdminLayout>
+      <Dialog open={!!imagePreview} onOpenChange={(open) => { if (!open) setImagePreview(null); }}>
+        <DialogContent className="max-w-[92vw] md:max-w-4xl p-2">
+          <DialogHeader>
+            <VisuallyHidden>
+              <DialogTitle>معاينة الصورة</DialogTitle>
+            </VisuallyHidden>
+          </DialogHeader>
+          <div className="w-full h-full flex items-center justify-center">
+            <img src={imagePreview ?? ''} alt="معاينة الصورة" className="max-h-[85vh] w-auto object-contain rounded-md" />
+          </div>
+        </DialogContent>
+      </Dialog>
+    </AdminLayout>
   );
 };
 
