@@ -406,22 +406,24 @@ const MobileProductDetail = ({
           </Button>
         </div>
 
-        {/* Price and Discount - Always show price */}
-        <div className="flex items-center gap-3">
-          <span className="text-2xl font-bold text-primary">
-            {product.price.toLocaleString()} ج.م
-          </span>
-          {product.originalPrice && product.originalPrice > product.price && (
-            <span className="text-lg text-slate-500 line-through">
-              {product.originalPrice.toLocaleString()} ج.م
+        {/* Price and Discount - Only show when hidePrices is false */}
+        {!hidePrices && (
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-bold text-primary">
+              {product.price.toLocaleString()} ج.م
             </span>
-          )}
-          {discountPercentage > 0 && (
-            <Badge className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-2 py-1 text-sm font-bold">
-              -{discountPercentage}%
-            </Badge>
-          )}
-        </div>
+            {product.originalPrice && product.originalPrice > product.price && (
+              <span className="text-lg text-slate-500 line-through">
+                {product.originalPrice.toLocaleString()} ج.م
+              </span>
+            )}
+            {discountPercentage > 0 && (
+              <Badge className="bg-gradient-to-r from-red-500 to-pink-600 text-white px-2 py-1 text-sm font-bold">
+                -{discountPercentage}%
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* Action Hub - Completely redesigned for better integration */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -440,92 +442,94 @@ const MobileProductDetail = ({
           )}
         </div>
 
-        {/* Price and Quantity - Always show */}
-        <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-          {/* Price Summary */}
-          <div className="p-4 border-b border-slate-200">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-slate-600">السعر</span>
-              <div className="text-right">
-                <div className="text-xl font-bold text-primary">
-                  {product.price.toLocaleString()} ج.م
+        {/* Price and Quantity - Only show when hidePrices is false */}
+        {!hidePrices && (
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+            {/* Price Summary */}
+            <div className="p-4 border-b border-slate-200">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm text-slate-600">السعر</span>
+                <div className="text-right">
+                  <div className="text-xl font-bold text-primary">
+                    {product.price.toLocaleString()} ج.م
+                  </div>
+                  {product.originalPrice && product.originalPrice > product.price && (
+                    <div className="text-sm text-slate-500 line-through">
+                      {product.originalPrice.toLocaleString()} ج.م
+                    </div>
+                  )}
                 </div>
-                {product.originalPrice && product.originalPrice > product.price && (
-                  <div className="text-sm text-slate-500 line-through">
-                    {product.originalPrice.toLocaleString()} ج.م
-                  </div>
-                )}
               </div>
+
+              {product.originalPrice && product.originalPrice > product.price && (
+                <div className="flex items-center justify-between bg-green-50 p-2 rounded-lg">
+                  <span className="text-sm font-medium text-green-700">توفير</span>
+                  <span className="text-sm font-bold text-green-700">
+                    {(product.originalPrice - product.price).toLocaleString()} ج.م
+                  </span>
+                </div>
+              )}
             </div>
 
-            {product.originalPrice && product.originalPrice > product.price && (
-              <div className="flex items-center justify-between bg-green-50 p-2 rounded-lg">
-                <span className="text-sm font-medium text-green-700">توفير</span>
-                <span className="text-sm font-bold text-green-700">
-                  {(product.originalPrice - product.price).toLocaleString()} ج.م
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Quantity Selector and Add to Cart Button */}
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-base font-semibold text-slate-900">الكمية</span>
-            </div>
-
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex items-center border-2 border-slate-300 rounded-lg overflow-hidden">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-10 h-10"
-                  onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  disabled={quantity <= 1}
-                >
-                  <Minus className="w-4 h-4" />
-                </Button>
-                <span className="w-12 text-center font-bold text-lg">{quantity}</span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="w-10 h-10"
-                  onClick={() => setQuantity(quantity + 1)}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
+            {/* Quantity Selector and Add to Cart Button */}
+            <div className="p-4">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-base font-semibold text-slate-900">الكمية</span>
               </div>
 
-              <Button
-                onClick={handleAddToCart}
-                disabled={addingToCart}
-                className={cn(
-                  "flex-1 py-3 rounded-lg font-bold text-base",
-                  inCart
-                    ? "bg-green-500 hover:bg-green-600"
-                    : "bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary"
-                )}
-              >
-                {addingToCart ? (
-                  <div className="flex items-center justify-center">
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                    جاري الإضافة...
-                  </div>
-                ) : inCart ? (
-                  <>
-                    <CheckCircle className="w-5 h-5 ml-2" />
-                    في السلة
-                  </>
-                ) : (
-                  <>
-                    <ShoppingCart className="w-5 h-5 ml-2" />
-                    أضف للسلة
-                  </>
-                )}
-              </Button>
+              <div className="flex flex-col sm:flex-row gap-4">
+                <div className="flex items-center border-2 border-slate-300 rounded-lg overflow-hidden">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="w-10 h-10"
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1}
+                  >
+                    <Minus className="w-4 h-4" />
+                  </Button>
+                  <span className="w-12 text-center font-bold text-lg">{quantity}</span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="w-10 h-10"
+                    onClick={() => setQuantity(quantity + 1)}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                <Button
+                  onClick={handleAddToCart}
+                  disabled={addingToCart}
+                  className={cn(
+                    "flex-1 py-3 rounded-lg font-bold text-base",
+                    inCart
+                      ? "bg-green-500 hover:bg-green-600"
+                      : "bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary"
+                  )}
+                >
+                  {addingToCart ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      جاري الإضافة...
+                    </div>
+                  ) : inCart ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 ml-2" />
+                      في السلة
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-5 h-5 ml-2" />
+                      أضف للسلة
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
 
         {/* Tabs - Keeping the existing tabs for التفاصيل والتقييمات */}
@@ -948,92 +952,94 @@ const DesktopProductDetail = ({
               </div>
             )}
 
-            {/* Price and Quantity - Always show */}
-            <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
-              {/* Price Summary */}
-              <div className="p-4 border-b border-slate-200">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-base text-slate-600">السعر</span>
-                  <div className="text-right">
-                    <div className="text-2xl font-bold text-primary">
-                      {product.price.toLocaleString()} ج.م
+            {/* Price and Quantity - Only show when hidePrices is false */}
+            {!hidePrices && (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
+                {/* Price Summary */}
+                <div className="p-4 border-b border-slate-200">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-base text-slate-600">السعر</span>
+                    <div className="text-right">
+                      <div className="text-2xl font-bold text-primary">
+                        {product.price.toLocaleString()} ج.م
+                      </div>
+                      {product.originalPrice && product.originalPrice > product.price && (
+                        <div className="text-base text-slate-500 line-through">
+                          {product.originalPrice.toLocaleString()} ج.م
+                        </div>
+                      )}
                     </div>
-                    {product.originalPrice && product.originalPrice > product.price && (
-                      <div className="text-base text-slate-500 line-through">
-                        {product.originalPrice.toLocaleString()} ج.م
-                      </div>
-                    )}
                   </div>
+
+                  {product.originalPrice && product.originalPrice > product.price && (
+                    <div className="flex items-center justify-between bg-green-50 p-2 rounded-lg">
+                      <span className="text-sm font-medium text-green-700">توفير</span>
+                      <span className="text-sm font-bold text-green-700">
+                        {(product.originalPrice - product.price).toLocaleString()} ج.م
+                      </span>
+                    </div>
+                  )}
                 </div>
 
-                {product.originalPrice && product.originalPrice > product.price && (
-                  <div className="flex items-center justify-between bg-green-50 p-2 rounded-lg">
-                    <span className="text-sm font-medium text-green-700">توفير</span>
-                    <span className="text-sm font-bold text-green-700">
-                      {(product.originalPrice - product.price).toLocaleString()} ج.م
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Quantity Selector and Add to Cart Button */}
-              <div className="p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-base font-semibold text-slate-900">الكمية</span>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex items-center border-2 border-slate-300 rounded-lg overflow-hidden">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="w-10 h-10"
-                      onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                      disabled={quantity <= 1}
-                    >
-                      <Minus className="w-4 h-4" />
-                    </Button>
-                    <span className="w-12 text-center font-bold text-lg">{quantity}</span>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="w-10 h-10"
-                      onClick={() => setQuantity(quantity + 1)}
-                    >
-                      <Plus className="w-4 h-4" />
-                    </Button>
+                {/* Quantity Selector and Add to Cart Button */}
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-base font-semibold text-slate-900">الكمية</span>
                   </div>
 
-                  <Button
-                    onClick={handleAddToCart}
-                    disabled={addingToCart}
-                    className={cn(
-                      "flex-1 py-3 rounded-lg font-bold text-base",
-                      inCart
-                        ? "bg-green-500 hover:bg-green-600"
-                        : "bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary"
-                    )}
-                  >
-                    {addingToCart ? (
-                      <div className="flex items-center justify-center">
-                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                        جاري الإضافة...
-                      </div>
-                    ) : inCart ? (
-                      <>
-                        <CheckCircle className="w-5 h-5 ml-2" />
-                        في السلة
-                      </>
-                    ) : (
-                      <>
-                        <ShoppingCart className="w-5 h-5 ml-2" />
-                        أضف للسلة
-                      </>
-                    )}
-                  </Button>
+                  <div className="flex flex-col sm:flex-row gap-4">
+                    <div className="flex items-center border-2 border-slate-300 rounded-lg overflow-hidden">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-10 h-10"
+                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                        disabled={quantity <= 1}
+                      >
+                        <Minus className="w-4 h-4" />
+                      </Button>
+                      <span className="w-12 text-center font-bold text-lg">{quantity}</span>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="w-10 h-10"
+                        onClick={() => setQuantity(quantity + 1)}
+                      >
+                        <Plus className="w-4 h-4" />
+                      </Button>
+                    </div>
+
+                    <Button
+                      onClick={handleAddToCart}
+                      disabled={addingToCart}
+                      className={cn(
+                        "flex-1 py-3 rounded-lg font-bold text-base",
+                        inCart
+                          ? "bg-green-500 hover:bg-green-600"
+                          : "bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary"
+                      )}
+                    >
+                      {addingToCart ? (
+                        <div className="flex items-center justify-center">
+                          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          جاري الإضافة...
+                        </div>
+                      ) : inCart ? (
+                        <>
+                          <CheckCircle className="w-5 h-5 ml-2" />
+                          في السلة
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart className="w-5 h-5 ml-2" />
+                          أضف للسلة
+                        </>
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Tabs - Keeping the existing tabs for التفاصيل والتقييمات */}
             <div className="flex border-b border-slate-200">

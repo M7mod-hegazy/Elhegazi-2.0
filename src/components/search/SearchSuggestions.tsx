@@ -14,11 +14,11 @@ interface SearchSuggestionsProps {
   showRecentSearches?: boolean;
 }
 
-const SearchSuggestions = ({ 
-  placeholder = "البحث عن المنتجات...", 
+const SearchSuggestions = ({
+  placeholder = "البحث عن المنتجات...",
   className,
   onSearch,
-  showRecentSearches = true 
+  showRecentSearches = true
 }: SearchSuggestionsProps) => {
   const [query, setQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
@@ -131,19 +131,19 @@ const SearchSuggestions = ({
         const updated = [searchQuery, ...recentSearches.filter(s => s !== searchQuery)].slice(0, 5);
         setRecentSearches(updated);
       }
-      
+
       // Track search in backend (fire and forget)
       fetch('/api/search/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ query: searchQuery.trim() })
       }).catch(err => console.error('Failed to track search:', err));
-      
+
       // Navigate to products page with search
       navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
       setQuery('');
       setIsOpen(false);
-      
+
       if (onSearch) {
         onSearch(searchQuery);
       }
@@ -180,7 +180,7 @@ const SearchSuggestions = ({
 
       {/* Suggestions Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-96 overflow-hidden">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-96 overflow-y-auto">
           {query.trim().length > 0 ? (
             // Product suggestions
             <div className="py-2">
@@ -264,7 +264,7 @@ const SearchSuggestions = ({
                   ))}
                 </>
               )}
-              
+
               {popularSearches.length > 0 && (
                 <>
                   <div className="px-4 py-2 border-t border-slate-100">

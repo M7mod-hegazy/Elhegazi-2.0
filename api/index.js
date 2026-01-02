@@ -202,7 +202,7 @@ app.post('/debug/seed-products', async (c) => {
 
     await Product.deleteMany({});
     const inserted = await Product.insertMany(testProducts);
-    
+
     return c.json({
       ok: true,
       message: `Seeded ${inserted.length} test products`,
@@ -220,7 +220,7 @@ app.get('/products', async (c) => {
     const { default: Product } = await import('../server/models/Product.js');
     const ids = c.req.query('ids');
     const categorySlug = c.req.query('categorySlug');
-    
+
     let query = { active: { $ne: false } };
     if (ids) {
       const idArray = ids.split(',').map(id => id.trim());
@@ -229,7 +229,7 @@ app.get('/products', async (c) => {
     if (categorySlug) {
       query.categorySlug = categorySlug;
     }
-    
+
     const products = await Product.find(query).lean().maxTimeMS(8000);
     return c.json({ ok: true, items: products });
   } catch (err) {
@@ -245,6 +245,33 @@ app.get('/products/:id', async (c) => {
     const product = await Product.findById(id).lean().maxTimeMS(8000);
     if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
     return c.json({ ok: true, item: product });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/products/:id', async (c) => {
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Product.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.delete('/products/:id', async (c) => {
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const id = c.req.param('id');
+    const deleted = await Product.findByIdAndDelete(id).maxTimeMS(8000);
+    if (!deleted) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
@@ -414,11 +441,11 @@ app.get('/orders/track', async (c) => {
     const { default: Order } = await import('../server/models/Order.js');
     const orderNumber = c.req.query('orderNumber');
     const email = c.req.query('email');
-    
+
     if (!orderNumber || !email) {
       return c.json({ ok: false, error: 'orderNumber and email required' }, 400);
     }
-    
+
     const order = await Order.findOne({ orderNumber, email }).lean().maxTimeMS(8000);
     if (!order) return c.json({ ok: false, error: 'Order not found' }, 404);
     return c.json({ ok: true, item: order });
