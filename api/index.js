@@ -303,6 +303,20 @@ app.delete('/products/:id', async (c) => {
   }
 });
 
+app.post('/products', async (c) => {
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const body = await c.req.json();
+    console.log('[API POST /products] Creating product:', body.name || body.nameAr);
+    const product = new Product(body);
+    await product.save();
+    return c.json({ ok: true, item: product });
+  } catch (err) {
+    console.error('[API] Error creating product:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 app.get('/products/:id/ratings', async (c) => {
   try {
     const { default: Rating } = await import('../server/models/Rating.js');
@@ -321,6 +335,59 @@ app.get('/categories', async (c) => {
     const { default: Category } = await import('../server/models/Category.js');
     const categories = await Category.find({}).lean().maxTimeMS(8000);
     return c.json({ ok: true, items: categories });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/categories/:id', async (c) => {
+  try {
+    const { default: Category } = await import('../server/models/Category.js');
+    const id = c.req.param('id');
+    const category = await Category.findById(id).lean().maxTimeMS(8000);
+    if (!category) return c.json({ ok: false, error: 'Category not found' }, 404);
+    return c.json({ ok: true, item: category });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/categories', async (c) => {
+  try {
+    const { default: Category } = await import('../server/models/Category.js');
+    const body = await c.req.json();
+    const category = new Category(body);
+    await category.save();
+    return c.json({ ok: true, item: category });
+  } catch (err) {
+    console.error('[API] Error creating category:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/categories/:id', async (c) => {
+  try {
+    const { default: Category } = await import('../server/models/Category.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Category.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Category not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.delete('/categories/:id', async (c) => {
+  try {
+    const { default: Category } = await import('../server/models/Category.js');
+    const id = c.req.param('id');
+    const deleted = await Category.findByIdAndDelete(id).maxTimeMS(8000);
+    if (!deleted) return c.json({ ok: false, error: 'Category not found' }, 404);
+    return c.json({ ok: true });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
@@ -966,6 +1033,136 @@ app.post('/users/sync', async (c) => {
   }
 });
 
+app.patch('/users/profile', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const body = await c.req.json();
+    const userId = body.userId || body.id;
+    const updated = await User.findByIdAndUpdate(userId, body, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'User not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/users/:id/orders', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const userId = c.req.param('id');
+    const orders = await Order.find({ userId }).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: orders });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/users/:id/favorites', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const userId = c.req.param('id');
+    const user = await User.findById(userId).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: user?.favorites || [] });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/users/:id/favorites/:productId', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const userId = c.req.param('id');
+    const productId = c.req.param('productId');
+    const updated = await User.findByIdAndUpdate(userId, {
+      $addToSet: { favorites: productId }
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'User not found' }, 404);
+    return c.json({ ok: true, item: productId });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.delete('/users/:id/favorites/:productId', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const userId = c.req.param('id');
+    const productId = c.req.param('productId');
+    const updated = await User.findByIdAndUpdate(userId, {
+      $pull: { favorites: productId }
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'User not found' }, 404);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.delete('/users/:id/favorites', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const userId = c.req.param('id');
+    const updated = await User.findByIdAndUpdate(userId, {
+      favorites: []
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'User not found' }, 404);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== ADMIN USERS =====
+app.post('/admin/users', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const body = await c.req.json();
+    const user = new User({ ...body, role: body.role || 'admin' });
+    await user.save();
+    return c.json({ ok: true, user: { id: user._id, email: user.email } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== RBAC ASSIGN =====
+app.post('/rbac/assign', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const body = await c.req.json();
+    const updated = await User.findByIdAndUpdate(body.userId, {
+      roleId: body.roleId
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'User not found' }, 404);
+    return c.json({ ok: true, success: true });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/rbac/assign-custom', async (c) => {
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const body = await c.req.json();
+    const updated = await User.findByIdAndUpdate(body.userId, {
+      customPermissions: body.permissions
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'User not found' }, 404);
+    return c.json({ ok: true, success: true });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // ===== CLOUDINARY =====
 app.post('/cloudinary/upload-file', async (c) => {
   try {
@@ -1099,6 +1296,124 @@ app.put('/orders/:id', async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json();
     const updated = await Order.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/orders/:id', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/orders/:id/cancel', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(id, {
+      status: 'cancelled',
+      cancellationReason: body.cancellationReason,
+      cancellationRequested: false,
+      cancelledAt: new Date()
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/orders/:id/return', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(id, {
+      status: 'returned',
+      returnReason: body.returnReason,
+      returnStatus: body.returnStatus || 'approved',
+      returnedAt: new Date()
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/orders/:id/request-cancellation', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(id, {
+      cancellationRequested: true,
+      cancellationReason: body.reason || body.cancellationReason
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/orders/:id/partial-refund', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(id, {
+      $push: { refunds: { amount: body.refundAmount, reason: body.refundReason, createdAt: new Date() } }
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/orders/:id/notes', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(id, {
+      $push: { notes: { text: body.text, createdAt: new Date() } }
+    }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Order not found' }, 404);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/orders/rate', async (c) => {
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const body = await c.req.json();
+    const updated = await Order.findByIdAndUpdate(body.orderId, {
+      rating: body.rating,
+      review: body.review,
+      ratedAt: new Date()
+    }, { new: true }).maxTimeMS(8000);
     if (!updated) return c.json({ ok: false, error: 'Order not found' }, 404);
     return c.json({ ok: true, item: updated });
   } catch (err) {
