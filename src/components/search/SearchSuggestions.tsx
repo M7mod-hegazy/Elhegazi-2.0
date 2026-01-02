@@ -74,10 +74,15 @@ const SearchSuggestions = ({
     let active = true;
     (async () => {
       const q = query.trim();
+      console.log('[SEARCH] Query:', q);
       if (!q) { setSuggestions([]); return; }
       try {
-        const res = await apiGet<ApiProduct>(`/api/products?search=${encodeURIComponent(q)}&limit=6`);
+        const apiUrl = `/api/products?search=${encodeURIComponent(q)}&limit=6`;
+        console.log('[SEARCH] Fetching:', apiUrl);
+        const res = await apiGet<ApiProduct>(apiUrl);
+        console.log('[SEARCH] API Response:', res);
         const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
+        console.log('[SEARCH] Items received:', items.length, items.map(p => ({ name: p.name, nameAr: p.nameAr })));
         const mapped: Product[] = items.map((p) => ({
           id: p._id,
           name: p.name,
@@ -103,9 +108,10 @@ const SearchSuggestions = ({
           createdAt: p.createdAt,
           updatedAt: p.updatedAt,
         }));
+        console.log('[SEARCH] Mapped suggestions:', mapped.length);
         if (active) setSuggestions(mapped);
       } catch (e) {
-        console.error('Search suggestions fetch failed:', e);
+        console.error('[SEARCH] Fetch failed:', e);
         if (active) setSuggestions([]);
       }
     })();
@@ -186,9 +192,6 @@ const SearchSuggestions = ({
             <div className="py-2">
               {suggestions.length > 0 ? (
                 <>
-                  <div className="px-4 py-2 text-xs font-medium text-slate-500 border-b border-slate-100">
-                    المنتجات المقترحة
-                  </div>
                   {suggestions.map((product) => (
                     <Link
                       key={product.id}

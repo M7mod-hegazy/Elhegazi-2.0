@@ -32,10 +32,10 @@ export default async function handler(req, res) {
   try {
     await connectMongoDB();
     const { default: Product } = await import('../server/models/Product.js');
-    
+
     // Extract product ID from query if present
     const productId = req.query.id;
-    
+
     console.log('[PRODUCTS] Request:', { method: req.method, productId, query: Object.keys(req.query) });
 
     // GET single product by ID
@@ -60,12 +60,12 @@ export default async function handler(req, res) {
 
     // GET list of products
     if (req.method === 'GET') {
-      const { limit = 60, featured, fields, ids } = req.query;
+      const { limit, featured, fields, ids } = req.query;
 
       console.log('[PRODUCTS] Listing products:', { limit, featured, fields: fields ? fields.substring(0, 50) : 'none', ids: ids ? ids.substring(0, 50) : 'none' });
 
       let query = Product.find({});
-      
+
       // Filter by IDs if provided
       if (ids) {
         const idList = ids.split(',').filter(id => id.trim());
@@ -74,7 +74,7 @@ export default async function handler(req, res) {
           console.log('[PRODUCTS] Filtering by IDs:', idList.length, 'IDs');
         }
       }
-      
+
       if (featured === 'true') query = query.where('featured').equals(true);
       if (fields) {
         // Ensure 'image' is always included in fields
@@ -86,9 +86,15 @@ export default async function handler(req, res) {
         console.log('[PRODUCTS] Selecting fields:', fieldArray.join(' '));
       }
 
-      const products = await query.limit(parseInt(limit) || 60).lean().maxTimeMS(8000);
+      // Only apply limit if explicitly passed
+      if (limit) {
+        const limitNum = parseInt(limit);
+        if (limitNum > 0) query = query.limit(limitNum);
+      }
+
+      const products = await query.lean().maxTimeMS(15000);
       console.log('[PRODUCTS] Found', products.length, 'products. First product image:', products[0]?.image ? 'YES' : 'EMPTY');
-      
+
       return res.json({ ok: true, items: products });
     }
 
