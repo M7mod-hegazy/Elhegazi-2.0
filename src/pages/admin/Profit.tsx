@@ -3565,69 +3565,218 @@ export default function AdminProfit() {
                             : '—'}
                         </div>
                       </div>
-                      <table className="w-full border-collapse text-sm">
-                        <tbody>
-                          <tr className="bg-blue-50/30">
-                            <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: '3px solid #3b82f6' }}>
-                              <div className="flex items-center justify-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-blue-300" />
-                                الشهر الماضي
+                      {(() => {
+                        const lastMonth = Number(lastMonthClosing || 0);
+                        const currentMonth = Number(correctFinalBalance || 0);
+                        const diff = Number(compareLastMonth || 0);
+                        const outletExp = Number(cashBreakdown.outletExpenses || 0);
+                        const baaqi = diff - outletExp;
+
+                        // Calculate total shareholder increases
+                        const totalShareholderIncrease = shareholders.reduce((sum, s) => {
+                          const hist = (shareHistory && shareHistory[s.id]) || [];
+                          const reportTxn = hist.find(txn =>
+                            txn.reportId === currentReportId ||
+                            txn.reportId?.startsWith(`${currentReportId}_profit_`) ||
+                            txn.reportId?.startsWith(`${currentReportId}_edit_`) ||
+                            txn.reportId?.startsWith(`${currentReportId}_reversal_`) ||
+                            txn.reportId?.startsWith(`${currentReportId}_skip_`)
+                          );
+                          if (!reportTxn || reportTxn.source !== 'auto') return sum;
+                          const profitPP = calculateProfitPerPound(diff, currentMonth);
+                          const delta = calculateShareholderDelta(Number(reportTxn.fromAmount), profitPP, s.percentage);
+                          return sum + delta;
+                        }, 0);
+
+                        const afterShareholders = baaqi - totalShareholderIncrease;
+                        const sadaqa = afterShareholders * 0.1;
+
+                        return (
+                          <div className="space-y-3 p-3">
+
+                            {/* ── Sub-calc 1: حساب الفرق ── */}
+                            <div className="rounded-lg border border-blue-200 overflow-hidden">
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 border-b border-blue-200">
+                                <div className="w-4 h-4 rounded-full bg-blue-500 text-white flex items-center justify-center text-[8px] font-black">1</div>
+                                <span className="text-[11px] font-bold text-blue-800">حساب الفرق</span>
                               </div>
-                            </td>
-                            <td className="border border-slate-200 p-2 text-center tabular-nums font-semibold">
-                              {Number(lastMonthClosing || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-white">
-                            <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: '3px solid #3b82f6' }}>
-                              <div className="flex items-center justify-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-blue-500" />
-                                الشهر الحالي
+                              <table className="w-full border-collapse text-sm">
+                                <tbody>
+                                  <tr className="bg-white">
+                                    <td className="border border-slate-100 p-2 text-center font-medium text-slate-600">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <div className="w-2 h-2 rounded-full bg-blue-300" />
+                                        الشهر الماضي
+                                      </div>
+                                    </td>
+                                    <td className="border border-slate-100 p-2 text-center tabular-nums font-semibold w-[120px]">
+                                      {lastMonth.toLocaleString()}
+                                    </td>
+                                  </tr>
+                                  <tr className="bg-slate-50/50">
+                                    <td className="border border-slate-100 p-2 text-center font-medium text-slate-600">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                        الشهر الحالي
+                                      </div>
+                                    </td>
+                                    <td className="border border-slate-100 p-2 text-center tabular-nums font-semibold w-[120px]">
+                                      {currentMonth.toLocaleString()}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                              <div className={`flex items-center justify-between px-3 py-2 ${diff >= 0 ? 'bg-emerald-50 border-t-2 border-emerald-300' : 'bg-red-50 border-t-2 border-red-300'}`}>
+                                <div className="flex items-center gap-1.5">
+                                  {diff >= 0 ? (
+                                    <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                  ) : (
+                                    <svg className="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                                  )}
+                                  <span className={`text-xs font-black ${diff >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>الفرق</span>
+                                  <span className={`text-[9px] font-semibold ${diff >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>(الحالي − الماضي)</span>
+                                </div>
+                                <span className={`text-sm font-black tabular-nums ${diff >= 0 ? 'text-emerald-800' : 'text-red-700'}`}>
+                                  {formatNumberWithParens(diff)}
+                                </span>
                               </div>
-                            </td>
-                            <td className="border border-slate-200 p-2 text-center tabular-nums font-semibold">
-                              {Number(correctFinalBalance).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-gradient-to-r from-emerald-50 to-green-50">
-                            <td className="border border-slate-200 p-2 text-center font-bold text-emerald-800" style={{ borderRight: '3px solid #10b981' }}>
-                              <div className="flex items-center justify-center gap-1.5">
-                                {Number(compareLastMonth || 0) >= 0 ? (
-                                  <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
-                                ) : (
-                                  <svg className="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
-                                )}
-                                الفرق
+                            </div>
+
+                            {/* ── Sub-calc 2: حساب الباقي ── */}
+                            <div className="rounded-lg border border-emerald-200 overflow-hidden">
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border-b border-emerald-200">
+                                <div className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[8px] font-black">2</div>
+                                <span className="text-[11px] font-bold text-emerald-800">حساب الباقي</span>
                               </div>
-                            </td>
-                            <td className="border border-slate-200 p-2 text-center font-black text-emerald-800 tabular-nums">
-                              {formatNumberWithParens(Number(compareLastMonth || 0))}
-                            </td>
-                          </tr>
-                          <tr className="bg-blue-50/30">
-                            <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: '3px solid #3b82f6' }}>
-                              <div className="flex items-center justify-center gap-1.5">
-                                <span className="text-xs">🏪</span>
-                                المصروفات من حساب المحل
+                              <table className="w-full border-collapse text-sm">
+                                <tbody>
+                                  <tr className="bg-white">
+                                    <td className="border border-slate-100 p-2 text-center font-medium text-slate-600">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <span className="text-[10px]">📊</span>
+                                        الفرق
+                                      </div>
+                                    </td>
+                                    <td className="border border-slate-100 p-2 text-center tabular-nums font-semibold w-[120px]">
+                                      {formatNumberWithParens(diff)}
+                                    </td>
+                                  </tr>
+                                  <tr className="bg-red-50/40">
+                                    <td className="border border-slate-100 p-2 text-center font-medium text-red-600">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <span className="text-[10px]">🏪</span>
+                                        المصروفات من حساب المحل
+                                      </div>
+                                    </td>
+                                    <td className="border border-slate-100 p-2 text-center tabular-nums font-semibold text-red-600 w-[120px]">
+                                      −{outletExp.toLocaleString()}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                              <div className="flex items-center justify-between px-3 py-2 bg-emerald-100/80 border-t-2 border-emerald-400">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px]">💎</span>
+                                  <span className="text-xs font-black text-emerald-900">الباقي</span>
+                                  <span className="text-[9px] font-semibold text-emerald-500">(الفرق − المصروفات)</span>
+                                </div>
+                                <span className="text-sm font-black text-emerald-900 tabular-nums">
+                                  {formatNumberWithParens(baaqi)}
+                                </span>
                               </div>
-                            </td>
-                            <td className="border border-slate-200 p-2 text-center tabular-nums font-semibold">
-                              {Number(cashBreakdown.outletExpenses || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-gradient-to-r from-emerald-100/80 to-green-100/80">
-                            <td className="border border-slate-200 p-2 text-center font-black text-emerald-900" style={{ borderRight: '3px solid #059669' }}>
-                              <div className="flex items-center justify-center gap-1.5">
-                                <span className="text-xs">💎</span>
-                                الباقي
+                            </div>
+
+                            {/* ── Sub-calc 3: خصم المساهمين ── */}
+                            <div className="rounded-lg border border-violet-200 overflow-hidden">
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-violet-50 border-b border-violet-200">
+                                <div className="w-4 h-4 rounded-full bg-violet-500 text-white flex items-center justify-center text-[8px] font-black">3</div>
+                                <span className="text-[11px] font-bold text-violet-800">خصم المساهمين</span>
                               </div>
-                            </td>
-                            <td className="border border-slate-200 p-2 text-center font-black text-emerald-900 tabular-nums text-base">
-                              {formatNumberWithParens(Number(compareLastMonth || 0) - Number(cashBreakdown.outletExpenses || 0))}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                              <table className="w-full border-collapse text-sm">
+                                <tbody>
+                                  <tr className="bg-white">
+                                    <td className="border border-slate-100 p-2 text-center font-medium text-slate-600">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <span className="text-[10px]">💎</span>
+                                        الباقي
+                                      </div>
+                                    </td>
+                                    <td className="border border-slate-100 p-2 text-center tabular-nums font-semibold w-[120px]">
+                                      {formatNumberWithParens(baaqi)}
+                                    </td>
+                                  </tr>
+                                  <tr className="bg-violet-50/40">
+                                    <td className="border border-slate-100 p-2 text-center font-medium text-violet-600">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <span className="text-[10px]">👥</span>
+                                        زيادة أرصدة المساهمين
+                                      </div>
+                                    </td>
+                                    <td className="border border-slate-100 p-2 text-center tabular-nums font-semibold text-violet-600 w-[120px]">
+                                      −{Number(totalShareholderIncrease).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                              <div className="flex items-center justify-between px-3 py-2 bg-amber-50 border-t-2 border-amber-400">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px]">✨</span>
+                                  <span className="text-xs font-black text-amber-900">الباقي بعد المساهمين</span>
+                                  <span className="text-[9px] font-semibold text-amber-500">(الباقي − المساهمين)</span>
+                                </div>
+                                <span className="text-sm font-black text-amber-900 tabular-nums">
+                                  {formatNumberWithParens(Math.round(afterShareholders))}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* ── Sub-calc 4: الصدقه ── */}
+                            <div className="rounded-lg border border-rose-200 overflow-hidden">
+                              <div className="flex items-center gap-1.5 px-3 py-1.5 bg-rose-50 border-b border-rose-200">
+                                <div className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[8px] font-black">4</div>
+                                <span className="text-[11px] font-bold text-rose-800">حساب الصدقه</span>
+                              </div>
+                              <table className="w-full border-collapse text-sm">
+                                <tbody>
+                                  <tr className="bg-white">
+                                    <td className="border border-slate-100 p-2 text-center font-medium text-slate-600">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <span className="text-[10px]">✨</span>
+                                        الباقي بعد المساهمين
+                                      </div>
+                                    </td>
+                                    <td className="border border-slate-100 p-2 text-center tabular-nums font-semibold w-[120px]">
+                                      {formatNumberWithParens(Math.round(afterShareholders))}
+                                    </td>
+                                  </tr>
+                                  <tr className="bg-rose-50/40">
+                                    <td className="border border-slate-100 p-2 text-center font-medium text-rose-600">
+                                      <div className="flex items-center justify-center gap-1.5">
+                                        <span className="text-[10px]">📐</span>
+                                        النسبة
+                                      </div>
+                                    </td>
+                                    <td className="border border-slate-100 p-2 text-center tabular-nums font-semibold text-rose-600 w-[120px]">
+                                      × 10%
+                                    </td>
+                                  </tr>
+                                </tbody>
+                              </table>
+                              <div className="flex items-center justify-between px-3 py-2 bg-rose-100/80 border-t-2 border-rose-400">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="text-[10px]">🤲</span>
+                                  <span className="text-xs font-black text-rose-900">الصدقه</span>
+                                  <span className="text-[9px] font-semibold text-rose-400">(10% من الباقي)</span>
+                                </div>
+                                <span className="text-sm font-black text-rose-900 tabular-nums">
+                                  {formatNumberWithParens(Math.round(sadaqa))}
+                                </span>
+                              </div>
+                            </div>
+
+                          </div>
+                        );
+                      })()}
                     </div>
 
                     {/* Net Profit — Hero Card */}
