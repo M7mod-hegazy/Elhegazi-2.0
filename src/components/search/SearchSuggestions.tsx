@@ -186,7 +186,7 @@ const SearchSuggestions = ({
 
       {/* Suggestions Dropdown */}
       {isOpen && (
-        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-96 overflow-y-auto">
+        <div className="absolute top-full left-0 right-0 mt-2 bg-white rounded-xl shadow-2xl border border-slate-200 z-50 max-h-96 overflow-y-auto scroll-smooth scrollbar-thin scrollbar-thumb-primary/40 scrollbar-track-slate-100 hover:scrollbar-thumb-primary/60">
           {query.trim().length > 0 ? (
             // Product suggestions
             <div className="py-2">

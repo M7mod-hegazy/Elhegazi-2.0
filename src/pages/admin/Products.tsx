@@ -180,271 +180,209 @@ type ProductFormProps = {
 
 const ProductForm = memo(function ProductForm({ formData, setFormData, categories, editingProduct, handleSubmit, generateSKU, hidePrices = false }: ProductFormProps) {
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-6">
-        {/* Product Name Section */}
-        <div className="bg-gradient-to-r from-primary/5 via-secondary/5 to-primary/10 backdrop-blur-sm rounded-2xl p-6 border border-primary/20 shadow-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-primary to-secondary rounded-xl flex items-center justify-center shadow-lg">
-              <Tag className="w-5 h-5 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              معلومات المنتج الأساسية
-            </h3>
-          </div>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-0">
+      {/* Two-column body */}
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-6 p-6">
 
-          <div className="space-y-3">
-            <Label htmlFor="name" className="text-base font-semibold text-slate-700 flex items-center gap-2">
-              <Package className="w-4 h-4 text-primary" />
-              اسم المنتج
+        {/* LEFT: text fields */}
+        <div className="space-y-5">
+
+          {/* Name */}
+          <div className="space-y-1.5">
+            <Label htmlFor="name" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+              <Package className="w-3.5 h-3.5 text-primary" />
+              اسم المنتج <span className="text-red-500">*</span>
             </Label>
             <Input
               id="name"
               value={formData.name}
-              onChange={(e) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  name: e.target.value,
-                  nameAr: e.target.value,
-                }))
-              }
+              onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value, nameAr: e.target.value }))}
               placeholder="اكتب اسم المنتج بأي لغة"
               required
-              className="h-12 text-lg bg-white/80 backdrop-blur border-primary/20 focus:border-primary focus:ring-primary/20 shadow-sm transition-all duration-200 hover:shadow-md"
+              className="h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 shadow-sm"
             />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            <div className="space-y-3">
-              <div className="flex items-center gap-3 p-4 bg-gradient-to-r from-amber-50/60 to-orange-50/60 rounded-xl border border-amber-200/50 shadow-sm">
-                <Checkbox
-                  id="isHidden"
-                  checked={!!formData.isHidden}
-                  onCheckedChange={(checked) =>
-                    setFormData((prev) => ({ ...prev, isHidden: Boolean(checked) }))
-                  }
-                  className="w-5 h-5 border-2 border-amber-400 text-amber-600 focus:ring-amber-500/20"
-                />
-                <Label htmlFor="isHidden" className="text-base font-semibold text-amber-800 cursor-pointer">
-                  <div className="flex items-center gap-2">
-                    <EyeOff className="w-4 h-4" />
-                    إخفاء المنتج من المتجر
-                  </div>
-                </Label>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <Label htmlFor="price" className="text-base font-semibold text-slate-700 flex items-center gap-2">
-                <DollarSign className="w-4 h-4 text-green-600" />
+          {/* Prices */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="price" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                <DollarSign className="w-3.5 h-3.5 text-green-600" />
                 السعر
-                {hidePrices && <span className="text-xs text-amber-600 font-normal">(للتتبع الداخلي فقط)</span>}
+                {hidePrices && <span className="text-[10px] text-amber-600 font-normal">(داخلي)</span>}
+                {!hidePrices && <span className="text-red-500">*</span>}
               </Label>
               {hidePrices && (
-                <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg mb-2">
-                  <p className="text-xs text-amber-800">
-                    <strong>ملاحظة:</strong> الأسعار مخفية حالياً. أدخل السعر للتتبع الداخلي فقط - لن يظهر على الموقع.
-                  </p>
-                </div>
+                <p className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 rounded px-2 py-1">الأسعار مخفية</p>
               )}
               <div className="relative">
                 <Input
                   id="price"
                   type="number"
                   value={formData.price}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, price: Number(e.target.value) }))
-                  }
+                  onChange={(e) => setFormData((prev) => ({ ...prev, price: Number(e.target.value) }))}
                   required={!hidePrices}
-                  className="h-12 text-lg pr-12 bg-white/80 backdrop-blur border-green-200/50 focus:border-green-500 focus:ring-green-500/20 shadow-sm transition-all duration-200 hover:shadow-md"
-                  placeholder={hidePrices ? "اختياري - للتتبع الداخلي فقط" : "0.00"}
+                  className="h-11 pr-12 bg-white border-slate-200 focus:border-green-500 focus:ring-green-500/20 shadow-sm"
+                  placeholder="0.00"
                 />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 font-bold text-lg">
-                  ج.م
-                </div>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-green-600 font-bold text-sm">ج.م</span>
               </div>
             </div>
-
-            {/* Original Price (Before Discount) */}
-            <div className="space-y-2">
-              <label htmlFor="originalPrice" className="block text-sm font-semibold text-slate-700">
-                السعر الأصلي (قبل الخصم) - اختياري
-              </label>
+            <div className="space-y-1.5">
+              <Label htmlFor="originalPrice" className="text-sm font-semibold text-slate-700">
+                السعر الأصلي <span className="text-slate-400 font-normal text-xs">(قبل الخصم)</span>
+              </Label>
               <div className="relative">
                 <Input
                   id="originalPrice"
                   type="number"
                   value={formData.originalPrice || ''}
-                  onChange={(e) =>
-                    setFormData((prev) => ({ ...prev, originalPrice: e.target.value ? Number(e.target.value) : undefined }))
-                  }
-                  className="h-12 text-lg pr-12 bg-white/80 backdrop-blur border-slate-200/50 focus:border-slate-400 focus:ring-slate-400/20 shadow-sm transition-all duration-200 hover:shadow-md"
+                  onChange={(e) => setFormData((prev) => ({ ...prev, originalPrice: e.target.value ? Number(e.target.value) : undefined }))}
+                  className="h-11 pr-12 bg-white border-slate-200 shadow-sm"
                   placeholder="0.00"
                 />
-                <div className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 font-bold text-lg">
-                  ج.م
-                </div>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">ج.م</span>
               </div>
-              <p className="text-xs text-slate-500">سيظهر السعر الأصلي مشطوب إذا كان أكبر من السعر الحالي</p>
+              <p className="text-[10px] text-slate-400">يظهر مشطوباً إن كان أكبر من السعر الحالي</p>
             </div>
           </div>
-        </div>
 
-        {/* Category and SKU Section */}
-        <div className="bg-gradient-to-r from-purple-50/60 via-pink-50/40 to-rose-50/60 backdrop-blur-sm rounded-2xl p-6 border border-purple-200/30 shadow-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Tag className="w-5 h-5 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-purple-600 to-pink-600 bg-clip-text text-transparent">
-              تصنيف والترميز
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <Label htmlFor="category" className="text-base font-semibold text-slate-700 flex items-center gap-2">
-                <Package className="w-4 h-4 text-purple-600" />
+          {/* Category + SKU */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="cat-select" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-purple-600" />
                 الفئة
               </Label>
               <select
-                id="category"
-                className="w-full border-purple-200/50 rounded-xl h-12 px-4 bg-white/80 backdrop-blur shadow-sm text-lg focus:border-purple-500 focus:ring-purple-500/20 transition-all duration-200 hover:shadow-md"
+                id="cat-select"
+                className="w-full h-11 px-3 rounded-md border border-slate-200 bg-white text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-400 transition"
                 value={formData.category}
                 onChange={(e) => {
                   const value = e.target.value;
-                  if (!value) {
-                    setFormData((prev) => ({ ...prev, category: '', categoryAr: '' }));
-                    return;
-                  }
+                  if (!value) { setFormData((prev) => ({ ...prev, category: '', categoryAr: '' })); return; }
                   const selectedCat = categories.find((c) => String(c.id) === String(value));
-                  setFormData((prev) => ({
-                    ...prev,
-                    category: value,
-                    categoryAr: selectedCat?.nameAr || selectedCat?.name || '',
-                  }));
+                  setFormData((prev) => ({ ...prev, category: value, categoryAr: selectedCat?.nameAr || selectedCat?.name || '' }));
                 }}
               >
-                <option value="">
-                  {categories.length === 0 ? 'لا توجد فئات متاحة — أنشئ فئة أولاً' : 'اختر الفئة'}
-                </option>
-                {categories.map(category => (
-                  <option key={category.id} value={category.id}>
-                    {category.nameAr || category.name}
-                  </option>
+                <option value="">{categories.length === 0 ? 'أنشئ فئة أولاً' : 'اختر الفئة'}</option>
+                {categories.map((category) => (
+                  <option key={category.id} value={category.id}>{category.nameAr || category.name}</option>
                 ))}
               </select>
             </div>
-
-            <div className="space-y-3">
-              <Label htmlFor="sku" className="text-base font-semibold text-slate-700 flex items-center gap-2">
-                <Tag className="w-4 h-4 text-purple-600" />
-                كود المنتج
+            <div className="space-y-1.5">
+              <Label htmlFor="sku" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-purple-600" />
+                كود المنتج <span className="text-red-500">*</span>
               </Label>
-              <div className="flex gap-3">
+              <div className="flex gap-2">
                 <Input
                   id="sku"
                   value={formData.sku}
                   onChange={(e) => setFormData((prev) => ({ ...prev, sku: e.target.value }))}
                   required
-                  className="h-12 text-lg bg-white/80 backdrop-blur border-purple-200/50 focus:border-purple-500 focus:ring-purple-500/20 shadow-sm transition-all duration-200 hover:shadow-md"
-                  placeholder="SKU123"
+                  className="h-11 bg-white border-slate-200 focus:border-purple-400 focus:ring-purple-400/20 shadow-sm"
+                  placeholder="SKU-001"
                 />
                 <Button
                   type="button"
                   variant="outline"
                   onClick={() => setFormData((prev) => ({ ...prev, sku: generateSKU() }))}
-                  className="h-12 px-6 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-pink-100 shadow-sm transition-all duration-200 hover:shadow-md"
+                  className="h-11 px-3 border-slate-200 text-slate-600 hover:border-purple-400 hover:text-purple-600 shrink-0"
+                  title="توليد تلقائي"
                 >
-                  <RefreshCw className="w-4 h-4 mr-2" />
-                  توليد تلقائي
+                  <RefreshCw className="w-4 h-4" />
                 </Button>
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Image Upload Section */}
-        <div className="bg-gradient-to-r from-green-50/60 via-emerald-50/40 to-teal-50/60 backdrop-blur-sm rounded-2xl p-6 border border-green-200/30 shadow-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-              <FileImage className="w-5 h-5 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-              صور المنتج
-            </h3>
-          </div>
-
-          <div className="space-y-4">
-            <ImageUpload
-              onImagesChange={(images) =>
-                setFormData((prev) => ({
-                  ...prev,
-                  images: images,
-                  image: images[0] || '',
-                }))
-              }
-              maxImages={5}
-              multiple={true}
-              initialImages={formData.images}
-              className="rounded-xl border-2 border-dashed border-green-300 bg-green-50/30 hover:bg-green-50/50 transition-all duration-200"
-            />
-            <div className="bg-green-100/50 border border-green-200 rounded-xl p-4">
-              <p className="text-sm text-green-800 font-medium flex items-center gap-2">
-                <CheckCircle className="w-4 h-4" />
-                يمكنك رفع حتى 5 صور للمنتج. الصورة الأولى ستكون الصورة الرئيسية.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Description Section */}
-        <div className="bg-gradient-to-r from-slate-50/60 via-gray-50/40 to-zinc-50/60 backdrop-blur-sm rounded-2xl p-6 border border-slate-200/30 shadow-lg">
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 bg-gradient-to-r from-slate-500 to-gray-600 rounded-xl flex items-center justify-center shadow-lg">
-              <FileText className="w-5 h-5 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-slate-900 bg-gradient-to-r from-slate-600 to-gray-600 bg-clip-text text-transparent">
+          {/* Description */}
+          <div className="space-y-1.5">
+            <Label htmlFor="description" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
               وصف المنتج
-            </h3>
-          </div>
-
-          <div className="space-y-3">
-            <Label htmlFor="description" className="text-base font-semibold text-slate-700 flex items-center gap-2">
-              <FileText className="w-4 h-4 text-slate-600" />
-              الوصف
             </Label>
             <Textarea
               id="description"
               value={formData.description}
               onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-              rows={4}
-              className="text-lg bg-white/80 backdrop-blur border-slate-200/50 focus:border-slate-500 focus:ring-slate-500/20 shadow-sm transition-all duration-200 hover:shadow-md rounded-xl"
+              rows={5}
+              className="bg-white border-slate-200 focus:border-slate-400 focus:ring-slate-400/20 shadow-sm rounded-lg resize-none"
               placeholder="اكتب وصفاً مفصلاً للمنتج..."
             />
           </div>
         </div>
 
-        <DialogFooter className="pt-6 border-t border-slate-200/50">
-          <Button
-            type="submit"
-            className="h-12 px-8 text-lg bg-gradient-to-r from-primary via-secondary to-primary hover:from-primary hover:via-secondary hover:to-primary shadow-xl transition-all duration-300 hover:shadow-2xl transform hover:scale-105"
-          >
-            <div className="flex items-center gap-3">
-              {editingProduct ? (
-                <>
-                  <Edit className="w-5 h-5" />
-                  تحديث المنتج
-                </>
-              ) : (
-                <>
-                  <Plus className="w-5 h-5" />
-                  إضافة المنتج
-                </>
-              )}
+        {/* RIGHT: images + toggles */}
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+              <FileImage className="w-3.5 h-3.5 text-green-600" />
+              صور المنتج
+            </Label>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
+              <ImageUpload
+                onImagesChange={(images) => setFormData((prev) => ({ ...prev, images, image: images[0] || '' }))}
+                maxImages={5}
+                multiple={true}
+                initialImages={formData.images}
+              />
             </div>
-          </Button>
-        </DialogFooter>
+            <p className="text-[10px] text-slate-400 flex items-center gap-1">
+              <CheckCircle className="w-3 h-3 text-green-500" />
+              الصورة الأولى رئيسية • حد أقصى 5 صور
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-200 bg-white divide-y divide-slate-100 overflow-hidden shadow-sm">
+            <label htmlFor="isHidden" className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition">
+              <div className="flex items-center gap-2.5">
+                <EyeOff className="w-4 h-4 text-amber-500" />
+                <div>
+                  <p className="text-sm font-medium text-slate-800">إخفاء من المتجر</p>
+                  <p className="text-[11px] text-slate-400">لن يظهر هذا المنتج للعملاء</p>
+                </div>
+              </div>
+              <Checkbox
+                id="isHidden"
+                checked={!!formData.isHidden}
+                onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, isHidden: Boolean(checked) }))}
+                className="w-5 h-5 border-2 border-amber-300 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+              />
+            </label>
+            <label htmlFor="featured" className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer hover:bg-slate-50 transition">
+              <div className="flex items-center gap-2.5">
+                <Star className="w-4 h-4 text-yellow-500" />
+                <div>
+                  <p className="text-sm font-medium text-slate-800">منتج مميز</p>
+                  <p className="text-[11px] text-slate-400">يظهر في قسم المنتجات المميزة</p>
+                </div>
+              </div>
+              <Checkbox
+                id="featured"
+                checked={!!formData.featured}
+                onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, featured: Boolean(checked) }))}
+                className="w-5 h-5 border-2 border-yellow-300 data-[state=checked]:bg-yellow-400 data-[state=checked]:border-yellow-400"
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div className="px-6 pb-6 pt-3 border-t border-slate-100 bg-slate-50/60 flex justify-end">
+        <Button
+          type="submit"
+          className="h-11 px-8 bg-gradient-to-r from-primary to-secondary hover:opacity-90 shadow-lg text-white font-semibold gap-2"
+        >
+          {editingProduct ? (
+            <><Edit className="w-4 h-4" /> تحديث المنتج</>
+          ) : (
+            <><Plus className="w-4 h-4" /> إضافة المنتج</>
+          )}
+        </Button>
       </div>
     </form>
   );
@@ -2343,8 +2281,8 @@ const AdminProducts = () => {
                           <Badge
                             variant={!product.isHidden ? "default" : "secondary"}
                             className={`text-xs ${!product.isHidden
-                                ? 'bg-green-500 hover:bg-green-600 text-white'
-                                : 'bg-slate-400 text-white'
+                              ? 'bg-green-500 hover:bg-green-600 text-white'
+                              : 'bg-slate-400 text-white'
                               }`}
                           >
                             {!product.isHidden ? 'نشط' : 'غير نشط'}

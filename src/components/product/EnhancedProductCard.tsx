@@ -34,6 +34,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authAction, setAuthAction] = useState<'cart' | 'favorites'>('cart');
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -49,6 +50,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
 
     // Check authentication and user type
     if (!isAuthenticated || isAdmin) {
+      setAuthAction('cart');
       setShowAuthModal(true);
       return;
     }
@@ -77,6 +79,12 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
   const handleToggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Show auth modal if not authenticated or is admin
+    if (!isAuthenticated || isAdmin) {
+      setAuthAction('favorites');
+      setShowAuthModal(true);
+      return;
+    }
     toggleFavoriteHook(product.id);
   };
 
@@ -104,15 +112,14 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
       const isHoveredStar = hoveredRating >= starIndex;
       const isRated = i < Math.floor(rating || 0);
       const shouldHighlight = hoveredRating > 0 ? isHoveredStar : isRated;
-      
+
       return (
         <Star
           key={i}
-          className={`w-4 h-4 transition-colors duration-200 cursor-pointer ${
-            shouldHighlight
-              ? 'text-yellow-400 fill-yellow-400'
-              : 'text-slate-300 hover:text-yellow-300'
-          }`}
+          className={`w-4 h-4 transition-colors duration-200 cursor-pointer ${shouldHighlight
+            ? 'text-yellow-400 fill-yellow-400'
+            : 'text-slate-300 hover:text-yellow-300'
+            }`}
           onMouseEnter={() => handleStarHover(starIndex)}
           onMouseLeave={handleStarLeave}
           onClick={handleRatingClick}
@@ -122,14 +129,14 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
   };
 
   const inCart = isInCart(product.id);
-  const discountPercentage = product.originalPrice 
+  const discountPercentage = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
   return (
     <>
       {/* Premium Card Design - Matching ProductsDesktop */}
-      <div 
+      <div
         className={`relative group rounded-2xl overflow-hidden bg-white border-2 border-slate-200 hover:border-primary shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] cursor-pointer ${className}`}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
@@ -137,7 +144,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
         <div className="relative h-full">
           {/* Interactive Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/10 via-transparent to-black/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 flex items-end p-4 pointer-events-none z-10"></div>
-          
+
           {/* Badges */}
           <div className="absolute top-3 right-3 z-20 flex flex-col gap-2">
             {discountPercentage > 0 && (
@@ -158,9 +165,8 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
               <img
                 src={optimizeImage(product.image, { w: 320 })}
                 alt={product.nameAr}
-                className={`w-full h-full object-cover transition-all duration-700 ${
-                  imageLoaded ? 'opacity-100' : 'opacity-0'
-                } ${isHovered ? 'scale-110 brightness-110' : 'scale-100'}`}
+                className={`w-full h-full object-cover transition-all duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+                  } ${isHovered ? 'scale-110 brightness-110' : 'scale-100'}`}
                 onLoad={() => setImageLoaded(true)}
                 loading="lazy"
                 decoding="async"
@@ -169,14 +175,14 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                 sizes="(max-width: 640px) 50vw, 320px"
               />
             </Link>
-            
+
             {/* Enhanced Visual overlay */}
             <div className="absolute inset-0 bg-gradient-to-t from-primary/10 via-transparent to-secondary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-700 pointer-events-none" />
 
             {/* Top bar controls */}
             <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-20">
               {/* Category Badge - Top Right */}
-              <Link 
+              <Link
                 to={`/category/${product.category}`}
                 className="text-xs font-semibold text-white bg-primary/90 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-lg hover:bg-primary transition-colors"
                 onClick={(e) => e.stopPropagation()}
@@ -190,30 +196,29 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                   <TooltipTrigger asChild>
                     <button
                       onClick={handleToggleFavorite}
-                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative heart-button ${
-                        favorites.includes(product.id) ? 'heart-active' : ''
-                      }`}
+                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative heart-button ${favorites.includes(product.id) ? 'heart-active' : ''
+                        }`}
                     >
                       {/* 3D Heart with State-Based Rendering */}
-                      <div className="relative heart-3d-advanced" style={{ 
+                      <div className="relative heart-3d-advanced" style={{
                         transformStyle: 'preserve-3d',
                         transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}>
                         {favorites.includes(product.id) ? (
                           // Active State - Theme Colored Heart
                           <div className="relative">
-                            <svg 
+                            <svg
                               className="w-6 h-6 absolute"
-                              style={{ 
+                              style={{
                                 transform: 'translate(2px, 2px)',
                                 filter: 'blur(0.5px)',
                                 fill: 'hsl(var(--primary) / 0.2)'
                               }}
                               viewBox="0 0 24 24"
                             >
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                             </svg>
-                            <svg 
+                            <svg
                               className="w-6 h-6 relative"
                               style={{
                                 fill: 'hsl(var(--primary))',
@@ -222,7 +227,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                               }}
                               viewBox="0 0 24 24"
                             >
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                             </svg>
                           </div>
                         ) : (
@@ -233,22 +238,22 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                             </svg>
                           </div>
                         )}
-                        
+
                         {/* Hover State - Theme Preview */}
                         {!favorites.includes(product.id) && (
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 scale-75 group-hover/heart:opacity-100 group-hover/heart:scale-100 transition-all duration-400 ease-out">
-                            <svg 
+                            <svg
                               className="w-6 h-6 absolute"
-                              style={{ 
+                              style={{
                                 transform: 'translate(2px, 2px)',
                                 filter: 'blur(0.5px)',
                                 fill: 'hsl(var(--primary) / 0.2)'
                               }}
                               viewBox="0 0 24 24"
                             >
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                             </svg>
-                            <svg 
+                            <svg
                               className="w-6 h-6 relative"
                               style={{
                                 fill: 'hsl(var(--primary))',
@@ -257,7 +262,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                               }}
                               viewBox="0 0 24 24"
                             >
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                             </svg>
                           </div>
                         )}
@@ -282,13 +287,13 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                   {product.nameAr}
                 </h3>
               </Link>
-              
+
               {/* Modern Animated Separation Line */}
               <div className="relative h-0.5 bg-slate-100 rounded-full overflow-hidden">
                 <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary transform -translate-x-full group-hover:translate-x-0 transition-transform duration-700 ease-out"></div>
               </div>
             </div>
-            
+
             {/* Interactive Rating Section */}
             <div className="flex items-center justify-between mb-4 gap-2" onMouseLeave={() => setHoveredRating(0)}>
               <div className="flex items-center gap-0.5 hover:opacity-80 transition-opacity">
@@ -303,7 +308,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                 </span>
               )}
             </div>
-            
+
             {/* Bottom action buttons - Eye + Action button */}
             <div className="flex gap-2 mt-auto pt-2">
               <TooltipProvider>
@@ -324,7 +329,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              
+
               {hidePrices ? (
                 <Button
                   onClick={(e) => {
@@ -351,11 +356,10 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
               ) : (
                 <Button
                   onClick={(e) => handleAddToCart(e)}
-                  className={`flex-1 rounded-lg h-10 text-xs font-semibold transition-all duration-500 group/btn relative overflow-hidden ${
-                    inCart
-                      ? 'bg-green-500 hover:bg-green-600 text-white'
-                      : 'bg-primary hover:bg-primary/90 text-white'
-                  }`}
+                  className={`flex-1 rounded-lg h-10 text-xs font-semibold transition-all duration-500 group/btn relative overflow-hidden ${inCart
+                    ? 'bg-green-500 hover:bg-green-600 text-white'
+                    : 'bg-primary hover:bg-primary/90 text-white'
+                    }`}
                 >
                   {inCart ? (
                     <>
@@ -420,7 +424,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        action="cart"
+        action={authAction}
       />
     </>
   );

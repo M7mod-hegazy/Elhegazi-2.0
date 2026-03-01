@@ -1166,10 +1166,45 @@ app.post('/rbac/assign-custom', async (c) => {
 // ===== CLOUDINARY =====
 app.post('/cloudinary/upload-file', async (c) => {
   try {
-    const body = await c.req.json();
-    return c.json({ ok: true, item: { url: body.url || 'https://via.placeholder.com/400' } });
+    // Parse multipart/form-data — NOT JSON (the file is a binary blob)
+    const formData = await c.req.formData();
+    const file = formData.get('file');
+
+    if (!file || typeof file === 'string') {
+      return c.json({ ok: false, error: 'file is required' }, 400);
+    }
+
+    // Read the file into an ArrayBuffer then Buffer
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Lazy-load cloudinary to avoid top-level import issues in Vercel edge
+    const cloudinary = await import('cloudinary').then(m => m.v2);
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'products',
+          format: 'webp',
+          quality: 'auto:good',
+          transformation: [{ width: 1280, height: 1280, crop: 'limit' }],
+        },
+        (error, uploaded) => {
+          if (error) return reject(error);
+          resolve(uploaded);
+        }
+      );
+      stream.end(buffer);
+    });
+
+    return c.json({ ok: true, result });
   } catch (err) {
-    console.error('[API] Error:', err.message);
+    console.error('[API] Cloudinary upload error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
   }
 });

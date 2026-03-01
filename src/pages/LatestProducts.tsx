@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import ProductCard from '@/components/product/ProductCard';
+import ProductsFilterBar from '@/components/product/ProductsFilterBar';
 import SocialLinks from '@/components/layout/SocialLinks';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
 import ScrollAnimation from '@/components/ui/scroll-animation';
@@ -240,140 +241,34 @@ const LatestProductsContent = () => {
         </div>
       </div>
 
-      {/* Compact Search and Filters */}
-      <section className="py-6 bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-40">
-        <div className="container mx-auto px-4">
-          <div className="space-y-4">
-            {/* Search Bar */}
-            <div className="mb-4">
-              <div className="relative max-w-2xl mx-auto">
-                <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 z-10" />
-                <Input
-                  placeholder="البحث في أحدث المنتجات..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pr-12 rounded-full border-2 border-slate-300 focus:border-primary w-full"
-                />
-              </div>
-            </div>
-
-            {/* Controls Row */}
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              {/* Sort */}
-              <div className="flex items-center gap-2">
-                <span className="text-slate-600 font-medium text-sm">ترتيب:</span>
-                <Select value={sortBy} onValueChange={(value: 'name' | 'price' | 'rating' | 'newest') => setSortBy(value)}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">الأحدث</SelectItem>
-                    <SelectItem value="name">الاسم</SelectItem>
-                    <SelectItem value="price">السعر</SelectItem>
-                    <SelectItem value="rating">التقييم</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Filter Toggle */}
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsFilterOpen(!isFilterOpen)}
-                className="flex items-center gap-2"
-              >
-                <Filter className="w-4 h-4" />
-                فلترة
-              </Button>
-
-              {/* View Mode */}
-              <div className="flex bg-slate-100 rounded-full p-1">
-                <Button
-                  variant={viewMode === 'grid' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('grid')}
-                  className="rounded-full"
-                >
-                  <Grid className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={viewMode === 'list' ? 'default' : 'ghost'}
-                  size="sm"
-                  onClick={() => setViewMode('list')}
-                  className="rounded-full"
-                >
-                  <List className="w-4 h-4" />
-                </Button>
-              </div>
-
-              {/* Results Count */}
-              <Badge variant="secondary" className="px-3 py-1.5 text-sm">
-                {filteredProducts.length} منتج
-              </Badge>
-            </div>
-
-            {/* Expandable Filters */}
-            {isFilterOpen && (
-              <div className="mt-6 p-6 bg-white rounded-2xl shadow-lg border border-slate-200">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  {/* Price Range */}
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">نطاق السعر</label>
-                    <div className="space-y-2">
-                      <Slider
-                        value={priceRange}
-                        onValueChange={(values) => {
-                          setPriceTouched(true);
-                          setPriceRange(values as [number, number]);
-                        }}
-                        max={maxPrice}
-                        min={0}
-                        step={50}
-                        className="w-full"
-                      />
-                      <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>{priceRange[0]} ج.م</span>
-                        <span>{priceRange[1]} ج.م</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Rating Filter */}
-                  <div>
-                    <label className="block text-sm font-semibold text-slate-700 mb-3">التقييم</label>
-                    <Select value={ratingFilter} onValueChange={(value: 'all' | '4+' | '3+') => setRatingFilter(value)}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">الكل</SelectItem>
-                        <SelectItem value="4+">4+ نجوم</SelectItem>
-                        <SelectItem value="3+">3+ نجوم</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  {/* Clear Filters */}
-                  <div className="flex items-end">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        setPriceTouched(false);
-                        setPriceRange([0, maxPrice]);
-                        setRatingFilter('all');
-                        setSearchTerm('');
-                      }}
-                      className="w-full"
-                    >
-                      مسح الفلاتر
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </section>
+      {/* Filter Bar */}
+      <ProductsFilterBar
+        searchTerm={searchTerm}
+        setSearchTerm={setSearchTerm}
+        searchPlaceholder="البحث في أحدث المنتجات..."
+        sortBy={sortBy}
+        setSortBy={setSortBy}
+        sortOrder={sortOrder}
+        setSortOrder={setSortOrder}
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        priceRange={priceRange}
+        setPriceRange={setPriceRange}
+        setPriceTouched={setPriceTouched}
+        dynMin={0}
+        dynMax={maxPrice}
+        ratingFilter={ratingFilter}
+        setRatingFilter={setRatingFilter}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
+        resultsCount={filteredProducts.length}
+        onClearFilters={() => {
+          setPriceTouched(false);
+          setPriceRange([0, maxPrice]);
+          setRatingFilter('all');
+          setSearchTerm('');
+        }}
+      />
 
       {/* Products Grid */}
       <div className="container mx-auto px-4 py-8">

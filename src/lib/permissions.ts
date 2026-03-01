@@ -28,12 +28,12 @@ export function isSuperAdmin(): boolean {
   if (adminEmail === 'admin@example.com') {
     return true;
   }
-  
+
   // Check role
   const adminRole = localStorage.getItem('admin.auth.role');
   const role = localStorage.getItem('auth.role');
-  return adminRole === 'SuperAdmin' || adminRole === 'super_admin' || 
-         role === 'SuperAdmin' || role === 'super_admin';
+  return adminRole === 'SuperAdmin' || adminRole === 'super_admin' ||
+    role === 'SuperAdmin' || role === 'super_admin';
 }
 
 /**
@@ -93,7 +93,7 @@ export async function getUserPermissions(forceRefresh = false): Promise<UserPerm
  */
 export async function hasPermission(resource: string, action: string): Promise<boolean> {
   const perms = await getUserPermissions();
-  
+
   // SuperAdmin has all permissions
   if (perms.isSuperAdmin) {
     return true;
@@ -110,7 +110,7 @@ export async function hasPermission(resource: string, action: string): Promise<b
  */
 export async function canAccessPage(pageName: string): Promise<boolean> {
   const perms = await getUserPermissions();
-  
+
   // SuperAdmin can access everything
   if (perms.isSuperAdmin) {
     return true;
@@ -150,7 +150,7 @@ export function clearPermissionsCache() {
  */
 export async function getAccessiblePages(): Promise<string[]> {
   const perms = await getUserPermissions();
-  
+
   // SuperAdmin can access all pages
   if (perms.isSuperAdmin) {
     return [

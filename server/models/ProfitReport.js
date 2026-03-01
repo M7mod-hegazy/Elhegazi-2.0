@@ -30,9 +30,11 @@ const ProfitReportSchema = new mongoose.Schema({
       home: { type: Number, default: 0 },
       bank: { type: Number, default: 0 },
       drawer: { type: Number, default: 0 },
-      customRows: [{ 
+      vodafone: { type: Number, default: 0 },
+      customRows: [{
         id: { type: String, required: true },
         name: { type: String, required: true },
+        description: { type: String, default: '' },
         amount: { type: Number, required: true }
       }]
     },

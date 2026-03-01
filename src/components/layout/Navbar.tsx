@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ShoppingCart, User, LogOut, Settings, Package, Heart, ChevronDown } from 'lucide-react';
+import { Menu, X, ShoppingCart, User, LogOut, Settings, Package, Heart, ChevronDown, Search } from 'lucide-react';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { useCart } from '@/hooks/useCart';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -34,6 +34,7 @@ type ApiCategory = {
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authAction, setAuthAction] = useState<'cart' | 'favorites' | 'general'>('general');
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
@@ -389,23 +390,39 @@ const Navbar = () => {
                 </div>
               )}
 
-              {/* Mobile Icons - Only show if prices are visible */}
-              {!hidePrices && (
-                <div className="lg:hidden flex items-center gap-2">
-                  {/* Heart/Favorites */}
-                  <Link
-                    to="/favorites"
-                    className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
-                  >
-                    <Heart className="w-5 h-5" />
-                    {favoritesCount > 0 && (
-                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                        {favoritesCount}
-                      </Badge>
-                    )}
-                  </Link>
+              {/* Mobile Icons */}
+              <div className="lg:hidden flex items-center gap-1">
+                {/* Mobile Search Icon */}
+                <button
+                  onClick={() => setIsMobileSearchOpen(true)}
+                  className="p-2 hover:bg-muted rounded-lg transition-all duration-300"
+                  aria-label="بحث"
+                >
+                  <Search className="w-5 h-5" />
+                </button>
 
-                  {/* Cart */}
+                {/* Heart/Favorites */}
+                <Link
+                  to={isAuthenticated && !isAdmin ? "/favorites" : "#"}
+                  onClick={(e) => {
+                    if (!isAuthenticated || isAdmin) {
+                      e.preventDefault();
+                      setAuthAction('favorites');
+                      setShowAuthModal(true);
+                    }
+                  }}
+                  className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
+                >
+                  <Heart className="w-5 h-5" />
+                  {isAuthenticated && !isAdmin && favoritesCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                      {favoritesCount}
+                    </Badge>
+                  )}
+                </Link>
+
+                {/* Cart - Only show if prices are visible */}
+                {!hidePrices && (
                   <Link
                     to="/cart"
                     className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
@@ -417,8 +434,8 @@ const Navbar = () => {
                       </Badge>
                     )}
                   </Link>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Mobile Menu Toggle */}
               <button
@@ -453,8 +470,8 @@ const Navbar = () => {
                     to={item.path}
                     onClick={() => setIsMobileMenuOpen(false)}
                     className={`block py-3 px-4 rounded-lg transition-all duration-300 ease-out font-medium ${isActivePath(item.path)
-                        ? 'bg-primary text-primary-foreground shadow-md'
-                        : 'hover:bg-muted/80 text-foreground'
+                      ? 'bg-primary text-primary-foreground shadow-md'
+                      : 'hover:bg-muted/80 text-foreground'
                       }`}
                   >
                     {item.label}
@@ -565,6 +582,40 @@ const Navbar = () => {
           )}
         </div>
       </nav>
+
+      {/* Mobile Search Overlay */}
+      {isMobileSearchOpen && (
+        <div className="fixed inset-0 z-[100] lg:hidden">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in"
+            onClick={() => setIsMobileSearchOpen(false)}
+          />
+
+          {/* Search Container */}
+          <div className="absolute top-0 left-0 right-0 bg-white shadow-2xl animate-in slide-in-from-top duration-300">
+            <div className="container mx-auto px-4 py-4">
+              {/* Header */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-bold text-slate-900">البحث</h3>
+                <button
+                  onClick={() => setIsMobileSearchOpen(false)}
+                  className="p-2 hover:bg-slate-100 rounded-full transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Search Input */}
+              <SearchSuggestions
+                placeholder="البحث عن المنتجات..."
+                onSearch={() => setIsMobileSearchOpen(false)}
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
       {showAuthModal && (
         <AuthModal
           isOpen={showAuthModal}

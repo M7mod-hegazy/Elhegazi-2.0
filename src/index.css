@@ -98,6 +98,32 @@
     display: none;  /* Chrome, Safari and Opera */
   }
 
+  /* Show thin styled scrollbar for search results */
+  .scrollbar-thin {
+    scrollbar-width: thin;  /* Firefox */
+    -ms-overflow-style: auto;  /* IE and Edge */
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar {
+    display: block !important;
+    width: 6px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: hsl(var(--muted));
+    border-radius: 3px;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--primary) / 0.4);
+    border-radius: 3px;
+    transition: background 0.2s ease;
+  }
+  
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--primary) / 0.6);
+  }
+
   .marquee-viewport {
     overflow: hidden;
     width: 100vw;

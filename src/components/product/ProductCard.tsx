@@ -37,6 +37,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authAction, setAuthAction] = useState<'cart' | 'favorites'>('cart');
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
   const { addItem, isInCart } = useCart();
@@ -51,6 +52,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
 
     // Check authentication and user type
     if (!isAuthenticated || isAdmin) {
+      setAuthAction('cart');
       setShowAuthModal(true);
       return;
     }
@@ -79,6 +81,12 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
   const handleToggleFavorite = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    // Show auth modal if not authenticated or is admin
+    if (!isAuthenticated || isAdmin) {
+      setAuthAction('favorites');
+      setShowAuthModal(true);
+      return;
+    }
     toggleFavoriteHook(product.id);
   };
 
@@ -88,15 +96,14 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
       const isHoveredStar = hoveredRating >= starIndex;
       const isRated = i < Math.floor(rating || 0);
       const shouldHighlight = hoveredRating > 0 ? isHoveredStar : isRated;
-      
+
       return (
         <Star
           key={i}
-          className={`w-4 h-4 transition-colors duration-200 cursor-pointer ${
-            shouldHighlight
-              ? 'text-yellow-400 fill-yellow-400'
-              : 'text-slate-300 hover:text-yellow-300'
-          }`}
+          className={`w-4 h-4 transition-colors duration-200 cursor-pointer ${shouldHighlight
+            ? 'text-yellow-400 fill-yellow-400'
+            : 'text-slate-300 hover:text-yellow-300'
+            }`}
           onMouseEnter={() => setHoveredRating(starIndex)}
           onMouseLeave={() => setHoveredRating(0)}
         />
@@ -107,11 +114,11 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
   const handleContactWhatsApp = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const whatsappNumber = localStorage.getItem('WHATSAPP_URL') || '';
     const message = `${contactMessage}\n\nالمنتج: ${product.nameAr}`;
     const encodedMessage = encodeURIComponent(message);
-    
+
     if (whatsappNumber) {
       window.open(`${whatsappNumber}?text=${encodedMessage}`, '_blank');
     } else {
@@ -124,7 +131,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
   };
 
   const inCart = isInCart(product.id);
-  const discountPercentage = product.originalPrice 
+  const discountPercentage = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
@@ -135,7 +142,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
         <div className="relative h-full">
           {/* Interactive Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/0 via-transparent to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-4 pointer-events-none"></div>
-          
+
           {/* Badges */}
           <div className="absolute top-2 right-2 z-20 flex flex-col gap-2">
             {discountPercentage > 0 && (
@@ -152,7 +159,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                 <LoadingSpinner />
               </div>
             )}
-            
+
             {/* Image Swiper */}
             <Swiper
               modules={[Pagination]}
@@ -178,7 +185,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                   />
                 </Link>
               </SwiperSlide>
-              
+
               {/* Additional Images */}
               {product.images && product.images.length > 0 && product.images.slice(0, 4).map((img, idx) => (
                 <SwiperSlide key={idx}>
@@ -194,14 +201,14 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                 </SwiperSlide>
               ))}
             </Swiper>
-            
+
             {/* Visual overlay (non-interactive) */}
             <div className="absolute inset-0 bg-gradient-to-t from-black/0 via-transparent to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none z-10" />
 
             {/* Top bar controls */}
             <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-20">
               {/* Category Badge - Top Right */}
-              <Link 
+              <Link
                 to={`/category/${product.category}`}
                 className="text-xs font-semibold text-white bg-primary/90 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-lg hover:bg-primary transition-colors"
                 onClick={(e) => e.stopPropagation()}
@@ -215,30 +222,29 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                   <TooltipTrigger asChild>
                     <button
                       onClick={handleToggleFavorite}
-                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative heart-button ${
-                        favorites.includes(product.id) ? 'heart-active' : ''
-                      }`}
+                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative heart-button ${favorites.includes(product.id) ? 'heart-active' : ''
+                        }`}
                     >
                       {/* 3D Heart with State-Based Rendering */}
-                      <div className="relative heart-3d-advanced" style={{ 
+                      <div className="relative heart-3d-advanced" style={{
                         transformStyle: 'preserve-3d',
                         transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}>
                         {favorites.includes(product.id) ? (
                           // Active State - Theme Colored Heart
                           <div className="relative">
-                            <svg 
+                            <svg
                               className="w-6 h-6 absolute"
-                              style={{ 
+                              style={{
                                 transform: 'translate(2px, 2px)',
                                 filter: 'blur(0.5px)',
                                 fill: 'hsl(var(--primary) / 0.2)'
                               }}
                               viewBox="0 0 24 24"
                             >
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                             </svg>
-                            <svg 
+                            <svg
                               className="w-6 h-6 relative"
                               style={{
                                 fill: 'hsl(var(--primary))',
@@ -247,7 +253,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                               }}
                               viewBox="0 0 24 24"
                             >
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                             </svg>
                           </div>
                         ) : (
@@ -258,22 +264,22 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                             </svg>
                           </div>
                         )}
-                        
+
                         {/* Hover State - Theme Preview */}
                         {!favorites.includes(product.id) && (
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 scale-75 group-hover/heart:opacity-100 group-hover/heart:scale-100 transition-all duration-400 ease-out">
-                            <svg 
+                            <svg
                               className="w-6 h-6 absolute"
-                              style={{ 
+                              style={{
                                 transform: 'translate(2px, 2px)',
                                 filter: 'blur(0.5px)',
                                 fill: 'hsl(var(--primary) / 0.2)'
                               }}
                               viewBox="0 0 24 24"
                             >
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                             </svg>
-                            <svg 
+                            <svg
                               className="w-6 h-6 relative"
                               style={{
                                 fill: 'hsl(var(--primary))',
@@ -282,7 +288,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                               }}
                               viewBox="0 0 24 24"
                             >
-                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+                              <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
                             </svg>
                           </div>
                         )}
@@ -305,7 +311,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                 {product.nameAr}
               </h3>
             </Link>
-            
+
             {/* Modern Separation Line */}
             <div className="relative h-0.5 bg-slate-100 rounded-full overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary transform -translate-x-full group-hover:translate-x-0 transition-transform duration-700 ease-out"></div>
@@ -324,14 +330,14 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                   <span className="text-xs text-slate-400 line-through">{product.originalPrice ? product.originalPrice.toLocaleString() : 'N/A'}</span>
                 )}
               </div>
-              
-              <div 
+
+              <div
                 className="flex items-center gap-2 hover:opacity-80 transition-opacity"
                 onMouseLeave={() => setHoveredRating(0)}
               >
                 <div className="flex items-center gap-0.5">
                   {renderStars(product.rating || 0)}
-                  <span 
+                  <span
                     className="text-xs text-slate-500 cursor-pointer hover:text-primary transition-colors"
                   >
                     ({product.reviews || 0})
@@ -365,7 +371,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              
+
               {hidePrices ? (
                 <Button
                   onClick={(e) => {
@@ -387,11 +393,10 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
               ) : (
                 <Button
                   onClick={(e) => handleAddToCart(e)}
-                  className={`flex-1 rounded-lg h-10 text-xs font-semibold transition-all duration-500 group/btn relative overflow-hidden ${
-                    inCart
-                      ? 'bg-green-500 hover:bg-green-600 text-white'
-                      : 'bg-primary hover:bg-primary/90 text-white'
-                  }`}
+                  className={`flex-1 rounded-lg h-10 text-xs font-semibold transition-all duration-500 group/btn relative overflow-hidden ${inCart
+                    ? 'bg-green-500 hover:bg-green-600 text-white'
+                    : 'bg-primary hover:bg-primary/90 text-white'
+                    }`}
                 >
                   {inCart ? (
                     <>
@@ -429,7 +434,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true }: Pro
       <AuthModal
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
-        action="cart"
+        action={authAction}
       />
 
       {/* WhatsApp Contact Modal */}

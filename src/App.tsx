@@ -37,7 +37,7 @@ const Contact = lazy(() => import("./pages/Contact"));
 const Locations = lazy(() => import("./pages/Locations"));
 const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const EnhancedOrderTracking = lazy(() => import("./pages/EnhancedOrderTracking"));
-const ShopBuilder3DPage = lazy(() => 
+const ShopBuilder3DPage = lazy(() =>
   import("@/features/shop-builder/ShopBuilder3DPage").catch(() => {
     // Fallback if import fails
     return { default: () => <div className="flex items-center justify-center h-screen"><p>Failed to load Shop Builder. Please refresh the page.</p></div> };
@@ -62,8 +62,8 @@ const AdminSettings = lazy(() => import("./pages/admin/Settings"));
 const AdminHomeConfig = lazy(() => import("./pages/admin/HomeConfig"));
 const AdminHistory = lazy(() => import("./pages/admin/History"));
 const AdminProfit = lazy(() => import("./pages/admin/Profit"));
-const AdminProfitAnalytics = lazy(() => import("./pages/admin/ProfitAnalytics"));
 const AdminShareholders = lazy(() => import("./pages/admin/Shareholders"));
+
 const AdminOrderTracking = lazy(() => import("./pages/admin/OrderTracking"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const Returns = lazy(() => import("./pages/Returns"));
@@ -397,16 +397,12 @@ const AppInner = () => {
                 <AdminProfit />
               </DualProtectedRoute>
             } />
-            <Route path="/admin/profit-analytics" element={
-              <DualProtectedRoute requireAdmin={true}>
-                <AdminProfitAnalytics />
-              </DualProtectedRoute>
-            } />
             <Route path="/admin/shareholders" element={
               <DualProtectedRoute requireAdmin={true}>
                 <AdminShareholders />
               </DualProtectedRoute>
             } />
+
 
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

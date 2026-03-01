@@ -25,11 +25,11 @@ import { ToastAction } from '@/components/ui/toast';
 import useDeviceDetection from '@/hooks/useDeviceDetection';
 import ModernStatCard from '@/components/admin/ModernStatCard';
 import { apiGet, apiPostJson, apiPutJson, apiDelete } from '@/lib/api';
-import { 
-  Calculator, 
-  FileText, 
-  Settings, 
-  TrendingUp, 
+import {
+  Calculator,
+  FileText,
+  Settings,
+  TrendingUp,
   TrendingDown,
   DollarSign,
   BarChart3,
@@ -51,7 +51,9 @@ import {
   Check,
   CheckIcon,
   Clock3,
-  Users
+  Users,
+  Wallet,
+  Edit3
 } from 'lucide-react';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
@@ -91,10 +93,10 @@ type CustomCashRow = {
   amount: number;
 };
 
-type CashBreakdown = { 
-  outletExpenses: number; 
-  home: number; 
-  bank: number; 
+type CashBreakdown = {
+  outletExpenses: number;
+  home: number;
+  bank: number;
   drawer: number;
   vodafone: number;
   customRows?: CustomCashRow[];
@@ -168,21 +170,21 @@ function calcTotals(branchRows: BranchRow[], expenses: Expense[], cashManual: nu
     }
   }
   const totalStores = sumByExpense['مخازن'] || 0;
-  
+
   // Separate personal and other expenses
   const personalExpensesTotal = expenses
     .filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
     .reduce((s, k) => s + (sumByExpense[k] || 0), 0);
-    
+
   // Sum all expense items, excluding stores, cash, debts, profits
   const allExpenses = expenses
     .filter(e => !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
     .reduce((s, k) => s + (sumByExpense[k] || 0), 0);
-  
+
   // Subtract outlet expenses (المصروفات من حساب المحل) from total expenses
   // This prevents double counting since outlet expenses are added to cash breakdown
   const totalExpenses = allExpenses - Number(outletExpenses || 0);
-    
+
   const totalProfits = sumByExpense['أرباح'] || 0;
   // Final balance uses manual cash subtotal rather than per-branch 'كاش الدرج'
   // cashManual already includes outletExpenses (personalExpensesTotal), so no need to add it again
@@ -190,7 +192,7 @@ function calcTotals(branchRows: BranchRow[], expenses: Expense[], cashManual: nu
   const cash = Number(cashManual || 0);
   const debtsToUs = sumByExpense['ديون ليه'] || 0;
   const debtsOnUs = sumByExpense['ديون عليه'] || 0;
-  
+
   // ✅ Using centralized formula from profitCalculations.ts
   const finalBalance = calculateFinalBalance(stores, cash, debtsToUs, debtsOnUs);
   const netProfit = calculateNetProfit(totalProfits, totalExpenses);
@@ -200,7 +202,7 @@ function calcTotals(branchRows: BranchRow[], expenses: Expense[], cashManual: nu
 export default function AdminProfit() {
   // Set page title
   usePageTitle('إدارة الأرباح');
-  
+
   const { toast } = useToast();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -217,18 +219,23 @@ export default function AdminProfit() {
   const [branchRows, setBranchRows] = useState<BranchRow[]>(() => branches.map(b => ({ name: b, values: Object.fromEntries(expenses.map(e => [e, 0])) })));
   // Fixed expenses that should not be editable or counted as custom items
   // Allow editing 'أرباح' (profit) explicitly in step 6 as requested
-  const fixedExpenses = useMemo(() => new Set<Expense>(['مخازن','كاش الدرج','ديون ليه','ديون عليه'] as Expense[]), []);
+  const fixedExpenses = useMemo(() => new Set<Expense>(['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه'] as Expense[]), []);
   const editableExpenses = useMemo(() => expenses.filter(e => !fixedExpenses.has(e)), [expenses, fixedExpenses]);
   const editableExpensesCount = editableExpenses.length;
-  
+
   // Dashboard counts using global state
-  const globalEditableExpensesCount = useMemo(() => 
-    globalExpenses.filter(e => !fixedExpenses.has(e)).length, 
+  const globalEditableExpensesCount = useMemo(() =>
+    globalExpenses.filter(e => !fixedExpenses.has(e)).length,
     [globalExpenses, fixedExpenses]
   );
   const [range, setRange] = useState<DateRange | undefined>();
   const [lastMonthClosing, setLastMonthClosing] = useState<number>(0);
   const [manualLastMonthValue, setManualLastMonthValue] = useState<boolean>(false);
+  const [baseClosingValue, setBaseClosingValue] = useState<number>(6000000); // Editable base value for report source
+  const [showBaseEditor, setShowBaseEditor] = useState<boolean>(false);
+  const [shareholdersOverride, setShareholdersOverride] = useState<number | null>(null); // Override calculated shareholders total
+  const [showShareholdersEditor, setShowShareholdersEditor] = useState<boolean>(false);
+  const [showShareholdersBreakdown, setShowShareholdersBreakdown] = useState<boolean>(false);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
@@ -245,8 +252,8 @@ export default function AdminProfit() {
   const [showManage, setShowManage] = useState(false);
   const [showBranchManage, setShowBranchManage] = useState(false);
   // Scope for management modals: global template or this report only
-  const [manageExpensesScope, setManageExpensesScope] = useState<'global'|'report'>('global');
-  const [manageBranchesScope, setManageBranchesScope] = useState<'global'|'report'>('global');
+  const [manageExpensesScope, setManageExpensesScope] = useState<'global' | 'report'>('global');
+  const [manageBranchesScope, setManageBranchesScope] = useState<'global' | 'report'>('global');
   // Expense edit modal state
   const [showExpenseEdit, setShowExpenseEdit] = useState(false);
   const resultsAtRef = useRef<number | null>(null);
@@ -258,7 +265,7 @@ export default function AdminProfit() {
   const [showAddExpenseDialog, setShowAddExpenseDialog] = useState(false);
   const [newExpenseName, setNewExpenseName] = useState('');
   const [newExpenseType, setNewExpenseType] = useState<ExpenseType>('other');
-  
+
   // Small green progress bar component for undo toast
   const DeleteCountdownBar = ({ durationMs = 6000 }: { durationMs?: number }) => {
     const barRef = useRef<HTMLDivElement | null>(null);
@@ -288,7 +295,7 @@ export default function AdminProfit() {
         const expenseTotal = branchRows.reduce((branchSum, branch) => branchSum + Number(branch.values[expenseName] || 0), 0);
         return sum + expenseTotal;
       }, 0);
-    
+
     // Always auto-update with sum of personal expenses
     setCashBreakdown(prev => {
       if (prev.outletExpenses !== personalExpensesTotal) {
@@ -301,7 +308,7 @@ export default function AdminProfit() {
   // Auto-update drawer (كاش الدرج) from الدرج والديون step (ALWAYS auto-calculated)
   useEffect(() => {
     const drawerTotal = branchRows.reduce((sum, branch) => sum + Number(branch.values['كاش الدرج'] || 0), 0);
-    
+
     setCashBreakdown(prev => {
       if (prev.drawer !== drawerTotal) {
         return { ...prev, drawer: drawerTotal };
@@ -311,8 +318,14 @@ export default function AdminProfit() {
   }, [branchRows]);
 
   const cashManual = useMemo(() => {
-    const customRowsTotal = (cashBreakdown.customRows || []).reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    return Number(cashBreakdown.outletExpenses||0) + Number(cashBreakdown.home||0) + Number(cashBreakdown.bank||0) + Number(cashBreakdown.drawer||0) + Number(cashBreakdown.vodafone||0) + customRowsTotal;
+    // Filter out vodafone-named custom rows from total calculation
+    const customRowsTotal = (cashBreakdown.customRows || [])
+      .filter(row => {
+        const name = (row.name || '').toLowerCase().trim();
+        return !name.includes('vodafone') && !name.includes('فودافون');
+      })
+      .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+    return Number(cashBreakdown.outletExpenses || 0) + Number(cashBreakdown.home || 0) + Number(cashBreakdown.bank || 0) + Number(cashBreakdown.drawer || 0) + Number(cashBreakdown.vodafone || 0) + customRowsTotal;
   }, [cashBreakdown]);
   const [showPreview, setShowPreview] = useState(false);
   const [showSimplePreview, setShowSimplePreview] = useState(false);
@@ -340,8 +353,8 @@ export default function AdminProfit() {
   }, [wizardStepsConfig, wizardStep]);
   const totalWizardSteps = wizardStepsConfig.length;
   const wizardProgress = totalWizardSteps > 1 ? (currentStepIndex / (totalWizardSteps - 1)) * 100 : 0;
-  
-  
+
+
   // Track dashboard values
   useEffect(() => {
     // Dashboard values tracking for UI updates
@@ -355,7 +368,7 @@ export default function AdminProfit() {
   const [historyForId, setHistoryForId] = useState<string | null>(null);
   // temp deltas for inline amount adjustments keyed by shareholder id
   const [shareDeltas, setShareDeltas] = useState<Record<string, string>>({});
-  
+
   // Shareholder selection for profit distribution
   const [selectedShareholders, setSelectedShareholders] = useState<Set<string>>(new Set());
   const [shareholdersInitialized, setShareholdersInitialized] = useState(false);
@@ -363,12 +376,12 @@ export default function AdminProfit() {
   const [draftStep, setDraftStep] = useState(0);
   const [reportName, setReportName] = useState('');
   const [isLoadingReport, setIsLoadingReport] = useState(false);
-  
+
   // Track reportName changes
   useEffect(() => {
     // reportName updated
   }, [reportName]);
-  
+
   // Initialize selected shareholders when shareholders list changes (default: NONE selected for new reports)
   useEffect(() => {
     if (shareholders.length > 0 && !shareholdersInitialized && !isLoadingReport && !currentReportId) {
@@ -380,11 +393,11 @@ export default function AdminProfit() {
   }, [shareholders, shareholdersInitialized, isLoadingReport, currentReportId]);
 
   // Shareholders and share history will be persisted to MongoDB via API calls
-  
+
   // persist shareholders to server (fast debounce for MongoDB)
   useEffect(() => {
     if (!profitSettingsLoaded) return;
-    
+
     // Skip initial save right after load to prevent overwriting with stale state
     if (shareholders.length === 0 && Object.keys(shareHistory).length === 0) {
       // Skipping save: initial render
@@ -401,11 +414,11 @@ export default function AdminProfit() {
         expenseTypes: Object.fromEntries(expenseTypes),
         cashBreakdown: cashBreakdown,
       };
-      
+
       try {
         // Saving profit settings
         const resp = await apiPutJson('/api/profit-settings', payload);
-        
+
         if (!resp.ok) {
           console.error('Failed to save profit settings:', 'error' in resp ? resp.error : 'Unknown error');
         } else {
@@ -423,31 +436,31 @@ export default function AdminProfit() {
     (async () => {
       try {
         const resp = await apiGet<{ globalBranches?: string[]; globalExpenses?: string[]; shareholders?: Shareholder[]; shareHistory?: Record<string, ShareTxn[]>; expenseTypes?: Record<string, string>; cashBreakdown?: CashBreakdown }>('/api/profit-settings');
-        
+
         if (!resp.ok) {
           console.error('Failed to load profit settings:', 'error' in resp ? resp.error : 'Unknown error');
           return;
         }
-        
+
         const item = resp.item;
-        
+
         if (item) {
           // Loaded profit settings
-          
+
           // Validate and use loaded data, fallback to defaults if invalid
-          const loadedBranches = Array.isArray(item.globalBranches) && item.globalBranches.length > 0 
-            ? item.globalBranches as Branch[] 
+          const loadedBranches = Array.isArray(item.globalBranches) && item.globalBranches.length > 0
+            ? item.globalBranches as Branch[]
             : defaultBranches;
-          const loadedExpenses = Array.isArray(item.globalExpenses) && item.globalExpenses.length > 0 
-            ? item.globalExpenses as Expense[] 
+          const loadedExpenses = Array.isArray(item.globalExpenses) && item.globalExpenses.length > 0
+            ? item.globalExpenses as Expense[]
             : defaultExpenses;
           const loadedShareholders = Array.isArray(item.shareholders) ? item.shareholders : [];
           // Loaded shareholders
-          
-          const loadedShareHistory = item.shareHistory && typeof item.shareHistory === 'object' 
-            ? item.shareHistory 
+
+          const loadedShareHistory = item.shareHistory && typeof item.shareHistory === 'object'
+            ? item.shareHistory
             : {};
-          
+
           // ✅ MIGRATION: Set active=true for all existing transactions (backward compatibility)
           const migratedShareHistory: Record<string, ShareTxn[]> = {};
           let migrationCount = 0;
@@ -464,32 +477,32 @@ export default function AdminProfit() {
           if (migrationCount > 0) {
 
           }
-          
-          const loadedExpenseTypes = item.expenseTypes && typeof item.expenseTypes === 'object' 
-            ? new Map(Object.entries(item.expenseTypes)) 
+
+          const loadedExpenseTypes = item.expenseTypes && typeof item.expenseTypes === 'object'
+            ? new Map(Object.entries(item.expenseTypes))
             : new Map();
           const loadedCashBreakdown = item.cashBreakdown && typeof item.cashBreakdown === 'object'
-            ? { 
-                outletExpenses: Number(item.cashBreakdown.outletExpenses || 0),
-                home: Number(item.cashBreakdown.home || 0),
-                bank: Number(item.cashBreakdown.bank || 0),
-                drawer: Number(item.cashBreakdown.drawer || 0),
-                vodafone: Number(item.cashBreakdown.vodafone || 0),
-                customRows: Array.isArray(item.cashBreakdown.customRows) ? item.cashBreakdown.customRows : []
-              }
+            ? {
+              outletExpenses: Number(item.cashBreakdown.outletExpenses || 0),
+              home: Number(item.cashBreakdown.home || 0),
+              bank: Number(item.cashBreakdown.bank || 0),
+              drawer: Number(item.cashBreakdown.drawer || 0),
+              vodafone: Number(item.cashBreakdown.vodafone || 0),
+              customRows: Array.isArray(item.cashBreakdown.customRows) ? item.cashBreakdown.customRows : []
+            }
             : { outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] };
-          
+
           setGlobalBranches(loadedBranches);
           setGlobalExpenses(loadedExpenses);
-          
+
           setShareholders(loadedShareholders);
-          
+
           setShareHistory(migratedShareHistory); // Use migrated history
-          
+
           setExpenseTypes(loadedExpenseTypes);
-          
+
           setCashBreakdown(loadedCashBreakdown);
-          
+
         } else {
           setGlobalBranches(defaultBranches);
           setGlobalExpenses(defaultExpenses);
@@ -521,23 +534,23 @@ export default function AdminProfit() {
 
     const timer = setTimeout(async () => {
       const expenseTypesObj = Object.fromEntries(expenseTypes);
-      
+
       // Don't save if we're about to overwrite existing data with empty types
       // This prevents race conditions during page load
       if (Object.keys(expenseTypesObj).length === 0 && globalExpenses.length > 0) {
         return;
       }
-      
+
       const payload = {
         globalBranches: globalBranches as string[],
         globalExpenses: globalExpenses as string[],
         expenseTypes: expenseTypesObj,
       };
-      
+
       try {
         // Saving template settings
         const resp = await apiPutJson('/api/profit-settings', payload);
-        
+
         if (!resp.ok) {
           console.error('Failed to save global settings:', 'error' in resp ? resp.error : 'Unknown error');
         }
@@ -585,10 +598,10 @@ export default function AdminProfit() {
   useEffect(() => {
     if (!currentReportId) {
       // Only update if expenses list actually changed (not just reference)
-      const expensesChanged = 
+      const expensesChanged =
         expenses.length !== prevExpensesRef.current.length ||
         expenses.some((e, i) => e !== prevExpensesRef.current[i]);
-      
+
       if (expensesChanged) {
         prevExpensesRef.current = [...expenses];
         setBranchRows(prev => prev.map(row => {
@@ -622,50 +635,50 @@ export default function AdminProfit() {
   }
   function saveShare() {
     const name = shareName.trim();
-    
+
     // Validate name
     if (!name) {
-      toast({ title:'الاسم مطلوب', description: 'يرجى إدخال اسم المساهم', variant:'destructive' });
+      toast({ title: 'الاسم مطلوب', description: 'يرجى إدخال اسم المساهم', variant: 'destructive' });
       return;
     }
     if (!validateTextInput(name)) {
-      toast({ title:'اسم غير صحيح', description: 'يرجى استخدام أحرف عربية وإنجليزية وأرقام فقط', variant:'destructive' });
+      toast({ title: 'اسم غير صحيح', description: 'يرجى استخدام أحرف عربية وإنجليزية وأرقام فقط', variant: 'destructive' });
       return;
     }
-    
+
     // Validate and parse amount
     const amount = sanitizeNumericValue(shareAmount);
     if (amount < 0) {
-      toast({ title:'الرصيد غير صحيح', description: 'يرجى إدخال رصيد صحيح (0 أو أكثر)', variant:'destructive' });
+      toast({ title: 'الرصيد غير صحيح', description: 'يرجى إدخال رصيد صحيح (0 أو أكثر)', variant: 'destructive' });
       return;
     }
-    
+
     // Validate and parse percentage
     const percentage = sanitizeNumericValue(sharePercent);
     if (percentage < 0 || percentage > 100) {
-      toast({ title:'النسبة غير صحيحة', description:'أدخل نسبة بين 0 و 100', variant:'destructive' });
+      toast({ title: 'النسبة غير صحيحة', description: 'أدخل نسبة بين 0 و 100', variant: 'destructive' });
       return;
     }
-    
+
     // Check for duplicate names (except when editing the same shareholder)
-    const duplicateName = shareholders.find(s => 
+    const duplicateName = shareholders.find(s =>
       s.name.trim().toLowerCase() === name.toLowerCase() && s.id !== editShareId
     );
     if (duplicateName) {
-      toast({ title:'اسم مكرر', description: 'يوجد مساهم بنفس الاسم بالفعل', variant:'destructive' });
+      toast({ title: 'اسم مكرر', description: 'يوجد مساهم بنفس الاسم بالفعل', variant: 'destructive' });
       return;
     }
-    
+
     if (editShareId) {
-      setShareholders(prev => prev.map(s => s.id===editShareId ? { ...s, name, amount, percentage } : s));
-      toast({ title:'تم التحديث', description: `تم تحديث بيانات ${name}` });
+      setShareholders(prev => prev.map(s => s.id === editShareId ? { ...s, name, amount, percentage } : s));
+      toast({ title: 'تم التحديث', description: `تم تحديث بيانات ${name}` });
     } else {
       const id = crypto.randomUUID();
       const initialAmount = amount;
       setShareholders(prev => [...prev, { id, name, amount, percentage, createdAt: Date.now(), initialAmount }]);
-      toast({ title:'تم الإضافة', description: `تم إضافة المساهم ${name}` });
+      toast({ title: 'تم الإضافة', description: `تم إضافة المساهم ${name}` });
     }
-    
+
     // Reset form
     setEditShareId(null);
     setShareName('');
@@ -674,7 +687,7 @@ export default function AdminProfit() {
     setShowShareModal(false);
   }
   function deleteShare(id: string) {
-    setShareholders(prev => prev.filter(s => s.id!==id));
+    setShareholders(prev => prev.filter(s => s.id !== id));
   }
 
   function applyManualDelta(s: Shareholder, sign: 1 | -1) {
@@ -684,27 +697,27 @@ export default function AdminProfit() {
     const delta = sign * deltaAbs;
     const from = Number(s.amount);
     const to = from + delta;
-    
+
     // ✅ Using centralized formula from profitCalculations.ts
     const stores = totals.sumByExpense?.['مخازن'] || 0;
     const cash = Number(cashManual || 0);
     const debtsToUs = totals.sumByExpense?.['ديون ليه'] || 0;
     const debtsOnUs = totals.sumByExpense?.['ديون عليه'] || 0;
     const fb = calculateFinalBalance(stores, cash, debtsToUs, debtsOnUs);
-    const np = Number(totals.netProfit||0);
-    const rec: ShareTxn = { 
-      id: Math.random().toString(36).slice(2), 
-      date: new Date().toISOString(), 
-      delta, 
-      fromAmount: from, 
-      toAmount: to, 
-      netProfit: np, 
-      finalBalance: fb, 
-      source: 'manual', 
-      note: `${sign>0 ? 'زيادة' : 'نقصان'} يدوية: تعديل مباشر = Δ (من ${Number(from).toLocaleString()} إلى ${Number(to).toLocaleString()}) ${Number(delta).toLocaleString()}${delta >= 0 ? '+' : ''}`
+    const np = Number(totals.netProfit || 0);
+    const rec: ShareTxn = {
+      id: Math.random().toString(36).slice(2),
+      date: new Date().toISOString(),
+      delta,
+      fromAmount: from,
+      toAmount: to,
+      netProfit: np,
+      finalBalance: fb,
+      source: 'manual',
+      note: `${sign > 0 ? 'زيادة' : 'نقصان'} يدوية: تعديل مباشر = Δ (من ${Number(from).toLocaleString()} إلى ${Number(to).toLocaleString()}) ${Number(delta).toLocaleString()}${delta >= 0 ? '+' : ''}`
     };
-    setShareHistory(h => ({ ...h, [s.id]: [...(h[s.id]||[]), rec] }));
-    setShareholders(prev => prev.map(x => x.id===s.id ? { ...x, amount: to } : x));
+    setShareHistory(h => ({ ...h, [s.id]: [...(h[s.id] || []), rec] }));
+    setShareholders(prev => prev.map(x => x.id === s.id ? { ...x, amount: to } : x));
     setShareDeltas(m => ({ ...m, [s.id]: '' }));
   }
 
@@ -713,170 +726,172 @@ export default function AdminProfit() {
     if (!showResults) return;
     const ppp = perPoundProfitComputed; // per pound profit
     if (ppp === 0) return;
-    
+
     // ✅ Using centralized formula from profitCalculations.ts
     const stores = totals.sumByExpense?.['مخازن'] || 0;
     const cash = Number(cashManual || 0);
     const debtsToUs = totals.sumByExpense?.['ديون ليه'] || 0;
     const debtsOnUs = totals.sumByExpense?.['ديون عليه'] || 0;
     const fb = calculateFinalBalance(stores, cash, debtsToUs, debtsOnUs);
-    const np = Number(totals.netProfit||0);
+    // ✅ FIXED: Store compareLastMonth (الفرق) instead of netProfit (صافي الربح)
+    // The shareholder calculation uses: الفرق ÷ مخازن نهائي × نسبة المساهم
+    const np = Number(compareLastMonth || 0);  // This is الفرق from مقارنة بالشهر الماضي
     const resultsAt = resultsAtRef.current || Date.now();
     const idsToUse = selectedIds || selectedShareholders;
-    
+
     // Clean reportId by removing any suffixes (_edit_, _profit_, etc.)
     const cleanReportId = reportId?.split('_')[0];
-    
+
     // Ensure we have a valid reportId - create a temporary one for new reports
     const effectiveReportId = cleanReportId || `temp_report_${Date.now()}`;
-    
+
     // Applying distribution to shareholders
-    
+
     // ✅ NEW: Create transactions for ALL shareholders (not just selected)
     setShareholders(prev => {
       return prev.map(s => {
-      const existingHistory = (shareHistory && shareHistory[s.id]) || [];
-      const isSelected = idsToUse.has(s.id);
-      
-      // Find existing transaction for this report
-      const existingTxn = existingHistory.find(txn => 
-        txn.reportId === effectiveReportId || 
-        txn.reportId?.startsWith(`${effectiveReportId}_`)
-      );
-      
+        const existingHistory = (shareHistory && shareHistory[s.id]) || [];
+        const isSelected = idsToUse.has(s.id);
 
-      
-      // Get balance before this report
-      const lastNonReportTxn = existingHistory
-        .filter(txn => 
-          txn.reportId !== effectiveReportId && 
-          !txn.reportId?.startsWith(`${effectiveReportId}_`)
-        )
-        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-      
-      const balanceBeforeReport = lastNonReportTxn ? lastNonReportTxn.toAmount : (s.initialAmount || s.amount);
-      
-      // ✅ ALWAYS create/update transaction (whether selected or not)
-      // If not selected: active=false, delta=0
-      if (!isSelected) {
-        const inactiveTxn: ShareTxn = {
+        // Find existing transaction for this report
+        const existingTxn = existingHistory.find(txn =>
+          txn.reportId === effectiveReportId ||
+          txn.reportId?.startsWith(`${effectiveReportId}_`)
+        );
+
+
+
+        // Get balance before this report
+        const lastNonReportTxn = existingHistory
+          .filter(txn =>
+            txn.reportId !== effectiveReportId &&
+            !txn.reportId?.startsWith(`${effectiveReportId}_`)
+          )
+          .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+        const balanceBeforeReport = lastNonReportTxn ? lastNonReportTxn.toAmount : (s.initialAmount || s.amount);
+
+        // ✅ ALWAYS create/update transaction (whether selected or not)
+        // If not selected: active=false, delta=0
+        if (!isSelected) {
+          const inactiveTxn: ShareTxn = {
+            id: existingTxn?.id || crypto.randomUUID(),
+            date: new Date().toISOString(),
+            reportId: effectiveReportId,
+            delta: 0, // ✅ No change when inactive
+            fromAmount: balanceBeforeReport,
+            toAmount: balanceBeforeReport, // ✅ Balance stays same
+            netProfit: np,
+            finalBalance: fb,
+            source: 'auto',
+            active: false, // ✅ Mark as inactive
+            note: `غير مشمول في هذا التقرير`
+          };
+
+          // Update or create transaction
+          setShareHistory(h => {
+            if (existingTxn) {
+              // Update existing
+              return { ...h, [s.id]: existingHistory.map(t => t.id === existingTxn.id ? inactiveTxn : t) };
+            } else {
+              // Create new
+              return { ...h, [s.id]: [...existingHistory, inactiveTxn] };
+            }
+          });
+
+          return { ...s, amount: balanceBeforeReport }; // No change to balance
+        }
+
+        // Processing selected shareholder
+
+        // Skip if shareholder created after this report's results time
+        if (s.createdAt && s.createdAt > resultsAt) {
+          const rec: ShareTxn = {
+            id: crypto.randomUUID(),
+            date: new Date().toISOString(),
+            reportId: effectiveReportId, // Use clean reportId
+            delta: 0,
+            fromAmount: Number(s.amount),
+            toAmount: Number(s.amount),
+            netProfit: np,
+            finalBalance: fb,
+            source: 'auto',
+            note: `لم يحدث تغيير: المساهم أضيف بعد تاريخ التقرير (${s.createdAt ? new Date(s.createdAt).toLocaleString('ar-EG') : '—'} > ${new Date(resultsAt).toLocaleString('ar-EG')})`
+          };
+          // Always add new transaction (never update existing ones)
+          setShareHistory(h => {
+            return { ...h, [s.id]: [...(h[s.id] || []), rec] };
+          });
+          return s;
+        }
+
+        const pct = Number(s.percentage || 0);
+        const delta = balanceBeforeReport * ppp * (pct / 100);
+        const targetBalance = balanceBeforeReport + delta;
+
+        // ✅ Create ACTIVE transaction for selected shareholder
+        const activeTxn: ShareTxn = {
           id: existingTxn?.id || crypto.randomUUID(),
           date: new Date().toISOString(),
           reportId: effectiveReportId,
-          delta: 0, // ✅ No change when inactive
+          delta,
           fromAmount: balanceBeforeReport,
-          toAmount: balanceBeforeReport, // ✅ Balance stays same
+          toAmount: targetBalance,
           netProfit: np,
           finalBalance: fb,
           source: 'auto',
-          active: false, // ✅ Mark as inactive
-          note: `غير مشمول في هذا التقرير`
+          active: true, // ✅ Mark as active
+          note: `توزيع أرباح: ${ppp.toFixed(4)} × ${pct}% = ${Number(delta).toLocaleString()}`
         };
-        
+
         // Update or create transaction
         setShareHistory(h => {
           if (existingTxn) {
             // Update existing
-            return { ...h, [s.id]: existingHistory.map(t => t.id === existingTxn.id ? inactiveTxn : t) };
+            return { ...h, [s.id]: existingHistory.map(t => t.id === existingTxn.id ? activeTxn : t) };
           } else {
             // Create new
-            return { ...h, [s.id]: [...existingHistory, inactiveTxn] };
+            return { ...h, [s.id]: [...existingHistory, activeTxn] };
           }
         });
-        
-        return { ...s, amount: balanceBeforeReport }; // No change to balance
-      }
-      
-      // Processing selected shareholder
-      
-      // Skip if shareholder created after this report's results time
-      if (s.createdAt && s.createdAt > resultsAt) {
-        const rec: ShareTxn = { 
-          id: crypto.randomUUID(), 
-          date: new Date().toISOString(), 
-          reportId: effectiveReportId, // Use clean reportId
-          delta: 0, 
-          fromAmount: Number(s.amount), 
-          toAmount: Number(s.amount), 
-          netProfit: np, 
-          finalBalance: fb, 
-          source: 'auto', 
-          note: `لم يحدث تغيير: المساهم أضيف بعد تاريخ التقرير (${s.createdAt ? new Date(s.createdAt).toLocaleString('ar-EG') : '—'} > ${new Date(resultsAt).toLocaleString('ar-EG')})`
-        };
-        // Always add new transaction (never update existing ones)
-        setShareHistory(h => {
-          return { ...h, [s.id]: [...(h[s.id] || []), rec] };
-        });
-        return s;
-      }
-      
-      const pct = Number(s.percentage||0);
-      const delta = balanceBeforeReport * ppp * (pct/100);
-      const targetBalance = balanceBeforeReport + delta;
-      
-      // ✅ Create ACTIVE transaction for selected shareholder
-      const activeTxn: ShareTxn = { 
-        id: existingTxn?.id || crypto.randomUUID(),
-        date: new Date().toISOString(), 
-        reportId: effectiveReportId,
-        delta, 
-        fromAmount: balanceBeforeReport, 
-        toAmount: targetBalance, 
-        netProfit: np, 
-        finalBalance: fb, 
-        source: 'auto',
-        active: true, // ✅ Mark as active
-        note: `توزيع أرباح: ${ppp.toFixed(4)} × ${pct}% = ${Number(delta).toLocaleString()}`
-      };
-      
-      // Update or create transaction
-      setShareHistory(h => {
-        if (existingTxn) {
-          // Update existing
-          return { ...h, [s.id]: existingHistory.map(t => t.id === existingTxn.id ? activeTxn : t) };
-        } else {
-          // Create new
-          return { ...h, [s.id]: [...existingHistory, activeTxn] };
-        }
+
+        return { ...s, amount: targetBalance };
       });
-      
-      return { ...s, amount: targetBalance };
-    });
     });
   }
 
   // Apply shareholder distribution for existing reports (when editing)
   function applyShareholderDistributionForExistingReport(
-    reportId: string, 
-    selectedIds: Set<string>, 
+    reportId: string,
+    selectedIds: Set<string>,
     reportData: { netProfit: number; finalBalance: number; profitPerPound: number }
   ) {
     const { netProfit, finalBalance, profitPerPound } = reportData;
-    
+
     console.log('📊 Applying distribution:', { reportId, selectedCount: selectedIds.size, profitPerPound: profitPerPound.toFixed(6) });
-    
+
     // ✅ NEW: Use active/inactive system for editing
     setShareholders(prev => {
       return prev.map(s => {
         const existingHistory = (shareHistory && shareHistory[s.id]) || [];
         const isSelected = selectedIds.has(s.id);
-        
+
         // Find existing transaction for this report
-        const existingTxn = existingHistory.find(txn => 
-          txn.reportId === reportId || 
+        const existingTxn = existingHistory.find(txn =>
+          txn.reportId === reportId ||
           txn.reportId?.startsWith(`${reportId}_`)
         );
-        
+
         // Get balance before this report
         const lastNonReportTxn = existingHistory
-          .filter(txn => 
-            txn.reportId !== reportId && 
+          .filter(txn =>
+            txn.reportId !== reportId &&
             !txn.reportId?.startsWith(`${reportId}_`)
           )
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
-        
+
         const balanceBeforeReport = lastNonReportTxn ? lastNonReportTxn.toAmount : (s.initialAmount || s.amount);
-        
+
         // ✅ If not selected: set active=false, delta=0
         if (!isSelected) {
           const inactiveTxn: ShareTxn = {
@@ -892,7 +907,7 @@ export default function AdminProfit() {
             active: false, // ✅ Mark as inactive
             note: `غير مشمول في هذا التقرير`
           };
-          
+
           // Update or create transaction
           setShareHistory(h => {
             if (existingTxn) {
@@ -901,15 +916,15 @@ export default function AdminProfit() {
               return { ...h, [s.id]: [...existingHistory, inactiveTxn] };
             }
           });
-          
+
           return { ...s, amount: balanceBeforeReport }; // No change to balance
         }
-        
+
         // ✅ Shareholder is selected: set active=true, calculate delta
         const pct = Number(s.percentage || 0);
         const delta = calculateShareholderDelta(balanceBeforeReport, profitPerPound, pct);
         const targetBalance = balanceBeforeReport + delta;
-        
+
         const activeTxn: ShareTxn = {
           id: existingTxn?.id || crypto.randomUUID(),
           date: new Date().toISOString(),
@@ -923,7 +938,7 @@ export default function AdminProfit() {
           active: true, // ✅ Mark as active
           note: `توزيع أرباح: ${profitPerPound.toFixed(4)} × ${pct}% = ${Number(delta).toLocaleString()}`
         };
-        
+
         // Update or create transaction
         setShareHistory(h => {
           if (existingTxn) {
@@ -933,7 +948,7 @@ export default function AdminProfit() {
           }
           return { ...h, [s.id]: updatedHistory };
         });
-        
+
         return { ...s, amount: targetBalance };
       });
     });
@@ -952,41 +967,41 @@ export default function AdminProfit() {
   const [source, setSource] = useState<'manual' | 'report'>('manual');
   const [showQuickEditModal, setShowQuickEditModal] = useState(false);
   const [quickEditReport, setQuickEditReport] = useState<ProfitReportDoc | null>(null);
-  
+
   // Quick edit save handler
   const handleQuickEditSave = async (updatedReport: Partial<ProfitReportDoc>) => {
     if (!updatedReport._id) return;
-    
+
     const resp = await apiPutJson(`/api/profit-reports/${updatedReport._id}`, updatedReport);
     if (resp.ok) {
       // Update local reports list
-      setReports(prev => prev.map(r => 
+      setReports(prev => prev.map(r =>
         r._id === updatedReport._id ? { ...r, ...updatedReport } : r
       ));
-      
+
       // Update quickEditReport state if it's the same report being edited
       if (quickEditReport && quickEditReport._id === updatedReport._id) {
         setQuickEditReport(prev => prev ? { ...prev, ...updatedReport } : null);
       }
-      
 
-      
+
+
       // Apply distribution for any edited report
       if (updatedReport.affectedShareholders !== undefined) {
         const newSelectedIds = new Set(updatedReport.affectedShareholders);
-        
+
         // ✅ Calculate profit per pound using centralized formula from profitCalculations.ts
         const reportCompareLastMonth = updatedReport.totals?.compareLastMonth || 0;
         const reportNetProfit = updatedReport.totals?.netProfit || 0;
         const reportFinalBalance = updatedReport.totals?.finalBalance || 0;
         const calculatedProfitPerPound = calculateProfitPerPound(reportCompareLastMonth, reportFinalBalance);
-        
+
         console.log('💰 Profit calculation:', {
           compareLastMonth: reportCompareLastMonth,
           finalBalance: reportFinalBalance,
           profitPerPound: calculatedProfitPerPound.toFixed(6)
         });
-        
+
         if (calculatedProfitPerPound > 0 || newSelectedIds.size === 0) {
           // Apply distribution (including reversions for deselected shareholders)
           applyShareholderDistributionForExistingReport(updatedReport._id, newSelectedIds, {
@@ -1036,7 +1051,7 @@ export default function AdminProfit() {
     const editReportId = searchParams.get('edit');
     const viewReportId = searchParams.get('view');
     const isModal = searchParams.get('modal') === 'true';
-    
+
     if (editReportId && reports.length > 0) {
       const reportToEdit = reports.find(r => r._id === editReportId);
       if (reportToEdit) {
@@ -1053,7 +1068,7 @@ export default function AdminProfit() {
 
               setLastMonthClosing(Number(doc?.totals?.lastMonthClosing || 0));
               setManualLastMonthValue(false);
-              
+
               // Migrate old "ديون له" to "ديون ليه"
               const migratedExpenses = (doc.expenses || []).map((e: string) => e === 'ديون له' ? 'ديون ليه' : e);
               setBranches(doc.branches || []);
@@ -1064,13 +1079,13 @@ export default function AdminProfit() {
               })));
               setRange({ from: new Date(doc.startDate), to: new Date(doc.endDate) });
               setCurrentReportId(doc._id);
-              
+
               const tb: ProfitTotals = (doc?.totals || {}) as ProfitTotals;
               // Handle cash breakdown with smart merge
               const reportCustomRows = tb.cashBreakdown?.customRows || [];
               const globalCustomRows = cashBreakdown.customRows || [];
               const mergedCustomRows = reportCustomRows.length > 0 ? reportCustomRows : globalCustomRows;
-              
+
               const reportCashBreakdown = {
                 outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0),
                 home: Number(tb.cashBreakdown?.home || 0),
@@ -1080,7 +1095,7 @@ export default function AdminProfit() {
                 customRows: mergedCustomRows
               };
               setCashBreakdown(reportCashBreakdown);
-              
+
               // Restore selected shareholders from saved report
               if (doc.affectedShareholders && Array.isArray(doc.affectedShareholders)) {
                 setSelectedShareholders(new Set(doc.affectedShareholders));
@@ -1090,7 +1105,7 @@ export default function AdminProfit() {
                 setSelectedShareholders(new Set());
 
               }
-              
+
               // Preserve report name (set again after other effects might clear it)
               setTimeout(() => {
                 if (doc.reportName && doc.reportName.trim()) {
@@ -1098,34 +1113,34 @@ export default function AdminProfit() {
 
                 }
               }, 100);
-              
+
               // Enter edit mode and open the wizard steps
               setPrefillLock(true);
               setEditMode(true);
               setShowPreview(false);
               setWizardStep(0);
               setShowWizard(true);
-              
-              toast({ 
-                title: 'جاهز للتعديل', 
-                description: `تم فتح تقرير "${doc.title}" للتعديل`, 
-                variant: 'default' 
+
+              toast({
+                title: 'جاهز للتعديل',
+                description: `تم فتح تقرير "${doc.title}" للتعديل`,
+                variant: 'default'
               });
-              
+
               // Clear the URL parameter
               navigate('/admin/profit', { replace: true });
             }
           } catch (e) {
-            toast({ 
-              title: 'خطأ في التحميل', 
-              description: (e as Error).message, 
-              variant: 'destructive' 
+            toast({
+              title: 'خطأ في التحميل',
+              description: (e as Error).message,
+              variant: 'destructive'
             });
           } finally {
             setIsLoadingReport(false);
           }
         };
-        
+
         loadReport();
       }
     } else if (viewReportId && reports.length > 0) {
@@ -1144,7 +1159,7 @@ export default function AdminProfit() {
 
               setLastMonthClosing(Number(doc?.totals?.lastMonthClosing || 0));
               setManualLastMonthValue(false);
-              
+
               // Migrate old "ديون له" to "ديون ليه"
               const migratedExpenses = (doc.expenses || []).map((e: string) => e === 'ديون له' ? 'ديون ليه' : e);
               setBranches(doc.branches || []);
@@ -1155,13 +1170,13 @@ export default function AdminProfit() {
               })));
               setRange({ from: new Date(doc.startDate), to: new Date(doc.endDate) });
               setCurrentReportId(doc._id);
-              
+
               const tb: ProfitTotals = (doc?.totals || {}) as ProfitTotals;
               // Handle cash breakdown with smart merge
               const reportCustomRows = tb.cashBreakdown?.customRows || [];
               const globalCustomRows = cashBreakdown.customRows || [];
               const mergedCustomRows = reportCustomRows.length > 0 ? reportCustomRows : globalCustomRows;
-              
+
               const reportCashBreakdown = {
                 outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0),
                 home: Number(tb.cashBreakdown?.home || 0),
@@ -1171,13 +1186,13 @@ export default function AdminProfit() {
                 customRows: mergedCustomRows
               };
               setCashBreakdown(reportCashBreakdown);
-              
+
               // Restore selected shareholders from saved report (for view mode)
               if (doc.affectedShareholders && Array.isArray(doc.affectedShareholders)) {
                 setSelectedShareholders(new Set(doc.affectedShareholders));
 
               }
-              
+
               // Preserve report name for view mode
               setTimeout(() => {
                 if (doc.reportName && doc.reportName.trim()) {
@@ -1185,34 +1200,34 @@ export default function AdminProfit() {
 
                 }
               }, 100);
-              
+
               // Enter view mode (show preview)
               setPrefillLock(true);
               setEditMode(false);
               setShowWizard(false);
               setPreviewLayout('a4');
               setShowPreview(true);
-              
-              toast({ 
-                title: 'تم فتح التقرير', 
-                description: `تم فتح تقرير "${doc.title}" للعرض`, 
-                variant: 'default' 
+
+              toast({
+                title: 'تم فتح التقرير',
+                description: `تم فتح تقرير "${doc.title}" للعرض`,
+                variant: 'default'
               });
-              
+
               // Clear the URL parameter
               navigate('/admin/profit', { replace: true });
             }
           } catch (e) {
-            toast({ 
-              title: 'خطأ في التحميل', 
-              description: (e as Error).message, 
-              variant: 'destructive' 
+            toast({
+              title: 'خطأ في التحميل',
+              description: (e as Error).message,
+              variant: 'destructive'
             });
           } finally {
             setIsLoadingReport(false);
           }
         };
-        
+
         loadReportForView();
       }
     }
@@ -1285,7 +1300,7 @@ export default function AdminProfit() {
     })();
   }, [showPreview, exportAction, toast]);
 
-  
+
 
   // Export to Excel (XLSX)
   const exportToExcel = async () => {
@@ -1294,7 +1309,7 @@ export default function AdminProfit() {
       // Sheet 1: Table (Branches x Expenses)
       const header = ['الفرع \\\u0020بند', ...expenses];
       const rows = branches.map(b => {
-        const vals = branchRows.find(r=>r.name===b)?.values as Record<string, number> | undefined;
+        const vals = branchRows.find(r => r.name === b)?.values as Record<string, number> | undefined;
         return [b, ...expenses.map(e => Number(vals?.[e] || 0))];
       });
       const totalsRow = ['الإجمالي', ...expenses.map(e => Number(totals.sumByExpense?.[e] || 0))];
@@ -1307,14 +1322,14 @@ export default function AdminProfit() {
         ['العنوان', title || '—'],
         ['الفترة', range?.from ? new Date(range.from).toLocaleDateString('ar-EG') : '—', range?.to ? new Date(range.to).toLocaleDateString('ar-EG') : '—'],
         ['مخازن نهائي (الشهر الحالي)', Number(correctFinalBalance)],
-        ['صافي الربح', Number(totals.netProfit||0)],
-        ['فرق المخازن', Number(compareLastMonth||0)],
-        ['صافي الربح - فرق المخازن', Math.abs(Number(totals.netProfit||0) - Number(compareLastMonth||0))],
+        ['صافي الربح', Number(totals.netProfit || 0)],
+        ['فرق المخازن', Number(compareLastMonth || 0)],
+        ['صافي الربح - فرق المخازن', Math.abs(Number(totals.netProfit || 0) - Number(compareLastMonth || 0))],
         [],
-        ['الكاش - المحل', Number(cashBreakdown.outletExpenses||0)],
-        ['الكاش - بيت', Number(cashBreakdown.home||0)],
-        ['الكاش - بنك', Number(cashBreakdown.bank||0)],
-        ['الكاش - درج', Number(totals.sumByExpense?.['كاش الدرج']||0)],
+        ['الكاش - المحل', Number(cashBreakdown.outletExpenses || 0)],
+        ['الكاش - بيت', Number(cashBreakdown.home || 0)],
+        ['الكاش - بنك', Number(cashBreakdown.bank || 0)],
+        ['الكاش - درج', Number(totals.sumByExpense?.['كاش الدرج'] || 0)],
       ];
       const ws2 = xlsx.utils.aoa_to_sheet(summary);
 
@@ -1335,11 +1350,11 @@ export default function AdminProfit() {
     const to = range?.to ? new Date(range.to) : null;
     if (!from || !to) return;
     if (prefillLock) return; // do not override loaded snapshot values
-    
+
     // Create a unique key for this date range to prevent duplicate fetches
     const rangeKey = `${from.toISOString()}_${to.toISOString()}`;
     if (lastFetchedRangeRef.current === rangeKey) return; // Already fetched this range
-    
+
     lastFetchedRangeRef.current = rangeKey;
     const url = `/api/profit-aggregate?from=${encodeURIComponent(from.toISOString())}&to=${encodeURIComponent(to.toISOString())}`;
     apiGet(url)
@@ -1360,7 +1375,7 @@ export default function AdminProfit() {
           return { name: b, values: vals };
         }));
       })
-      .catch(() => {});
+      .catch(() => { });
   }, [range?.from, range?.to, prefillLock, branches, expenses]);
 
   // Keep rows in sync when adding branches/expenses
@@ -1368,17 +1383,17 @@ export default function AdminProfit() {
   const prevExpensesForSyncRef = useRef<string[]>([]);
   useEffect(() => {
     // Only sync if branches or expenses actually changed (not just reference)
-    const branchesChanged = 
+    const branchesChanged =
       branches.length !== prevBranchesRef.current.length ||
       branches.some((b, i) => b !== prevBranchesRef.current[i]);
-    const expensesChanged = 
+    const expensesChanged =
       expenses.length !== prevExpensesForSyncRef.current.length ||
       expenses.some((e, i) => e !== prevExpensesForSyncRef.current[i]);
-    
+
     if (branchesChanged || expensesChanged) {
       prevBranchesRef.current = [...branches];
       prevExpensesForSyncRef.current = [...expenses];
-      
+
       setBranchRows(prev => {
         // ensure each branch has a row
         const map = new Map(prev.map(r => [r.name, r] as const));
@@ -1397,19 +1412,19 @@ export default function AdminProfit() {
   }, [branches, expenses]);
 
   const totals = useMemo(() => calcTotals(branchRows, expenses, cashManual, expenseTypes, cashBreakdown.outletExpenses), [branchRows, expenses, cashManual, expenseTypes, cashBreakdown.outletExpenses]);
-  
+
   // Correct final balance calculation (مخازن نهائي) - reusable across the component
   const correctFinalBalance = useMemo(() => {
     return (totals.sumByExpense?.['مخازن'] || 0) + Number(cashManual || 0) + (totals.sumByExpense?.['ديون ليه'] || 0) - (totals.sumByExpense?.['ديون عليه'] || 0);
   }, [totals.sumByExpense, cashManual]);
-  
+
   // ✅ Using centralized formulas from profitCalculations.ts
   const compareLastMonth = useMemo(() => {
     return calculateCompareLastMonth(correctFinalBalance, Number(lastMonthClosing || 0));
   }, [correctFinalBalance, lastMonthClosing]);
-  
-  const perPoundProfitComputed = useMemo(()=> {
-    return calculateProfitPerPound(Number(compareLastMonth||0), correctFinalBalance);
+
+  const perPoundProfitComputed = useMemo(() => {
+    return calculateProfitPerPound(Number(compareLastMonth || 0), correctFinalBalance);
   }, [correctFinalBalance, compareLastMonth]);
 
   // Pagination calculations
@@ -1417,7 +1432,7 @@ export default function AdminProfit() {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
   const currentReports = reports.slice(startIndex, endIndex);
-  
+
   // Reset to first page when reports change
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) {
@@ -1469,7 +1484,7 @@ export default function AdminProfit() {
 
   // Auto-populate drawer field in step 4 with total from كاش الدرج in step 3
   const totalCashDrawer = useMemo(() => {
-    return branches.reduce((sum, b) => sum + Number(branchRows.find(r=>r.name===b)?.values['كاش الدرج']||0), 0);
+    return branches.reduce((sum, b) => sum + Number(branchRows.find(r => r.name === b)?.values['كاش الدرج'] || 0), 0);
   }, [branches, branchRows]);
 
   useEffect(() => {
@@ -1509,14 +1524,14 @@ export default function AdminProfit() {
       toast({ title: fixText('تنبيه'), description: fixText('هذا المصروف موجود بالفعل.') });
       return;
     }
-    
+
     setExpenses([...expenses, trimmedName]);
     setExpenseTypes(prev => {
       const newMap = new Map(prev).set(trimmedName, newExpenseType);
       return newMap;
     });
     toast({ title: fixText('تم'), description: fixText(`تم إضافة المصروف "${trimmedName}" كنوع ${newExpenseType === 'personal' ? 'شخصي' : 'عادي'}.`) });
-    
+
     // Reset form
     setNewExpenseName('');
     setNewExpenseType('other');
@@ -1531,22 +1546,22 @@ export default function AdminProfit() {
       toast({ title: fixText('خطأ'), description: fixText('وصف البند غير صحيح.'), variant: 'destructive' });
       return;
     }
-    
+
     const newRow: CustomCashRow = {
       id: crypto.randomUUID(),
       name: trimmedDescription,
       description: trimmedDescription,
       amount: 0
     };
-    
+
     setCashBreakdown(prev => {
       const updated = {
         ...prev,
         customRows: [...(prev.customRows || []), newRow]
       };
-      toast({ 
-        title: 'تم إضافة البند', 
-        description: `تم إضافة "${trimmedDescription}" - سيتم الحفظ خلال ثوانٍ` 
+      toast({
+        title: 'تم إضافة البند',
+        description: `تم إضافة "${trimmedDescription}" - سيتم الحفظ خلال ثوانٍ`
       });
       return updated;
     });
@@ -1556,7 +1571,7 @@ export default function AdminProfit() {
     setCashBreakdown(prev => {
       const updated = {
         ...prev,
-        customRows: (prev.customRows || []).map(row => 
+        customRows: (prev.customRows || []).map(row =>
           row.id === id ? { ...row, amount } : row
         )
       };
@@ -1640,17 +1655,17 @@ export default function AdminProfit() {
         exportDate: new Date().toISOString(),
         version: '1.0'
       };
-      
+
       const dataStr = JSON.stringify(exportData, null, 2);
       const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      
+
       const link = document.createElement('a');
       link.href = URL.createObjectURL(dataBlob);
       link.download = `profit-reports-${new Date().toISOString().split('T')[0]}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      
+
       toast({
         title: 'تم التصدير',
         description: `تم تصدير ${reports.length} تقرير بنجاح`,
@@ -1675,7 +1690,7 @@ export default function AdminProfit() {
       try {
         const content = e.target?.result as string;
         const importData = JSON.parse(content);
-        
+
         if (!importData.reports || !Array.isArray(importData.reports)) {
           throw new Error('Invalid file format');
         }
@@ -1695,7 +1710,7 @@ export default function AdminProfit() {
 
         // Refresh reports list
         await refreshReports();
-        
+
         toast({
           title: 'تم الاستيراد',
           description: `تم استيراد ${successCount} من ${importData.reports.length} تقرير`,
@@ -1709,7 +1724,7 @@ export default function AdminProfit() {
         });
       }
     };
-    
+
     reader.readAsText(file);
     // Reset input
     event.target.value = '';
@@ -1719,7 +1734,7 @@ export default function AdminProfit() {
     if (!range?.from || !range?.to) {
       return toast({ title: fixText('حدد الفترة'), description: fixText('اختر تاريخ البداية والنهاية'), variant: 'destructive' });
     }
-    
+
     // Validate report name
     const trimmedReportName = reportName.trim();
     if (!trimmedReportName) {
@@ -1728,25 +1743,25 @@ export default function AdminProfit() {
     if (!validateTextInput(trimmedReportName)) {
       return toast({ title: fixText('خطأ'), description: fixText('اسم التقرير غير صحيح. يرجى استخدام أحرف عربية وإنجليزية وارقام وفراغات فقط.'), variant: 'destructive' });
     }
-    
+
     // Validate title and description
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();
-    
+
     if (trimmedTitle && !validateTextInput(trimmedTitle)) {
       return toast({ title: fixText('خطأ'), description: fixText('عنوان التقرير غير صحيح. يرجى استخدام أحرف عربية وإنجليزية وارقام وفراغات فقط.'), variant: 'destructive' });
     }
-    
+
     if (trimmedDescription && !validateTextInput(trimmedDescription)) {
       return toast({ title: fixText('خطأ'), description: fixText('وصف التقرير غير صحيح. يرجى استخدام أحرف عربية وإنجليزية وارقام وفراغات فقط.'), variant: 'destructive' });
     }
-    
+
     setSaving(true);
-    
+
     // Debug logging for shareholder selection
 
     console.log('💾 Converted to array:', Array.from(selectedShareholders));
-    
+
     const payload = {
       title: trimmedTitle || trimmedReportName, // Use report name as title if no title provided
       description: trimmedDescription,
@@ -1822,13 +1837,13 @@ export default function AdminProfit() {
               </div>
             </div>
 
-        {/* Wizard Helper Card: connect guidance text to the actual wizard */}
-     
-              <Badge variant="secondary" className="bg-primary/10 text-primary">{fixText('تجريبي')}</Badge>
+            {/* Wizard Helper Card: connect guidance text to the actual wizard */}
+
+            <Badge variant="secondary" className="bg-primary/10 text-primary">{fixText('تجريبي')}</Badge>
           </div>
           <div className="flex items-center gap-3">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={async () => {
                 try {
@@ -1841,7 +1856,7 @@ export default function AdminProfit() {
                     cashBreakdown: { outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] }
                   };
                   const resp = await apiPutJson('/api/profit-settings', resetPayload);
-                  
+
                   if (resp.ok) {
                     // Update local state immediately
                     setGlobalBranches(defaultBranches);
@@ -1861,20 +1876,20 @@ export default function AdminProfit() {
               🔄 إعادة تعيين
             </Button>
             {hasDraftInProgress && (
-              <Button 
+              <Button
                 onClick={() => {
                   setWizardStep(draftStep);
                   setShowWizard(true);
                   setHasDraftInProgress(false);
-                }} 
+                }}
                 className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 shadow-lg"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
                 استكمال المسودة (الخطوة {draftStep + 1})
               </Button>
             )}
-            <Button 
-              onClick={() => { 
+            <Button
+              onClick={() => {
                 // Start a brand-new report
                 setCurrentReportId(undefined);
                 setTitle('');
@@ -1895,7 +1910,7 @@ export default function AdminProfit() {
                 setBranches(globalBranches);
                 setExpenses(globalExpenses);
                 setBranchRows(globalBranches.map(b => ({ name: b, values: Object.fromEntries(globalExpenses.map(e => [e, 0])) as Record<Expense, number> })));
-              }} 
+              }}
               className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg"
             >
               <Calculator className="w-4 h-4 mr-2" />
@@ -1908,54 +1923,54 @@ export default function AdminProfit() {
         <div className="space-y-8">
           {/* Modern Stats Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <ModernStatCard
-                title="عدد الفروع"
-                value={globalBranches.length}
-                subtitle="الفروع المسجلة في النظام"
-                icon={<BarChart3 className="w-7 h-7" />}
-                iconColor="text-primary"
-                backgroundColor="bg-primary/5"
-                gradient="from-primary/5 via-secondary/5 to-primary/10"
-                buttonText="إدارة الفروع"
-                onButtonClick={() => { setManageBranchesScope('global'); setShowBranchManage(true); }}
-              />
-              
-              <ModernStatCard
-                title="بنود المصروفات"
-                value={globalEditableExpensesCount}
-                subtitle="أنواع المصروفات المختلفة"
-                icon={<PieChart className="w-7 h-7" />}
-                iconColor="text-primary"
-                backgroundColor="bg-primary/5"
-                gradient="from-purple-50 via-violet-50 to-fuchsia-50"
-                buttonText="إدارة المصروفات"
-                onButtonClick={() => { setManageExpensesScope('global'); setShowManage(true); }}
-              />
-              <ModernStatCard
-                title="إدارة المساهمين"
-                value={shareholders.length}
-                subtitle="عدد المساهمين"
-                icon={<Users className="w-7 h-7" />}
-                iconColor="text-emerald-600"
-                backgroundColor="bg-emerald-50"
-                gradient="from-emerald-50 via-green-50 to-teal-50"
-                buttonText="فتح الإدارة"
-                onButtonClick={() => navigate('/admin/shareholders')}
-              />
-              
-              <ModernStatCard
-                title="تحليلات الأرباح"
-                value={reports.length}
-                subtitle="رسوم بيانية وتقارير تفصيلية"
-                icon={<TrendingUp className="w-7 h-7" />}
-                iconColor="text-emerald-600"
-                backgroundColor="bg-emerald-50"
-                gradient="from-emerald-50 via-green-50 to-teal-50"
-                buttonText="فتح صفحة التحليلات"
-                onButtonClick={() => navigate('/admin/profit-analytics')}
-              />
-            </div>
+            <ModernStatCard
+              title="عدد الفروع"
+              value={globalBranches.length}
+              subtitle="الفروع المسجلة في النظام"
+              icon={<BarChart3 className="w-7 h-7" />}
+              iconColor="text-primary"
+              backgroundColor="bg-primary/5"
+              gradient="from-primary/5 via-secondary/5 to-primary/10"
+              buttonText="إدارة الفروع"
+              onButtonClick={() => { setManageBranchesScope('global'); setShowBranchManage(true); }}
+            />
+
+            <ModernStatCard
+              title="بنود المصروفات"
+              value={globalEditableExpensesCount}
+              subtitle="أنواع المصروفات المختلفة"
+              icon={<PieChart className="w-7 h-7" />}
+              iconColor="text-primary"
+              backgroundColor="bg-primary/5"
+              gradient="from-purple-50 via-violet-50 to-fuchsia-50"
+              buttonText="إدارة المصروفات"
+              onButtonClick={() => { setManageExpensesScope('global'); setShowManage(true); }}
+            />
+            <ModernStatCard
+              title="إدارة المساهمين"
+              value={shareholders.length}
+              subtitle="عدد المساهمين"
+              icon={<Users className="w-7 h-7" />}
+              iconColor="text-emerald-600"
+              backgroundColor="bg-emerald-50"
+              gradient="from-emerald-50 via-green-50 to-teal-50"
+              buttonText="فتح الإدارة"
+              onButtonClick={() => navigate('/admin/shareholders')}
+            />
+
+            <ModernStatCard
+              title="تحليلات الأرباح"
+              value={reports.length}
+              subtitle="رسوم بيانية وتقارير تفصيلية"
+              icon={<TrendingUp className="w-7 h-7" />}
+              iconColor="text-emerald-600"
+              backgroundColor="bg-emerald-50"
+              gradient="from-emerald-50 via-green-50 to-teal-50"
+              buttonText="فتح صفحة التحليلات"
+              onButtonClick={() => navigate('/admin/profit-analytics')}
+            />
           </div>
+        </div>
 
 
         {/* Enhanced Saved Reports Grid */}
@@ -1968,7 +1983,7 @@ export default function AdminProfit() {
               <h2 className="text-xl font-bold text-slate-900">التقارير المحفوظة</h2>
               <Badge variant="secondary" className="bg-green-100 text-green-800">{reports.length} تقرير</Badge>
             </div>
-            
+
             {/* Export/Import Buttons */}
             <div className="flex gap-2">
               <Button
@@ -1997,7 +2012,7 @@ export default function AdminProfit() {
                 onChange={handleImportReports}
               />
             </div>
-            
+
             {/* Pagination Info */}
             {reports.length > 0 && (
               <div className="flex items-center gap-2 text-sm text-slate-600">
@@ -2007,7 +2022,7 @@ export default function AdminProfit() {
               </div>
             )}
           </div>
-          
+
           {reports.length === 0 ? (
             <Card className="bg-gradient-to-br from-slate-50 to-slate-100 border-slate-200 shadow-lg">
               <CardContent className="flex flex-col items-center justify-center py-12">
@@ -2016,8 +2031,8 @@ export default function AdminProfit() {
                 </div>
                 <h3 className="text-lg font-semibold text-slate-600 mb-2">لا توجد تقارير محفوظة</h3>
                 <p className="text-slate-500 text-center max-w-md">ابدأ بإنشاء تقرير أرباح جديد لرؤية تقاريرك هنا</p>
-                <Button 
-                  onClick={() => { 
+                <Button
+                  onClick={() => {
                     setCurrentReportId(undefined);
                     setTitle('');
                     setDescription('');
@@ -2042,158 +2057,78 @@ export default function AdminProfit() {
             <>
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {currentReports.map((r) => (
-              <Card key={r._id} className="group bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg font-bold text-slate-900 group-hover:text-green-600 transition-colors">
-                        {r.reportName || r.title || 'ملخص محفوظ'}
-                      </CardTitle>
-                      <p className="text-sm text-slate-600 mt-1 leading-relaxed">{r.description}</p>
-                    </div>
-                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <FileText className="w-5 h-5 text-green-600" />
-                    </div>
-                  </div>
-                  <div className="text-xs text-slate-500 mt-2 flex items-center gap-2">
-                    <CalendarIcon className="w-3 h-3" />
-                    <span>{new Date(r.createdAt).toLocaleString('ar-EG')}</span>
-                  </div>
-                </CardHeader>
-                
-                <CardContent className="space-y-4">
-                  {/* Date Range and Final Balance */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
-                      <div className="text-xs text-blue-600 font-semibold mb-1">الشهر الماضي</div>
-                      <div className="text-sm font-bold text-blue-800">{Number(r.totals?.lastMonthClosing || 0).toLocaleString()}</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-3 border border-emerald-200">
-                      <div className="text-xs text-emerald-600 font-semibold">مخازن نهائي</div>
-                      <div className="text-sm font-bold text-emerald-800">{Number(r.totals?.finalBalance || 0).toLocaleString()}</div>
-                    </div>
-                  </div>
-                  
-                  {/* Net Profit and Storage Difference */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg p-3 border border-primary/20">
-                      <div className="text-xs text-primary font-semibold">صافي الربح</div>
-                      <div className="text-sm font-bold text-primary">{Number(r.totals?.netProfit||0).toLocaleString()}</div>
-                    </div>
-                    <div className="bg-gradient-to-r from-secondary/5 to-secondary/10 rounded-lg p-3 border border-secondary/20">
-                      <div className="text-xs text-secondary font-semibold">فرق المخازن</div>
-                      <div className="text-sm font-bold text-secondary">{Number((r.totals?.finalBalance || 0) - (r.totals?.lastMonthClosing || 0)).toLocaleString()}</div>
-                    </div>
-                  </div>
-                  
-                  {/* Calculation Result */}
-                  <div className="rounded-lg p-3 border bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
-                    <div className="text-xs font-semibold text-primary">صافي الربح - فرق المخازن</div>
-                    <div className="text-sm font-bold text-primary">{Math.abs(Number(r.totals?.netProfit||0) - ((r.totals?.finalBalance || 0) - (r.totals?.lastMonthClosing || 0))).toLocaleString()}</div>
-                  </div>
-                  
-                  {/* Action Buttons */}
-                  <div className="flex gap-2 pt-2 items-center">
-                    {/* Open: show final results wizard view */}
-                    <Button 
-                      size="sm" 
-                      variant="outline" 
-                      onClick={async () => {
-                        try {
-                          toast({ title: 'جارٍ الفتح', description: 'يتم تحميل المعاينة المبسطة...', variant: 'default' });
-                        // Unsaved changes guard
-                        if (currentReportId && editMode) {
-                          const confirmed = confirm('لديك تعديلات غير محفوظة على التقرير الحالي. هل تريد المتابعة وفقدان التعديلات؟');
-                          if (!confirmed) return;
-                        }
-                        const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${r._id}`);
-                        const doc = resp.ok ? (resp as { ok: true; item: ProfitReportDoc }).item : r;
-                        setTitle(doc.title||''); setDescription(doc.description||'');
-                        setLastMonthClosing(Number(doc?.totals?.lastMonthClosing||0)); setManualLastMonthValue(false);
-                        // Migrate old "ديون له" to "ديون ليه"
-                        const migratedExpenses = (doc.expenses || []).map((e: string) => e === 'ديون له' ? 'ديون ليه' : e);
-                        setBranches(doc.branches || []); setExpenses(migratedExpenses);
-                        setBranchRows((doc.branchRows||[]).map((br: SavedBranchRow) => {
-                          const values = { ...(br.values || {}) } as Record<string, number>;
-                          if (values['ديون له'] !== undefined) {
-                            values['ديون ليه'] = values['ديون له'];
-                            delete values['ديون له'];
-                          }
-                          return { name: br.name, values: values as Record<Expense, number> };
-                        }));
-                        setRange({ from: new Date(doc.startDate), to: new Date(doc.endDate) }); setCurrentReportId(doc._id);
-                        const tb: ProfitTotals = (doc?.totals || {}) as ProfitTotals;
-                        setCashBreakdown({ outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0), home: Number(tb.cashBreakdown?.home || 0), bank: Number(tb.cashBreakdown?.bank || 0), drawer: Number(tb.cashBreakdown?.drawer || 0), vodafone: Number(tb.cashBreakdown?.vodafone || 0), customRows: tb.cashBreakdown?.customRows || [] });
-                        setPrefillLock(true);
-                        // Ensure only simple preview opens
-                        setShowWizard(false);
-                        setShowPreview(false);
-                        setShowResults(false);
-                        setWizardStep(0);
-                        setEditMode(false);
-                        setTimeout(() => {
-                          setShowSimplePreview(true);
-                        }, 50);
-                        toast({ title: 'تم الفتح', description: 'تم فتح المعاينة المبسطة.', variant: 'default' });
-                        } catch (e) {
-                          toast({ title: 'فشل الفتح', description: (e as Error).message, variant: 'destructive' });
-                        }
-                      }}
-                      className="w-9 h-9 p-0 bg-white/80 hover:bg-white border-green-200 text-green-700 hover:text-green-800"
-                    >
-                      <Eye className="w-4 h-4" aria-label="فتح" />
-                    </Button>
+                  <Card key={r._id} className="group bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-1">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg font-bold text-slate-900 group-hover:text-green-600 transition-colors">
+                            {r.reportName || r.title || 'ملخص محفوظ'}
+                          </CardTitle>
+                          <p className="text-sm text-slate-600 mt-1 leading-relaxed">{r.description}</p>
+                        </div>
+                        <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                          <FileText className="w-5 h-5 text-green-600" />
+                        </div>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-2 flex items-center gap-2">
+                        <CalendarIcon className="w-3 h-3" />
+                        <span>{new Date(r.createdAt).toLocaleString('ar-EG')}</span>
+                      </div>
+                    </CardHeader>
 
-                    {/* View Report (A4 layout) */}
-                    <Button
-                      size="sm"
-                      className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-600 text-white"
-                      onClick={async () => {
-                        try {
-                          toast({ title: 'فتح تقرير A4', description: 'جاري التحميل...', variant: 'default' });
-                          if (currentReportId !== r._id) {
-                            const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${r._id}`);
-                            if (!resp.ok) {
-                              toast({ title: 'تعذر التحميل', description: (resp as { ok: false; error: string }).error || '' , variant: 'destructive'});
-                              setTitle(r.title||''); setDescription(r.description||'');
-                              setLastMonthClosing(Number(r?.totals?.lastMonthClosing||0)); setManualLastMonthValue(false);
-                              // Migrate old "ديون له" to "ديون ليه" in expenses array
-                              const migratedExpenses = (r.expenses || []).map((e: string) => e === 'ديون له' ? 'ديون ليه' : e);
-                              setBranches(r.branches || []); setExpenses(migratedExpenses);
-                              // Migrate old "ديون له" to "ديون ليه" in branch values
-                              setBranchRows((r.branchRows||[]).map((br: SavedBranchRow) => {
-                                const values = { ...(br.values || {}) } as Record<string, number>;
-                                if (values['ديون له'] !== undefined) {
-                                  values['ديون ليه'] = values['ديون له'];
-                                  delete values['ديون له'];
-                                }
-                                return { name: br.name, values: values as Record<Expense, number> };
-                              }));
-                              setRange({ from: new Date(r.startDate), to: new Date(r.endDate) }); setCurrentReportId(r._id);
-                              const tb: ProfitTotals = (r?.totals || {}) as ProfitTotals;
-                              // 🎯 SMART MERGE: If report has no custom rows, preserve global custom rows
-                              const reportCustomRows = tb.cashBreakdown?.customRows || [];
-                              const globalCustomRows = cashBreakdown.customRows || [];
-                              const mergedCustomRows = reportCustomRows.length > 0 ? reportCustomRows : globalCustomRows;
-                              
-                              const reportCashBreakdown = { 
-                                outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0), 
-                                home: Number(tb.cashBreakdown?.home || 0), 
-                                bank: Number(tb.cashBreakdown?.bank || 0), 
-                                drawer: Number(tb.cashBreakdown?.drawer || 0), 
-                                vodafone: Number(tb.cashBreakdown?.vodafone || 0), 
-                                customRows: mergedCustomRows 
-                              };
-                              setCashBreakdown(reportCashBreakdown);
-                              setPrefillLock(true);
-                            } else {
-                              const doc = (resp as { ok: true; item: ProfitReportDoc }).item;
-                              setTitle(doc.title||''); setDescription(doc.description||'');
-                              setLastMonthClosing(Number(doc?.totals?.lastMonthClosing||0)); setManualLastMonthValue(false);
+                    <CardContent className="space-y-4">
+                      {/* Date Range and Final Balance */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg p-3 border border-blue-200">
+                          <div className="text-xs text-blue-600 font-semibold mb-1">الشهر الماضي</div>
+                          <div className="text-sm font-bold text-blue-800">{Number(r.totals?.lastMonthClosing || 0).toLocaleString()}</div>
+                        </div>
+                        <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-lg p-3 border border-emerald-200">
+                          <div className="text-xs text-emerald-600 font-semibold">مخازن نهائي</div>
+                          <div className="text-sm font-bold text-emerald-800">{Number(r.totals?.finalBalance || 0).toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                      {/* Net Profit and Storage Difference */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg p-3 border border-primary/20">
+                          <div className="text-xs text-primary font-semibold">صافي الربح</div>
+                          <div className="text-sm font-bold text-primary">{Number(r.totals?.netProfit || 0).toLocaleString()}</div>
+                        </div>
+                        <div className="bg-gradient-to-r from-secondary/5 to-secondary/10 rounded-lg p-3 border border-secondary/20">
+                          <div className="text-xs text-secondary font-semibold">فرق المخازن</div>
+                          <div className="text-sm font-bold text-secondary">{Number((r.totals?.finalBalance || 0) - (r.totals?.lastMonthClosing || 0)).toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                      {/* Calculation Result */}
+                      <div className="rounded-lg p-3 border bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20">
+                        <div className="text-xs font-semibold text-primary">صافي الربح - فرق المخازن</div>
+                        <div className="text-sm font-bold text-primary">{Math.abs(Number(r.totals?.netProfit || 0) - ((r.totals?.finalBalance || 0) - (r.totals?.lastMonthClosing || 0))).toLocaleString()}</div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-2 pt-2 items-center">
+                        {/* Open: show final results wizard view */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            try {
+                              toast({ title: 'جارٍ الفتح', description: 'يتم تحميل المعاينة المبسطة...', variant: 'default' });
+                              // Unsaved changes guard
+                              if (currentReportId && editMode) {
+                                const confirmed = confirm('لديك تعديلات غير محفوظة على التقرير الحالي. هل تريد المتابعة وفقدان التعديلات؟');
+                                if (!confirmed) return;
+                              }
+                              const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${r._id}`);
+                              const doc = resp.ok ? (resp as { ok: true; item: ProfitReportDoc }).item : r;
+                              setTitle(doc.title || ''); setDescription(doc.description || '');
+                              setLastMonthClosing(Number(doc?.totals?.lastMonthClosing || 0)); setManualLastMonthValue(false);
                               // Migrate old "ديون له" to "ديون ليه"
                               const migratedExpenses = (doc.expenses || []).map((e: string) => e === 'ديون له' ? 'ديون ليه' : e);
                               setBranches(doc.branches || []); setExpenses(migratedExpenses);
-                              setBranchRows((doc.branchRows||[]).map((br: SavedBranchRow) => {
+                              setBranchRows((doc.branchRows || []).map((br: SavedBranchRow) => {
                                 const values = { ...(br.values || {}) } as Record<string, number>;
                                 if (values['ديون له'] !== undefined) {
                                   values['ديون ليه'] = values['ديون له'];
@@ -2203,81 +2138,161 @@ export default function AdminProfit() {
                               }));
                               setRange({ from: new Date(doc.startDate), to: new Date(doc.endDate) }); setCurrentReportId(doc._id);
                               const tb: ProfitTotals = (doc?.totals || {}) as ProfitTotals;
-                              // 🎯 SMART MERGE: If report has no custom rows, preserve global custom rows
-                              const reportCustomRows2 = tb.cashBreakdown?.customRows || [];
-                              const globalCustomRows2 = cashBreakdown.customRows || [];
-                              const mergedCustomRows2 = reportCustomRows2.length > 0 ? reportCustomRows2 : globalCustomRows2;
-                              
-                              const reportCashBreakdown2 = { 
-                                outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0), 
-                                home: Number(tb.cashBreakdown?.home || 0), 
-                                bank: Number(tb.cashBreakdown?.bank || 0), 
-                                drawer: Number(tb.cashBreakdown?.drawer || 0), 
-                                vodafone: Number(tb.cashBreakdown?.vodafone || 0), 
-                                customRows: mergedCustomRows2 
-                              };
-                              setCashBreakdown(reportCashBreakdown2);
+                              setCashBreakdown({ outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0), home: Number(tb.cashBreakdown?.home || 0), bank: Number(tb.cashBreakdown?.bank || 0), drawer: Number(tb.cashBreakdown?.drawer || 0), vodafone: Number(tb.cashBreakdown?.vodafone || 0), customRows: tb.cashBreakdown?.customRows || [] });
                               setPrefillLock(true);
+                              // Ensure only simple preview opens
+                              setShowWizard(false);
+                              setShowPreview(false);
+                              setShowResults(false);
+                              setWizardStep(0);
+                              setEditMode(false);
+                              setTimeout(() => {
+                                setShowSimplePreview(true);
+                              }, 50);
+                              toast({ title: 'تم الفتح', description: 'تم فتح المعاينة المبسطة.', variant: 'default' });
+                            } catch (e) {
+                              toast({ title: 'فشل الفتح', description: (e as Error).message, variant: 'destructive' });
                             }
-                          }
-                          setEditMode(false);
-                          setPreviewLayout('a4');
-                          setShowPreview(true);
-                          toast({ title: 'تم الفتح', description: 'تم فتح عرض A4.', variant: 'default' });
-                        } catch (e) {
-                          toast({ title: 'فشل الفتح', description: (e as Error).message, variant: 'destructive' });
-                        }
-                      }}
-                    >
-                      <FileText className="w-3 h-3 mr-1" />
-                      {'عرض تقرير'}
-                    </Button>
+                          }}
+                          className="w-9 h-9 p-0 bg-white/80 hover:bg-white border-green-200 text-green-700 hover:text-green-800"
+                        >
+                          <Eye className="w-4 h-4" aria-label="فتح" />
+                        </Button>
 
-                    {/* Edit (open multi-step wizard like create flow) */}
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={async () => {
-                        // Unsaved changes guard
-                        if (currentReportId && editMode) {
-                          const confirmed = confirm('لديك تعديلات غير محفوظة على التقرير الحالي. هل تريد المتابعة وفقدان التعديلات؟');
-                          if (!confirmed) return;
-                        }
-                        
-                        // Open comprehensive edit modal instead of wizard
-                        const localReport = reports.find(report => report._id === r._id);
-                        if (localReport) {
-                          setQuickEditReport(localReport);
-                          setShowQuickEditModal(true);
-                        } else {
+                        {/* View Report (A4 layout) */}
+                        <Button
+                          size="sm"
+                          className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-600 text-white"
+                          onClick={async () => {
+                            try {
+                              toast({ title: 'فتح تقرير A4', description: 'جاري التحميل...', variant: 'default' });
+                              if (currentReportId !== r._id) {
+                                const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${r._id}`);
+                                if (!resp.ok) {
+                                  toast({ title: 'تعذر التحميل', description: (resp as { ok: false; error: string }).error || '', variant: 'destructive' });
+                                  setTitle(r.title || ''); setDescription(r.description || '');
+                                  setLastMonthClosing(Number(r?.totals?.lastMonthClosing || 0)); setManualLastMonthValue(false);
+                                  // Migrate old "ديون له" to "ديون ليه" in expenses array
+                                  const migratedExpenses = (r.expenses || []).map((e: string) => e === 'ديون له' ? 'ديون ليه' : e);
+                                  setBranches(r.branches || []); setExpenses(migratedExpenses);
+                                  // Migrate old "ديون له" to "ديون ليه" in branch values
+                                  setBranchRows((r.branchRows || []).map((br: SavedBranchRow) => {
+                                    const values = { ...(br.values || {}) } as Record<string, number>;
+                                    if (values['ديون له'] !== undefined) {
+                                      values['ديون ليه'] = values['ديون له'];
+                                      delete values['ديون له'];
+                                    }
+                                    return { name: br.name, values: values as Record<Expense, number> };
+                                  }));
+                                  setRange({ from: new Date(r.startDate), to: new Date(r.endDate) }); setCurrentReportId(r._id);
+                                  const tb: ProfitTotals = (r?.totals || {}) as ProfitTotals;
+                                  // 🎯 SMART MERGE: If report has no custom rows, preserve global custom rows
+                                  const reportCustomRows = tb.cashBreakdown?.customRows || [];
+                                  const globalCustomRows = cashBreakdown.customRows || [];
+                                  const mergedCustomRows = reportCustomRows.length > 0 ? reportCustomRows : globalCustomRows;
 
-                          const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${r._id}`);
-                          if (resp.ok) {
-                            setQuickEditReport((resp as { ok: true; item: ProfitReportDoc }).item);
-                            setShowQuickEditModal(true);
-                          }
-                        }
-                      }}
-                      className="w-9 h-9 p-0 bg-white/80 hover:bg-white border-emerald-200 text-emerald-700 hover:text-emerald-800"
-                    >
-                      <Edit className="w-4 h-4" aria-label="تعديل" />
-                    </Button>
+                                  const reportCashBreakdown = {
+                                    outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0),
+                                    home: Number(tb.cashBreakdown?.home || 0),
+                                    bank: Number(tb.cashBreakdown?.bank || 0),
+                                    drawer: Number(tb.cashBreakdown?.drawer || 0),
+                                    vodafone: Number(tb.cashBreakdown?.vodafone || 0),
+                                    customRows: mergedCustomRows
+                                  };
+                                  setCashBreakdown(reportCashBreakdown);
+                                  setPrefillLock(true);
+                                } else {
+                                  const doc = (resp as { ok: true; item: ProfitReportDoc }).item;
+                                  setTitle(doc.title || ''); setDescription(doc.description || '');
+                                  setLastMonthClosing(Number(doc?.totals?.lastMonthClosing || 0)); setManualLastMonthValue(false);
+                                  // Migrate old "ديون له" to "ديون ليه"
+                                  const migratedExpenses = (doc.expenses || []).map((e: string) => e === 'ديون له' ? 'ديون ليه' : e);
+                                  setBranches(doc.branches || []); setExpenses(migratedExpenses);
+                                  setBranchRows((doc.branchRows || []).map((br: SavedBranchRow) => {
+                                    const values = { ...(br.values || {}) } as Record<string, number>;
+                                    if (values['ديون له'] !== undefined) {
+                                      values['ديون ليه'] = values['ديون له'];
+                                      delete values['ديون له'];
+                                    }
+                                    return { name: br.name, values: values as Record<Expense, number> };
+                                  }));
+                                  setRange({ from: new Date(doc.startDate), to: new Date(doc.endDate) }); setCurrentReportId(doc._id);
+                                  const tb: ProfitTotals = (doc?.totals || {}) as ProfitTotals;
+                                  // 🎯 SMART MERGE: If report has no custom rows, preserve global custom rows
+                                  const reportCustomRows2 = tb.cashBreakdown?.customRows || [];
+                                  const globalCustomRows2 = cashBreakdown.customRows || [];
+                                  const mergedCustomRows2 = reportCustomRows2.length > 0 ? reportCustomRows2 : globalCustomRows2;
 
-                    {/* Delete (confirm then schedule with undo) */}
-                    <Button
-                      size="sm"
-                      variant="destructive"
-                      onClick={() => setShowDeleteReportId(r._id)}
-                      className="w-9 h-9 p-0"
-                    >
-                      <Trash2 className="w-4 h-4" aria-label="حذف" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                                  const reportCashBreakdown2 = {
+                                    outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0),
+                                    home: Number(tb.cashBreakdown?.home || 0),
+                                    bank: Number(tb.cashBreakdown?.bank || 0),
+                                    drawer: Number(tb.cashBreakdown?.drawer || 0),
+                                    vodafone: Number(tb.cashBreakdown?.vodafone || 0),
+                                    customRows: mergedCustomRows2
+                                  };
+                                  setCashBreakdown(reportCashBreakdown2);
+                                  setPrefillLock(true);
+                                }
+                              }
+                              setEditMode(false);
+                              setPreviewLayout('a4');
+                              setShowPreview(true);
+                              toast({ title: 'تم الفتح', description: 'تم فتح عرض A4.', variant: 'default' });
+                            } catch (e) {
+                              toast({ title: 'فشل الفتح', description: (e as Error).message, variant: 'destructive' });
+                            }
+                          }}
+                        >
+                          <FileText className="w-3 h-3 mr-1" />
+                          {'عرض تقرير'}
+                        </Button>
+
+                        {/* Edit (open multi-step wizard like create flow) */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={async () => {
+                            // Unsaved changes guard
+                            if (currentReportId && editMode) {
+                              const confirmed = confirm('لديك تعديلات غير محفوظة على التقرير الحالي. هل تريد المتابعة وفقدان التعديلات؟');
+                              if (!confirmed) return;
+                            }
+
+                            // Open comprehensive edit modal instead of wizard
+                            const localReport = reports.find(report => report._id === r._id);
+                            if (localReport) {
+                              setQuickEditReport(localReport);
+                              setShowQuickEditModal(true);
+                            } else {
+
+                              const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${r._id}`);
+                              if (resp.ok) {
+                                setQuickEditReport((resp as { ok: true; item: ProfitReportDoc }).item);
+                                setShowQuickEditModal(true);
+                              }
+                            }
+                          }}
+                          className="w-9 h-9 p-0 bg-white/80 hover:bg-white border-emerald-200 text-emerald-700 hover:text-emerald-800"
+                        >
+                          <Edit className="w-4 h-4" aria-label="تعديل" />
+                        </Button>
+
+                        {/* Delete (confirm then schedule with undo) */}
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => setShowDeleteReportId(r._id)}
+                          className="w-9 h-9 p-0"
+                        >
+                          <Trash2 className="w-4 h-4" aria-label="حذف" />
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
-              
+
               <div className="flex items-center gap-2">
                 {/* First Page Button */}
                 <Button
@@ -2289,7 +2304,7 @@ export default function AdminProfit() {
                 >
                   <ChevronsLeft className="w-4 h-4" />
                 </Button>
-                
+
                 {/* Previous Page Button */}
                 <Button
                   variant="outline"
@@ -2300,7 +2315,7 @@ export default function AdminProfit() {
                 >
                   <ChevronLeft className="w-4 h-4" />
                 </Button>
-                
+
                 {/* Page Numbers */}
                 <div className="flex items-center gap-1">
                   {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -2314,25 +2329,24 @@ export default function AdminProfit() {
                     } else {
                       pageNum = currentPage - 2 + i;
                     }
-                    
+
                     return (
                       <Button
                         key={pageNum}
                         variant={currentPage === pageNum ? "default" : "outline"}
                         size="sm"
                         onClick={() => goToPage(pageNum)}
-                        className={`w-9 h-9 p-0 transition-all duration-200 ${
-                          currentPage === pageNum
-                            ? 'bg-gradient-to-r from-green-600 to-emerald-600 border-green-600 text-white shadow-md hover:from-green-700 hover:to-emerald-700'
-                            : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
-                        }`}
+                        className={`w-9 h-9 p-0 transition-all duration-200 ${currentPage === pageNum
+                          ? 'bg-gradient-to-r from-green-600 to-emerald-600 border-green-600 text-white shadow-md hover:from-green-700 hover:to-emerald-700'
+                          : 'border-slate-300 hover:border-slate-400 hover:bg-slate-50'
+                          }`}
                       >
                         {pageNum}
                       </Button>
                     );
                   })}
                 </div>
-                
+
                 {/* Next Page Button */}
                 <Button
                   variant="outline"
@@ -2343,7 +2357,7 @@ export default function AdminProfit() {
                 >
                   <ChevronRight className="w-4 h-4" />
                 </Button>
-                
+
                 {/* Last Page Button */}
                 <Button
                   variant="outline"
@@ -2355,12 +2369,12 @@ export default function AdminProfit() {
                   <ChevronsRight className="w-4 h-4" />
                 </Button>
               </div>
-            
-          </>
+
+            </>
           )}
         </div>
 
-        
+
 
         {/* Enhanced Management Modal */}
         <Dialog open={showManage} onOpenChange={setShowManage}>
@@ -2376,14 +2390,14 @@ export default function AdminProfit() {
                   </DialogTitle>
                   <DialogDescription className="text-slate-600 mt-1 flex items-center gap-2">
                     <span>أضف أو احذف المصروفات.</span>
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${manageExpensesScope==='global' ? 'bg-primary/5 text-primary border-primary/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-                      النطاق: {manageExpensesScope==='global' ? 'عام (قالب)' : 'هذا التقرير فقط'}
+                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${manageExpensesScope === 'global' ? 'bg-primary/5 text-primary border-primary/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                      النطاق: {manageExpensesScope === 'global' ? 'عام (قالب)' : 'هذا التقرير فقط'}
                     </span>
                   </DialogDescription>
                 </div>
               </div>
             </DialogHeader>
-            
+
             <div className="py-6">
               {/* Expenses Section */}
               <Card className="bg-gradient-to-br from-primary/5 to-secondary/5 border-primary/20/50 shadow-lg rounded-xl mb-6">
@@ -2393,19 +2407,19 @@ export default function AdminProfit() {
                       <PieChart className="w-5 h-5 text-primary" />
                     </div>
                     <span>
-                      المصروفات ({(manageExpensesScope==='global' ? globalExpenses : expenses).filter(e => !new Set(['مخازن','كاش الدرج','ديون ليه','ديون عليه','أرباح']).has(e)).length})
+                      المصروفات ({(manageExpensesScope === 'global' ? globalExpenses : expenses).filter(e => !new Set(['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح']).has(e)).length})
                     </span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 max-h-96 overflow-y-auto pt-4">
-                  {(manageExpensesScope==='global' ? globalExpenses : expenses).filter(e => !new Set(['مخازن','كاش الدرج','ديون ليه','ديون عليه','أرباح']).has(e)).map((eName) => {
-                    const i = (manageExpensesScope==='global' ? globalExpenses : expenses).indexOf(eName);
+                  {(manageExpensesScope === 'global' ? globalExpenses : expenses).filter(e => !new Set(['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح']).has(e)).map((eName) => {
+                    const i = (manageExpensesScope === 'global' ? globalExpenses : expenses).indexOf(eName);
                     const currentType = expenseTypes.get(eName) || 'other';
                     return (
                       <div key={i} className="flex gap-3 items-center p-3 bg-white rounded-lg border border-primary/20 shadow-sm hover:shadow-md transition-shadow">
                         <div className="flex-1 flex items-center gap-2">
                           <Input value={eName} readOnly className="flex-1 bg-white" />
-                          <Badge 
+                          <Badge
                             variant={currentType === 'personal' ? 'default' : 'secondary'}
                             className={currentType === 'personal' ? 'bg-blue-500 hover:bg-blue-600' : 'bg-gray-500 hover:bg-gray-600'}
                           >
@@ -2421,40 +2435,40 @@ export default function AdminProfit() {
                               const newMap = new Map(prev).set(eName, newType);
                               return newMap;
                             });
-                            toast({ 
-                              title: fixText('تم التحديث'), 
-                              description: fixText(`تم تغيير نوع "${eName}" إلى ${newType === 'personal' ? 'شخصي' : 'عادي'}`) 
+                            toast({
+                              title: fixText('تم التحديث'),
+                              description: fixText(`تم تغيير نوع "${eName}" إلى ${newType === 'personal' ? 'شخصي' : 'عادي'}`)
                             });
                           }}
                           className="border-blue-300 hover:border-blue-500 text-blue-600 hover:text-blue-700"
                         >
                           <Edit className="w-4 h-4" />
                         </Button>
-                        {manageExpensesScope==='report' && (
+                        {manageExpensesScope === 'report' && (
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={()=> { setExpenseValuesIndex(i); setShowExpenseValues(true); }}
+                            onClick={() => { setExpenseValuesIndex(i); setShowExpenseValues(true); }}
                             className="border-purple-300 hover:border-purple-500"
                           >
                             قيم
                           </Button>
                         )}
-                        <Button 
-                          size="sm" 
-                          variant="destructive" 
-                          onClick={()=> {
-                            const list = (manageExpensesScope==='global' ? globalExpenses : expenses);
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          onClick={() => {
+                            const list = (manageExpensesScope === 'global' ? globalExpenses : expenses);
                             const expenseName = list[i];
-                            if (manageExpensesScope==='report') {
+                            if (manageExpensesScope === 'report') {
                               const hasValues = branchRows.some(branch => Number((branch.values as Record<string, number>)[expenseName]) > 0);
                               if (hasValues) {
                                 const confirmed = confirm(`تحذير: المصروف "${expenseName}" يحتوي على قيم محفوظة في بعض الفروع. هل أنت متأكد من حذفه؟`);
                                 if (!confirmed) return;
                               }
-                              setExpenses(prev => prev.filter((_,idx)=> idx!==i));
+                              setExpenses(prev => prev.filter((_, idx) => idx !== i));
                             } else {
-                              setGlobalExpenses(prev => prev.filter((_,idx)=> idx!==i));
+                              setGlobalExpenses(prev => prev.filter((_, idx) => idx !== i));
                             }
                             // Remove from expense types as well
                             setExpenseTypes(prev => {
@@ -2470,10 +2484,10 @@ export default function AdminProfit() {
                       </div>
                     );
                   })}
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => {
-                      if (manageExpensesScope==='global') {
+                      if (manageExpensesScope === 'global') {
                         const name = prompt('اسم المصروف الجديد:');
                         if (!name) return;
                         const trimmedName = name.trim();
@@ -2488,15 +2502,15 @@ export default function AdminProfit() {
                         // Ask for expense type
                         const typeChoice = confirm('هل هذا مصروف شخصي؟\n\nاضغط "موافق" للمصروف الشخصي (يضاف للكاش)\nاضغط "إلغاء" للمصروف العادي (يخصم من الأرباح)');
                         const expenseType: ExpenseType = typeChoice ? 'personal' : 'other';
-                        
+
                         setGlobalExpenses(prev => [...prev, trimmedName]);
                         setExpenseTypes(prev => {
                           const newMap = new Map(prev).set(trimmedName, expenseType);
                           return newMap;
                         });
-                        toast({ 
-                          title: fixText('تم'), 
-                          description: fixText(`تم إضافة المصروف "${trimmedName}" كنوع ${expenseType === 'personal' ? 'شخصي' : 'عادي'}.`) 
+                        toast({
+                          title: fixText('تم'),
+                          description: fixText(`تم إضافة المصروف "${trimmedName}" كنوع ${expenseType === 'personal' ? 'شخصي' : 'عادي'}.`)
                         });
                       } else {
                         addExpense();
@@ -2505,16 +2519,16 @@ export default function AdminProfit() {
                     className="w-full bg-gradient-to-r from-purple-500 to-violet-500 hover:from-purple-600 hover:to-violet-600 text-white border-0 shadow-md"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    {manageExpensesScope==='global' ? 'إضافة مصروف (عام)' : 'إضافة مصروف (للتقرير)'}
+                    {manageExpensesScope === 'global' ? 'إضافة مصروف (عام)' : 'إضافة مصروف (للتقرير)'}
                   </Button>
                 </CardContent>
               </Card>
               {/* Removed Analytics Section per request */}
             </div>
-            
+
             <DialogFooter className="pt-6 border-t border-slate-200">
-              <Button 
-                onClick={()=> setShowManage(false)}
+              <Button
+                onClick={() => setShowManage(false)}
                 className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg text-white"
               >
                 <Eye className="w-4 h-4 mr-2" />
@@ -2546,9 +2560,9 @@ export default function AdminProfit() {
                   {expenses.filter(e => !fixedExpenses.has(e)).map(e => (
                     <tr key={`ex-row-${e}`} className="odd:bg-white even:bg-primary/5/40">
                       <td className="p-2 border border-primary/20 text-right font-medium">{e}</td>
-                      <td className="p-2 border border-primary/20 text-center font-semibold">{Number(totals.sumByExpense?.[e]||0).toLocaleString('en-US')}</td>
+                      <td className="p-2 border border-primary/20 text-center font-semibold">{Number(totals.sumByExpense?.[e] || 0).toLocaleString('en-US')}</td>
                       {branches.map(b => (
-                        <td key={`ex-cell-${e}-${b}`} className="p-2 border border-primary/20 text-center">{Number(branchRows.find(r=>r.name===b)?.values[e]||0).toLocaleString('en-US')}</td>
+                        <td key={`ex-cell-${e}-${b}`} className="p-2 border border-primary/20 text-center">{Number(branchRows.find(r => r.name === b)?.values[e] || 0).toLocaleString('en-US')}</td>
                       ))}
                     </tr>
                   ))}
@@ -2556,7 +2570,7 @@ export default function AdminProfit() {
               </table>
             </div>
             <DialogFooter className="pt-4 border-t border-primary/20">
-              <Button variant="outline" onClick={()=> setShowExpensesDetails(false)}>إغلاق</Button>
+              <Button variant="outline" onClick={() => setShowExpensesDetails(false)}>إغلاق</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2580,9 +2594,9 @@ export default function AdminProfit() {
               <div className="flex flex-wrap gap-3 items-end bg-white border border-emerald-200 p-4 rounded-xl">
                 <div className="flex-1 min-w-[200px]">
                   <Label>الاسم *</Label>
-                  <Input 
-                    value={shareName} 
-                    onChange={(e)=> setShareName(e.target.value)}
+                  <Input
+                    value={shareName}
+                    onChange={(e) => setShareName(e.target.value)}
                     placeholder="اسم المساهم"
                     className="bg-white"
                   />
@@ -2591,7 +2605,7 @@ export default function AdminProfit() {
                   <Label>الرصيد الابتدائي *</Label>
                   <Input
                     value={shareAmount}
-                    onChange={(e)=> { 
+                    onChange={(e) => {
                       const v = e.target.value;
                       if (v === '' || validateNumericInput(v)) {
                         setShareAmount(v);
@@ -2605,7 +2619,7 @@ export default function AdminProfit() {
                   <Label>النسبة % من ربح الجنيه *</Label>
                   <Input
                     value={sharePercent}
-                    onChange={(e)=> { 
+                    onChange={(e) => {
                       const v = e.target.value;
                       if (v === '' || validateNumericInput(v)) {
                         setSharePercent(v);
@@ -2616,8 +2630,8 @@ export default function AdminProfit() {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button onClick={saveShare} className="bg-emerald-600 hover:bg-emerald-700 text-white">{editShareId? 'تحديث':'إضافة'}</Button>
-                  {editShareId && <Button variant="outline" onClick={()=> { setEditShareId(null); setShareName(''); setShareAmount('0'); setSharePercent('0'); }}>إلغاء التعديل</Button>}
+                  <Button onClick={saveShare} className="bg-emerald-600 hover:bg-emerald-700 text-white">{editShareId ? 'تحديث' : 'إضافة'}</Button>
+                  {editShareId && <Button variant="outline" onClick={() => { setEditShareId(null); setShareName(''); setShareAmount('0'); setSharePercent('0'); }}>إلغاء التعديل</Button>}
                 </div>
                 <div className="text-xs text-emerald-800 ml-auto">ربح الجنيه الحالي: <b>{perPoundProfitComputed.toFixed(4)}</b></div>
               </div>
@@ -2639,18 +2653,18 @@ export default function AdminProfit() {
                         <td className="p-2 border border-emerald-200 text-right font-medium">
                           <Input
                             value={s.name}
-                            onChange={(e)=> setShareholders(prev => prev.map(x => x.id===s.id ? { ...x, name: e.target.value } : x))}
+                            onChange={(e) => setShareholders(prev => prev.map(x => x.id === s.id ? { ...x, name: e.target.value } : x))}
                             className="bg-white"
                           />
                         </td>
-                        <td className="p-2 border border-emerald-200 text-center">{Number(s.amount||0).toLocaleString()}</td>
+                        <td className="p-2 border border-emerald-200 text-center">{Number(s.amount || 0).toLocaleString()}</td>
                         <td className="p-2 border border-emerald-200 text-center">
                           <Input
                             value={formatNumber(sanitizeNumericValue(String(s.percentage)))}
-                            onChange={(e)=> {
-                              const v=e.target.value; if(!validateNumericInput(v)) return;
+                            onChange={(e) => {
+                              const v = e.target.value; if (!validateNumericInput(v)) return;
                               const num = sanitizeNumericValue(v);
-                              setShareholders(prev => prev.map(x => x.id===s.id ? { ...x, percentage: num } : x));
+                              setShareholders(prev => prev.map(x => x.id === s.id ? { ...x, percentage: num } : x));
                             }}
                             className="bg-white text-center max-w-[120px] mx-auto"
                           />
@@ -2660,16 +2674,16 @@ export default function AdminProfit() {
                             <Input
                               placeholder="0"
                               value={formatNumber(sanitizeNumericValue(shareDeltas[s.id] || ''))}
-                              onChange={(e)=> { const v=e.target.value; if(!validateNumericInput(v)) return; setShareDeltas(m => ({ ...m, [s.id]: v })); }}
+                              onChange={(e) => { const v = e.target.value; if (!validateNumericInput(v)) return; setShareDeltas(m => ({ ...m, [s.id]: v })); }}
                               className="bg-white text-center max-w-[120px]"
                             />
-                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={()=> applyManualDelta(s, 1)}>زيادة</Button>
-                            <Button size="sm" variant="destructive" onClick={()=> applyManualDelta(s, -1)}>نقصان</Button>
+                            <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => applyManualDelta(s, 1)}>زيادة</Button>
+                            <Button size="sm" variant="destructive" onClick={() => applyManualDelta(s, -1)}>نقصان</Button>
                           </div>
                         </td>
                         <td className="p-2 border border-emerald-200 text-center">
-                          <Button size="sm" variant="secondary" className="mr-2" onClick={()=> { setHistoryForId(s.id); setShowShareHistory(true); }}>السجل</Button>
-                          <Button size="sm" variant="destructive" onClick={()=> deleteShare(s.id)}>حذف</Button>
+                          <Button size="sm" variant="secondary" className="mr-2" onClick={() => { setHistoryForId(s.id); setShowShareHistory(true); }}>السجل</Button>
+                          <Button size="sm" variant="destructive" onClick={() => deleteShare(s.id)}>حذف</Button>
                         </td>
                       </tr>
                     ))}
@@ -2679,7 +2693,7 @@ export default function AdminProfit() {
             </div>
 
             <DialogFooter className="pt-6 border-t border-emerald-200">
-              <Button onClick={()=> setShowShareModal(false)} className="bg-emerald-600 hover:bg-emerald-700 text-white">إغلاق</Button>
+              <Button onClick={() => setShowShareModal(false)} className="bg-emerald-600 hover:bg-emerald-700 text-white">إغلاق</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2732,13 +2746,13 @@ export default function AdminProfit() {
               </table>
             </div>
             <DialogFooter className="pt-4 border-t border-slate-200">
-              <Button variant="outline" onClick={()=> setShowShareHistory(false)}>إغلاق</Button>
+              <Button variant="outline" onClick={() => setShowShareHistory(false)}>إغلاق</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
 
         {/* Expense Edit Modal */}
-        <Dialog open={showExpenseEdit} onOpenChange={(o)=> { setShowExpenseEdit(o); if (!o) { setExpenseEditIndex(null); setExpenseEditValue(''); } }}>
+        <Dialog open={showExpenseEdit} onOpenChange={(o) => { setShowExpenseEdit(o); if (!o) { setExpenseEditIndex(null); setExpenseEditValue(''); } }}>
           <DialogContent className="max-w-md bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-2xl rounded-2xl">
             <DialogHeader className="pb-4 border-b border-slate-200">
               <DialogTitle className="text-xl font-bold text-slate-800">تحرير المصروف</DialogTitle>
@@ -2749,7 +2763,7 @@ export default function AdminProfit() {
                 <Label>اسم المصروف</Label>
                 <Input
                   value={expenseEditValue}
-                  onChange={(e)=> {
+                  onChange={(e) => {
                     const v = e.target.value; if (!validateTextInput(v)) return; setExpenseEditValue(v);
                   }}
                   className="bg-white"
@@ -2758,20 +2772,20 @@ export default function AdminProfit() {
               </div>
             </div>
             <DialogFooter className="pt-4 border-t border-slate-200">
-              <Button variant="outline" onClick={()=> { setShowExpenseEdit(false); setExpenseEditIndex(null); setExpenseEditValue(''); }}>إلغاء</Button>
+              <Button variant="outline" onClick={() => { setShowExpenseEdit(false); setExpenseEditIndex(null); setExpenseEditValue(''); }}>إلغاء</Button>
               <Button
-                onClick={()=> {
-                  if (expenseEditIndex==null) return;
+                onClick={() => {
+                  if (expenseEditIndex == null) return;
                   const trimmed = expenseEditValue.trim();
-                  const fixedSet = new Set(['مخازن','كاش الدرج','ديون ليه','ديون عليه','أرباح']);
+                  const fixedSet = new Set(['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح']);
                   if (!trimmed || !validateTextInput(trimmed)) { toast({ title: 'خطأ', description: 'اسم غير صالح', variant: 'destructive' }); return; }
                   if (fixedSet.has(trimmed)) { toast({ title: 'غير مسموح', description: 'لا يمكن تغيير اسم المصروف إلى بند ثابت', variant: 'destructive' }); return; }
                   // Prevent duplicate names
-                  if (expenses.some((x,idx)=> idx!==expenseEditIndex && x === trimmed)) { toast({ title: 'مكرر', description: 'يوجد مصروف بنفس الاسم', variant: 'destructive' }); return; }
+                  if (expenses.some((x, idx) => idx !== expenseEditIndex && x === trimmed)) { toast({ title: 'مكرر', description: 'يوجد مصروف بنفس الاسم', variant: 'destructive' }); return; }
                   const oldName = expenses[expenseEditIndex];
                   const newName = trimmed;
                   // Update expenses array
-                  setExpenses(prev => prev.map((x,idx)=> idx===expenseEditIndex ? newName : x));
+                  setExpenses(prev => prev.map((x, idx) => idx === expenseEditIndex ? newName : x));
                   // Update branchRows value keys (rename key)
                   setBranchRows(prev => prev.map(row => {
                     const val = (row.values as Record<string, number>)[oldName];
@@ -2793,7 +2807,7 @@ export default function AdminProfit() {
         </Dialog>
 
         {/* Expense Values Modal (edit this expense per-branch) */}
-        <Dialog open={showExpenseValues} onOpenChange={(o)=> { setShowExpenseValues(o); if (!o) setExpenseValuesIndex(null); }}>
+        <Dialog open={showExpenseValues} onOpenChange={(o) => { setShowExpenseValues(o); if (!o) setExpenseValuesIndex(null); }}>
           <DialogContent className="max-w-3xl bg-gradient-to-br from-emerald-50 to-green-50 border-emerald-200/60 shadow-2xl rounded-2xl">
             <DialogHeader className="pb-4 border-b border-emerald-200">
               <DialogTitle className="text-xl font-extrabold text-emerald-800">
@@ -2815,16 +2829,16 @@ export default function AdminProfit() {
                   <tbody>
                     {typeof expenseValuesIndex === 'number' && branches.map((b) => {
                       const eName = expenses[expenseValuesIndex] as Expense;
-                      const current = Number(branchRows.find(r=>r.name===b)?.values[eName] || 0);
+                      const current = Number(branchRows.find(r => r.name === b)?.values[eName] || 0);
                       return (
                         <tr key={`ev-${eName}-${b}`} className="odd:bg-white even:bg-emerald-50/40">
                           <td className="p-2 border border-emerald-200 font-medium text-right">{b}</td>
                           <td className="p-2 border border-emerald-200 text-center">
                             <Input
                               value={formatNumber(current)}
-                              onChange={(ev)=>{
+                              onChange={(ev) => {
                                 const raw = ev.target.value; if (!validateNumericInput(raw)) return; const num = sanitizeNumericValue(raw);
-                                setBranchRows(prev => prev.map(row => row.name===b ? { ...row, values: { ...row.values, [eName]: num } } : row));
+                                setBranchRows(prev => prev.map(row => row.name === b ? { ...row, values: { ...row.values, [eName]: num } } : row));
                               }}
                               className="max-w-[220px] mx-auto text-center"
                             />
@@ -2838,7 +2852,7 @@ export default function AdminProfit() {
                       <tr>
                         <td className="p-2 border border-emerald-200 text-right font-semibold">الإجمالي</td>
                         <td className="p-2 border border-emerald-200 text-center font-bold text-emerald-800">
-                          {branches.reduce((s,b)=> s + Number(branchRows.find(r=>r.name===b)?.values[expenses[expenseValuesIndex] as Expense] || 0),0).toLocaleString()}
+                          {branches.reduce((s, b) => s + Number(branchRows.find(r => r.name === b)?.values[expenses[expenseValuesIndex] as Expense] || 0), 0).toLocaleString()}
                         </td>
                       </tr>
                     </tfoot>
@@ -2847,8 +2861,8 @@ export default function AdminProfit() {
               </div>
             </div>
             <DialogFooter className="pt-4 border-t border-emerald-200">
-              <Button variant="outline" onClick={()=> { setShowExpenseValues(false); setExpenseValuesIndex(null); }} className="border-emerald-300">إغلاق</Button>
-              <Button onClick={()=> { setShowExpenseValues(false); setExpenseValuesIndex(null); }} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white">تم</Button>
+              <Button variant="outline" onClick={() => { setShowExpenseValues(false); setExpenseValuesIndex(null); }} className="border-emerald-300">إغلاق</Button>
+              <Button onClick={() => { setShowExpenseValues(false); setExpenseValuesIndex(null); }} className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 text-white">تم</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2859,7 +2873,7 @@ export default function AdminProfit() {
             <DialogHeader className="pb-4 border-b border-emerald-200">
               <DialogTitle className="text-xl font-extrabold text-emerald-800">تفاصيل تأثير التقرير على المساهمين</DialogTitle>
               <DialogDescription className="text-emerald-700">
-                ربح الجنيه الحالي = صافي الربح ÷ مخازن نهائي = {Number(totals.netProfit||0).toLocaleString('en-US')} ÷ {Number(correctFinalBalance).toLocaleString('en-US')} = <b>{perPoundProfitComputed.toFixed(4)}</b>
+                ربح الجنيه الحالي = صافي الربح ÷ مخازن نهائي = {Number(totals.netProfit || 0).toLocaleString('en-US')} ÷ {Number(correctFinalBalance).toLocaleString('en-US')} = <b>{perPoundProfitComputed.toFixed(4)}</b>
               </DialogDescription>
             </DialogHeader>
             <div className="overflow-auto max-h-[70vh] bg-white rounded-xl border border-emerald-200">
@@ -2878,13 +2892,13 @@ export default function AdminProfit() {
                 <tbody>
                   {shareholders.map(s => {
                     const hist = (shareHistory && shareHistory[s.id]) || [];
-                    const last = hist[hist.length-1] as ShareTxn | undefined;
+                    const last = hist[hist.length - 1] as ShareTxn | undefined;
                     if (!last || last.source !== 'auto') return null;
                     return (
                       <tr key={`impd-${s.id}`} className="odd:bg-white even:bg-emerald-50/40">
                         <td className="p-2 border border-emerald-200 text-right font-medium">{s.name}</td>
                         <td className="p-2 border border-emerald-200 text-center">{Number(last.fromAmount).toLocaleString('en-US')}</td>
-                        <td className="p-2 border border-emerald-200 text-center">{Number(s.percentage||0).toLocaleString('en-US')}%</td>
+                        <td className="p-2 border border-emerald-200 text-center">{Number(s.percentage || 0).toLocaleString('en-US')}%</td>
                         <td className="p-2 border border-emerald-200 text-center text-emerald-700">+{Number(last.delta).toLocaleString('en-US')}</td>
                         <td className="p-2 border border-emerald-200 text-center font-semibold">{Number(last.toAmount).toLocaleString('en-US')}</td>
                         <td className="p-2 border border-emerald-200 text-center">{last.source === 'auto' ? 'تلقائي' : 'يدوي'}</td>
@@ -2899,18 +2913,18 @@ export default function AdminProfit() {
                     <td className="p-2 border border-emerald-200"></td>
                     <td className="p-2 border border-emerald-200"></td>
                     <td className="p-2 border border-emerald-200 text-center font-bold text-emerald-800">
-                      {shareholders.reduce((sum,s)=>{
+                      {shareholders.reduce((sum, s) => {
                         const hist = (shareHistory && shareHistory[s.id]) || [];
-                        const last = hist[hist.length-1] as ShareTxn | undefined;
-                        return sum + (last && last.source==='auto' ? Number(last.delta||0) : 0);
-                      },0).toLocaleString('en-US')}
+                        const last = hist[hist.length - 1] as ShareTxn | undefined;
+                        return sum + (last && last.source === 'auto' ? Number(last.delta || 0) : 0);
+                      }, 0).toLocaleString('en-US')}
                     </td>
                     <td className="p-2 border border-emerald-200 text-center font-bold text-emerald-800">
-                      {shareholders.reduce((sum,s)=>{
+                      {shareholders.reduce((sum, s) => {
                         const hist = (shareHistory && shareHistory[s.id]) || [];
-                        const last = hist[hist.length-1] as ShareTxn | undefined;
-                        return sum + (last && last.source==='auto' ? Number(last.toAmount||0) : 0);
-                      },0).toLocaleString('en-US')}
+                        const last = hist[hist.length - 1] as ShareTxn | undefined;
+                        return sum + (last && last.source === 'auto' ? Number(last.toAmount || 0) : 0);
+                      }, 0).toLocaleString('en-US')}
                     </td>
                     <td className="p-2 border border-emerald-200"></td>
                     <td className="p-2 border border-emerald-200"></td>
@@ -2919,7 +2933,7 @@ export default function AdminProfit() {
               </table>
             </div>
             <DialogFooter className="pt-4 border-t border-emerald-200">
-              <Button variant="outline" onClick={()=> setShowImpactModal(false)}>إغلاق</Button>
+              <Button variant="outline" onClick={() => setShowImpactModal(false)}>إغلاق</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -2945,7 +2959,7 @@ export default function AdminProfit() {
                 <div className="space-y-3 p-4 bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg border border-primary/20">
                   <div className="font-semibold text-primary">مخازن نهائي = مخازن + الكاش + ديون ليه - ديون عليه</div>
                   <div className="font-mono text-sm p-3 bg-white rounded border">
-                    {Number(totals.sumByExpense?.['مخازن']||0).toLocaleString()} + {(Number(cashBreakdown.outletExpenses||0)+Number(cashBreakdown.home||0)+Number(cashBreakdown.bank||0)+Number(totals.sumByExpense?.['كاش الدرج']||0)).toLocaleString()} + {(Number(totals.sumByExpense?.['ديون له']||0)+Number(totals.sumByExpense?.['ديون ليه']||0)).toLocaleString()} - {Number(totals.sumByExpense?.['ديون عليه']||0).toLocaleString()} = <b className="text-primary">{Number(correctFinalBalance).toLocaleString()}</b>
+                    {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()} + {(Number(cashBreakdown.outletExpenses || 0) + Number(cashBreakdown.home || 0) + Number(cashBreakdown.bank || 0) + Number(totals.sumByExpense?.['كاش الدرج'] || 0)).toLocaleString()} + {(Number(totals.sumByExpense?.['ديون له'] || 0) + Number(totals.sumByExpense?.['ديون ليه'] || 0)).toLocaleString()} - {Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()} = <b className="text-primary">{Number(correctFinalBalance).toLocaleString()}</b>
                   </div>
                 </div>
               )}
@@ -2953,7 +2967,7 @@ export default function AdminProfit() {
                 <div className="space-y-3 p-4 bg-gradient-to-r from-primary/5 to-secondary/5 rounded-lg border border-primary/20">
                   <div className="font-semibold text-primary">صافي الربح = إجمالي الأرباح - إجمالي المصروفات</div>
                   <div className="font-mono text-sm p-3 bg-white rounded border">
-                    {Number(totals.totalProfits||0).toLocaleString()} - {Number(totals.totalExpenses||0).toLocaleString()} = <b className="text-primary">{Number(totals.netProfit||0).toLocaleString()}</b>
+                    {Number(totals.totalProfits || 0).toLocaleString()} - {Number(totals.totalExpenses || 0).toLocaleString()} = <b className="text-primary">{Number(totals.netProfit || 0).toLocaleString()}</b>
                   </div>
                 </div>
               )}
@@ -2961,7 +2975,7 @@ export default function AdminProfit() {
                 <div className="space-y-3 p-4 bg-gradient-to-r from-secondary/5 to-secondary/10 rounded-lg border border-secondary/20">
                   <div className="font-semibold text-secondary">فرق المخازن = الشهر الحالي (مخازن نهائي) - الشهر الماضي</div>
                   <div className="font-mono text-sm p-3 bg-white rounded border">
-                    {Number(correctFinalBalance).toLocaleString()} - {Number(lastMonthClosing||0).toLocaleString()} = <b className="text-secondary">{Number(compareLastMonth||0).toLocaleString()}</b>
+                    {Number(correctFinalBalance).toLocaleString()} - {Number(lastMonthClosing || 0).toLocaleString()} = <b className="text-secondary">{Number(compareLastMonth || 0).toLocaleString()}</b>
                   </div>
                 </div>
               )}
@@ -2969,7 +2983,7 @@ export default function AdminProfit() {
                 <div className="space-y-3 p-4 bg-gradient-to-r from-primary/5 to-primary/10 rounded-lg border border-primary/20">
                   <div className="font-semibold text-primary">فرق المخازن = الشهر الحالي (مخازن نهائي) - الشهر الماضي</div>
                   <div className="font-mono text-sm p-3 bg-white rounded border">
-                    {Number(correctFinalBalance).toLocaleString()} - {Number(lastMonthClosing||0).toLocaleString()} = {formatNumberWithParens(Number(compareLastMonth||0))}
+                    {Number(correctFinalBalance).toLocaleString()} - {Number(lastMonthClosing || 0).toLocaleString()} = {formatNumberWithParens(Number(compareLastMonth || 0))}
                   </div>
                 </div>
               )}
@@ -2979,11 +2993,11 @@ export default function AdminProfit() {
                   <div className="space-y-2">
                     <div className="font-mono text-sm p-3 bg-white rounded border">
                       <div className="font-semibold text-green-700">إجمالي الأرباح (قبل المصروفات):</div>
-                      <div className="text-lg">{Number(totals.totalProfits||0).toLocaleString()}</div>
+                      <div className="text-lg">{Number(totals.totalProfits || 0).toLocaleString()}</div>
                     </div>
                     <div className="font-mono text-sm p-3 bg-white rounded border">
                       <div className="font-semibold text-green-800">صافي الربح = إجمالي الأرباح - المصروفات</div>
-                      <div className="text-lg">{Number(totals.totalProfits||0).toLocaleString()} - {Number(totals.totalExpenses||0).toLocaleString()} = {Number(totals.netProfit||0).toLocaleString()}</div>
+                      <div className="text-lg">{Number(totals.totalProfits || 0).toLocaleString()} - {Number(totals.totalExpenses || 0).toLocaleString()} = {Number(totals.netProfit || 0).toLocaleString()}</div>
                     </div>
                   </div>
                 </div>
@@ -2992,15 +3006,15 @@ export default function AdminProfit() {
                 <div className="space-y-3 p-4 bg-gradient-to-r from-primary/10 to-secondary/10 rounded-lg border border-primary/20">
                   <div className="font-semibold text-primary">صافي الربح - فرق المخازن (الفرق المطلق)</div>
                   <div className="font-mono text-sm p-3 bg-white rounded border">
-                    |{Number(totals.netProfit||0).toLocaleString()} - {Number(compareLastMonth||0).toLocaleString()}| = <b className="text-green-600">{Math.abs(Number(totals.netProfit||0)-Number(compareLastMonth||0)).toLocaleString()}</b>
+                    |{Number(totals.netProfit || 0).toLocaleString()} - {Number(compareLastMonth || 0).toLocaleString()}| = <b className="text-green-600">{Math.abs(Number(totals.netProfit || 0) - Number(compareLastMonth || 0)).toLocaleString()}</b>
                   </div>
                 </div>
               )}
             </div>
             <DialogFooter className="pt-4 border-t border-slate-200">
-              <Button 
-                variant="outline" 
-                onClick={()=> setShowExplain(false)}
+              <Button
+                variant="outline"
+                onClick={() => setShowExplain(false)}
                 className="border-slate-300 hover:border-slate-400 hover:bg-slate-50"
               >
                 إغلاق
@@ -3010,8 +3024,8 @@ export default function AdminProfit() {
         </Dialog>
 
         {/* Preview Modal (A4 or Summary) */}
-        <Dialog open={showPreview} onOpenChange={(o)=> setShowPreview(o)}>
-          <DialogContent className="max-w-6xl bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-2xl max-h-[85vh] overflow-y-auto rounded-2xl"> 
+        <Dialog open={showPreview} onOpenChange={(o) => setShowPreview(o)}>
+          <DialogContent className="max-w-6xl bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-2xl max-h-[85vh] overflow-y-auto rounded-2xl">
             <DialogHeader className="pb-6 border-b border-slate-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="space-y-1">
@@ -3023,15 +3037,15 @@ export default function AdminProfit() {
                   </DialogDescription>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <Button 
-                    size="sm" 
-                    onClick={()=> setExportAction('print')}
+                  <Button
+                    size="sm"
+                    onClick={() => setExportAction('print')}
                     className="bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary shadow-md"
                   >
-                    <Printer className="w-4 h-4 mr-1"/>طباعة
+                    <Printer className="w-4 h-4 mr-1" />طباعة
                   </Button>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     onClick={async () => {
                       if (currentReportId) {
                         // Open comprehensive edit modal instead of wizard
@@ -3053,23 +3067,23 @@ export default function AdminProfit() {
                     }}
                     className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
                   >
-                    <Edit className="w-4 h-4 mr-1"/>تعديل شامل
+                    <Edit className="w-4 h-4 mr-1" />تعديل شامل
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
+                  <Button
+                    size="sm"
+                    variant="outline"
                     onClick={exportToExcel}
                     className="border-slate-300 hover:border-slate-400 hover:bg-slate-50"
                   >
-                    <Download className="w-4 h-4 mr-1"/>تنزيل Excel
+                    <Download className="w-4 h-4 mr-1" />تنزيل Excel
                   </Button>
-                  <Button 
-                    size="sm" 
-                    variant="outline" 
-                    onClick={()=> setExportAction('image')}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setExportAction('image')}
                     className="border-slate-300 hover:border-slate-400 hover:bg-slate-50"
                   >
-                    <ImageIcon className="w-4 h-4 mr-1"/>تنزيل صورة
+                    <ImageIcon className="w-4 h-4 mr-1" />تنزيل صورة
                   </Button>
                 </div>
               </div>
@@ -3160,7 +3174,7 @@ export default function AdminProfit() {
                             {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}
                           </td>
                         </tr>
-                        
+
                         {/* Personal Expenses */}
                         {expenses
                           .filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
@@ -3169,19 +3183,19 @@ export default function AdminProfit() {
                             return total > 0;
                           })
                           .map((expense, idx) => (
-                          <tr key={expense} className="bg-yellow-50">
-                            <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
-                            {branches.map((branch, branchIdx) => (
-                              <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
-                                {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                            <tr key={expense} className="bg-yellow-50">
+                              <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
+                              {branches.map((branch, branchIdx) => (
+                                <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
+                                  {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                                </td>
+                              ))}
+                              <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                                {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
                               </td>
-                            ))}
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                        
+                            </tr>
+                          ))}
+
                         {/* Other Expenses */}
                         {expenses
                           .filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
@@ -3190,19 +3204,19 @@ export default function AdminProfit() {
                             return total > 0;
                           })
                           .map((expense, idx) => (
-                          <tr key={expense} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
-                            <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
-                            {branches.map((branch, branchIdx) => (
-                              <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
-                                {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                            <tr key={expense} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                              <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
+                              {branches.map((branch, branchIdx) => (
+                                <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
+                                  {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                                </td>
+                              ))}
+                              <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                                {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
                               </td>
-                            ))}
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                        
+                            </tr>
+                          ))}
+
                         {/* Cash, Debts, Profits */}
                         <tr className="bg-white">
                           <td className="border border-slate-300 p-2 text-center bg-yellow-100">كاش الدرج</td>
@@ -3215,7 +3229,7 @@ export default function AdminProfit() {
                             {Number(totals.sumByExpense?.['كاش الدرج'] || 0).toLocaleString()}
                           </td>
                         </tr>
-                        
+
                         <tr className="bg-slate-50">
                           <td className="border border-slate-300 p-2 text-center bg-yellow-100">ديون ليه</td>
                           {branches.map((branch, idx) => (
@@ -3227,7 +3241,7 @@ export default function AdminProfit() {
                             {Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}
                           </td>
                         </tr>
-                        
+
                         <tr className="bg-white">
                           <td className="border border-slate-300 p-2 text-center bg-yellow-100">ديون عليه</td>
                           {branches.map((branch, idx) => (
@@ -3239,7 +3253,7 @@ export default function AdminProfit() {
                             {Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()}
                           </td>
                         </tr>
-                        
+
                         <tr className="bg-slate-50">
                           <td className="border border-slate-300 p-2 text-center bg-yellow-100">أرباح</td>
                           {branches.map((branch, idx) => (
@@ -3286,17 +3300,30 @@ export default function AdminProfit() {
                             {Number(cashBreakdown.drawer || 0).toLocaleString()}
                           </td>
                         </tr>
-                        {/* Custom Cash Rows */}
-                        {(cashBreakdown.customRows || [])
-                          .filter(row => Number(row.amount || 0) > 0)
-                          .map((row, idx) => (
-                          <tr key={row.id} className={idx % 2 === 0 ? "bg-gray-100" : "bg-gray-50"}>
-                            <td className="border border-slate-300 p-2 text-center font-semibold">{row.name}</td>
+                        {/* Explicit Vodafone Row - only show if value > 0 */}
+                        {Number(cashBreakdown.vodafone || 0) > 0 && (
+                          <tr className="bg-gray-100">
+                            <td className="border border-slate-300 p-2 text-center font-semibold">فودافون</td>
                             <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(row.amount || 0).toLocaleString()}
+                              {Number(cashBreakdown.vodafone || 0).toLocaleString()}
                             </td>
                           </tr>
-                        ))}
+                        )}
+                        {/* Custom Cash Rows - filter out vodafone-related */}
+                        {(cashBreakdown.customRows || [])
+                          .filter(row => {
+                            const name = (row.name || '').toLowerCase().trim();
+                            const isVodafone = name.includes('vodafone') || name.includes('فودافون') || name === 'فودافون';
+                            return !isVodafone && Number(row.amount || 0) > 0;
+                          })
+                          .map((row, idx) => (
+                            <tr key={row.id} className={idx % 2 === 0 ? "bg-gray-100" : "bg-gray-50"}>
+                              <td className="border border-slate-300 p-2 text-center font-semibold">{row.name}</td>
+                              <td className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(row.amount || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          ))}
                         <tr className="bg-green-200">
                           <td className="border border-slate-300 p-2 text-center font-bold">المجموع</td>
                           <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
@@ -3382,12 +3409,24 @@ export default function AdminProfit() {
                               {formatNumberWithParens(Number(compareLastMonth || 0))}
                             </td>
                           </tr>
+                          <tr className="bg-blue-100">
+                            <td className="border border-slate-300 p-2 text-center font-semibold">المصروفات من حساب المحل</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0">
+                              {Number(cashBreakdown.outletExpenses || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-green-300">
+                            <td className="border border-slate-300 p-2 text-center font-bold">الباقي</td>
+                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                              {formatNumberWithParens(Number(compareLastMonth || 0) - Number(cashBreakdown.outletExpenses || 0))}
+                            </td>
+                          </tr>
                         </tbody>
                       </table>
                     </div>
 
                     {/* Net Profit */}
-                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden table-container">
+                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden table-container h-fit">
                       <div className="bg-green-600 text-white p-3 text-center font-bold print-header">
                         صافي الربح (النتيجة)
                       </div>
@@ -3416,7 +3455,7 @@ export default function AdminProfit() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Shareholders Impact Summary for this result */}
                 <div className="mt-6 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-200 shadow-sm">
                   <div className="text-emerald-700 font-semibold mb-3">تأثير التقرير على أرصدة المساهمين</div>
@@ -3435,7 +3474,7 @@ export default function AdminProfit() {
                         {shareholders.map(s => {
                           const hist = (shareHistory && shareHistory[s.id]) || [];
                           // Find transaction specifically for THIS report using currentReportId
-                          const reportTxn = hist.find(txn => 
+                          const reportTxn = hist.find(txn =>
                             txn.reportId === currentReportId ||
                             txn.reportId?.startsWith(`${currentReportId}_profit_`) ||
                             txn.reportId?.startsWith(`${currentReportId}_edit_`) ||
@@ -3443,17 +3482,17 @@ export default function AdminProfit() {
                             txn.reportId?.startsWith(`${currentReportId}_skip_`)
                           ) as ShareTxn | undefined;
                           if (!reportTxn || reportTxn.source !== 'auto') return null;
-                          
+
                           // ✅ Calculate using centralized formulas from profitCalculations.ts
                           const currentDifference = compareLastMonth || 0;
                           const currentFinalBalance = correctFinalBalance || 0;
                           const profitPerPound = calculateProfitPerPound(currentDifference, currentFinalBalance);
                           const shareholderPercentage = s.percentage;
-                          
+
                           // Calculate shareholder's delta
                           const calculatedDelta = calculateShareholderDelta(Number(reportTxn.fromAmount), profitPerPound, shareholderPercentage);
                           const calculatedNewBalance = Number(reportTxn.fromAmount) + calculatedDelta;
-                          
+
                           return (
                             <tr key={`sh-imp-${s.id}`} className="odd:bg-white even:bg-emerald-50/40">
                               <td className="p-2 border border-emerald-200 text-right font-medium">{s.name}</td>
@@ -3490,7 +3529,7 @@ export default function AdminProfit() {
                                         </div>
                                       </div>
                                     </div>
-                                    
+
                                     {/* Step 2: Shareholder calculation formula */}
                                     <div className="bg-white p-2 rounded border border-emerald-200">
                                       <div className="text-emerald-700 font-medium mb-1 text-right text-[10px]">حساب نصيب {s.name}:</div>
@@ -3514,7 +3553,7 @@ export default function AdminProfit() {
                                         </div>
                                       </div>
                                     </div>
-                                    
+
                                     {/* Step 3: Final balance */}
                                     <div className="bg-emerald-100 p-2 rounded border border-emerald-300">
                                       <div className="text-emerald-700 font-medium mb-1 text-right text-[10px]">الرصيد النهائي:</div>
@@ -3556,9 +3595,9 @@ export default function AdminProfit() {
               </div>
             </div>
             <DialogFooter className="pt-6 border-t border-slate-200">
-              <Button 
-                variant="outline" 
-                onClick={()=> setShowPreview(false)}
+              <Button
+                variant="outline"
+                onClick={() => setShowPreview(false)}
                 className="border-slate-300 hover:border-slate-400 hover:bg-slate-50"
               >
                 إغلاق
@@ -3579,8 +3618,8 @@ export default function AdminProfit() {
                 </DialogTitle>
                 <DialogDescription className="text-slate-600 mt-1 flex items-center gap-2">
                   <span>أضف أو احذف الفروع.</span>
-                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${manageBranchesScope==='global' ? 'bg-primary/5 text-primary border-primary/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
-                    النطاق: {manageBranchesScope==='global' ? 'عام (قالب)' : 'هذا التقرير فقط'}
+                  <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold border ${manageBranchesScope === 'global' ? 'bg-primary/5 text-primary border-primary/20' : 'bg-emerald-50 text-emerald-700 border-emerald-200'}`}>
+                    النطاق: {manageBranchesScope === 'global' ? 'عام (قالب)' : 'هذا التقرير فقط'}
                   </span>
                 </DialogDescription>
               </div>
@@ -3593,21 +3632,21 @@ export default function AdminProfit() {
                     <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
                       <BarChart3 className="w-5 h-5 text-primary" />
                     </div>
-                    <span>{manageBranchesScope==='global' ? `الفروع (${globalBranches.length})` : `الفروع (${branches.length})`}</span>
+                    <span>{manageBranchesScope === 'global' ? `الفروع (${globalBranches.length})` : `الفروع (${branches.length})`}</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4 pt-4">
-                  {(manageBranchesScope==='global' ? globalBranches : branches).map((b, i) => (
+                  {(manageBranchesScope === 'global' ? globalBranches : branches).map((b, i) => (
                     <div key={i} className="flex gap-3 items-center p-3 bg-white rounded-lg border border-primary/20 shadow-sm hover:shadow-md transition-shadow">
-                      <Input 
-                        value={b} 
+                      <Input
+                        value={b}
                         onChange={e => {
                           const inputValue = e.target.value;
                           if (validateTextInput(inputValue)) {
-                            if (manageBranchesScope==='global') {
-                              setGlobalBranches(prev => prev.map((x,idx)=> idx===i? inputValue : x));
+                            if (manageBranchesScope === 'global') {
+                              setGlobalBranches(prev => prev.map((x, idx) => idx === i ? inputValue : x));
                             } else {
-                              setBranches(prev => prev.map((x,idx)=> idx===i? inputValue : x));
+                              setBranches(prev => prev.map((x, idx) => idx === i ? inputValue : x));
                             }
                           }
                         }}
@@ -3615,38 +3654,38 @@ export default function AdminProfit() {
                           // Remove extra spaces and ensure not empty
                           const trimmedValue = e.target.value.trim();
                           if (trimmedValue.length === 0) {
-                            if (manageBranchesScope==='global') {
-                              setGlobalBranches(prev => prev.map((x,idx)=> idx===i? 'فرع جديد' : x));
+                            if (manageBranchesScope === 'global') {
+                              setGlobalBranches(prev => prev.map((x, idx) => idx === i ? 'فرع جديد' : x));
                             } else {
-                              setBranches(prev => prev.map((x,idx)=> idx===i? 'فرع جديد' : x));
+                              setBranches(prev => prev.map((x, idx) => idx === i ? 'فرع جديد' : x));
                             }
                           } else {
-                            if (manageBranchesScope==='global') {
-                              setGlobalBranches(prev => prev.map((x,idx)=> idx===i? trimmedValue : x));
+                            if (manageBranchesScope === 'global') {
+                              setGlobalBranches(prev => prev.map((x, idx) => idx === i ? trimmedValue : x));
                             } else {
-                              setBranches(prev => prev.map((x,idx)=> idx===i? trimmedValue : x));
+                              setBranches(prev => prev.map((x, idx) => idx === i ? trimmedValue : x));
                             }
                           }
                         }}
                         className="flex-1 bg-white border-primary/30 focus:border-primary focus:ring-primary/20"
                       />
-                      <Button 
-                        size="sm" 
-                        variant="destructive" 
-                        onClick={()=> {
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => {
                           // Check if branch has any values before deletion
                           const branchData = branchRows.find(row => row.name === b);
                           const hasValues = branchData && Object.values(branchData.values).some(val => Number(val) > 0);
-                          
-                          if (hasValues && manageBranchesScope==='report') {
+
+                          if (hasValues && manageBranchesScope === 'report') {
                             const confirmed = confirm(`تحذير: الفرع "${b}" يحتوي على قيم محفوظة. هل أنت متأكد من حذفه؟`);
                             if (!confirmed) return;
                           }
-                          
-                          if (manageBranchesScope==='global') {
-                            setGlobalBranches(prev => prev.filter((_,idx)=> idx!==i));
+
+                          if (manageBranchesScope === 'global') {
+                            setGlobalBranches(prev => prev.filter((_, idx) => idx !== i));
                           } else {
-                            setBranches(prev => prev.filter((_,idx)=> idx!==i));
+                            setBranches(prev => prev.filter((_, idx) => idx !== i));
                           }
                         }}
                         className="bg-red-500 hover:bg-red-600 shadow-sm"
@@ -3655,10 +3694,10 @@ export default function AdminProfit() {
                       </Button>
                     </div>
                   ))}
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => {
-                      if (manageBranchesScope==='global') {
+                      if (manageBranchesScope === 'global') {
                         const name = prompt('اسم الفرع الجديد:');
                         if (!name) return;
                         const trimmedName = name.trim();
@@ -3683,10 +3722,10 @@ export default function AdminProfit() {
                 </CardContent>
               </Card>
             </div>
-            
+
             <DialogFooter className="pt-6 border-t border-slate-200">
-              <Button 
-                onClick={()=> setShowBranchManage(false)}
+              <Button
+                onClick={() => setShowBranchManage(false)}
                 className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 shadow-lg text-white"
               >
                 <Eye className="w-4 h-4 mr-2" />
@@ -3697,9 +3736,9 @@ export default function AdminProfit() {
         </Dialog>
 
         {/* Profit Wizard Modal */}
-        <Dialog open={showWizard} onOpenChange={(o)=> { 
-          setShowWizard(o); 
-          if(!o) {
+        <Dialog open={showWizard} onOpenChange={(o) => {
+          setShowWizard(o);
+          if (!o) {
             // Save draft state when closing
             if (wizardStep > 0 && !showResults) {
               setHasDraftInProgress(true);
@@ -3707,9 +3746,9 @@ export default function AdminProfit() {
             }
           }
         }}>
-          <DialogContent className="max-w-4xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
+          <DialogContent className="max-w-7xl w-[95vw] sm:w-full max-h-[90vh] overflow-y-auto">
             <DialogHeader>
-              {wizardStep===5 && showResults ? (
+              {wizardStep === 5 && showResults ? (
                 <>
                   <DialogTitle>النتيجة النهائية</DialogTitle>
                   <DialogDescription>تم توليد الملخص. يمكنك تعديل القيم أو عرض التقرير.</DialogDescription>
@@ -3723,7 +3762,7 @@ export default function AdminProfit() {
             </DialogHeader>
 
             {/* Stepper */}
-            {!(wizardStep===5 && showResults) && (
+            {!(wizardStep === 5 && showResults) && (
               <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-lg font-bold text-slate-800">خطوات إنشاء التقرير</h3>
@@ -3733,7 +3772,7 @@ export default function AdminProfit() {
                 </div>
                 <div className="relative" dir="rtl">
                   <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 -translate-y-1/2 z-0"></div>
-                  <div 
+                  <div
                     className="absolute top-1/2 right-0 h-1 bg-gradient-to-l from-green-500 to-emerald-500 -translate-y-1/2 z-10 transition-all duration-500 ease-in-out"
                     style={{ width: `${wizardProgress}%` }}
                   ></div>
@@ -3743,31 +3782,30 @@ export default function AdminProfit() {
                       const isCompleted = index < currentStepIndex;
                       const isClickable = index <= currentStepIndex;
                       return (
-                      <div key={step.value} className="flex flex-col items-center">
-                        <button
-                          type="button"
-                          onClick={() => { if (isClickable) setWizardStep(step.value); }}
-                          className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${
-                            isActive
+                        <div key={step.value} className="flex flex-col items-center">
+                          <button
+                            type="button"
+                            onClick={() => { if (isClickable) setWizardStep(step.value); }}
+                            className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-300 ${isActive
                               ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg transform scale-110'
                               : isCompleted
                                 ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-md hover:shadow-lg hover:scale-105'
                                 : 'bg-white border-2 border-slate-300 text-slate-400 hover:border-slate-400 hover:text-slate-500'
-                          } ${isClickable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
-                          title={isClickable ? 'الانتقال إلى هذه الخطوة' : 'أكمل الخطوات السابقة أولاً'}
-                          disabled={!isClickable}
-                        >
-                          {isCompleted ? (
-                            <CheckIcon className="w-5 h-5" />
-                          ) : (
-                            <span className="font-bold">{index + 1}</span>
-                          )}
-                        </button>
-                        <div className="mt-2 text-xs text-center max-w-[100px] font-medium text-primary">
-                          {step.label}
+                              } ${isClickable ? 'cursor-pointer' : 'cursor-not-allowed'}`}
+                            title={isClickable ? 'الانتقال إلى هذه الخطوة' : 'أكمل الخطوات السابقة أولاً'}
+                            disabled={!isClickable}
+                          >
+                            {isCompleted ? (
+                              <CheckIcon className="w-5 h-5" />
+                            ) : (
+                              <span className="font-bold">{index + 1}</span>
+                            )}
+                          </button>
+                          <div className="mt-2 text-xs text-center max-w-[100px] font-medium text-primary">
+                            {step.label}
+                          </div>
                         </div>
-                      </div>
-                    );
+                      );
                     })}
                   </div>
                 </div>
@@ -3830,7 +3868,7 @@ export default function AdminProfit() {
                         )}
                       </p>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       {/* Period Selection */}
                       <div className="bg-gradient-to-br from-primary/5 to-secondary/5 rounded-xl p-5 border border-primary/20">
@@ -3840,16 +3878,16 @@ export default function AdminProfit() {
                         </h3>
                         <div className="space-y-4">
                           <div className="flex flex-wrap items-center gap-3">
-                            <Button 
-                              variant="outline" 
-                              onClick={()=> setShowFromPicker(true)}
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowFromPicker(true)}
                               className="bg-white hover:bg-slate-50 border-slate-300"
                             >
                               اختر تاريخ البداية
                             </Button>
-                            <Button 
-                              variant="outline" 
-                              onClick={()=> setShowToPicker(true)}
+                            <Button
+                              variant="outline"
+                              onClick={() => setShowToPicker(true)}
                               className="bg-white hover:bg-slate-50 border-slate-300"
                             >
                               اختر تاريخ النهاية
@@ -3864,7 +3902,7 @@ export default function AdminProfit() {
                                     const firstDay = new Date(parseInt(year), parseInt(month) - 1, 1);
                                     const lastDay = new Date(parseInt(year), parseInt(month), 0);
                                     setRange({ from: firstDay, to: lastDay });
-                                    
+
                                     // Auto-suggest report name
                                     const monthNames = [
                                       'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
@@ -3929,27 +3967,27 @@ export default function AdminProfit() {
                         <div className="space-y-3">
                           <div className="flex gap-3">
                             <Button
-                              variant={source==='manual' ? 'default' : 'outline'}
+                              variant={source === 'manual' ? 'default' : 'outline'}
                               onClick={() => { setSource('manual'); setManualLastMonthValue(true); }}
-                              className={source==='manual' ? 'bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white' : ''}
+                              className={source === 'manual' ? 'bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white' : ''}
                             >
                               قيمة ثابتة (الشهر الماضي)
                             </Button>
                             <Button
-                              variant={source==='report' ? 'default' : 'outline'}
+                              variant={source === 'report' ? 'default' : 'outline'}
                               onClick={() => { setSource('report'); setManualLastMonthValue(false); }}
-                              className={source==='report' ? 'bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white' : ''}
+                              className={source === 'report' ? 'bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white' : ''}
                             >
                               من تقرير محفوظ
                             </Button>
                           </div>
-                          {source==='manual' && (
+                          {source === 'manual' && (
                             <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-emerald-200">
                               <Label className="min-w-32">الرصيد النهائي (الشهر الماضي)</Label>
                               <Input
                                 type="text"
                                 value={formatNumber(lastMonthClosing)}
-                                onChange={(e)=> {
+                                onChange={(e) => {
                                   const v = e.target.value; if (!validateNumericInput(v)) return; const n = sanitizeNumericValue(v);
                                   setManualLastMonthValue(true);
                                   setLastMonthClosing(n);
@@ -3959,29 +3997,203 @@ export default function AdminProfit() {
                               />
                             </div>
                           )}
-                          {source==='report' && (
-                            <div className="flex items-center gap-3 p-3 bg-white rounded-lg border border-emerald-200">
-                              <Label className="min-w-32">اختر تقريرًا</Label>
-                              <select
-                                className="border rounded px-2 py-2 text-sm max-w-[220px]"
-                                onChange={(e) => {
-                                  const id = e.target.value;
-                                  const rep = reports.find(x => x._id === id);
-                                  if (rep?.totals?.finalBalance != null) {
-                                    setManualLastMonthValue(false);
-                                    setLastMonthClosing(Number(rep.totals.finalBalance));
+                          {source === 'report' && (
+                            <div className="space-y-4">
+                              {/* Base Value + Shareholders Total Cards */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Editable Base Value Card */}
+                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
+                                  <div className="flex flex-col gap-2 mb-4">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-base font-semibold text-blue-700 flex items-center gap-2">
+                                        <Wallet className="w-5 h-5" />
+                                        القيمة الأساسية
+                                      </div>
+                                    </div>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setShowBaseEditor(!showBaseEditor)}
+                                      className="text-blue-600 border-blue-300 hover:bg-blue-100 text-xs h-8 w-full"
+                                    >
+                                      <Edit3 className="w-4 h-4 ml-1" />
+                                      {showBaseEditor ? 'إغلاق' : 'تعديل القيمة'}
+                                    </Button>
+                                  </div>
+                                  {showBaseEditor ? (
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        value={formatNumber(baseClosingValue)}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          if (!validateNumericInput(v)) return;
+                                          const n = sanitizeNumericValue(v);
+                                          setBaseClosingValue(n);
+                                          // Recalculate lastMonthClosing
+                                          const shareholdersTotal = shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0);
+                                          setLastMonthClosing(n + shareholdersTotal);
+                                        }}
+                                        className="text-center font-bold text-lg bg-white"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setShowBaseEditor(false)}
+                                        className="border-blue-300"
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <div className="text-2xl font-bold text-blue-800">
+                                      {Number(baseClosingValue || 0).toLocaleString()}
+                                    </div>
+                                  )}
+                                  <div className="text-xs text-blue-600 mt-2">رأس المال الثابت</div>
+                                </div>
+
+                                {/* Shareholders Total Card */}
+                                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-5 border border-purple-200">
+                                  <div className="flex flex-col gap-2 mb-4">
+                                    <div className="flex items-center justify-between">
+                                      <div className="text-base font-semibold text-purple-700 flex items-center gap-2">
+                                        <Users className="w-5 h-5" />
+                                        أرصدة الشركاء
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setShowShareholdersBreakdown(!showShareholdersBreakdown)}
+                                        className="text-purple-600 border-purple-300 hover:bg-purple-100 text-xs h-8 flex-1"
+                                      >
+                                        <Eye className="w-4 h-4 ml-1" />
+                                        {showShareholdersBreakdown ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setShowShareholdersEditor(!showShareholdersEditor)}
+                                        className="text-purple-600 border-purple-300 hover:bg-purple-100 text-xs h-8 flex-1"
+                                      >
+                                        <Edit3 className="w-4 h-4 ml-1" />
+                                        تعديل القيمة
+                                      </Button>
+                                    </div>
+                                  </div>
+                                  {showShareholdersEditor ? (
+                                    <div className="flex items-center gap-2">
+                                      <Input
+                                        type="text"
+                                        value={formatNumber(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0))}
+                                        onChange={(e) => {
+                                          const v = e.target.value;
+                                          if (!validateNumericInput(v)) return;
+                                          const n = sanitizeNumericValue(v);
+                                          setShareholdersOverride(n);
+                                          // Recalculate lastMonthClosing
+                                          setLastMonthClosing(baseClosingValue + n);
+                                        }}
+                                        className="text-center font-bold text-lg bg-white"
+                                      />
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setShowShareholdersEditor(false)}
+                                        className="border-purple-300"
+                                      >
+                                        <Check className="w-4 h-4" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <div className="text-2xl font-bold text-purple-800">
+                                      {Number(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}
+                                      {shareholdersOverride !== null && (
+                                        <span className="text-xs text-orange-600 mr-2">(معدّل)</span>
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="text-xs text-purple-600 mt-2">
+                                    إجمالي {shareholders.length} شريك
+                                  </div>
+
+                                  {/* Shareholders Breakdown */}
+                                  {showShareholdersBreakdown && (
+                                    <div className="mt-3 pt-3 border-t border-purple-200 space-y-2">
+                                      <div className="text-xs font-semibold text-purple-700 mb-2">تفاصيل أرصدة الشركاء:</div>
+                                      {shareholders.length === 0 ? (
+                                        <div className="text-xs text-slate-500">لا يوجد شركاء</div>
+                                      ) : (
+                                        shareholders.map((sh, idx) => (
+                                          <div key={sh.id} className="flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 text-sm">
+                                            <span className="font-medium text-purple-800">{sh.name}</span>
+                                            <span className="font-bold text-purple-700">{Number(sh.amount || 0).toLocaleString()}</span>
+                                          </div>
+                                        ))
+                                      )}
+                                      <div className="flex items-center justify-between bg-purple-100 rounded-lg px-3 py-2 text-sm font-bold border border-purple-300">
+                                        <span className="text-purple-800">المجموع المحسوب</span>
+                                        <span className="text-purple-900">{Number(shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}</span>
+                                      </div>
+                                      {shareholdersOverride !== null && (
+                                        <div className="flex items-center justify-between bg-orange-100 rounded-lg px-3 py-2 text-sm border border-orange-300">
+                                          <span className="text-orange-800 font-medium">القيمة المعدّلة يدوياً</span>
+                                          <div className="flex items-center gap-2">
+                                            <span className="font-bold text-orange-900">{Number(shareholdersOverride).toLocaleString()}</span>
+                                            <Button
+                                              size="sm"
+                                              variant="ghost"
+                                              onClick={() => {
+                                                setShareholdersOverride(null);
+                                                const calculated = shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0);
+                                                setLastMonthClosing(baseClosingValue + calculated);
+                                              }}
+                                              className="h-6 px-2 text-xs text-orange-700 hover:bg-orange-200"
+                                            >
+                                              إلغاء التعديل
+                                            </Button>
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* Final Calculation Card */}
+                              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-300">
+                                <div className="text-sm font-semibold text-emerald-700 mb-3 flex items-center gap-2">
+                                  <Calculator className="w-4 h-4" />
+                                  الإجمالي (الشهر الماضي)
+                                </div>
+                                <div className="flex items-center gap-3 flex-wrap">
+                                  <div className="bg-white/80 px-3 py-2 rounded-lg border border-emerald-200">
+                                    <span className="text-sm text-slate-600">القيمة الأساسية</span>
+                                    <div className="font-bold text-blue-700">{Number(baseClosingValue || 0).toLocaleString()}</div>
+                                  </div>
+                                  <span className="text-xl font-bold text-emerald-600">+</span>
+                                  <div className="bg-white/80 px-3 py-2 rounded-lg border border-emerald-200">
+                                    <span className="text-sm text-slate-600">أرصدة الشركاء {shareholdersOverride !== null && <span className="text-orange-600">(معدّل)</span>}</span>
+                                    <div className="font-bold text-purple-700">{Number(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}</div>
+                                  </div>
+                                  <span className="text-xl font-bold text-emerald-600">=</span>
+                                  <div className="bg-emerald-100 px-4 py-2 rounded-lg border-2 border-emerald-400">
+                                    <span className="text-sm text-emerald-700">الإجمالي</span>
+                                    <div className="text-xl font-bold text-emerald-800">{Number(baseClosingValue + (shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0))).toLocaleString()}</div>
+                                  </div>
+                                </div>
+                                {/* Auto-update lastMonthClosing when values change */}
+                                {(() => {
+                                  const shareholdersTotal = shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0);
+                                  const total = baseClosingValue + shareholdersTotal;
+                                  if (lastMonthClosing !== total && !manualLastMonthValue) {
+                                    setTimeout(() => setLastMonthClosing(total), 0);
                                   }
-                                }}
-                                defaultValue=""
-                              >
-                                <option value="" disabled>اختر تقريرًا</option>
-                                {reports.map(rep => (
-                                  <option key={rep._id} value={rep._id}>
-                                    {(rep.title || 'تقرير') + ' • ' + new Date(rep.createdAt||rep.startDate).toLocaleDateString('ar-EG') + ' • ' + Number(rep?.totals?.finalBalance||0).toLocaleString()}
-                                  </option>
-                                ))}
-                              </select>
-                              <div className="text-xs text-slate-500">القيمة المختارة: {Number(lastMonthClosing||0).toLocaleString()}</div>
+                                  return null;
+                                })()}
+                              </div>
                             </div>
                           )}
                         </div>
@@ -3989,7 +4201,7 @@ export default function AdminProfit() {
 
                       {/* Manage Lists Shortcuts */}
                       <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20 cursor-pointer hover:shadow-lg transition-shadow" onClick={()=> { setManageBranchesScope('report'); setShowBranchManage(true); }}>
+                        <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setManageBranchesScope('report'); setShowBranchManage(true); }}>
                           <CardContent className="p-4 flex items-center justify-between">
                             <div>
                               <div className="font-semibold text-primary flex items-center gap-2">
@@ -4001,7 +4213,7 @@ export default function AdminProfit() {
                             <Button size="sm" variant="outline">تحرير</Button>
                           </CardContent>
                         </Card>
-                        <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20 cursor-pointer hover:shadow-lg transition-shadow" onClick={()=> { setManageExpensesScope('report'); setShowManage(true); }}>
+                        <Card className="bg-gradient-to-r from-primary/5 to-secondary/5 border-primary/20 cursor-pointer hover:shadow-lg transition-shadow" onClick={() => { setManageExpensesScope('report'); setShowManage(true); }}>
                           <CardContent className="p-4 flex items-center justify-between">
                             <div>
                               <div className="font-semibold text-primary flex items-center gap-2">
@@ -4022,9 +4234,9 @@ export default function AdminProfit() {
               {/* Navigation Buttons (only for step 0) */}
               {wizardStep === 0 && (
                 <div className="flex items-center justify-between pt-4">
-                  <Button 
-                    variant="outline" 
-                    onClick={()=> setShowWizard(false)}
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowWizard(false)}
                     className="border-slate-300 hover:border-slate-400 hover:bg-slate-50"
                   >
                     إلغاء
@@ -4038,1811 +4250,1834 @@ export default function AdminProfit() {
                 </div>
               )}
 
-            {wizardStep === 1 && (
-              <Fragment>
-                <Card className="bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg rounded-2xl">
-                  <CardHeader className="pb-4 border-b border-slate-200">
-                    <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                      <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-lg flex items-center justify-center">
-                        <BarChart3 className="w-4 h-4 text-white" />
-                      </div>
-                      المخازن
-                    </CardTitle>
-                    <CardDescription className="text-slate-600">
-                      أدخل مخزن كل فرع في بداية الفترة
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr>
-                            <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">الفرع</th>
-                            <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">المخازن</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {branches.map((b, i) => (
-                            <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                              <td className="border p-3 font-semibold text-right">{b}</td>
-                              <td className="border p-3 text-center">
-                                <Input 
-                                  type="text"
-                                  value={formatNumber(Number(branchRows[i]?.values['مخازن'] || 0))}
-                                  onChange={e => {
-                                    const inputValue = e.target.value; if (!validateNumericInput(inputValue)) return;
-                                    const n = parseNumber(inputValue);
-                                    setBranchRows(prev => prev.map((x,idx)=> idx===i? { ...x, values: { ...x.values, ['مخازن']: n } } : x));
-                                  }}
-                                  className="bg-white border-slate-300 focus:border-primary focus:ring-primary/20 text-center"
-                                />
-                              </td>
+              {wizardStep === 1 && (
+                <Fragment>
+                  <Card className="bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg rounded-2xl">
+                    <CardHeader className="pb-4 border-b border-slate-200">
+                      <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gradient-to-r from-primary to-secondary rounded-lg flex items-center justify-center">
+                          <BarChart3 className="w-4 h-4 text-white" />
+                        </div>
+                        المخازن
+                      </CardTitle>
+                      <CardDescription className="text-slate-600">
+                        أدخل مخزن كل فرع في بداية الفترة
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr>
+                              <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">الفرع</th>
+                              <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">المخازن</th>
                             </tr>
-                          ))}
-                          <tr className="bg-gradient-to-r from-primary/5 to-secondary/5">
-                            <td className="border p-3 font-bold text-right text-primary">الإجمالي</td>
-                            <td className="border p-3 text-center font-bold text-primary">
-                              {Number(totals.sumByExpense?.['مخازن']||0).toLocaleString()}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <div className="flex items-center gap-2 justify-end mt-4">
-                  <Button
-                    onClick={() => setWizardStep(0)}
-                    variant="outline"
-                  >
-                    الخطوة السابقة
-                  </Button>
-                  <Button
-                    onClick={() => setWizardStep(2)}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
-                  >
-                    الخطوة التالية
-                  </Button>
-                </div>
-              </Fragment>
-            )}
-
-            {wizardStep === 2 && (
-              <Fragment>
-                <div className="space-y-6">
-                  {/* Personal Expenses Table */}
-                  {expenses.filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e)).length > 0 && (
-                    <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg rounded-2xl">
-                      <CardHeader className="pb-4 border-b border-blue-200">
-                        <CardTitle className="text-xl font-bold text-blue-800 flex items-center gap-2">
-                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
-                            <Users className="w-4 h-4 text-white" />
-                          </div>
-                          المصروفات الشخصية
-                          <Badge className="bg-blue-500 text-white">تضاف للكاش</Badge>
-                        </CardTitle>
-                        <CardDescription className="text-blue-600">
-                          هذه المصروفات لا تؤثر على الربح وتضاف إلى حساب المحل
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="pt-6">
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse">
-                            <thead>
-                              <tr>
-                                <th className="border border-blue-300 bg-gradient-to-r from-blue-100 to-indigo-100 p-3 text-right font-bold text-blue-800">المصروف \ الفرع</th>
-                                {branches.map((branch, branchIdx) => (
-                                  <th key={branchIdx} className="border border-blue-300 bg-gradient-to-r from-blue-100 to-indigo-100 p-3 text-center font-bold text-blue-800">{branch}</th>
-                                ))}
-                                <th className="border border-blue-300 bg-gradient-to-r from-blue-100 to-indigo-100 p-3 text-center font-bold text-blue-800">الإجمالي</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {expenses.filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e)).map((expense, expenseIdx) => (
-                                <tr key={expenseIdx} className={expenseIdx % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
-                                  <td className="border border-blue-200 p-3 font-semibold text-right">{expense}</td>
-                                  {branches.map((branch, branchIdx) => (
-                                    <td key={`${expenseIdx}-${branchIdx}`} className="border border-blue-200 p-3 text-center">
-                                      <Input 
-                                        type="text"
-                                        value={formatNumber(Number(branchRows[branchIdx]?.values[expense] || 0))}
-                                        onChange={ev => {
-                                          const inputValue = ev.target.value; if (!validateNumericInput(inputValue)) return;
-                                          const n = parseNumber(inputValue);
-                                          setBranchRows(prev => prev.map((x,idx)=> idx===branchIdx? { ...x, values: { ...x.values, [expense]: n } } : x));
-                                        }}
-                                        className="bg-white border-blue-300 focus:border-blue-500 focus:ring-blue-500/20 text-center w-full"
-                                      />
-                                    </td>
-                                  ))}
-                                  <td className="border border-blue-200 p-3 text-center font-bold text-blue-800">
-                                    {branches.reduce((sum, branch, branchIdx) => sum + Number(branchRows[branchIdx]?.values[expense] || 0), 0).toLocaleString()}
-                                  </td>
-                                </tr>
-                              ))}
-                              <tr className="bg-gradient-to-r from-blue-100 to-indigo-100">
-                                <td className="border border-blue-300 p-3 font-bold text-right text-blue-800">الإجمالي</td>
-                                {branches.map((branch, branchIdx) => (
-                                  <td key={branchIdx} className="border border-blue-300 p-3 text-center font-bold text-blue-800">
-                                    {expenses
-                                      .filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
-                                      .reduce((sum, expense) => sum + Number(branchRows[branchIdx]?.values[expense] || 0), 0)
-                                      .toLocaleString()}
-                                  </td>
-                                ))}
-                                <td className="border border-blue-300 p-3 text-center font-bold text-blue-800">
-                                  {expenses
-                                    .filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
-                                    .reduce((sum, expense) => sum + branches.reduce((branchSum, branch, branchIdx) => branchSum + Number(branchRows[branchIdx]?.values[expense] || 0), 0), 0)
-                                    .toLocaleString()}
+                          </thead>
+                          <tbody>
+                            {branches.map((b, i) => (
+                              <tr key={i} className={i % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                                <td className="border p-3 font-semibold text-right">{b}</td>
+                                <td className="border p-3 text-center">
+                                  <Input
+                                    type="text"
+                                    value={formatNumber(Number(branchRows[i]?.values['مخازن'] || 0))}
+                                    onChange={e => {
+                                      const inputValue = e.target.value; if (!validateNumericInput(inputValue)) return;
+                                      const n = parseNumber(inputValue);
+                                      setBranchRows(prev => prev.map((x, idx) => idx === i ? { ...x, values: { ...x.values, ['مخازن']: n } } : x));
+                                    }}
+                                    className="bg-white border-slate-300 focus:border-primary focus:ring-primary/20 text-center"
+                                  />
                                 </td>
                               </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
+                            ))}
+                            <tr className="bg-gradient-to-r from-primary/5 to-secondary/5">
+                              <td className="border p-3 font-bold text-right text-primary">الإجمالي</td>
+                              <td className="border p-3 text-center font-bold text-primary">
+                                {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                  {/* Other Expenses Table */}
-                  {expenses.filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e)).length > 0 && (
-                    <Card className="bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg rounded-2xl">
-                      <CardHeader className="pb-4 border-b border-slate-200">
-                        <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                          <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg flex items-center justify-center">
-                            <DollarSign className="w-4 h-4 text-white" />
-                          </div>
-                          المصروفات العادية
-                          <Badge variant="secondary">تؤثر على الربح</Badge>
-                        </CardTitle>
-                        <CardDescription className="text-slate-600">
-                          هذه المصروفات تخصم من الأرباح
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="pt-6">
-                        <div className="overflow-x-auto">
-                          <table className="w-full border-collapse">
-                            <thead>
-                              <tr>
-                                <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">المصروف \ الفرع</th>
-                                {branches.map((branch, branchIdx) => (
-                                  <th key={branchIdx} className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">{branch}</th>
-                                ))}
-                                <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">الإجمالي</th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {expenses.filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e)).map((expense, expenseIdx) => (
-                                <tr key={expenseIdx} className={expenseIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
-                                  <td className="border p-3 font-semibold text-right">{expense}</td>
+                  <div className="flex items-center gap-2 justify-end mt-4">
+                    <Button
+                      onClick={() => setWizardStep(0)}
+                      variant="outline"
+                    >
+                      الخطوة السابقة
+                    </Button>
+                    <Button
+                      onClick={() => setWizardStep(2)}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                    >
+                      الخطوة التالية
+                    </Button>
+                  </div>
+                </Fragment>
+              )}
+
+              {wizardStep === 2 && (
+                <Fragment>
+                  <div className="space-y-6">
+                    {/* Personal Expenses Table */}
+                    {expenses.filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e)).length > 0 && (
+                      <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 shadow-lg rounded-2xl">
+                        <CardHeader className="pb-4 border-b border-blue-200">
+                          <CardTitle className="text-xl font-bold text-blue-800 flex items-center gap-2">
+                            <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg flex items-center justify-center">
+                              <Users className="w-4 h-4 text-white" />
+                            </div>
+                            المصروفات الشخصية
+                            <Badge className="bg-blue-500 text-white">تضاف للكاش</Badge>
+                          </CardTitle>
+                          <CardDescription className="text-blue-600">
+                            هذه المصروفات لا تؤثر على الربح وتضاف إلى حساب المحل
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr>
+                                  <th className="border border-blue-300 bg-gradient-to-r from-blue-100 to-indigo-100 p-3 text-right font-bold text-blue-800">المصروف \ الفرع</th>
                                   {branches.map((branch, branchIdx) => (
-                                    <td key={`${expenseIdx}-${branchIdx}`} className="border p-3 text-center">
-                                      <Input 
-                                        type="text"
-                                        value={formatNumber(Number(branchRows[branchIdx]?.values[expense] || 0))}
-                                        onChange={ev => {
-                                          const inputValue = ev.target.value; if (!validateNumericInput(inputValue)) return;
-                                          const n = parseNumber(inputValue);
-                                          setBranchRows(prev => prev.map((x,idx)=> idx===branchIdx? { ...x, values: { ...x.values, [expense]: n } } : x));
-                                        }}
-                                        className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center w-full"
-                                      />
+                                    <th key={branchIdx} className="border border-blue-300 bg-gradient-to-r from-blue-100 to-indigo-100 p-3 text-center font-bold text-blue-800">{branch}</th>
+                                  ))}
+                                  <th className="border border-blue-300 bg-gradient-to-r from-blue-100 to-indigo-100 p-3 text-center font-bold text-blue-800">الإجمالي</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {expenses.filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e)).map((expense, expenseIdx) => (
+                                  <tr key={expenseIdx} className={expenseIdx % 2 === 0 ? 'bg-white' : 'bg-blue-50'}>
+                                    <td className="border border-blue-200 p-3 font-semibold text-right">{expense}</td>
+                                    {branches.map((branch, branchIdx) => (
+                                      <td key={`${expenseIdx}-${branchIdx}`} className="border border-blue-200 p-3 text-center">
+                                        <Input
+                                          type="text"
+                                          value={formatNumber(Number(branchRows[branchIdx]?.values[expense] || 0))}
+                                          onChange={ev => {
+                                            const inputValue = ev.target.value; if (!validateNumericInput(inputValue)) return;
+                                            const n = parseNumber(inputValue);
+                                            setBranchRows(prev => prev.map((x, idx) => idx === branchIdx ? { ...x, values: { ...x.values, [expense]: n } } : x));
+                                          }}
+                                          className="bg-white border-blue-300 focus:border-blue-500 focus:ring-blue-500/20 text-center w-full"
+                                        />
+                                      </td>
+                                    ))}
+                                    <td className="border border-blue-200 p-3 text-center font-bold text-blue-800">
+                                      {branches.reduce((sum, branch, branchIdx) => sum + Number(branchRows[branchIdx]?.values[expense] || 0), 0).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                                <tr className="bg-gradient-to-r from-blue-100 to-indigo-100">
+                                  <td className="border border-blue-300 p-3 font-bold text-right text-blue-800">الإجمالي</td>
+                                  {branches.map((branch, branchIdx) => (
+                                    <td key={branchIdx} className="border border-blue-300 p-3 text-center font-bold text-blue-800">
+                                      {expenses
+                                        .filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
+                                        .reduce((sum, expense) => sum + Number(branchRows[branchIdx]?.values[expense] || 0), 0)
+                                        .toLocaleString()}
+                                    </td>
+                                  ))}
+                                  <td className="border border-blue-300 p-3 text-center font-bold text-blue-800">
+                                    {expenses
+                                      .filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
+                                      .reduce((sum, expense) => sum + branches.reduce((branchSum, branch, branchIdx) => branchSum + Number(branchRows[branchIdx]?.values[expense] || 0), 0), 0)
+                                      .toLocaleString()}
+                                  </td>
+                                </tr>
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {/* Other Expenses Table */}
+                    {expenses.filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e)).length > 0 && (
+                      <Card className="bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg rounded-2xl">
+                        <CardHeader className="pb-4 border-b border-slate-200">
+                          <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                            <div className="w-8 h-8 bg-gradient-to-r from-purple-500 to-violet-500 rounded-lg flex items-center justify-center">
+                              <DollarSign className="w-4 h-4 text-white" />
+                            </div>
+                            المصروفات العادية
+                            <Badge variant="secondary">تؤثر على الربح</Badge>
+                          </CardTitle>
+                          <CardDescription className="text-slate-600">
+                            هذه المصروفات تخصم من الأرباح
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent className="pt-6">
+                          <div className="overflow-x-auto">
+                            <table className="w-full border-collapse">
+                              <thead>
+                                <tr>
+                                  <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">المصروف \ الفرع</th>
+                                  {branches.map((branch, branchIdx) => (
+                                    <th key={branchIdx} className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">{branch}</th>
+                                  ))}
+                                  <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">الإجمالي</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {expenses.filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e)).map((expense, expenseIdx) => (
+                                  <tr key={expenseIdx} className={expenseIdx % 2 === 0 ? 'bg-white' : 'bg-slate-50'}>
+                                    <td className="border p-3 font-semibold text-right">{expense}</td>
+                                    {branches.map((branch, branchIdx) => (
+                                      <td key={`${expenseIdx}-${branchIdx}`} className="border p-3 text-center">
+                                        <Input
+                                          type="text"
+                                          value={formatNumber(Number(branchRows[branchIdx]?.values[expense] || 0))}
+                                          onChange={ev => {
+                                            const inputValue = ev.target.value; if (!validateNumericInput(inputValue)) return;
+                                            const n = parseNumber(inputValue);
+                                            setBranchRows(prev => prev.map((x, idx) => idx === branchIdx ? { ...x, values: { ...x.values, [expense]: n } } : x));
+                                          }}
+                                          className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center w-full"
+                                        />
+                                      </td>
+                                    ))}
+                                    <td className="border p-3 text-center font-bold text-primary">
+                                      {branches.reduce((sum, branch, branchIdx) => sum + Number(branchRows[branchIdx]?.values[expense] || 0), 0).toLocaleString()}
+                                    </td>
+                                  </tr>
+                                ))}
+                                <tr className="bg-gradient-to-r from-primary/5 to-secondary/5">
+                                  <td className="border p-3 font-bold text-right text-primary">الإجمالي</td>
+                                  {branches.map((branch, branchIdx) => (
+                                    <td key={branchIdx} className="border p-3 text-center font-bold text-primary">
+                                      {expenses
+                                        .filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
+                                        .reduce((sum, expense) => sum + Number(branchRows[branchIdx]?.values[expense] || 0), 0)
+                                        .toLocaleString()}
                                     </td>
                                   ))}
                                   <td className="border p-3 text-center font-bold text-primary">
-                                    {branches.reduce((sum, branch, branchIdx) => sum + Number(branchRows[branchIdx]?.values[expense] || 0), 0).toLocaleString()}
+                                    {totals.totalExpenses.toLocaleString()}
                                   </td>
                                 </tr>
-                              ))}
-                              <tr className="bg-gradient-to-r from-primary/5 to-secondary/5">
-                                <td className="border p-3 font-bold text-right text-primary">الإجمالي</td>
-                                {branches.map((branch, branchIdx) => (
-                                  <td key={branchIdx} className="border p-3 text-center font-bold text-primary">
-                                    {expenses
-                                      .filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
-                                      .reduce((sum, expense) => sum + Number(branchRows[branchIdx]?.values[expense] || 0), 0)
-                                      .toLocaleString()}
-                                  </td>
-                                ))}
-                                <td className="border p-3 text-center font-bold text-primary">
-                                  {totals.totalExpenses.toLocaleString()}
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
+                              </tbody>
+                            </table>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                  </div>
+
+                  <div className="flex items-center gap-2 justify-end mt-4">
+                    <Button
+                      onClick={() => setWizardStep(1)}
+                      variant="outline"
+                    >
+                      الخطوة السابقة
+                    </Button>
+                    <Button
+                      onClick={() => setWizardStep(3)}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                    >
+                      الخطوة التالية
+                    </Button>
+                  </div>
+                </Fragment>
+              )}
+
+              {wizardStep === 3 && (
+                <Fragment>
+                  <Card className="bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg rounded-2xl">
+                    <CardHeader className="pb-4 border-b border-slate-200">
+                      <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-white" />
                         </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                </div>
-
-                <div className="flex items-center gap-2 justify-end mt-4">
-                  <Button
-                    onClick={() => setWizardStep(1)}
-                    variant="outline"
-                  >
-                    الخطوة السابقة
-                  </Button>
-                  <Button
-                    onClick={() => setWizardStep(3)}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
-                  >
-                    الخطوة التالية
-                  </Button>
-                </div>
-              </Fragment>
-            )}
-
-            {wizardStep === 3 && (
-              <Fragment>
-                <Card className="bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg rounded-2xl">
-                  <CardHeader className="pb-4 border-b border-slate-200">
-                    <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                      <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
-                        <DollarSign className="w-4 h-4 text-white" />
-                      </div>
-                      الدرج والديون
-                    </CardTitle>
-                    <CardDescription className="text-slate-600">
-                      أدخل الدرج والديون لكل فرع
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr>
-                            <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">البند \ الفرع</th>
-                            {branches.map((branch, idx) => (
-                              <th key={idx} className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">{branch}</th>
-                            ))}
-                            <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">الإجمالي</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {/* الدرج Row */}
-                          <tr className="bg-white">
-                            <td className="border p-3 font-semibold text-right">الدرج</td>
-                            {branches.map((branch, branchIdx) => (
-                              <td key={branchIdx} className="border p-3 text-center">
-                                <input
-                                  type="text"
-                                  defaultValue={Number(branchRows[branchIdx]?.values['كاش الدرج'] || 0) === 0 ? '' : Number(branchRows[branchIdx]?.values['كاش الدرج'] || 0).toLocaleString('en-US')}
-                                  key={`drawer-${branchIdx}`}
-                                  onChange={e => {
-                                    const inputValue = e.target.value;
-                                    if (!validateNumericInputWithNegative(inputValue)) return;
-                                    const n = parseNumber(inputValue);
-                                    setBranchRows(prev => prev.map((x,idx)=> idx===branchIdx? { ...x, values: { ...x.values, ['كاش الدرج']: n } } : x));
-                                  }}
-                                  className="flex h-9 w-full rounded-md border border-primary/30 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary text-center"
-                                />
-                              </td>
-                            ))}
-                            <td className="border p-3 text-center font-bold text-primary">
-                              {branches.reduce((sum, b, i) => sum + Number(branchRows[i]?.values['كاش الدرج'] || 0), 0).toLocaleString()}
-                            </td>
-                          </tr>
-
-                          {/* ديون ليه Row */}
-                          <tr className="bg-slate-50">
-                            <td className="border p-3 font-semibold text-right">ديون ليه</td>
-                            {branches.map((branch, branchIdx) => (
-                              <td key={branchIdx} className="border p-3 text-center">
-                                <input
-                                  type="text"
-                                  defaultValue={Number(branchRows[branchIdx]?.values['ديون ليه'] || 0) === 0 ? '' : Number(branchRows[branchIdx]?.values['ديون ليه'] || 0).toLocaleString('en-US')}
-                                  key={`debt-for-${branchIdx}`}
-                                  onChange={e => {
-                                    const inputValue = e.target.value;
-                                    if (!validateNumericInputWithNegative(inputValue)) return;
-                                    const n = parseNumber(inputValue);
-                                    setBranchRows(prev => prev.map((x,idx)=> idx===branchIdx? { ...x, values: { ...x.values, ['ديون ليه']: n } } : x));
-                                  }}
-                                  className="flex h-9 w-full rounded-md border border-primary/30 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary text-center"
-                                />
-                              </td>
-                            ))}
-                            <td className="border p-3 text-center font-bold text-primary">
-                              {branches.reduce((sum, b, i) => sum + Number(branchRows[i]?.values['ديون ليه'] || 0), 0).toLocaleString()}
-                            </td>
-                          </tr>
-
-                          {/* ديون عليه Row */}
-                          <tr className="bg-white">
-                            <td className="border p-3 font-semibold text-right">ديون عليه</td>
-                            {branches.map((branch, branchIdx) => (
-                              <td key={branchIdx} className="border p-3 text-center">
-                                <input
-                                  type="text"
-                                  defaultValue={Number(branchRows[branchIdx]?.values['ديون عليه'] || 0) === 0 ? '' : Number(branchRows[branchIdx]?.values['ديون عليه'] || 0).toLocaleString('en-US')}
-                                  key={`debt-against-${branchIdx}`}
-                                  onChange={e => {
-                                    const inputValue = e.target.value;
-                                    if (!validateNumericInputWithNegative(inputValue)) return;
-                                    const n = parseNumber(inputValue);
-                                    setBranchRows(prev => prev.map((x,idx)=> idx===branchIdx? { ...x, values: { ...x.values, ['ديون عليه']: n } } : x));
-                                  }}
-                                  className="flex h-9 w-full rounded-md border border-primary/30 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary text-center"
-                                />
-                              </td>
-                            ))}
-                            <td className="border p-3 text-center font-bold text-primary">
-                              {branches.reduce((sum, b, i) => sum + Number(branchRows[i]?.values['ديون عليه'] || 0), 0).toLocaleString()}
-                            </td>
-                          </tr>
-
-                          {/* Total Row */}
-                          <tr className="bg-gradient-to-r from-green-50 to-emerald-50">
-                            <td className="border p-3 font-bold text-right text-green-800">الإجمالي</td>
-                            {branches.map((branch, branchIdx) => {
-                              const drawer = Number(branchRows[branchIdx]?.values['كاش الدرج'] || 0);
-                              const debtsFor = Number(branchRows[branchIdx]?.values['ديون ليه'] || 0);
-                              const debtsAgainst = Number(branchRows[branchIdx]?.values['ديون عليه'] || 0);
-                              const total = drawer + debtsFor - debtsAgainst;
-                              return (
-                                <td key={branchIdx} className="border p-3 text-center font-bold text-green-800">
-                                  {total.toLocaleString()}
+                        الدرج والديون
+                      </CardTitle>
+                      <CardDescription className="text-slate-600">
+                        أدخل الدرج والديون لكل فرع
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr>
+                              <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">البند \ الفرع</th>
+                              {branches.map((branch, idx) => (
+                                <th key={idx} className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">{branch}</th>
+                              ))}
+                              <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">الإجمالي</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {/* الدرج Row */}
+                            <tr className="bg-white">
+                              <td className="border p-3 font-semibold text-right">الدرج</td>
+                              {branches.map((branch, branchIdx) => (
+                                <td key={branchIdx} className="border p-3 text-center">
+                                  <input
+                                    type="text"
+                                    defaultValue={Number(branchRows[branchIdx]?.values['كاش الدرج'] || 0) === 0 ? '' : Number(branchRows[branchIdx]?.values['كاش الدرج'] || 0).toLocaleString('en-US')}
+                                    key={`drawer-${branchIdx}`}
+                                    onChange={e => {
+                                      const inputValue = e.target.value;
+                                      if (!validateNumericInputWithNegative(inputValue)) return;
+                                      const n = parseNumber(inputValue);
+                                      setBranchRows(prev => prev.map((x, idx) => idx === branchIdx ? { ...x, values: { ...x.values, ['كاش الدرج']: n } } : x));
+                                    }}
+                                    className="flex h-9 w-full rounded-md border border-primary/30 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary text-center"
+                                  />
                                 </td>
-                              );
-                            })}
-                            <td className="border p-3 text-center font-bold text-green-800">
-                              {branches.reduce((sum, b, i) => {
-                                const drawer = Number(branchRows[i]?.values['كاش الدرج'] || 0);
-                                const debtsFor = Number(branchRows[i]?.values['ديون ليه'] || 0);
-                                const debtsAgainst = Number(branchRows[i]?.values['ديون عليه'] || 0);
-                                return sum + drawer + debtsFor - debtsAgainst;
-                              }, 0).toLocaleString()}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                              ))}
+                              <td className="border p-3 text-center font-bold text-primary">
+                                {branches.reduce((sum, b, i) => sum + Number(branchRows[i]?.values['كاش الدرج'] || 0), 0).toLocaleString()}
+                              </td>
+                            </tr>
 
-                <div className="flex items-center gap-2 justify-end mt-4">
-                  <Button
-                    onClick={() => setWizardStep(2)}
-                    variant="outline"
-                  >
-                    الخطوة السابقة
-                  </Button>
-                  <Button
-                    onClick={() => setWizardStep(4)}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 to-emerald-700 text-white"
-                  >
-                    الخطوة التالية
-                  </Button>
-                </div>
-              </Fragment>
-            )}
+                            {/* ديون ليه Row */}
+                            <tr className="bg-slate-50">
+                              <td className="border p-3 font-semibold text-right">ديون ليه</td>
+                              {branches.map((branch, branchIdx) => (
+                                <td key={branchIdx} className="border p-3 text-center">
+                                  <input
+                                    type="text"
+                                    defaultValue={Number(branchRows[branchIdx]?.values['ديون ليه'] || 0) === 0 ? '' : Number(branchRows[branchIdx]?.values['ديون ليه'] || 0).toLocaleString('en-US')}
+                                    key={`debt-for-${branchIdx}`}
+                                    onChange={e => {
+                                      const inputValue = e.target.value;
+                                      if (!validateNumericInputWithNegative(inputValue)) return;
+                                      const n = parseNumber(inputValue);
+                                      setBranchRows(prev => prev.map((x, idx) => idx === branchIdx ? { ...x, values: { ...x.values, ['ديون ليه']: n } } : x));
+                                    }}
+                                    className="flex h-9 w-full rounded-md border border-primary/30 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary text-center"
+                                  />
+                                </td>
+                              ))}
+                              <td className="border p-3 text-center font-bold text-primary">
+                                {branches.reduce((sum, b, i) => sum + Number(branchRows[i]?.values['ديون ليه'] || 0), 0).toLocaleString()}
+                              </td>
+                            </tr>
 
-            {wizardStep === 4 && (
-              <Fragment>
-                <Card className="bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg rounded-2xl">
-                  <CardHeader className="pb-4 border-b border-slate-200">
-                    <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
-                      <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg flex items-center justify-center">
-                        <DollarSign className="w-4 h-4 text-white" />
+                            {/* ديون عليه Row */}
+                            <tr className="bg-white">
+                              <td className="border p-3 font-semibold text-right">ديون عليه</td>
+                              {branches.map((branch, branchIdx) => (
+                                <td key={branchIdx} className="border p-3 text-center">
+                                  <input
+                                    type="text"
+                                    defaultValue={Number(branchRows[branchIdx]?.values['ديون عليه'] || 0) === 0 ? '' : Number(branchRows[branchIdx]?.values['ديون عليه'] || 0).toLocaleString('en-US')}
+                                    key={`debt-against-${branchIdx}`}
+                                    onChange={e => {
+                                      const inputValue = e.target.value;
+                                      if (!validateNumericInputWithNegative(inputValue)) return;
+                                      const n = parseNumber(inputValue);
+                                      setBranchRows(prev => prev.map((x, idx) => idx === branchIdx ? { ...x, values: { ...x.values, ['ديون عليه']: n } } : x));
+                                    }}
+                                    className="flex h-9 w-full rounded-md border border-primary/30 bg-white px-3 py-1 text-sm shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary focus-visible:border-primary text-center"
+                                  />
+                                </td>
+                              ))}
+                              <td className="border p-3 text-center font-bold text-primary">
+                                {branches.reduce((sum, b, i) => sum + Number(branchRows[i]?.values['ديون عليه'] || 0), 0).toLocaleString()}
+                              </td>
+                            </tr>
+
+                            {/* Total Row */}
+                            <tr className="bg-gradient-to-r from-green-50 to-emerald-50">
+                              <td className="border p-3 font-bold text-right text-green-800">الإجمالي</td>
+                              {branches.map((branch, branchIdx) => {
+                                const drawer = Number(branchRows[branchIdx]?.values['كاش الدرج'] || 0);
+                                const debtsFor = Number(branchRows[branchIdx]?.values['ديون ليه'] || 0);
+                                const debtsAgainst = Number(branchRows[branchIdx]?.values['ديون عليه'] || 0);
+                                const total = drawer + debtsFor - debtsAgainst;
+                                return (
+                                  <td key={branchIdx} className="border p-3 text-center font-bold text-green-800">
+                                    {total.toLocaleString()}
+                                  </td>
+                                );
+                              })}
+                              <td className="border p-3 text-center font-bold text-green-800">
+                                {branches.reduce((sum, b, i) => {
+                                  const drawer = Number(branchRows[i]?.values['كاش الدرج'] || 0);
+                                  const debtsFor = Number(branchRows[i]?.values['ديون ليه'] || 0);
+                                  const debtsAgainst = Number(branchRows[i]?.values['ديون عليه'] || 0);
+                                  return sum + drawer + debtsFor - debtsAgainst;
+                                }, 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
-                      الكاش
-                    </CardTitle>
-                    <CardDescription className="text-slate-600">
-                      أدخل كاش كل فرع
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-6">
-                    <div className="overflow-x-auto">
-                      <table className="w-full border-collapse">
-                        <thead>
-                          <tr>
-                            <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">البند</th>
-                            <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">القيمة</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          <tr className="bg-blue-50">
-                            <td className="border p-3 font-semibold text-right">
-                              المصروفات من حساب المحل
-                              <span className="text-xs text-blue-600 block mt-1">(محسوب تلقائياً من المصروفات الشخصية)</span>
-                            </td>
-                            <td className="border p-3 text-center">
-                              <Input 
-                                type="text"
-                                value={formatNumber(Number(cashBreakdown.outletExpenses || 0))}
-                                readOnly
-                                disabled
-                                className="bg-blue-100 border-blue-300 text-center cursor-not-allowed"
-                              />
-                            </td>
-                          </tr>
-                          <tr className="bg-slate-50">
-                            <td className="border p-3 font-semibold text-right">المنزل</td>
-                            <td className="border p-3 text-center">
-                              <Input 
-                                type="text"
-                                value={formatNumber(Number(cashBreakdown.home || 0))}
-                                onChange={e => { const v=e.target.value; if(!validateNumericInput(v)) return; setCashBreakdown(prev => ({ ...prev, home: parseNumber(v) })); }}
-                                className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center"
-                              />
-                            </td>
-                          </tr>
-                          <tr className="bg-white">
-                            <td className="border p-3 font-semibold text-right">البنك</td>
-                            <td className="border p-3 text-center">
-                              <Input 
-                                type="text"
-                                value={formatNumber(Number(cashBreakdown.bank || 0))}
-                                onChange={e => { const v=e.target.value; if(!validateNumericInput(v)) return; setCashBreakdown(prev => ({ ...prev, bank: parseNumber(v) })); }}
-                                className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center"
-                              />
-                            </td>
-                          </tr>
-                          <tr className="bg-slate-50">
-                            <td className="border p-3 font-semibold text-right">
-                              الدرج
-                              <span className="text-xs text-blue-600 block mt-1">(محسوب تلقائياً من الدرج والديون)</span>
-                            </td>
-                            <td className="border p-3 text-center">
-                              <Input 
-                                type="text"
-                                value={formatNumber(Number(cashBreakdown.drawer || 0))}
-                                readOnly
-                                disabled
-                                className="bg-blue-100 cursor-not-allowed text-center"
-                              />
-                            </td>
-                          </tr>
-                          <tr className="bg-white">
-                            <td className="border p-3 font-semibold text-right">فودافون</td>
-                            <td className="border p-3 text-center">
-                              <Input 
-                                type="text"
-                                value={formatNumber(Number(cashBreakdown.vodafone || 0))}
-                                onChange={e => { const v=e.target.value; if(!validateNumericInput(v)) return; setCashBreakdown(prev => ({ ...prev, vodafone: parseNumber(v) })); }}
-                                className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center"
-                              />
-                            </td>
-                          </tr>
-                          {/* Custom Cash Rows */}
-                          {(cashBreakdown.customRows || []).map((row, index) => (
-                            <tr key={row.id} className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex items-center gap-2 justify-end mt-4">
+                    <Button
+                      onClick={() => setWizardStep(2)}
+                      variant="outline"
+                    >
+                      الخطوة السابقة
+                    </Button>
+                    <Button
+                      onClick={() => setWizardStep(4)}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 to-emerald-700 text-white"
+                    >
+                      الخطوة التالية
+                    </Button>
+                  </div>
+                </Fragment>
+              )}
+
+              {wizardStep === 4 && (
+                <Fragment>
+                  <Card className="bg-gradient-to-br from-white to-slate-50/50 border-slate-200/50 shadow-lg rounded-2xl">
+                    <CardHeader className="pb-4 border-b border-slate-200">
+                      <CardTitle className="text-xl font-bold text-slate-800 flex items-center gap-2">
+                        <div className="w-8 h-8 bg-gradient-to-r from-orange-500 to-amber-500 rounded-lg flex items-center justify-center">
+                          <DollarSign className="w-4 h-4 text-white" />
+                        </div>
+                        الكاش
+                      </CardTitle>
+                      <CardDescription className="text-slate-600">
+                        أدخل كاش كل فرع
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent className="pt-6">
+                      <div className="overflow-x-auto">
+                        <table className="w-full border-collapse">
+                          <thead>
+                            <tr>
+                              <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">البند</th>
+                              <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">القيمة</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            <tr className="bg-blue-50">
                               <td className="border p-3 font-semibold text-right">
-                                <div className="flex items-center justify-between">
-                                  <span>{row.description}</span>
-                                  <Button
-                                    size="sm"
-                                    variant="ghost"
-                                    onClick={() => removeCustomCashRow(row.id)}
-                                    className="text-red-500 hover:text-red-700 hover:bg-red-50"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </div>
+                                المصروفات من حساب المحل
+                                <span className="text-xs text-blue-600 block mt-1">(محسوب تلقائياً من المصروفات الشخصية)</span>
                               </td>
                               <td className="border p-3 text-center">
-                                <Input 
+                                <Input
                                   type="text"
-                                  value={formatNumber(Number(row.amount || 0))}
-                                  onChange={e => { 
-                                    const v = e.target.value; 
-                                    if(!validateNumericInput(v)) return; 
-                                    updateCustomCashRow(row.id, parseNumber(v)); 
-                                  }}
+                                  value={formatNumber(Number(cashBreakdown.outletExpenses || 0))}
+                                  readOnly
+                                  disabled
+                                  className="bg-blue-100 border-blue-300 text-center cursor-not-allowed"
+                                />
+                              </td>
+                            </tr>
+                            <tr className="bg-slate-50">
+                              <td className="border p-3 font-semibold text-right">المنزل</td>
+                              <td className="border p-3 text-center">
+                                <Input
+                                  type="text"
+                                  value={formatNumber(Number(cashBreakdown.home || 0))}
+                                  onChange={e => { const v = e.target.value; if (!validateNumericInput(v)) return; setCashBreakdown(prev => ({ ...prev, home: parseNumber(v) })); }}
                                   className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center"
                                 />
                               </td>
                             </tr>
-                          ))}
-                          {/* Add Custom Row Button */}
-                          <tr className="bg-yellow-50">
-                            <td colSpan={2} className="border p-3 text-center">
-                              <Button
-                                variant="outline"
-                                onClick={addCustomCashRow}
-                                className="border-dashed border-primary/50 hover:border-primary text-primary hover:bg-primary/5"
-                              >
-                                <Plus className="w-4 h-4 mr-2" />
-                                إضافة بند جديد
-                              </Button>
-                            </td>
-                          </tr>
-                          <tr className="bg-gradient-to-r from-green-50 to-emerald-50">
-                            <td className="border p-3 font-bold text-right text-green-800">الإجمالي</td>
-                            <td className="border p-3 text-center font-bold text-green-800">
-                              {cashManual.toLocaleString()}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
+                            <tr className="bg-white">
+                              <td className="border p-3 font-semibold text-right">البنك</td>
+                              <td className="border p-3 text-center">
+                                <Input
+                                  type="text"
+                                  value={formatNumber(Number(cashBreakdown.bank || 0))}
+                                  onChange={e => { const v = e.target.value; if (!validateNumericInput(v)) return; setCashBreakdown(prev => ({ ...prev, bank: parseNumber(v) })); }}
+                                  className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center"
+                                />
+                              </td>
+                            </tr>
+                            <tr className="bg-slate-50">
+                              <td className="border p-3 font-semibold text-right">
+                                الدرج
+                                <span className="text-xs text-blue-600 block mt-1">(محسوب تلقائياً من الدرج والديون)</span>
+                              </td>
+                              <td className="border p-3 text-center">
+                                <Input
+                                  type="text"
+                                  value={formatNumber(Number(cashBreakdown.drawer || 0))}
+                                  readOnly
+                                  disabled
+                                  className="bg-blue-100 cursor-not-allowed text-center"
+                                />
+                              </td>
+                            </tr>
+                            <tr className="bg-white">
+                              <td className="border p-3 font-semibold text-right">فودافون</td>
+                              <td className="border p-3 text-center">
+                                <Input
+                                  type="text"
+                                  value={formatNumber(Number(cashBreakdown.vodafone || 0))}
+                                  onChange={e => { const v = e.target.value; if (!validateNumericInput(v)) return; setCashBreakdown(prev => ({ ...prev, vodafone: parseNumber(v) })); }}
+                                  className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center"
+                                />
+                              </td>
+                            </tr>
+                            {/* Custom Cash Rows */}
+                            {(cashBreakdown.customRows || []).map((row, index) => (
+                              <tr key={row.id} className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                                <td className="border p-3 font-semibold text-right">
+                                  <div className="flex items-center justify-between">
+                                    <span>{row.description}</span>
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={() => removeCustomCashRow(row.id)}
+                                      className="text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </td>
+                                <td className="border p-3 text-center">
+                                  <Input
+                                    type="text"
+                                    value={formatNumber(Number(row.amount || 0))}
+                                    onChange={e => {
+                                      const v = e.target.value;
+                                      if (!validateNumericInput(v)) return;
+                                      updateCustomCashRow(row.id, parseNumber(v));
+                                    }}
+                                    className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center"
+                                  />
+                                </td>
+                              </tr>
+                            ))}
+                            {/* Add Custom Row Button */}
+                            <tr className="bg-yellow-50">
+                              <td colSpan={2} className="border p-3 text-center">
+                                <Button
+                                  variant="outline"
+                                  onClick={addCustomCashRow}
+                                  className="border-dashed border-primary/50 hover:border-primary text-primary hover:bg-primary/5"
+                                >
+                                  <Plus className="w-4 h-4 mr-2" />
+                                  إضافة بند جديد
+                                </Button>
+                              </td>
+                            </tr>
+                            <tr className="bg-gradient-to-r from-green-50 to-emerald-50">
+                              <td className="border p-3 font-bold text-right text-green-800">الإجمالي</td>
+                              <td className="border p-3 text-center font-bold text-green-800">
+                                {cashManual.toLocaleString()}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-                <div className="flex items-center gap-2 justify-end mt-4">
-                  <Button
-                    onClick={() => setWizardStep(3)}
-                    variant="outline"
-                  >
-                    الخطوة السابقة
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setWizardStep((s) => {
-                        const next = Math.min(5, s + 1);
-                        // Do not auto-open final results; keep consistent next-step behavior
-                        setShowResults(false);
-                        return next;
-                      });
-                    }}
-                    className="bg-green-600 hover:bg-green-700 text-white"
-                  >
-                     الخطوة التالية
-                  </Button>
-                </div>
-              </Fragment>
-            )}
-
-            {wizardStep === 5 && !showResults && (
-              <Fragment>
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-slate-800">أدخل أرباح كل فرع (قبل المصروفات)</h3>
-                  <p className="text-sm text-slate-500">أدخل ربح كل فرع قبل طرح المصروفات. سيتم خصم المصروفات لاحقًا لحساب صافي الربح.</p>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full border-collapse">
-                    <thead>
-                      <tr>
-                        <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">الفرع</th>
-                        <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">أرباح قبل المصروفات</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {branches.map((b) => {
-                        const row = branchRows.find(r => r.name === b);
-                        const val = (row?.values['أرباح'] as number) || 0;
-                        return (
-                          <tr key={b} className="bg-white">
-                            <td className="border p-3 font-semibold text-right">{b}</td>
-                            <td className="border p-3 text-center">
-                              <Input
-                                type="text"
-                                value={formatNumber(val)}
-                                onChange={(e) => { const v = e.target.value; if(!validateNumericInput(v)) return; updateValue(b, 'أرباح' as Expense, parseNumber(v)); }}
-                                className="w-full text-center bg-white border-primary/30 focus:border-primary focus:ring-primary/20"
-                              />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                      <tr className="bg-gradient-to-r from-primary/10 to-secondary/10">
-                        <td className="border p-3 font-bold text-right text-primary">الإجمالي</td>
-                        <td className="border p-3 text-center font-bold text-primary">{Number(totals.totalProfits||0).toLocaleString()}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-                <div className="mt-3 text-xs text-slate-600">إجمالي أرباح الفروع: <span className="font-semibold text-primary">{Number(totals.totalProfits||0).toLocaleString()}</span> — صافي الربح الحالي: <span className="font-semibold text-secondary">{Number(totals.netProfit||0).toLocaleString()}</span></div>
-                <div className="mt-4 flex items-center justify-between gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setWizardStep(4)}
-                    className="border-slate-300 hover:border-slate-400"
-                  >
-                    الخطوة السابقة
-                  </Button>
-                  <div className="flex gap-2">
+                  <div className="flex items-center gap-2 justify-end mt-4">
+                    <Button
+                      onClick={() => setWizardStep(3)}
+                      variant="outline"
+                    >
+                      الخطوة السابقة
+                    </Button>
                     <Button
                       onClick={() => {
-                        if (shareholders.length > 0) {
-                          setWizardStep(5.5); // Go to shareholder selection
-                        } else {
-                          setShowResults(true); // Skip if no shareholders
-                        }
+                        setWizardStep((s) => {
+                          const next = Math.min(5, s + 1);
+                          // Do not auto-open final results; keep consistent next-step behavior
+                          setShowResults(false);
+                          return next;
+                        });
                       }}
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                      className="bg-green-600 hover:bg-green-700 text-white"
                     >
-                      {shareholders.length > 0 ? 'التالي: اختيار المساهمين' : 'عرض النتيجة النهائية'}
+                      الخطوة التالية
                     </Button>
                   </div>
-                </div>
-              </Fragment>
-            )}
-            
-            {/* Step 5.5: Shareholder Selection */}
-            {wizardStep === 5.5 && (
-              <Fragment>
-                <div className="mb-4">
-                  <h3 className="text-lg font-semibold text-slate-800">اختر المساهمين المشمولين في هذا التقرير</h3>
-                  <p className="text-sm text-slate-500">حدد المساهمين الذين سيتم توزيع الأرباح عليهم في هذا التقرير. {currentReportId ? 'تم تحميل الاختيارات المحفوظة' : 'الافتراضي: لا أحد محدد'}</p>
-                </div>
-                
-                <div className="bg-white rounded-lg border border-slate-200 p-4 mb-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedShareholders(new Set(shareholders.map(s => s.id)))}
-                        className="border-emerald-300 hover:bg-emerald-50"
-                      >
-                        <Users className="w-4 h-4 ml-1" />
-                        تحديد الكل
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setSelectedShareholders(new Set())}
-                        className="border-rose-300 hover:bg-rose-50"
-                      >
-                        إلغاء الكل
-                      </Button>
-                    </div>
-                    <div className="text-sm text-slate-600">
-                      المحدد: <span className="font-bold text-primary">{selectedShareholders.size}</span> من {shareholders.length}
-                    </div>
+                </Fragment>
+              )}
+
+              {wizardStep === 5 && !showResults && (
+                <Fragment>
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-slate-800">أدخل أرباح كل فرع (قبل المصروفات)</h3>
+                    <p className="text-sm text-slate-500">أدخل ربح كل فرع قبل طرح المصروفات. سيتم خصم المصروفات لاحقًا لحساب صافي الربح.</p>
                   </div>
-                  
-                  <div className="space-y-2">
-                    {shareholders.map(shareholder => {
-                      const history = shareHistory[shareholder.id] || [];
-                      const startingBalance = shareholder.initialAmount ?? (history.length > 0 ? history[0].fromAmount : Number(shareholder.amount));
-                      const currentBalance = Number(shareholder.amount);
-                      
-                      // Calculate new balance after profit distribution
-                      const pct = Number(shareholder.percentage || 0);
-                      const profitDelta = selectedShareholders.has(shareholder.id) 
-                        ? currentBalance * perPoundProfitComputed * (pct / 100)
-                        : 0;
-                      const newBalance = currentBalance + profitDelta;
-                      
-                      return (
-                      <div
-                        key={shareholder.id}
-                        className={`flex items-center justify-between p-3 rounded-lg border-2 transition-all cursor-pointer ${
-                          selectedShareholders.has(shareholder.id)
-                            ? 'border-emerald-500 bg-emerald-50'
-                            : 'border-slate-200 bg-white hover:border-slate-300'
-                        }`}
-                        onClick={() => {
-                          const newSet = new Set(selectedShareholders);
-                          if (newSet.has(shareholder.id)) {
-                            newSet.delete(shareholder.id);
-                          } else {
-                            newSet.add(shareholder.id);
-                          }
-                          setSelectedShareholders(newSet);
-                        }}
-                      >
-                        <div className="flex items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={selectedShareholders.has(shareholder.id)}
-                            onChange={() => {}}
-                            className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500"
-                          />
-                          <div>
-                            <div className="font-semibold text-slate-800">{shareholder.name}</div>
-                            <div className="text-xs text-slate-500">
-                              الرصيد الحالي: {formatNumber(currentBalance)} | النسبة: {formatNumber(shareholder.percentage)}%
-                            </div>
-                            {selectedShareholders.has(shareholder.id) && profitDelta > 0 && (
-                              <div className="text-xs text-emerald-600 font-semibold mt-1">
-                                الرصيد الجديد: {formatNumber(newBalance)} (+{formatNumber(profitDelta)})
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {selectedShareholders.has(shareholder.id) && (
-                          <Badge className="bg-emerald-500">محدد</Badge>
-                        )}
-                      </div>
-                    );
-                    })}
-                  </div>
-                  
-                  {selectedShareholders.size === 0 ? (
-                    <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
-                      ℹ️ لم يتم اختيار أي مساهم - سيتم إنشاء التقرير بدون توزيع أرباح
-                    </div>
-                  ) : (
-                    <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
-                      <div className="text-sm font-semibold text-emerald-800 mb-2">ملخص التوزيع المتوقع:</div>
-                      <div className="text-xs text-emerald-700 space-y-1">
-                        {shareholders
-                          .filter(s => selectedShareholders.has(s.id))
-                          .map(s => {
-                            const currentBalance = Number(s.amount);
-                            const pct = Number(s.percentage || 0);
-                            const profitDelta = currentBalance * perPoundProfitComputed * (pct / 100);
-                            return (
-                              <div key={s.id} className="flex justify-between">
-                                <span>{s.name}:</span>
-                                <span className="font-semibold">+{formatNumber(profitDelta)}</span>
-                              </div>
-                            );
-                          })}
-                        <div className="border-t border-emerald-300 pt-1 mt-2 flex justify-between font-bold">
-                          <span>إجمالي التوزيع:</span>
-                          <span>
-                            +{formatNumber(
-                              shareholders
-                                .filter(s => selectedShareholders.has(s.id))
-                                .reduce((total, s) => {
-                                  const currentBalance = Number(s.amount);
-                                  const pct = Number(s.percentage || 0);
-                                  return total + (currentBalance * perPoundProfitComputed * (pct / 100));
-                                }, 0)
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-                
-                <div className="mt-4 flex items-center justify-between gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => setWizardStep(5)}
-                    className="border-slate-300 hover:border-slate-400"
-                  >
-                    الخطوة السابقة
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      setWizardStep(5);
-                      setShowResults(true);
-                    }}
-                    className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
-                  >
-                    عرض النتيجة النهائية
-                  </Button>
-                </div>
-              </Fragment>
-            )}
-            
-            {wizardStep === 5 && showResults && (
-              <Fragment>
-                {/* Report Header */}
-                <div className="text-center mb-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
-                  <h1 className="text-3xl font-bold text-green-800 mb-2">
-                    {reportName || title || 'تقرير الأرباح'}
-                  </h1>
-                  {title && title !== reportName && (
-                    <h2 className="text-xl text-green-600 mb-2">{title}</h2>
-                  )}
-                  {range?.from && range?.to && (
-                    <div className="text-green-700 font-medium">
-                      {new Date(range.from).toLocaleDateString('ar-EG')} - {new Date(range.to).toLocaleDateString('ar-EG')}
-                    </div>
-                  )}
-                </div>
-                
-                <div className="space-y-6">
-                  {/* Main Expenses Table */}
-                  <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                    <div className="bg-slate-600 text-white p-3 text-center font-bold">
-                      الفترة الزمنية
-                    </div>
+                  <div className="overflow-x-auto">
                     <table className="w-full border-collapse">
                       <thead>
-                        <tr className="bg-slate-100">
-                          <th className="border border-slate-300 p-2 text-center font-bold">البند</th>
-                          {branches.map((branch, idx) => (
-                            <th key={idx} className="border border-slate-300 p-2 text-center font-bold border-r-0">{branch}</th>
-                          ))}
-                          <th className="border border-slate-300 p-2 text-center font-bold border-r-0">المجموع</th>
+                        <tr>
+                          <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-right font-bold text-primary">الفرع</th>
+                          <th className="border bg-gradient-to-r from-primary/10 to-secondary/10 p-3 text-center font-bold text-primary">أرباح قبل المصروفات</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr className="bg-yellow-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-yellow-200">مخازن</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['مخازن'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        
-                        {/* Personal Expenses */}
-                        {expenses
-                          .filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
-                          .filter(expense => {
-                            // Hide row if all values are zero
-                            const total = Number(totals.sumByExpense?.[expense] || 0);
-                            return total > 0;
-                          })
-                          .map((expense, idx) => (
-                          <tr key={expense} className="bg-yellow-50">
-                            <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
-                            {branches.map((branch, branchIdx) => (
-                              <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
-                                {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                        {branches.map((b) => {
+                          const row = branchRows.find(r => r.name === b);
+                          const val = (row?.values['أرباح'] as number) || 0;
+                          return (
+                            <tr key={b} className="bg-white">
+                              <td className="border p-3 font-semibold text-right">{b}</td>
+                              <td className="border p-3 text-center">
+                                <Input
+                                  type="text"
+                                  value={formatNumber(val)}
+                                  onChange={(e) => { const v = e.target.value; if (!validateNumericInput(v)) return; updateValue(b, 'أرباح' as Expense, parseNumber(v)); }}
+                                  className="w-full text-center bg-white border-primary/30 focus:border-primary focus:ring-primary/20"
+                                />
                               </td>
-                            ))}
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                        
-                        {/* Other Expenses */}
-                        {expenses
-                          .filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
-                          .filter(expense => {
-                            // Hide row if all values are zero
-                            const total = Number(totals.sumByExpense?.[expense] || 0);
-                            return total > 0;
-                          })
-                          .map((expense, idx) => (
-                          <tr key={expense} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
-                            <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
-                            {branches.map((branch, branchIdx) => (
-                              <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
-                                {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
-                              </td>
-                            ))}
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                        
-                        {/* Cash, Debts, Profits */}
-                        <tr className="bg-white">
-                          <td className="border border-slate-300 p-2 text-center bg-yellow-100">كاش الدرج</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['كاش الدرج'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['كاش الدرج'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        
-                        <tr className="bg-slate-50">
-                          <td className="border border-slate-300 p-2 text-center bg-yellow-100">ديون ليه</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['ديون ليه'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        
-                        <tr className="bg-white">
-                          <td className="border border-slate-300 p-2 text-center bg-yellow-100">ديون عليه</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['ديون عليه'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        
-                        <tr className="bg-slate-50">
-                          <td className="border border-slate-300 p-2 text-center bg-yellow-100">أرباح</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['أرباح'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['أرباح'] || 0).toLocaleString()}
-                          </td>
+                            </tr>
+                          );
+                        })}
+                        <tr className="bg-gradient-to-r from-primary/10 to-secondary/10">
+                          <td className="border p-3 font-bold text-right text-primary">الإجمالي</td>
+                          <td className="border p-3 text-center font-bold text-primary">{Number(totals.totalProfits || 0).toLocaleString()}</td>
                         </tr>
                       </tbody>
                     </table>
                   </div>
-
-                  {/* Cash Breakdown Table */}
-                  <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                    <div className="bg-orange-400 text-white p-3 text-center font-bold">
-                      مخازن نهائي
-                    </div>
-                    <table className="w-full border-collapse">
-                      <tbody>
-                        <tr className="bg-orange-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">مخازن</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-orange-50">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">الكاش</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashManual || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-orange-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">ديون ليه</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        {/* Subtotal before deducting ديون عليه */}
-                        <tr className="bg-slate-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-slate-200">المجموع</td>
-                          <td className="border border-slate-300 p-2 text-center font-semibold border-r-0">
-                            {Number((totals.sumByExpense?.['مخازن'] || 0) + Number(cashManual || 0) + (totals.sumByExpense?.['ديون ليه'] || 0)).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-blue-50">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-blue-200">ديون عليه</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0 text-red-600">
-                            -{Math.abs(Number(totals.sumByExpense?.['ديون عليه'] || 0)).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-green-200">
-                          <td className="border border-slate-300 p-2 text-center font-bold">مخازن نهائي</td>
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(correctFinalBalance).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Cash Details Table */}
-                  <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                    <div className="bg-gray-500 text-white p-3 text-center font-bold">
-                      الكاش
-                    </div>
-                    <table className="w-full border-collapse">
-                      <tbody>
-                        <tr className="bg-gray-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold">المصروفات من حساب المحل</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashBreakdown.outletExpenses || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-gray-50">
-                          <td className="border border-slate-300 p-2 text-center font-semibold">بيت</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashBreakdown.home || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-gray-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold">بنك</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashBreakdown.bank || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-gray-50">
-                          <td className="border border-slate-300 p-2 text-center font-semibold">درج</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashBreakdown.drawer || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        {/* Custom Cash Rows */}
-                        {(cashBreakdown.customRows || [])
-                          .filter(row => Number(row.amount || 0) > 0)
-                          .map((row, idx) => (
-                          <tr key={row.id} className={idx % 2 === 0 ? "bg-gray-100" : "bg-gray-50"}>
-                            <td className="border border-slate-300 p-2 text-center font-semibold">{row.name}</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(row.amount || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                        ))}
-                        <tr className="bg-green-200">
-                          <td className="border border-slate-300 p-2 text-center font-bold">المجموع</td>
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(cashManual || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Profit Comparison Tables */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Previous Month Comparison */}
-                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                      <div className="bg-blue-500 text-white p-3 text-center font-bold">
-                        مقارنة بالشهر الماضي
-                      </div>
-                      <table className="w-full border-collapse">
-                        <tbody>
-                          <tr className="bg-blue-100">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">الشهر الماضي</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(lastMonthClosing || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-blue-50">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">الشهر الحالي</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(correctFinalBalance).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-green-200">
-                            <td className="border border-slate-300 p-2 text-center font-bold">الفرق</td>
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {formatNumberWithParens(Number(compareLastMonth || 0))}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Net Profit */}
-                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
-                      <div className="bg-green-600 text-white p-3 text-center font-bold">
-                        صافي الربح (النتيجة)
-                      </div>
-                      <table className="w-full border-collapse">
-                        <tbody>
-                          <tr className="bg-green-100">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">مصروفات</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(totals.totalExpenses || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-green-50">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">أرباح</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(totals.totalProfits || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-green-200">
-                            <td className="border border-slate-300 p-2 text-center font-bold">صافي الربح</td>
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {formatNumberWithParens(Number(totals.netProfit || 0))}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
+                  <div className="mt-3 text-xs text-slate-600">إجمالي أرباح الفروع: <span className="font-semibold text-primary">{Number(totals.totalProfits || 0).toLocaleString()}</span> — صافي الربح الحالي: <span className="font-semibold text-secondary">{Number(totals.netProfit || 0).toLocaleString()}</span></div>
+                  <div className="mt-4 flex items-center justify-between gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setWizardStep(4)}
+                      className="border-slate-300 hover:border-slate-400"
+                    >
+                      الخطوة السابقة
+                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={() => {
+                          if (shareholders.length > 0) {
+                            setWizardStep(5.5); // Go to shareholder selection
+                          } else {
+                            setShowResults(true); // Skip if no shareholders
+                          }
+                        }}
+                        className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                      >
+                        {shareholders.length > 0 ? 'التالي: اختيار المساهمين' : 'عرض النتيجة النهائية'}
+                      </Button>
                     </div>
                   </div>
-                </div>
-
-
-                <div className="mt-4 flex items-center justify-end gap-2">
-                  <Button
-                    variant="outline"
-                    onClick={() => { setShowResults(false); setWizardStep(0); }}
-                  >
-                    تعديل من البداية (الخطوة 1)
-                  </Button>
-                  <Button
-                    onClick={() => { setShowWizard(false); setPreviewLayout('a4'); setShowPreview(true); }}
-                    className="bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white"
-                  >
-                    عرض التقرير
-                  </Button>
-                  <Button
-                    onClick={() => setShowWizard(false)}
-                    className="bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white"
-                  >
-                    خروج
-                  </Button>
-                </div>
-              </Fragment>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-      {/* Delete Report Confirmation Dialog */}
-      <Dialog open={!!showDeleteReportId} onOpenChange={(o)=> { if (!o) setShowDeleteReportId(null); }}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>تأكيد حذف التقرير</DialogTitle>
-            <DialogDescription>سيتم حذف التقرير نهائيًا بعد 6 ثوانٍ ما لم تتراجع. هل تريد المتابعة؟</DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={()=> setShowDeleteReportId(null)}>إلغاء</Button>
-            <Button variant="destructive" onClick={() => {
-              const id = showDeleteReportId; if (!id) return; setShowDeleteReportId(null);
-              try {
-                // optimistic UI: remove and schedule
-                setBackupReports(prev => prev ?? reports);
-                reportBackupsRef.current.set(id, reports);
-                setReports(prev => prev.filter(x => x._id !== id));
-                const t = window.setTimeout(async () => {
-                  try {
-                    const resp = await apiDelete(`/api/profit-reports/${id}`);
-                    if (!resp.ok) {
-                      const backup = reportBackupsRef.current.get(id) || backupReports || [];
-                      setReports(backup);
-                      toast({ title: 'فشل الحذف', variant: 'destructive' });
-                    } else {
-                      toast({ title: 'تم الحذف', description: 'تم حذف التقرير بنجاح.' });
-                      refreshReports();
-                    }
-                  } catch (e) {
-                    const backup = reportBackupsRef.current.get(id) || backupReports || [];
-                    setReports(backup);
-                    toast({ title: 'فشل الحذف', description: (e as Error).message, variant: 'destructive' });
-                  } finally {
-                    setScheduledReportDeletes(map => { const m = new Map(map); m.delete(id); return m; });
-                    reportBackupsRef.current.delete(id);
-                    setBackupReports(null);
-                  }
-                }, 6000);
-                setScheduledReportDeletes(map => new Map(map).set(id, t));
-                toast({
-                  title: 'تم جدولة الحذف',
-                  description: (
-                    <div>
-                      سيتم حذف التقرير خلال 6 ثوانٍ — يمكنك التراجع الآن
-                      <DeleteCountdownBar />
-                    </div>
-                  ),
-                  action: (
-                    <ToastAction altText="تراجع" onClick={() => {
-                      const timer = scheduledReportDeletesRef.current.get(id);
-                      if (timer) {
-                        window.clearTimeout(timer);
-                        setScheduledReportDeletes(map => { const m = new Map(map); m.delete(id); return m; });
-                        // undo UI from per-id backup (fallback to global backup)
-                        const backup = reportBackupsRef.current.get(id) || backupReports || [];
-                        setReports(backup);
-                        reportBackupsRef.current.delete(id);
-                        setBackupReports(null);
-                        toast({ title: 'تم التراجع عن الحذف' });
-                      }
-                    }}>تراجع</ToastAction>
-                  ),
-                });
-              } catch (e) {
-                toast({ title: 'تعذر جدولة الحذف', description: (e as Error).message, variant: 'destructive' });
-              }
-            }}>حذف</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* From Date Picker */}
-      <Dialog open={showFromPicker} onOpenChange={setShowFromPicker}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>اختر تاريخ البداية</DialogTitle>
-            <DialogDescription>اضغط على اليوم لتحديد بداية الفترة</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={range?.from}
-              onSelect={(d) => {
-                if (!d) return;
-                setRange((prev) => {
-                  const to = prev?.to && prev.to < d ? d : (prev?.to || d);
-                  return { from: d, to } as DateRange;
-                });
-                setShowFromPicker(false);
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={()=> setShowFromPicker(false)}>إغلاق</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* To Date Picker */}
-      <Dialog open={showToPicker} onOpenChange={setShowToPicker}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>اختر تاريخ النهاية</DialogTitle>
-            <DialogDescription>اضغط على اليوم لتحديد نهاية الفترة</DialogDescription>
-          </DialogHeader>
-          <div className="flex justify-center">
-            <Calendar
-              mode="single"
-              selected={range?.to}
-              onSelect={(d) => {
-                if (!d) return;
-                setRange((prev) => {
-                  const from = prev?.from && d < prev.from ? d : (prev?.from || d);
-                  return { from, to: d } as DateRange;
-                });
-                setShowToPicker(false);
-              }}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={()=> setShowToPicker(false)}>إغلاق</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Add Expense Dialog */}
-      <Dialog open={showAddExpenseDialog} onOpenChange={setShowAddExpenseDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-primary">إضافة مصروف جديد</DialogTitle>
-            <DialogDescription>أدخل اسم المصروف ونوعه</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="expense-name">اسم المصروف</Label>
-              <Input
-                id="expense-name"
-                value={newExpenseName}
-                onChange={(e) => setNewExpenseName(e.target.value)}
-                placeholder="أدخل اسم المصروف"
-                className="mt-1"
-              />
-            </div>
-            <div>
-              <Label>نوع المصروف</Label>
-              <RadioGroup value={newExpenseType} onValueChange={(value) => setNewExpenseType(value as ExpenseType)} className="mt-2">
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="other" id="other" />
-                  <Label htmlFor="other" className="cursor-pointer">عادي (يؤثر على الربح)</Label>
-                </div>
-                <div className="flex items-center space-x-2 space-x-reverse">
-                  <RadioGroupItem value="personal" id="personal" />
-                  <Label htmlFor="personal" className="cursor-pointer">شخصي (يضاف للكاش)</Label>
-                </div>
-              </RadioGroup>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddExpenseDialog(false)}>إلغاء</Button>
-            <Button onClick={handleAddExpense} className="bg-primary hover:bg-primary/90">إضافة</Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Simple Preview Modal (Old Blocks View) */}
-      <Dialog open={showSimplePreview} onOpenChange={setShowSimplePreview}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-slate-900 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-              {title || 'ملخص الأرباح'}
-            </DialogTitle>
-            <DialogDescription className="text-slate-600">
-              عرض مبسط للنتائج
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="space-y-6">
-            {/* Summary Cards - Old Blocks Style */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-              <div 
-                className={`bg-gradient-to-r from-primary/5 to-secondary/5 rounded-xl p-4 border shadow-sm cursor-pointer hover:shadow-md transition-all relative ${
-                  expandedBlock === 'expenses' 
-                    ? 'border-primary/50 ring-2 ring-primary/20 bg-primary/10' 
-                    : 'border-primary/20'
-                }`}
-                onClick={() => setExpandedBlock(expandedBlock === 'expenses' ? null : 'expenses')}
-              >
-                <div className="text-primary font-semibold mb-1">مصروفات</div>
-                <div className="text-2xl font-bold text-primary">{Number(totals.totalExpenses||0).toLocaleString('en-US')}</div>
-                <div className="text-xs text-primary mt-1">إجمالي المصروفات</div>
-                {expandedBlock === 'expenses' && (
-                  <div className="absolute top-2 right-2 w-3 h-3 bg-primary rounded-full animate-pulse"></div>
-                )}
-                <div className="absolute bottom-2 left-2 text-xs text-primary/60">
-                  {expandedBlock === 'expenses' ? '👆 انقر للإغلاق' : '👆 انقر للتفاصيل'}
-                </div>
-              </div>
-              
-              <div 
-                className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setExpandedBlock(expandedBlock === 'profits' ? null : 'profits')}
-              >
-                <div className="text-green-600 font-semibold mb-1">أرباح</div>
-                <div className="text-lg font-bold text-green-800">إجمالي: {Number(totals.totalProfits||0).toLocaleString('en-US')}</div>
-                <div className="text-lg font-bold text-green-900 mt-1">صافي: {Number(totals.netProfit||0).toLocaleString('en-US')}</div>
-                {expandedBlock === 'profits' && (
-                  <div className="mt-4 p-4 bg-white/80 rounded-lg border border-green-300 shadow-sm">
-                    <div className="font-bold text-sm text-green-700 mb-3 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-green-600 rounded-full"></div>
-                      حساب الأرباح
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
-                        <span className="font-medium text-green-700">إجمالي الأرباح</span>
-                        <span className="font-mono font-bold text-green-800">{Number(totals.totalProfits||0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 px-3 bg-red-50 rounded">
-                        <span className="font-medium text-red-700">إجمالي المصروفات</span>
-                        <span className="font-mono font-bold text-red-800">-{Number(totals.totalExpenses||0).toLocaleString()}</span>
-                      </div>
-                      <div className="border-t border-green-200 pt-3">
-                        <div className="flex justify-between items-center py-2 px-3 bg-green-100 rounded font-bold">
-                          <span className="text-green-800">صافي الربح:</span>
-                          <span className="font-mono text-lg text-green-900">{Number(totals.netProfit||0).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div 
-                className="bg-gradient-to-r from-secondary/5 to-secondary/10 rounded-xl p-4 border border-secondary/20 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setExpandedBlock(expandedBlock === 'final' ? null : 'final')}
-              >
-                <div className="text-secondary font-semibold mb-1">رصيد نهائي</div>
-                <div className="text-2xl font-bold text-secondary">{Number((totals.sumByExpense?.['مخازن'] || 0) + Number(cashManual || 0) + (totals.sumByExpense?.['ديون ليه'] || 0) - (totals.sumByExpense?.['ديون عليه'] || 0)).toLocaleString('en-US')}</div>
-                {expandedBlock === 'final' && (
-                  <div className="mt-4 p-4 bg-white/80 rounded-lg border border-secondary/30 shadow-sm">
-                    <div className="font-bold text-sm text-secondary mb-3 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-secondary rounded-full"></div>
-                      حساب الرصيد النهائي
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center py-2 px-3 bg-blue-50 rounded">
-                        <span className="font-medium text-blue-700">مخازن</span>
-                        <span className="font-mono font-bold text-blue-800">{Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
-                        <span className="font-medium text-green-700">الكاش</span>
-                        <span className="font-mono font-bold text-green-800">{Number(cashManual || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 px-3 bg-emerald-50 rounded">
-                        <span className="font-medium text-emerald-700">ديون ليه</span>
-                        <span className="font-mono font-bold text-emerald-800">{Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 px-3 bg-red-50 rounded">
-                        <span className="font-medium text-red-700">ديون عليه</span>
-                        <span className="font-mono font-bold text-red-800">-{Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="border-t border-secondary/20 pt-3">
-                        <div className="flex justify-between items-center py-2 px-3 bg-secondary/10 rounded font-bold">
-                          <span className="text-secondary">الرصيد النهائي:</span>
-                          <span className="font-mono text-lg text-secondary">{Number((totals.sumByExpense?.['مخازن'] || 0) + Number(cashManual || 0) + (totals.sumByExpense?.['ديون ليه'] || 0) - (totals.sumByExpense?.['ديون عليه'] || 0)).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div 
-                className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-4 border border-primary/20 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setExpandedBlock(expandedBlock === 'difference' ? null : 'difference')}
-              >
-                <div className="text-primary font-semibold mb-1">فرق المخازن</div>
-                <div className="text-2xl font-bold text-primary">{formatNumberWithParens(Number(compareLastMonth||0))}</div>
-                {expandedBlock === 'difference' && (
-                  <div className="mt-4 p-4 bg-white/80 rounded-lg border border-primary/30 shadow-sm">
-                    <div className="font-bold text-sm text-primary mb-3 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-primary rounded-full"></div>
-                      حساب فرق المخازن
-                    </div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center py-2 px-3 bg-blue-50 rounded">
-                        <span className="font-medium text-blue-700">الشهر الحالي</span>
-                        <span className="font-mono font-bold text-blue-800">{Number(correctFinalBalance).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded">
-                        <span className="font-medium text-gray-700">الشهر الماضي</span>
-                        <span className="font-mono font-bold text-gray-800">-{Number(lastMonthClosing || 0).toLocaleString()}</span>
-                      </div>
-                      <div className="border-t border-primary/20 pt-3">
-                        <div className="flex justify-between items-center py-2 px-3 bg-primary/10 rounded font-bold">
-                          <span className="text-primary">فرق المخازن:</span>
-                          <span className="font-mono text-lg text-primary">{formatNumberWithParens(Number(compareLastMonth||0))}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-              
-              <div 
-                className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl p-4 border border-primary/20 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                onClick={() => setExpandedBlock(expandedBlock === 'result' ? null : 'result')}
-              >
-                <div className="text-primary font-semibold mb-1 text-sm">صافي الربح - فرق المخازن</div>
-                <div className="text-xl font-bold text-primary">{Math.abs(Number(totals.netProfit||0)-Number(compareLastMonth||0)).toLocaleString()}</div>
-                <div className="text-xs text-primary/70 mt-1">النتيجة النهائية</div>
-                {expandedBlock === 'result' && (
-                  <div className="mt-3 p-3 bg-white/90 rounded-lg border border-primary/30 shadow-sm">
-                    <div className="font-semibold text-xs text-primary mb-2 flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
-                      حساب النتيجة النهائية
-                    </div>
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center py-1.5 px-2 bg-green-50 rounded text-sm">
-                        <span className="text-green-700">صافي الربح</span>
-                        <span className="font-mono font-bold text-green-800 text-xs">{Number(totals.netProfit||0).toLocaleString()}</span>
-                      </div>
-                      <div className="flex justify-between items-center py-1.5 px-2 bg-blue-50 rounded text-sm">
-                        <span className="text-blue-700">فرق المخازن</span>
-                        <span className="font-mono font-bold text-blue-800 text-xs">-{formatNumberWithParens(Number(compareLastMonth||0))}</span>
-                      </div>
-                      <div className="border-t border-primary/20 pt-2">
-                        <div className="flex justify-between items-center py-1.5 px-2 bg-gradient-to-r from-primary/10 to-secondary/10 rounded font-bold text-sm">
-                          <span className="text-primary">النتيجة:</span>
-                          <span className="font-mono text-primary text-xs">{Math.abs(Number(totals.netProfit||0)-Number(compareLastMonth||0)).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Cash Breakdown */}
-            <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200 shadow-sm">
-              <div className="text-blue-800 font-semibold mb-3">تفاصيل الكاش</div>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="text-center">
-                  <div className="text-xs text-blue-600">المصروفات من حساب المحل</div>
-                  <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.outletExpenses||0).toLocaleString()}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-blue-600">المنزل</div>
-                  <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.home||0).toLocaleString()}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-blue-600">البنك</div>
-                  <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.bank||0).toLocaleString()}</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-xs text-blue-600">الدرج</div>
-                  <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.drawer||0).toLocaleString()}</div>
-                </div>
-              </div>
-              {(cashBreakdown.customRows || []).filter(row => Number(row.amount || 0) > 0).length > 0 && (
-                <div className="mt-3 pt-3 border-t border-blue-200">
-                  <div className="text-xs text-blue-600 mb-2">بنود إضافية:</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(cashBreakdown.customRows || []).filter(row => Number(row.amount || 0) > 0).map((row) => (
-                      <div key={row.id} className="text-center">
-                        <div className="text-xs text-blue-600">{row.description}</div>
-                        <div className="text-sm font-bold text-blue-800">{Number(row.amount||0).toLocaleString()}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                </Fragment>
               )}
-              <div className="mt-3 pt-3 border-t border-blue-200 text-center">
-                <div className="text-xs text-blue-600">إجمالي الكاش</div>
-                <div className="text-xl font-bold text-blue-800">{Number(cashManual||0).toLocaleString()}</div>
-              </div>
-            </div>
 
-            {/* Shareholders Info Block */}
-            {shareholders.length > 0 && (() => {
-              // Filter shareholders based on selection
-              const affectedShareholders = shareholders.filter(sh => selectedShareholders.has(sh.id));
-              const excludedShareholders = shareholders.filter(sh => !selectedShareholders.has(sh.id));
-              
-              return (
-                <div 
-                  className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
-                  onClick={() => setExpandedBlock(expandedBlock === 'shareholders' ? null : 'shareholders')}
-                >
-                  <div className="text-purple-800 font-semibold mb-3 flex items-center justify-between">
-                    <span>معلومات الشركاء</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm bg-purple-100 px-2 py-1 rounded-full">{affectedShareholders.length} مشمول</span>
-                      {excludedShareholders.length > 0 && (
-                        <span className="text-sm bg-slate-200 px-2 py-1 rounded-full text-slate-600">{excludedShareholders.length} مستبعد</span>
-                      )}
-                    </div>
+              {/* Step 5.5: Shareholder Selection */}
+              {wizardStep === 5.5 && (
+                <Fragment>
+                  <div className="mb-4">
+                    <h3 className="text-lg font-semibold text-slate-800">اختر المساهمين المشمولين في هذا التقرير</h3>
+                    <p className="text-sm text-slate-500">حدد المساهمين الذين سيتم توزيع الأرباح عليهم في هذا التقرير. {currentReportId ? 'تم تحميل الاختيارات المحفوظة' : 'الافتراضي: لا أحد محدد'}</p>
                   </div>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                    {affectedShareholders.slice(0, 3).map((sh, idx) => (
-                    <div key={sh.id} className="text-center">
-                      <div className="text-xs text-purple-600">{sh.name}</div>
-                      <div className="text-sm font-bold text-purple-800">{sh.percentage.toFixed(1)}%</div>
+
+                  <div className="bg-white rounded-lg border border-slate-200 p-4 mb-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedShareholders(new Set(shareholders.map(s => s.id)))}
+                          className="border-emerald-300 hover:bg-emerald-50"
+                        >
+                          <Users className="w-4 h-4 ml-1" />
+                          تحديد الكل
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setSelectedShareholders(new Set())}
+                          className="border-rose-300 hover:bg-rose-50"
+                        >
+                          إلغاء الكل
+                        </Button>
+                      </div>
+                      <div className="text-sm text-slate-600">
+                        المحدد: <span className="font-bold text-primary">{selectedShareholders.size}</span> من {shareholders.length}
+                      </div>
                     </div>
-                  ))}
-                  {shareholders.length > 3 && (
-                    <div className="text-center">
-                      <div className="text-xs text-purple-600">وآخرون</div>
-                      <div className="text-sm font-bold text-purple-800">+{shareholders.length - 3}</div>
-                    </div>
-                  )}
-                </div>
-                {expandedBlock === 'shareholders' && (
-                  <div className="mt-4 p-4 bg-white/80 rounded-lg border border-purple-300 shadow-sm">
-                    <div className="font-bold text-sm text-purple-700 mb-3 flex items-center gap-2">
-                      <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                      تفاصيل الشركاء
-                    </div>
+
                     <div className="space-y-2">
-                      {/* Affected Shareholders */}
-                      {affectedShareholders.map((sh) => {
-                        // Use correct formula: balance × profitPerPound × percentage
-                        const shareAmount = Number(sh.amount || 0) * perPoundProfitComputed * (sh.percentage / 100);
+                      {shareholders.map(shareholder => {
+                        const history = shareHistory[shareholder.id] || [];
+                        const startingBalance = shareholder.initialAmount ?? (history.length > 0 ? history[0].fromAmount : Number(shareholder.amount));
+                        const currentBalance = Number(shareholder.amount);
+
+                        // Calculate new balance after profit distribution
+                        const pct = Number(shareholder.percentage || 0);
+                        const profitDelta = selectedShareholders.has(shareholder.id)
+                          ? currentBalance * perPoundProfitComputed * (pct / 100)
+                          : 0;
+                        const newBalance = currentBalance + profitDelta;
+
                         return (
-                          <div key={sh.id} className="flex justify-between items-center py-2 px-3 bg-purple-50 rounded">
-                            <div className="flex flex-col">
-                              <span className="font-medium text-purple-700">{sh.name}</span>
-                              <span className="text-xs text-purple-600">{sh.percentage.toFixed(1)}% × رصيد {Number(sh.amount || 0).toLocaleString()}</span>
+                          <div
+                            key={shareholder.id}
+                            className={`flex items-center justify-between p-3 rounded-lg border-2 transition-all cursor-pointer ${selectedShareholders.has(shareholder.id)
+                              ? 'border-emerald-500 bg-emerald-50'
+                              : 'border-slate-200 bg-white hover:border-slate-300'
+                              }`}
+                            onClick={() => {
+                              const newSet = new Set(selectedShareholders);
+                              if (newSet.has(shareholder.id)) {
+                                newSet.delete(shareholder.id);
+                              } else {
+                                newSet.add(shareholder.id);
+                              }
+                              setSelectedShareholders(newSet);
+                            }}
+                          >
+                            <div className="flex items-center gap-3">
+                              <input
+                                type="checkbox"
+                                checked={selectedShareholders.has(shareholder.id)}
+                                onChange={() => { }}
+                                className="w-5 h-5 text-emerald-600 rounded focus:ring-emerald-500"
+                              />
+                              <div>
+                                <div className="font-semibold text-slate-800">{shareholder.name}</div>
+                                <div className="text-xs text-slate-500">
+                                  الرصيد الحالي: {formatNumber(currentBalance)} | النسبة: {formatNumber(shareholder.percentage)}%
+                                </div>
+                                {selectedShareholders.has(shareholder.id) && profitDelta > 0 && (
+                                  <div className="text-xs text-emerald-600 font-semibold mt-1">
+                                    الرصيد الجديد: {formatNumber(newBalance)} (+{formatNumber(profitDelta)})
+                                  </div>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-left">
-                              <div className="font-mono font-bold text-purple-800">{shareAmount.toLocaleString()}</div>
-                              <div className="text-xs text-purple-600">نصيب الشريك</div>
-                            </div>
+                            {selectedShareholders.has(shareholder.id) && (
+                              <Badge className="bg-emerald-500">محدد</Badge>
+                            )}
                           </div>
                         );
                       })}
-                      
-                      {/* Excluded Shareholders */}
-                      {excludedShareholders.length > 0 && (
-                        <>
-                          <div className="border-t border-slate-300 pt-3 mt-3">
-                            <div className="text-xs font-semibold text-slate-600 mb-2">مستبعدون من هذا التقرير:</div>
+                    </div>
+
+                    {selectedShareholders.size === 0 ? (
+                      <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-blue-800 text-sm">
+                        ℹ️ لم يتم اختيار أي مساهم - سيتم إنشاء التقرير بدون توزيع أرباح
+                      </div>
+                    ) : (
+                      <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-lg">
+                        <div className="text-sm font-semibold text-emerald-800 mb-2">ملخص التوزيع المتوقع:</div>
+                        <div className="text-xs text-emerald-700 space-y-1">
+                          {shareholders
+                            .filter(s => selectedShareholders.has(s.id))
+                            .map(s => {
+                              const currentBalance = Number(s.amount);
+                              const pct = Number(s.percentage || 0);
+                              const profitDelta = currentBalance * perPoundProfitComputed * (pct / 100);
+                              return (
+                                <div key={s.id} className="flex justify-between">
+                                  <span>{s.name}:</span>
+                                  <span className="font-semibold">+{formatNumber(profitDelta)}</span>
+                                </div>
+                              );
+                            })}
+                          <div className="border-t border-emerald-300 pt-1 mt-2 flex justify-between font-bold">
+                            <span>إجمالي التوزيع:</span>
+                            <span>
+                              +{formatNumber(
+                                shareholders
+                                  .filter(s => selectedShareholders.has(s.id))
+                                  .reduce((total, s) => {
+                                    const currentBalance = Number(s.amount);
+                                    const pct = Number(s.percentage || 0);
+                                    return total + (currentBalance * perPoundProfitComputed * (pct / 100));
+                                  }, 0)
+                              )}
+                            </span>
                           </div>
-                          {excludedShareholders.map((sh) => (
-                            <div key={sh.id} className="flex justify-between items-center py-2 px-3 bg-slate-100 rounded opacity-60">
-                              <div className="flex flex-col">
-                                <span className="font-medium text-slate-600">{sh.name}</span>
-                                <span className="text-xs text-slate-500">{sh.percentage.toFixed(1)}% (غير مشمول)</span>
-                              </div>
-                              <div className="text-left">
-                                <Badge variant="secondary" className="text-xs">مستبعد</Badge>
-                              </div>
-                            </div>
-                          ))}
-                        </>
-                      )}
-                      
-                      <div className="border-t border-purple-200 pt-3">
-                        <div className="flex justify-between items-center py-2 px-3 bg-purple-100 rounded font-bold">
-                          <span className="text-purple-800">إجمالي الأنصبة ({affectedShareholders.length} مشمول):</span>
-                          <span className="font-mono text-lg text-purple-900">
-                            {affectedShareholders.reduce((sum, sh) => sum + (Number(sh.amount || 0) * perPoundProfitComputed * (sh.percentage / 100)), 0).toLocaleString()}
-                          </span>
                         </div>
                       </div>
-                    </div>
+                    )}
                   </div>
-                )}
-              </div>
-              );
-            })()}
-          </div>
 
-          {/* Enhanced Expanded Block Section */}
-          {expandedBlock && (
-            <div className="mt-8 bg-gradient-to-br from-white to-slate-50/50 border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
-              <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-4 border-b border-slate-200">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xl font-bold text-primary flex items-center gap-3">
-                    <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                      <div className="w-4 h-4 bg-white rounded-full"></div>
-                    </div>
-                    {expandedBlock === 'expenses' && 'تفاصيل المصروفات'}
-                    {expandedBlock === 'profits' && 'تفاصيل الأرباح'}
-                    {expandedBlock === 'final' && 'تفاصيل الرصيد النهائي'}
-                    {expandedBlock === 'difference' && 'تفاصيل فرق المخازن'}
-                    {expandedBlock === 'result' && 'تفاصيل النتيجة النهائية'}
-                    {expandedBlock === 'shareholders' && 'تفاصيل المساهمين'}
-                  </h3>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setExpandedBlock(null)}
-                    className="text-slate-500 hover:text-slate-700"
-                  >
-                    ✕
-                  </Button>
-                </div>
-              </div>
-              
-              <div className="p-6">
-                {/* Expenses Details */}
-                {expandedBlock === 'expenses' && (
+                  <div className="mt-4 flex items-center justify-between gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setWizardStep(5)}
+                      className="border-slate-300 hover:border-slate-400"
+                    >
+                      الخطوة السابقة
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        setWizardStep(5);
+                        setShowResults(true);
+                      }}
+                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white"
+                    >
+                      عرض النتيجة النهائية
+                    </Button>
+                  </div>
+                </Fragment>
+              )}
+
+              {wizardStep === 5 && showResults && (
+                <Fragment>
+                  {/* Report Header */}
+                  <div className="text-center mb-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl border border-green-200">
+                    <h1 className="text-3xl font-bold text-green-800 mb-2">
+                      {reportName || title || 'تقرير الأرباح'}
+                    </h1>
+                    {title && title !== reportName && (
+                      <h2 className="text-xl text-green-600 mb-2">{title}</h2>
+                    )}
+                    {range?.from && range?.to && (
+                      <div className="text-green-700 font-medium">
+                        {new Date(range.from).toLocaleDateString('ar-EG')} - {new Date(range.to).toLocaleDateString('ar-EG')}
+                      </div>
+                    )}
+                  </div>
+
                   <div className="space-y-6">
-                    <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                      <h4 className="font-bold text-blue-800 mb-2">📊 شرح حساب المصروفات</h4>
-                      <p className="text-blue-700 text-sm leading-relaxed">
-                        يتم حساب إجمالي المصروفات من خلال جمع جميع المصروفات العادية (غير الشخصية) من جميع الفروع. 
-                        المصروفات الشخصية لا تدخل في هذا الحساب لأنها تضاف إلى الكاش ولا تؤثر على الربح.
-                      </p>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div>
-                        <h4 className="font-bold text-slate-800 mb-3">المصروفات العادية</h4>
-                        <div className="space-y-2">
-                          {expenses.filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
-                            .map(e => (
-                              <div key={e} className="flex justify-between items-center py-2 px-3 bg-slate-100 rounded">
-                                <span className="font-medium">{e}</span>
-                                <span className="font-mono font-bold text-primary">{Number(totals.sumByExpense?.[e] || 0).toLocaleString()}</span>
-                              </div>
+                    {/* Main Expenses Table */}
+                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                      <div className="bg-slate-600 text-white p-3 text-center font-bold">
+                        الفترة الزمنية
+                      </div>
+                      <table className="w-full border-collapse">
+                        <thead>
+                          <tr className="bg-slate-100">
+                            <th className="border border-slate-300 p-2 text-center font-bold">البند</th>
+                            {branches.map((branch, idx) => (
+                              <th key={idx} className="border border-slate-300 p-2 text-center font-bold border-r-0">{branch}</th>
                             ))}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <h4 className="font-bold text-slate-800 mb-3">المصروفات الشخصية (مستبعدة)</h4>
-                        <div className="space-y-2">
-                          {expenses.filter(e => expenseTypes.get(e) === 'personal')
-                            .map(e => (
-                              <div key={e} className="flex justify-between items-center py-2 px-3 bg-blue-50 rounded opacity-60">
-                                <span className="font-medium text-blue-700">{e}</span>
-                                <span className="font-mono font-bold text-blue-600">{Number(totals.sumByExpense?.[e] || 0).toLocaleString()}</span>
-                              </div>
+                            <th className="border border-slate-300 p-2 text-center font-bold border-r-0">المجموع</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr className="bg-yellow-100">
+                            <td className="border border-slate-300 p-2 text-center font-semibold bg-yellow-200">مخازن</td>
+                            {branches.map((branch, idx) => (
+                              <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(branchRows.find(br => br.name === branch)?.values['مخازن'] || 0).toLocaleString()}
+                              </td>
                             ))}
-                          <div className="text-xs text-blue-600 mt-2 p-2 bg-blue-100 rounded">
-                            💡 هذه المصروفات تضاف للكاش ولا تؤثر على حساب الربح
-                          </div>
+                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                              {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}
+                            </td>
+                          </tr>
+
+                          {/* Personal Expenses */}
+                          {expenses
+                            .filter(e => expenseTypes.get(e) === 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
+                            .filter(expense => {
+                              // Hide row if all values are zero
+                              const total = Number(totals.sumByExpense?.[expense] || 0);
+                              return total > 0;
+                            })
+                            .map((expense, idx) => (
+                              <tr key={expense} className="bg-yellow-50">
+                                <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
+                                {branches.map((branch, branchIdx) => (
+                                  <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
+                                    {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                                  </td>
+                                ))}
+                                <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                                  {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+
+                          {/* Other Expenses */}
+                          {expenses
+                            .filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
+                            .filter(expense => {
+                              // Hide row if all values are zero
+                              const total = Number(totals.sumByExpense?.[expense] || 0);
+                              return total > 0;
+                            })
+                            .map((expense, idx) => (
+                              <tr key={expense} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
+                                <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
+                                {branches.map((branch, branchIdx) => (
+                                  <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
+                                    {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                                  </td>
+                                ))}
+                                <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                                  {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+
+                          {/* Cash, Debts, Profits */}
+                          <tr className="bg-white">
+                            <td className="border border-slate-300 p-2 text-center bg-yellow-100">كاش الدرج</td>
+                            {branches.map((branch, idx) => (
+                              <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(branchRows.find(br => br.name === branch)?.values['كاش الدرج'] || 0).toLocaleString()}
+                              </td>
+                            ))}
+                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                              {Number(totals.sumByExpense?.['كاش الدرج'] || 0).toLocaleString()}
+                            </td>
+                          </tr>
+
+                          <tr className="bg-slate-50">
+                            <td className="border border-slate-300 p-2 text-center bg-yellow-100">ديون ليه</td>
+                            {branches.map((branch, idx) => (
+                              <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(branchRows.find(br => br.name === branch)?.values['ديون ليه'] || 0).toLocaleString()}
+                              </td>
+                            ))}
+                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                              {Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}
+                            </td>
+                          </tr>
+
+                          <tr className="bg-white">
+                            <td className="border border-slate-300 p-2 text-center bg-yellow-100">ديون عليه</td>
+                            {branches.map((branch, idx) => (
+                              <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(branchRows.find(br => br.name === branch)?.values['ديون عليه'] || 0).toLocaleString()}
+                              </td>
+                            ))}
+                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                              {Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()}
+                            </td>
+                          </tr>
+
+                          <tr className="bg-slate-50">
+                            <td className="border border-slate-300 p-2 text-center bg-yellow-100">أرباح</td>
+                            {branches.map((branch, idx) => (
+                              <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(branchRows.find(br => br.name === branch)?.values['أرباح'] || 0).toLocaleString()}
+                              </td>
+                            ))}
+                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                              {Number(totals.sumByExpense?.['أرباح'] || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Cash Breakdown Table */}
+                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                      <div className="bg-orange-400 text-white p-3 text-center font-bold">
+                        مخازن نهائي
+                      </div>
+                      <table className="w-full border-collapse">
+                        <tbody>
+                          <tr className="bg-orange-100">
+                            <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">مخازن</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0">
+                              {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-orange-50">
+                            <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">الكاش</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0">
+                              {Number(cashManual || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-orange-100">
+                            <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">ديون ليه</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0">
+                              {Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          {/* Subtotal before deducting ديون عليه */}
+                          <tr className="bg-slate-100">
+                            <td className="border border-slate-300 p-2 text-center font-semibold bg-slate-200">المجموع</td>
+                            <td className="border border-slate-300 p-2 text-center font-semibold border-r-0">
+                              {Number((totals.sumByExpense?.['مخازن'] || 0) + Number(cashManual || 0) + (totals.sumByExpense?.['ديون ليه'] || 0)).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-blue-50">
+                            <td className="border border-slate-300 p-2 text-center font-semibold bg-blue-200">ديون عليه</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0 text-red-600">
+                              -{Math.abs(Number(totals.sumByExpense?.['ديون عليه'] || 0)).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-green-200">
+                            <td className="border border-slate-300 p-2 text-center font-bold">مخازن نهائي</td>
+                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                              {Number(correctFinalBalance).toLocaleString()}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Cash Details Table */}
+                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                      <div className="bg-gray-500 text-white p-3 text-center font-bold">
+                        الكاش
+                      </div>
+                      <table className="w-full border-collapse">
+                        <tbody>
+                          <tr className="bg-gray-100">
+                            <td className="border border-slate-300 p-2 text-center font-semibold">المصروفات من حساب المحل</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0">
+                              {Number(cashBreakdown.outletExpenses || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-gray-50">
+                            <td className="border border-slate-300 p-2 text-center font-semibold">بيت</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0">
+                              {Number(cashBreakdown.home || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-gray-100">
+                            <td className="border border-slate-300 p-2 text-center font-semibold">بنك</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0">
+                              {Number(cashBreakdown.bank || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-gray-50">
+                            <td className="border border-slate-300 p-2 text-center font-semibold">درج</td>
+                            <td className="border border-slate-300 p-2 text-center border-r-0">
+                              {Number(cashBreakdown.drawer || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          {/* Explicit Vodafone Row - only show if value > 0 */}
+                          {Number(cashBreakdown.vodafone || 0) > 0 && (
+                            <tr className="bg-gray-100">
+                              <td className="border border-slate-300 p-2 text-center font-semibold">فودافون</td>
+                              <td className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(cashBreakdown.vodafone || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          )}
+                          {/* Custom Cash Rows - filter out any vodafone-related rows */}
+                          {(cashBreakdown.customRows || [])
+                            .filter(row => {
+                              const name = (row.name || '').toLowerCase().trim();
+                              const isVodafone = name.includes('vodafone') || name.includes('فودافون') || name === 'فودافون';
+                              return !isVodafone && Number(row.amount || 0) > 0;
+                            })
+                            .map((row, idx) => (
+                              <tr key={row.id} className={idx % 2 === 0 ? "bg-gray-100" : "bg-gray-50"}>
+                                <td className="border border-slate-300 p-2 text-center font-semibold">{row.name}</td>
+                                <td className="border border-slate-300 p-2 text-center border-r-0">
+                                  {Number(row.amount || 0).toLocaleString()}
+                                </td>
+                              </tr>
+                            ))}
+                          <tr className="bg-green-200">
+                            <td className="border border-slate-300 p-2 text-center font-bold">المجموع</td>
+                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                              {Number(cashManual || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Profit Comparison Tables */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {/* Previous Month Comparison */}
+                      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                        <div className="bg-blue-500 text-white p-3 text-center font-bold">
+                          مقارنة بالشهر الماضي
                         </div>
+                        <table className="w-full border-collapse">
+                          <tbody>
+                            <tr className="bg-blue-100">
+                              <td className="border border-slate-300 p-2 text-center font-semibold">الشهر الماضي</td>
+                              <td className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(lastMonthClosing || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                            <tr className="bg-blue-50">
+                              <td className="border border-slate-300 p-2 text-center font-semibold">الشهر الحالي</td>
+                              <td className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(correctFinalBalance).toLocaleString()}
+                              </td>
+                            </tr>
+                            <tr className="bg-green-200">
+                              <td className="border border-slate-300 p-2 text-center font-bold">الفرق</td>
+                              <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                                {formatNumberWithParens(Number(compareLastMonth || 0))}
+                              </td>
+                            </tr>
+                            <tr className="bg-blue-100">
+                              <td className="border border-slate-300 p-2 text-center font-semibold">المصروفات من حساب المحل</td>
+                              <td className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(cashBreakdown.outletExpenses || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                            <tr className="bg-green-300">
+                              <td className="border border-slate-300 p-2 text-center font-bold">الباقي</td>
+                              <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                                {formatNumberWithParens(Number(compareLastMonth || 0) - Number(cashBreakdown.outletExpenses || 0))}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
-                    </div>
-                    
-                    <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-lg">إجمالي المصروفات العادية:</span>
-                        <span className="font-mono font-bold text-2xl text-primary">{Number(totals.totalExpenses||0).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
-                {/* Profits Details */}
-                {expandedBlock === 'profits' && (
-                  <div className="space-y-6">
-                    <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                      <h4 className="font-bold text-green-800 mb-2">💰 شرح حساب الأرباح</h4>
-                      <p className="text-green-700 text-sm leading-relaxed">
-                        صافي الربح = إجمالي الأرباح - إجمالي المصروفات العادية. 
-                        هذا هو الربح الحقيقي بعد خصم جميع المصروفات التشغيلية.
-                      </p>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                      <div className="bg-green-100 p-4 rounded-lg text-center">
-                        <div className="text-green-600 font-semibold mb-1">إجمالي الأرباح</div>
-                        <div className="text-2xl font-bold text-green-800">{Number(totals.totalProfits||0).toLocaleString()}</div>
-                      </div>
-                      <div className="bg-red-100 p-4 rounded-lg text-center">
-                        <div className="text-red-600 font-semibold mb-1">إجمالي المصروفات</div>
-                        <div className="text-2xl font-bold text-red-800">-{Number(totals.totalExpenses||0).toLocaleString()}</div>
-                      </div>
-                      <div className="bg-primary/10 p-4 rounded-lg text-center">
-                        <div className="text-primary font-semibold mb-1">صافي الربح</div>
-                        <div className="text-2xl font-bold text-primary">{Number(totals.netProfit||0).toLocaleString()}</div>
-                      </div>
-                    </div>
-                    
-                    <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                      <h4 className="font-bold text-yellow-800 mb-2">📈 ربح الجنيه الواحد</h4>
-                      <div className="flex items-center justify-between">
-                        <span className="text-yellow-700">كل جنيه في المخازن يحقق ربح قدره:</span>
-                        <span className="font-mono font-bold text-xl text-yellow-800">{perPoundProfitComputed.toFixed(4)} جنيه</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Final Balance Details */}
-                {expandedBlock === 'final' && (
-                  <div className="space-y-6">
-                    <div className="bg-secondary/10 p-4 rounded-lg border border-secondary/20">
-                      <h4 className="font-bold text-secondary mb-2">🏦 شرح الرصيد النهائي</h4>
-                      <p className="text-secondary text-sm leading-relaxed">
-                        الرصيد النهائي = المخازن + الكاش + الديون لنا - الديون علينا. 
-                        هذا هو إجمالي ما تملكه الشركة من أصول سائلة.
-                      </p>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                      <div className="space-y-3">
-                        <h4 className="font-bold text-slate-800">الأصول (+)</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
-                            <span className="font-medium">المخازن</span>
-                            <span className="font-mono font-bold text-green-600">+{Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
-                            <span className="font-medium">الكاش الإجمالي</span>
-                            <span className="font-mono font-bold text-green-600">+{Number(cashManual || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
-                            <span className="font-medium">ديون لنا</span>
-                            <span className="font-mono font-bold text-green-600">+{Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}</span>
-                          </div>
+                      {/* Net Profit */}
+                      <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
+                        <div className="bg-green-600 text-white p-3 text-center font-bold">
+                          صافي الربح (النتيجة)
                         </div>
-                      </div>
-                      
-                      <div className="space-y-3">
-                        <h4 className="font-bold text-slate-800">الخصوم (-)</h4>
-                        <div className="space-y-2">
-                          <div className="flex justify-between items-center py-2 px-3 bg-red-50 rounded">
-                            <span className="font-medium">ديون علينا</span>
-                            <span className="font-mono font-bold text-red-600">-{Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()}</span>
-                          </div>
-                        </div>
+                        <table className="w-full border-collapse">
+                          <tbody>
+                            <tr className="bg-green-100">
+                              <td className="border border-slate-300 p-2 text-center font-semibold">مصروفات</td>
+                              <td className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(totals.totalExpenses || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                            <tr className="bg-green-50">
+                              <td className="border border-slate-300 p-2 text-center font-semibold">أرباح</td>
+                              <td className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(totals.totalProfits || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                            <tr className="bg-green-200">
+                              <td className="border border-slate-300 p-2 text-center font-bold">صافي الربح</td>
+                              <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
+                                {formatNumberWithParens(Number(totals.netProfit || 0))}
+                              </td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
-                    
-                    <div className="bg-secondary/5 p-4 rounded-lg border border-secondary/20">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-lg">الرصيد النهائي:</span>
-                        <span className="font-mono font-bold text-2xl text-secondary">{Number(correctFinalBalance).toLocaleString()}</span>
+                  </div>
+
+
+                  <div className="mt-4 flex items-center justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => { setShowResults(false); setWizardStep(0); }}
+                    >
+                      تعديل من البداية (الخطوة 1)
+                    </Button>
+                    <Button
+                      onClick={() => { setShowWizard(false); setPreviewLayout('a4'); setShowPreview(true); }}
+                      className="bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white"
+                    >
+                      عرض التقرير
+                    </Button>
+                    <Button
+                      onClick={() => setShowWizard(false)}
+                      className="bg-gradient-to-r from-slate-700 to-slate-800 hover:from-slate-800 hover:to-slate-900 text-white"
+                    >
+                      خروج
+                    </Button>
+                  </div>
+                </Fragment>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
+        {/* Delete Report Confirmation Dialog */}
+        <Dialog open={!!showDeleteReportId} onOpenChange={(o) => { if (!o) setShowDeleteReportId(null); }}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>تأكيد حذف التقرير</DialogTitle>
+              <DialogDescription>سيتم حذف التقرير نهائيًا بعد 6 ثوانٍ ما لم تتراجع. هل تريد المتابعة؟</DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowDeleteReportId(null)}>إلغاء</Button>
+              <Button variant="destructive" onClick={() => {
+                const id = showDeleteReportId; if (!id) return; setShowDeleteReportId(null);
+                try {
+                  // optimistic UI: remove and schedule
+                  setBackupReports(prev => prev ?? reports);
+                  reportBackupsRef.current.set(id, reports);
+                  setReports(prev => prev.filter(x => x._id !== id));
+                  const t = window.setTimeout(async () => {
+                    try {
+                      const resp = await apiDelete(`/api/profit-reports/${id}`);
+                      if (!resp.ok) {
+                        const backup = reportBackupsRef.current.get(id) || backupReports || [];
+                        setReports(backup);
+                        toast({ title: 'فشل الحذف', variant: 'destructive' });
+                      } else {
+                        toast({ title: 'تم الحذف', description: 'تم حذف التقرير بنجاح.' });
+                        refreshReports();
+                      }
+                    } catch (e) {
+                      const backup = reportBackupsRef.current.get(id) || backupReports || [];
+                      setReports(backup);
+                      toast({ title: 'فشل الحذف', description: (e as Error).message, variant: 'destructive' });
+                    } finally {
+                      setScheduledReportDeletes(map => { const m = new Map(map); m.delete(id); return m; });
+                      reportBackupsRef.current.delete(id);
+                      setBackupReports(null);
+                    }
+                  }, 6000);
+                  setScheduledReportDeletes(map => new Map(map).set(id, t));
+                  toast({
+                    title: 'تم جدولة الحذف',
+                    description: (
+                      <div>
+                        سيتم حذف التقرير خلال 6 ثوانٍ — يمكنك التراجع الآن
+                        <DeleteCountdownBar />
                       </div>
-                    </div>
-                  </div>
-                )}
+                    ),
+                    action: (
+                      <ToastAction altText="تراجع" onClick={() => {
+                        const timer = scheduledReportDeletesRef.current.get(id);
+                        if (timer) {
+                          window.clearTimeout(timer);
+                          setScheduledReportDeletes(map => { const m = new Map(map); m.delete(id); return m; });
+                          // undo UI from per-id backup (fallback to global backup)
+                          const backup = reportBackupsRef.current.get(id) || backupReports || [];
+                          setReports(backup);
+                          reportBackupsRef.current.delete(id);
+                          setBackupReports(null);
+                          toast({ title: 'تم التراجع عن الحذف' });
+                        }
+                      }}>تراجع</ToastAction>
+                    ),
+                  });
+                } catch (e) {
+                  toast({ title: 'تعذر جدولة الحذف', description: (e as Error).message, variant: 'destructive' });
+                }
+              }}>حذف</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-                {/* Other expanded blocks would go here... */}
-                {expandedBlock === 'difference' && (
-                  <div className="text-center py-8">
-                    <div className="text-6xl mb-4">🔄</div>
-                    <h3 className="text-xl font-bold text-slate-600 mb-2">تفاصيل فرق المخازن</h3>
-                    <p className="text-slate-500">سيتم إضافة التفاصيل قريباً...</p>
-                  </div>
-                )}
+        {/* From Date Picker */}
+        <Dialog open={showFromPicker} onOpenChange={setShowFromPicker}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>اختر تاريخ البداية</DialogTitle>
+              <DialogDescription>اضغط على اليوم لتحديد بداية الفترة</DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={range?.from}
+                onSelect={(d) => {
+                  if (!d) return;
+                  setRange((prev) => {
+                    const to = prev?.to && prev.to < d ? d : (prev?.to || d);
+                    return { from: d, to } as DateRange;
+                  });
+                  setShowFromPicker(false);
+                }}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowFromPicker(false)}>إغلاق</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-                {expandedBlock === 'result' && (
-                  <div className="text-center py-8">
-                    <div className="text-6xl mb-4">📊</div>
-                    <h3 className="text-xl font-bold text-slate-600 mb-2">تفاصيل النتيجة النهائية</h3>
-                    <p className="text-slate-500">سيتم إضافة التفاصيل قريباً...</p>
-                  </div>
-                )}
+        {/* To Date Picker */}
+        <Dialog open={showToPicker} onOpenChange={setShowToPicker}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>اختر تاريخ النهاية</DialogTitle>
+              <DialogDescription>اضغط على اليوم لتحديد نهاية الفترة</DialogDescription>
+            </DialogHeader>
+            <div className="flex justify-center">
+              <Calendar
+                mode="single"
+                selected={range?.to}
+                onSelect={(d) => {
+                  if (!d) return;
+                  setRange((prev) => {
+                    const from = prev?.from && d < prev.from ? d : (prev?.from || d);
+                    return { from, to: d } as DateRange;
+                  });
+                  setShowToPicker(false);
+                }}
+              />
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowToPicker(false)}>إغلاق</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-                {expandedBlock === 'shareholders' && (
-                  <div className="text-center py-8">
-                    <div className="text-6xl mb-4">👥</div>
-                    <h3 className="text-xl font-bold text-slate-600 mb-2">تفاصيل المساهمين</h3>
-                    <p className="text-slate-500">سيتم إضافة التفاصيل قريباً...</p>
+        {/* Add Expense Dialog */}
+        <Dialog open={showAddExpenseDialog} onOpenChange={setShowAddExpenseDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-primary">إضافة مصروف جديد</DialogTitle>
+              <DialogDescription>أدخل اسم المصروف ونوعه</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="expense-name">اسم المصروف</Label>
+                <Input
+                  id="expense-name"
+                  value={newExpenseName}
+                  onChange={(e) => setNewExpenseName(e.target.value)}
+                  placeholder="أدخل اسم المصروف"
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <Label>نوع المصروف</Label>
+                <RadioGroup value={newExpenseType} onValueChange={(value) => setNewExpenseType(value as ExpenseType)} className="mt-2">
+                  <div className="flex items-center space-x-2 space-x-reverse">
+                    <RadioGroupItem value="other" id="other" />
+                    <Label htmlFor="other" className="cursor-pointer">عادي (يؤثر على الربح)</Label>
                   </div>
-                )}
+                  <div className="flex items-center space-x-2 space-x-reverse">
+                    <RadioGroupItem value="personal" id="personal" />
+                    <Label htmlFor="personal" className="cursor-pointer">شخصي (يضاف للكاش)</Label>
+                  </div>
+                </RadioGroup>
               </div>
             </div>
-          )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowAddExpenseDialog(false)}>إلغاء</Button>
+              <Button onClick={handleAddExpense} className="bg-primary hover:bg-primary/90">إضافة</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowSimplePreview(false)}>إغلاق</Button>
-            <Button 
-              variant="outline"
-              onClick={() => { 
-                setShowSimplePreview(false);
-                // Open comprehensive edit modal instead of wizard
-                if (currentReportId) {
-                  const localReport = reports.find(report => report._id === currentReportId);
-                  if (localReport) {
-                    setQuickEditReport(localReport);
-                    setShowQuickEditModal(true);
+        {/* Simple Preview Modal (Old Blocks View) */}
+        <Dialog open={showSimplePreview} onOpenChange={setShowSimplePreview}>
+          <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-black text-slate-900 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
+                {title || 'ملخص الأرباح'}
+              </DialogTitle>
+              <DialogDescription className="text-slate-600">
+                عرض مبسط للنتائج
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-6">
+              {/* Summary Cards - Old Blocks Style */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                <div
+                  className={`bg-gradient-to-r from-primary/5 to-secondary/5 rounded-xl p-4 border shadow-sm cursor-pointer hover:shadow-md transition-all relative ${expandedBlock === 'expenses'
+                    ? 'border-primary/50 ring-2 ring-primary/20 bg-primary/10'
+                    : 'border-primary/20'
+                    }`}
+                  onClick={() => setExpandedBlock(expandedBlock === 'expenses' ? null : 'expenses')}
+                >
+                  <div className="text-primary font-semibold mb-1">مصروفات</div>
+                  <div className="text-2xl font-bold text-primary">{Number(totals.totalExpenses || 0).toLocaleString('en-US')}</div>
+                  <div className="text-xs text-primary mt-1">إجمالي المصروفات</div>
+                  {expandedBlock === 'expenses' && (
+                    <div className="absolute top-2 right-2 w-3 h-3 bg-primary rounded-full animate-pulse"></div>
+                  )}
+                  <div className="absolute bottom-2 left-2 text-xs text-primary/60">
+                    {expandedBlock === 'expenses' ? '👆 انقر للإغلاق' : '👆 انقر للتفاصيل'}
+                  </div>
+                </div>
+
+                <div
+                  className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setExpandedBlock(expandedBlock === 'profits' ? null : 'profits')}
+                >
+                  <div className="text-green-600 font-semibold mb-1">أرباح</div>
+                  <div className="text-lg font-bold text-green-800">إجمالي: {Number(totals.totalProfits || 0).toLocaleString('en-US')}</div>
+                  <div className="text-lg font-bold text-green-900 mt-1">صافي: {Number(totals.netProfit || 0).toLocaleString('en-US')}</div>
+                  {expandedBlock === 'profits' && (
+                    <div className="mt-4 p-4 bg-white/80 rounded-lg border border-green-300 shadow-sm">
+                      <div className="font-bold text-sm text-green-700 mb-3 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+                        حساب الأرباح
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
+                          <span className="font-medium text-green-700">إجمالي الأرباح</span>
+                          <span className="font-mono font-bold text-green-800">{Number(totals.totalProfits || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 px-3 bg-red-50 rounded">
+                          <span className="font-medium text-red-700">إجمالي المصروفات</span>
+                          <span className="font-mono font-bold text-red-800">-{Number(totals.totalExpenses || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="border-t border-green-200 pt-3">
+                          <div className="flex justify-between items-center py-2 px-3 bg-green-100 rounded font-bold">
+                            <span className="text-green-800">صافي الربح:</span>
+                            <span className="font-mono text-lg text-green-900">{Number(totals.netProfit || 0).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="bg-gradient-to-r from-secondary/5 to-secondary/10 rounded-xl p-4 border border-secondary/20 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setExpandedBlock(expandedBlock === 'final' ? null : 'final')}
+                >
+                  <div className="text-secondary font-semibold mb-1">رصيد نهائي</div>
+                  <div className="text-2xl font-bold text-secondary">{Number((totals.sumByExpense?.['مخازن'] || 0) + Number(cashManual || 0) + (totals.sumByExpense?.['ديون ليه'] || 0) - (totals.sumByExpense?.['ديون عليه'] || 0)).toLocaleString('en-US')}</div>
+                  {expandedBlock === 'final' && (
+                    <div className="mt-4 p-4 bg-white/80 rounded-lg border border-secondary/30 shadow-sm">
+                      <div className="font-bold text-sm text-secondary mb-3 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-secondary rounded-full"></div>
+                        حساب الرصيد النهائي
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center py-2 px-3 bg-blue-50 rounded">
+                          <span className="font-medium text-blue-700">مخازن</span>
+                          <span className="font-mono font-bold text-blue-800">{Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
+                          <span className="font-medium text-green-700">الكاش</span>
+                          <span className="font-mono font-bold text-green-800">{Number(cashManual || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 px-3 bg-emerald-50 rounded">
+                          <span className="font-medium text-emerald-700">ديون ليه</span>
+                          <span className="font-mono font-bold text-emerald-800">{Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 px-3 bg-red-50 rounded">
+                          <span className="font-medium text-red-700">ديون عليه</span>
+                          <span className="font-mono font-bold text-red-800">-{Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="border-t border-secondary/20 pt-3">
+                          <div className="flex justify-between items-center py-2 px-3 bg-secondary/10 rounded font-bold">
+                            <span className="text-secondary">الرصيد النهائي:</span>
+                            <span className="font-mono text-lg text-secondary">{Number((totals.sumByExpense?.['مخازن'] || 0) + Number(cashManual || 0) + (totals.sumByExpense?.['ديون ليه'] || 0) - (totals.sumByExpense?.['ديون عليه'] || 0)).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="bg-gradient-to-r from-primary/5 to-primary/10 rounded-xl p-4 border border-primary/20 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setExpandedBlock(expandedBlock === 'difference' ? null : 'difference')}
+                >
+                  <div className="text-primary font-semibold mb-1">فرق المخازن</div>
+                  <div className="text-2xl font-bold text-primary">{formatNumberWithParens(Number(compareLastMonth || 0))}</div>
+                  {expandedBlock === 'difference' && (
+                    <div className="mt-4 p-4 bg-white/80 rounded-lg border border-primary/30 shadow-sm">
+                      <div className="font-bold text-sm text-primary mb-3 flex items-center gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full"></div>
+                        حساب فرق المخازن
+                      </div>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center py-2 px-3 bg-blue-50 rounded">
+                          <span className="font-medium text-blue-700">الشهر الحالي</span>
+                          <span className="font-mono font-bold text-blue-800">{Number(correctFinalBalance).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-2 px-3 bg-gray-50 rounded">
+                          <span className="font-medium text-gray-700">الشهر الماضي</span>
+                          <span className="font-mono font-bold text-gray-800">-{Number(lastMonthClosing || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="border-t border-primary/20 pt-3">
+                          <div className="flex justify-between items-center py-2 px-3 bg-primary/10 rounded font-bold">
+                            <span className="text-primary">فرق المخازن:</span>
+                            <span className="font-mono text-lg text-primary">{formatNumberWithParens(Number(compareLastMonth || 0))}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className="bg-gradient-to-r from-primary/10 to-secondary/10 rounded-xl p-4 border border-primary/20 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                  onClick={() => setExpandedBlock(expandedBlock === 'result' ? null : 'result')}
+                >
+                  <div className="text-primary font-semibold mb-1 text-sm">صافي الربح - فرق المخازن</div>
+                  <div className="text-xl font-bold text-primary">{Math.abs(Number(totals.netProfit || 0) - Number(compareLastMonth || 0)).toLocaleString()}</div>
+                  <div className="text-xs text-primary/70 mt-1">النتيجة النهائية</div>
+                  {expandedBlock === 'result' && (
+                    <div className="mt-3 p-3 bg-white/90 rounded-lg border border-primary/30 shadow-sm">
+                      <div className="font-semibold text-xs text-primary mb-2 flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-primary rounded-full"></div>
+                        حساب النتيجة النهائية
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center py-1.5 px-2 bg-green-50 rounded text-sm">
+                          <span className="text-green-700">صافي الربح</span>
+                          <span className="font-mono font-bold text-green-800 text-xs">{Number(totals.netProfit || 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 px-2 bg-blue-50 rounded text-sm">
+                          <span className="text-blue-700">فرق المخازن</span>
+                          <span className="font-mono font-bold text-blue-800 text-xs">-{formatNumberWithParens(Number(compareLastMonth || 0))}</span>
+                        </div>
+                        <div className="border-t border-primary/20 pt-2">
+                          <div className="flex justify-between items-center py-1.5 px-2 bg-gradient-to-r from-primary/10 to-secondary/10 rounded font-bold text-sm">
+                            <span className="text-primary">النتيجة:</span>
+                            <span className="font-mono text-primary text-xs">{Math.abs(Number(totals.netProfit || 0) - Number(compareLastMonth || 0)).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Cash Breakdown */}
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200 shadow-sm">
+                <div className="text-blue-800 font-semibold mb-3">تفاصيل الكاش</div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="text-center">
+                    <div className="text-xs text-blue-600">المصروفات من حساب المحل</div>
+                    <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.outletExpenses || 0).toLocaleString()}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-blue-600">المنزل</div>
+                    <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.home || 0).toLocaleString()}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-blue-600">البنك</div>
+                    <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.bank || 0).toLocaleString()}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-blue-600">الدرج</div>
+                    <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.drawer || 0).toLocaleString()}</div>
+                  </div>
+                </div>
+                {(cashBreakdown.customRows || []).filter(row => Number(row.amount || 0) > 0).length > 0 && (
+                  <div className="mt-3 pt-3 border-t border-blue-200">
+                    <div className="text-xs text-blue-600 mb-2">بنود إضافية:</div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {(cashBreakdown.customRows || []).filter(row => Number(row.amount || 0) > 0).map((row) => (
+                        <div key={row.id} className="text-center">
+                          <div className="text-xs text-blue-600">{row.description}</div>
+                          <div className="text-sm font-bold text-blue-800">{Number(row.amount || 0).toLocaleString()}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="mt-3 pt-3 border-t border-blue-200 text-center">
+                  <div className="text-xs text-blue-600">إجمالي الكاش</div>
+                  <div className="text-xl font-bold text-blue-800">{Number(cashManual || 0).toLocaleString()}</div>
+                </div>
+              </div>
+
+              {/* Shareholders Info Block */}
+              {shareholders.length > 0 && (() => {
+                // Filter shareholders based on selection
+                const affectedShareholders = shareholders.filter(sh => selectedShareholders.has(sh.id));
+                const excludedShareholders = shareholders.filter(sh => !selectedShareholders.has(sh.id));
+
+                return (
+                  <div
+                    className="bg-gradient-to-r from-purple-50 to-indigo-50 rounded-xl p-4 border border-purple-200 shadow-sm cursor-pointer hover:shadow-md transition-shadow"
+                    onClick={() => setExpandedBlock(expandedBlock === 'shareholders' ? null : 'shareholders')}
+                  >
+                    <div className="text-purple-800 font-semibold mb-3 flex items-center justify-between">
+                      <span>معلومات الشركاء</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm bg-purple-100 px-2 py-1 rounded-full">{affectedShareholders.length} مشمول</span>
+                        {excludedShareholders.length > 0 && (
+                          <span className="text-sm bg-slate-200 px-2 py-1 rounded-full text-slate-600">{excludedShareholders.length} مستبعد</span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      {affectedShareholders.slice(0, 3).map((sh, idx) => (
+                        <div key={sh.id} className="text-center">
+                          <div className="text-xs text-purple-600">{sh.name}</div>
+                          <div className="text-sm font-bold text-purple-800">{sh.percentage.toFixed(1)}%</div>
+                        </div>
+                      ))}
+                      {shareholders.length > 3 && (
+                        <div className="text-center">
+                          <div className="text-xs text-purple-600">وآخرون</div>
+                          <div className="text-sm font-bold text-purple-800">+{shareholders.length - 3}</div>
+                        </div>
+                      )}
+                    </div>
+                    {expandedBlock === 'shareholders' && (
+                      <div className="mt-4 p-4 bg-white/80 rounded-lg border border-purple-300 shadow-sm">
+                        <div className="font-bold text-sm text-purple-700 mb-3 flex items-center gap-2">
+                          <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
+                          تفاصيل الشركاء
+                        </div>
+                        <div className="space-y-2">
+                          {/* Affected Shareholders */}
+                          {affectedShareholders.map((sh) => {
+                            // Use correct formula: balance × profitPerPound × percentage
+                            const shareAmount = Number(sh.amount || 0) * perPoundProfitComputed * (sh.percentage / 100);
+                            return (
+                              <div key={sh.id} className="flex justify-between items-center py-2 px-3 bg-purple-50 rounded">
+                                <div className="flex flex-col">
+                                  <span className="font-medium text-purple-700">{sh.name}</span>
+                                  <span className="text-xs text-purple-600">{sh.percentage.toFixed(1)}% × رصيد {Number(sh.amount || 0).toLocaleString()}</span>
+                                </div>
+                                <div className="text-left">
+                                  <div className="font-mono font-bold text-purple-800">{shareAmount.toLocaleString()}</div>
+                                  <div className="text-xs text-purple-600">نصيب الشريك</div>
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Excluded Shareholders */}
+                          {excludedShareholders.length > 0 && (
+                            <>
+                              <div className="border-t border-slate-300 pt-3 mt-3">
+                                <div className="text-xs font-semibold text-slate-600 mb-2">مستبعدون من هذا التقرير:</div>
+                              </div>
+                              {excludedShareholders.map((sh) => (
+                                <div key={sh.id} className="flex justify-between items-center py-2 px-3 bg-slate-100 rounded opacity-60">
+                                  <div className="flex flex-col">
+                                    <span className="font-medium text-slate-600">{sh.name}</span>
+                                    <span className="text-xs text-slate-500">{sh.percentage.toFixed(1)}% (غير مشمول)</span>
+                                  </div>
+                                  <div className="text-left">
+                                    <Badge variant="secondary" className="text-xs">مستبعد</Badge>
+                                  </div>
+                                </div>
+                              ))}
+                            </>
+                          )}
+
+                          <div className="border-t border-purple-200 pt-3">
+                            <div className="flex justify-between items-center py-2 px-3 bg-purple-100 rounded font-bold">
+                              <span className="text-purple-800">إجمالي الأنصبة ({affectedShareholders.length} مشمول):</span>
+                              <span className="font-mono text-lg text-purple-900">
+                                {affectedShareholders.reduce((sum, sh) => sum + (Number(sh.amount || 0) * perPoundProfitComputed * (sh.percentage / 100)), 0).toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Enhanced Expanded Block Section */}
+            {expandedBlock && (
+              <div className="mt-8 bg-gradient-to-br from-white to-slate-50/50 border border-slate-200 rounded-2xl shadow-lg overflow-hidden">
+                <div className="bg-gradient-to-r from-primary/10 to-secondary/10 p-4 border-b border-slate-200">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xl font-bold text-primary flex items-center gap-3">
+                      <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                        <div className="w-4 h-4 bg-white rounded-full"></div>
+                      </div>
+                      {expandedBlock === 'expenses' && 'تفاصيل المصروفات'}
+                      {expandedBlock === 'profits' && 'تفاصيل الأرباح'}
+                      {expandedBlock === 'final' && 'تفاصيل الرصيد النهائي'}
+                      {expandedBlock === 'difference' && 'تفاصيل فرق المخازن'}
+                      {expandedBlock === 'result' && 'تفاصيل النتيجة النهائية'}
+                      {expandedBlock === 'shareholders' && 'تفاصيل المساهمين'}
+                    </h3>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setExpandedBlock(null)}
+                      className="text-slate-500 hover:text-slate-700"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="p-6">
+                  {/* Expenses Details */}
+                  {expandedBlock === 'expenses' && (
+                    <div className="space-y-6">
+                      <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                        <h4 className="font-bold text-blue-800 mb-2">📊 شرح حساب المصروفات</h4>
+                        <p className="text-blue-700 text-sm leading-relaxed">
+                          يتم حساب إجمالي المصروفات من خلال جمع جميع المصروفات العادية (غير الشخصية) من جميع الفروع.
+                          المصروفات الشخصية لا تدخل في هذا الحساب لأنها تضاف إلى الكاش ولا تؤثر على الربح.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div>
+                          <h4 className="font-bold text-slate-800 mb-3">المصروفات العادية</h4>
+                          <div className="space-y-2">
+                            {expenses.filter(e => expenseTypes.get(e) !== 'personal' && !['مخازن', 'كاش الدرج', 'ديون ليه', 'ديون عليه', 'أرباح'].includes(e))
+                              .map(e => (
+                                <div key={e} className="flex justify-between items-center py-2 px-3 bg-slate-100 rounded">
+                                  <span className="font-medium">{e}</span>
+                                  <span className="font-mono font-bold text-primary">{Number(totals.sumByExpense?.[e] || 0).toLocaleString()}</span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+
+                        <div>
+                          <h4 className="font-bold text-slate-800 mb-3">المصروفات الشخصية (مستبعدة)</h4>
+                          <div className="space-y-2">
+                            {expenses.filter(e => expenseTypes.get(e) === 'personal')
+                              .map(e => (
+                                <div key={e} className="flex justify-between items-center py-2 px-3 bg-blue-50 rounded opacity-60">
+                                  <span className="font-medium text-blue-700">{e}</span>
+                                  <span className="font-mono font-bold text-blue-600">{Number(totals.sumByExpense?.[e] || 0).toLocaleString()}</span>
+                                </div>
+                              ))}
+                            <div className="text-xs text-blue-600 mt-2 p-2 bg-blue-100 rounded">
+                              💡 هذه المصروفات تضاف للكاش ولا تؤثر على حساب الربح
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-primary/5 p-4 rounded-lg border border-primary/20">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-lg">إجمالي المصروفات العادية:</span>
+                          <span className="font-mono font-bold text-2xl text-primary">{Number(totals.totalExpenses || 0).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Profits Details */}
+                  {expandedBlock === 'profits' && (
+                    <div className="space-y-6">
+                      <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                        <h4 className="font-bold text-green-800 mb-2">💰 شرح حساب الأرباح</h4>
+                        <p className="text-green-700 text-sm leading-relaxed">
+                          صافي الربح = إجمالي الأرباح - إجمالي المصروفات العادية.
+                          هذا هو الربح الحقيقي بعد خصم جميع المصروفات التشغيلية.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                        <div className="bg-green-100 p-4 rounded-lg text-center">
+                          <div className="text-green-600 font-semibold mb-1">إجمالي الأرباح</div>
+                          <div className="text-2xl font-bold text-green-800">{Number(totals.totalProfits || 0).toLocaleString()}</div>
+                        </div>
+                        <div className="bg-red-100 p-4 rounded-lg text-center">
+                          <div className="text-red-600 font-semibold mb-1">إجمالي المصروفات</div>
+                          <div className="text-2xl font-bold text-red-800">-{Number(totals.totalExpenses || 0).toLocaleString()}</div>
+                        </div>
+                        <div className="bg-primary/10 p-4 rounded-lg text-center">
+                          <div className="text-primary font-semibold mb-1">صافي الربح</div>
+                          <div className="text-2xl font-bold text-primary">{Number(totals.netProfit || 0).toLocaleString()}</div>
+                        </div>
+                      </div>
+
+                      <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                        <h4 className="font-bold text-yellow-800 mb-2">📈 ربح الجنيه الواحد</h4>
+                        <div className="flex items-center justify-between">
+                          <span className="text-yellow-700">كل جنيه في المخازن يحقق ربح قدره:</span>
+                          <span className="font-mono font-bold text-xl text-yellow-800">{perPoundProfitComputed.toFixed(4)} جنيه</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Final Balance Details */}
+                  {expandedBlock === 'final' && (
+                    <div className="space-y-6">
+                      <div className="bg-secondary/10 p-4 rounded-lg border border-secondary/20">
+                        <h4 className="font-bold text-secondary mb-2">🏦 شرح الرصيد النهائي</h4>
+                        <p className="text-secondary text-sm leading-relaxed">
+                          الرصيد النهائي = المخازن + الكاش + الديون لنا - الديون علينا.
+                          هذا هو إجمالي ما تملكه الشركة من أصول سائلة.
+                        </p>
+                      </div>
+
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="space-y-3">
+                          <h4 className="font-bold text-slate-800">الأصول (+)</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
+                              <span className="font-medium">المخازن</span>
+                              <span className="font-mono font-bold text-green-600">+{Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
+                              <span className="font-medium">الكاش الإجمالي</span>
+                              <span className="font-mono font-bold text-green-600">+{Number(cashManual || 0).toLocaleString()}</span>
+                            </div>
+                            <div className="flex justify-between items-center py-2 px-3 bg-green-50 rounded">
+                              <span className="font-medium">ديون لنا</span>
+                              <span className="font-mono font-bold text-green-600">+{Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <h4 className="font-bold text-slate-800">الخصوم (-)</h4>
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center py-2 px-3 bg-red-50 rounded">
+                              <span className="font-medium">ديون علينا</span>
+                              <span className="font-mono font-bold text-red-600">-{Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="bg-secondary/5 p-4 rounded-lg border border-secondary/20">
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-lg">الرصيد النهائي:</span>
+                          <span className="font-mono font-bold text-2xl text-secondary">{Number(correctFinalBalance).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Other expanded blocks would go here... */}
+                  {expandedBlock === 'difference' && (
+                    <div className="text-center py-8">
+                      <div className="text-6xl mb-4">🔄</div>
+                      <h3 className="text-xl font-bold text-slate-600 mb-2">تفاصيل فرق المخازن</h3>
+                      <p className="text-slate-500">سيتم إضافة التفاصيل قريباً...</p>
+                    </div>
+                  )}
+
+                  {expandedBlock === 'result' && (
+                    <div className="text-center py-8">
+                      <div className="text-6xl mb-4">📊</div>
+                      <h3 className="text-xl font-bold text-slate-600 mb-2">تفاصيل النتيجة النهائية</h3>
+                      <p className="text-slate-500">سيتم إضافة التفاصيل قريباً...</p>
+                    </div>
+                  )}
+
+                  {expandedBlock === 'shareholders' && (
+                    <div className="text-center py-8">
+                      <div className="text-6xl mb-4">👥</div>
+                      <h3 className="text-xl font-bold text-slate-600 mb-2">تفاصيل المساهمين</h3>
+                      <p className="text-slate-500">سيتم إضافة التفاصيل قريباً...</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setShowSimplePreview(false)}>إغلاق</Button>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowSimplePreview(false);
+                  // Open comprehensive edit modal instead of wizard
+                  if (currentReportId) {
+                    const localReport = reports.find(report => report._id === currentReportId);
+                    if (localReport) {
+                      setQuickEditReport(localReport);
+                      setShowQuickEditModal(true);
+                    }
                   }
-                }
-              }}
-              className="border-orange-300 text-orange-600 hover:bg-orange-50"
-            >
-              <Edit className="w-4 h-4 mr-1" />
-              تعديل شامل
-            </Button>
-            <Button 
-              onClick={() => { 
-                setShowSimplePreview(false); 
-                setPreviewLayout('a4');
-                setShowPreview(true);
-              }}
-              className="bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white"
-            >
-              عرض تقرير
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+                }}
+                className="border-orange-300 text-orange-600 hover:bg-orange-50"
+              >
+                <Edit className="w-4 h-4 mr-1" />
+                تعديل شامل
+              </Button>
+              <Button
+                onClick={() => {
+                  setShowSimplePreview(false);
+                  setPreviewLayout('a4');
+                  setShowPreview(true);
+                }}
+                className="bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-white"
+              >
+                عرض تقرير
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
-      {/* Comprehensive Edit Report Modal */}
-      <ComprehensiveEditModal
-        open={showQuickEditModal}
-        onOpenChange={setShowQuickEditModal}
-        report={quickEditReport}
-        shareholders={shareholders}
-        shareHistory={shareHistory}
-        onSave={handleQuickEditSave}
-      />
-    </div>
-  </AdminLayout>
-);
+        {/* Comprehensive Edit Report Modal */}
+        <ComprehensiveEditModal
+          open={showQuickEditModal}
+          onOpenChange={setShowQuickEditModal}
+          report={quickEditReport}
+          shareholders={shareholders}
+          shareHistory={shareHistory}
+          onSave={handleQuickEditSave}
+        />
+      </div>
+    </AdminLayout>
+  );
 }
