@@ -327,13 +327,13 @@ const ImageUpload = ({
             setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, progress: pct } : e));
           });
           setEntries((prev) => {
-            const next = prev.map((e) => e.id === entry.id ? { ...e, status: 'done', remoteUrl: secureUrl, progress: 100 } : e);
+            const next = prev.map((e) => e.id === entry.id ? { ...e, status: 'done' as const, remoteUrl: secureUrl, progress: 100 } : e);
             syncParent(next);
             return next;
           });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : 'Upload failed';
-          setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: 'error', error: msg } : e));
+          setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: 'error' as const, error: msg } : e));
         }
       }
     },

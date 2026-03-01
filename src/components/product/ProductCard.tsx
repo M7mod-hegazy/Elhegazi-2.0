@@ -31,9 +31,10 @@ interface ProductCardProps {
   product: Product;
   showQuickView?: boolean;
   showFavorite?: boolean;
+  className?: string;
 }
 
-const ProductCard = ({ product, showQuickView = true, showFavorite = true }: ProductCardProps) => {
+const ProductCard = ({ product, showQuickView = true, showFavorite = true, className = "" }: ProductCardProps) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);

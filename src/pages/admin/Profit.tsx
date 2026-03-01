@@ -946,7 +946,6 @@ export default function AdminProfit() {
           } else {
             return { ...h, [s.id]: [...existingHistory, activeTxn] };
           }
-          return { ...h, [s.id]: updatedHistory };
         });
 
         return { ...s, amount: targetBalance };
@@ -3134,46 +3133,142 @@ export default function AdminProfit() {
                     }
                   }
                 `}</style>
-                {/* A4 Detailed Tables */}
-                <div className="text-center mb-6">
-                  <div className="text-2xl font-black text-slate-900 bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent mb-2">
-                    {reportName || title || 'تقرير الأرباح'}
-                  </div>
-                  {range?.from && range?.to && (
-                    <div className="text-sm text-slate-600 font-medium">
-                      {new Date(range.from).toLocaleDateString('ar-EG')} - {new Date(range.to).toLocaleDateString('ar-EG')}
+                {/* ══════════════ REPORT HEADER ══════════════ */}
+                <div className="mb-6">
+                  {/* Top accent bar */}
+                  <div className="h-1.5 bg-gradient-to-r from-emerald-400 via-teal-500 to-blue-500 rounded-full mb-5" />
+
+                  {/* Title + Date */}
+                  <div className="text-center mb-5">
+                    <div className="text-2xl font-black text-slate-900 tracking-tight mb-1">
+                      {reportName || title || 'تقرير الأرباح'}
                     </div>
-                  )}
+                    {range?.from && range?.to && (
+                      <div className="inline-flex items-center gap-2 bg-slate-50 text-slate-600 text-xs font-semibold px-4 py-1.5 rounded-full border border-slate-200 mt-1">
+                        <svg className="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                        <span>{new Date(range.from).toLocaleDateString('ar-EG')}</span>
+                        <span className="text-slate-300">|</span>
+                        <span>{new Date(range.to).toLocaleDateString('ar-EG')}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* ─── Hero KPI Summary Strip ─── */}
+                  <div className="grid grid-cols-3 gap-3 mb-1">
+                    {/* KPI 1: Final Balance */}
+                    <div className="relative bg-gradient-to-br from-emerald-50 to-teal-50 rounded-xl p-3 border border-emerald-200/80 overflow-hidden">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-emerald-200/40 to-transparent rounded-bl-[40px]" />
+                      <div className="relative">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <div className="w-5 h-5 rounded-md bg-emerald-500 flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+                          </div>
+                          <span className="text-[10px] font-bold text-emerald-700 tracking-tight">مخازن نهائي</span>
+                        </div>
+                        <div className="text-lg font-black text-emerald-900 tabular-nums tracking-tight" dir="ltr">
+                          {Number(correctFinalBalance).toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* KPI 2: Net Profit */}
+                    <div className="relative bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-3 border border-blue-200/80 overflow-hidden">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-blue-200/40 to-transparent rounded-bl-[40px]" />
+                      <div className="relative">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <div className="w-5 h-5 rounded-md bg-blue-500 flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          </div>
+                          <span className="text-[10px] font-bold text-blue-700 tracking-tight">صافي الربح</span>
+                        </div>
+                        <div className={`text-lg font-black tabular-nums tracking-tight ${Number(totals.netProfit || 0) >= 0 ? 'text-blue-900' : 'text-red-600'}`} dir="ltr">
+                          {formatNumberWithParens(Number(totals.netProfit || 0))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* KPI 3: Growth Rate */}
+                    <div className="relative bg-gradient-to-br from-violet-50 to-purple-50 rounded-xl p-3 border border-violet-200/80 overflow-hidden">
+                      <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl from-violet-200/40 to-transparent rounded-bl-[40px]" />
+                      <div className="relative">
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <div className="w-5 h-5 rounded-md bg-violet-500 flex items-center justify-center">
+                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                          </div>
+                          <span className="text-[10px] font-bold text-violet-700 tracking-tight">نسبة النمو</span>
+                        </div>
+                        <div className="flex items-baseline gap-1">
+                          <div className={`text-lg font-black tabular-nums tracking-tight ${Number(compareLastMonth || 0) >= 0 ? 'text-emerald-700' : 'text-red-600'}`} dir="ltr">
+                            {Number(lastMonthClosing || 0) > 0
+                              ? `${((Number(compareLastMonth || 0) / Number(lastMonthClosing || 1)) * 100).toFixed(1)}%`
+                              : '—'}
+                          </div>
+                          {Number(compareLastMonth || 0) >= 0 ? (
+                            <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                          ) : (
+                            <svg className="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="space-y-6">
-                  {/* Main Expenses Table */}
-                  <div className="bg-white rounded-lg border border-slate-200 overflow-hidden table-container">
-                    <div className="bg-slate-600 text-white p-3 text-center font-bold print-header">
-                      الفترة الزمنية
+                <div className="space-y-5">
+                  {/* ══════════════ SECTION 1: EXPENSES TABLE ══════════════ */}
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden table-container shadow-sm">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-white border-b-2 border-emerald-400">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">1</div>
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm leading-tight">الفترة الزمنية</div>
+                          <div className="text-[10px] text-slate-500 font-medium">تفاصيل البنود حسب الفرع</div>
+                        </div>
+                      </div>
+                      <div className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">{branches.length} فرع</div>
                     </div>
                     <table className="w-full border-collapse text-sm">
                       <thead>
-                        <tr className="bg-slate-100">
-                          <th className="border border-slate-300 p-2 text-center font-bold">البند</th>
+                        <tr className="bg-slate-50/80">
+                          <th className="border border-slate-200 p-2 text-center font-bold text-slate-700 text-xs">البند</th>
                           {branches.map((branch, idx) => (
-                            <th key={idx} className="border border-slate-300 p-2 text-center font-bold border-r-0">{branch}</th>
+                            <th key={idx} className="border border-slate-200 p-2 text-center font-bold text-slate-700 text-xs">{branch}</th>
                           ))}
-                          <th className="border border-slate-300 p-2 text-center font-bold border-r-0">المجموع</th>
+                          <th className="border border-slate-200 p-2 text-center font-bold text-slate-700 bg-slate-100/80 text-xs">المجموع</th>
+                          <th className="border border-slate-200 p-2 text-center font-bold text-slate-700 bg-emerald-50/60 text-xs w-[60px]">%</th>
                         </tr>
                       </thead>
                       <tbody>
-                        <tr className="bg-yellow-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-yellow-200">مخازن</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['مخازن'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
+                        {/* مخازن - highlighted row */}
+                        {(() => {
+                          const storageTotal = Number(totals.sumByExpense?.['مخازن'] || 0);
+                          const grandTotal = Number(correctFinalBalance || 1);
+                          const pct = grandTotal > 0 ? ((storageTotal / grandTotal) * 100).toFixed(1) : '0';
+                          return (
+                            <tr className="bg-emerald-50/50">
+                              <td className="border border-slate-200 p-2 text-center font-semibold text-emerald-800" style={{ borderRight: '3px solid #10b981' }}>
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                                  مخازن
+                                </div>
+                              </td>
+                              {branches.map((branch, idx) => (
+                                <td key={idx} className="border border-slate-200 p-2 text-center tabular-nums">
+                                  {Number(branchRows.find(br => br.name === branch)?.values['مخازن'] || 0).toLocaleString()}
+                                </td>
+                              ))}
+                              <td className="border border-slate-200 p-2 text-center font-bold bg-emerald-50 tabular-nums">
+                                {storageTotal.toLocaleString()}
+                              </td>
+                              <td className="border border-slate-200 p-1 text-center">
+                                <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="absolute inset-y-0 right-0 bg-gradient-to-l from-emerald-400 to-emerald-300 rounded-full" style={{ width: `${Math.min(Number(pct), 100)}%` }} />
+                                  <span className="relative text-[9px] font-bold text-slate-700 leading-4">{pct}%</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })()}
 
                         {/* Personal Expenses */}
                         {expenses
@@ -3182,19 +3277,35 @@ export default function AdminProfit() {
                             const total = Number(totals.sumByExpense?.[expense] || 0);
                             return total > 0;
                           })
-                          .map((expense, idx) => (
-                            <tr key={expense} className="bg-yellow-50">
-                              <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
-                              {branches.map((branch, branchIdx) => (
-                                <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
-                                  {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                          .map((expense, idx) => {
+                            const expTotal = Number(totals.sumByExpense?.[expense] || 0);
+                            const grandTotal = Number(correctFinalBalance || 1);
+                            const pct = grandTotal > 0 ? ((expTotal / grandTotal) * 100).toFixed(1) : '0';
+                            return (
+                              <tr key={expense} className={idx % 2 === 0 ? "bg-amber-50/30" : "bg-white"}>
+                                <td className="border border-slate-200 p-2 text-center font-medium text-amber-800" style={{ borderRight: '3px solid #f59e0b' }}>
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-amber-400" />
+                                    {expense}
+                                  </div>
                                 </td>
-                              ))}
-                              <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                                {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
-                              </td>
-                            </tr>
-                          ))}
+                                {branches.map((branch, branchIdx) => (
+                                  <td key={branchIdx} className="border border-slate-200 p-2 text-center tabular-nums">
+                                    {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                                  </td>
+                                ))}
+                                <td className="border border-slate-200 p-2 text-center font-bold bg-slate-50/50 tabular-nums">
+                                  {expTotal.toLocaleString()}
+                                </td>
+                                <td className="border border-slate-200 p-1 text-center">
+                                  <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="absolute inset-y-0 right-0 bg-gradient-to-l from-amber-400 to-amber-300 rounded-full" style={{ width: `${Math.min(Number(pct), 100)}%` }} />
+                                    <span className="relative text-[9px] font-bold text-slate-700 leading-4">{pct}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
 
                         {/* Other Expenses */}
                         {expenses
@@ -3203,386 +3314,66 @@ export default function AdminProfit() {
                             const total = Number(totals.sumByExpense?.[expense] || 0);
                             return total > 0;
                           })
-                          .map((expense, idx) => (
-                            <tr key={expense} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50"}>
-                              <td className="border border-slate-300 p-2 text-center bg-yellow-100">{expense}</td>
+                          .map((expense, idx) => {
+                            const expTotal = Number(totals.sumByExpense?.[expense] || 0);
+                            const grandTotal = Number(correctFinalBalance || 1);
+                            const pct = grandTotal > 0 ? ((expTotal / grandTotal) * 100).toFixed(1) : '0';
+                            return (
+                              <tr key={expense} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/30"}>
+                                <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: '3px solid #94a3b8' }}>
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <div className="w-2 h-2 rounded-full bg-slate-400" />
+                                    {expense}
+                                  </div>
+                                </td>
+                                {branches.map((branch, branchIdx) => (
+                                  <td key={branchIdx} className="border border-slate-200 p-2 text-center tabular-nums">
+                                    {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                                  </td>
+                                ))}
+                                <td className="border border-slate-200 p-2 text-center font-bold bg-slate-50/50 tabular-nums">
+                                  {expTotal.toLocaleString()}
+                                </td>
+                                <td className="border border-slate-200 p-1 text-center">
+                                  <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="absolute inset-y-0 right-0 bg-gradient-to-l from-slate-400 to-slate-300 rounded-full" style={{ width: `${Math.min(Number(pct), 100)}%` }} />
+                                    <span className="relative text-[9px] font-bold text-slate-700 leading-4">{pct}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                        {/* Cash, Debts, Profits - special rows */}
+                        {[
+                          { key: 'كاش الدرج', color: '#0d9488', dotColor: 'bg-teal-400', bgClass: 'bg-teal-50/30' },
+                          { key: 'ديون ليه', color: '#3b82f6', dotColor: 'bg-blue-400', bgClass: 'bg-blue-50/30' },
+                          { key: 'ديون عليه', color: '#ef4444', dotColor: 'bg-red-400', bgClass: 'bg-red-50/30' },
+                          { key: 'أرباح', color: '#8b5cf6', dotColor: 'bg-violet-400', bgClass: 'bg-violet-50/30' },
+                        ].map((item, idx) => {
+                          const itemTotal = Number(totals.sumByExpense?.[item.key] || 0);
+                          const grandTotal = Number(correctFinalBalance || 1);
+                          const pct = grandTotal > 0 ? ((Math.abs(itemTotal) / grandTotal) * 100).toFixed(1) : '0';
+                          return (
+                            <tr key={item.key} className={idx % 2 === 0 ? item.bgClass : 'bg-white'}>
+                              <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: `3px solid ${item.color}` }}>
+                                <div className="flex items-center justify-center gap-1.5">
+                                  <div className={`w-2 h-2 rounded-full ${item.dotColor}`} />
+                                  {item.key}
+                                </div>
+                              </td>
                               {branches.map((branch, branchIdx) => (
-                                <td key={branchIdx} className="border border-slate-300 p-2 text-center border-r-0">
-                                  {Number(branchRows.find(br => br.name === branch)?.values[expense] || 0).toLocaleString()}
+                                <td key={branchIdx} className="border border-slate-200 p-2 text-center tabular-nums">
+                                  {Number(branchRows.find(br => br.name === branch)?.values[item.key] || 0).toLocaleString()}
                                 </td>
                               ))}
-                              <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                                {Number(totals.sumByExpense?.[expense] || 0).toLocaleString()}
+                              <td className="border border-slate-200 p-2 text-center font-bold bg-slate-50/50 tabular-nums">
+                                {itemTotal.toLocaleString()}
                               </td>
-                            </tr>
-                          ))}
-
-                        {/* Cash, Debts, Profits */}
-                        <tr className="bg-white">
-                          <td className="border border-slate-300 p-2 text-center bg-yellow-100">كاش الدرج</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['كاش الدرج'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['كاش الدرج'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-
-                        <tr className="bg-slate-50">
-                          <td className="border border-slate-300 p-2 text-center bg-yellow-100">ديون ليه</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['ديون ليه'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-
-                        <tr className="bg-white">
-                          <td className="border border-slate-300 p-2 text-center bg-yellow-100">ديون عليه</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['ديون عليه'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['ديون عليه'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-
-                        <tr className="bg-slate-50">
-                          <td className="border border-slate-300 p-2 text-center bg-yellow-100">أرباح</td>
-                          {branches.map((branch, idx) => (
-                            <td key={idx} className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(branchRows.find(br => br.name === branch)?.values['أرباح'] || 0).toLocaleString()}
-                            </td>
-                          ))}
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(totals.sumByExpense?.['أرباح'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Cash Details Table */}
-                  <div className="bg-white rounded-lg border border-slate-200 overflow-hidden table-container page-break-before">
-                    <div className="bg-gray-500 text-white p-3 text-center font-bold print-header">
-                      الكاش
-                    </div>
-                    <table className="w-full border-collapse text-sm">
-                      <tbody>
-                        <tr className="bg-gray-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold">المصروفات من حساب المحل</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashBreakdown.outletExpenses || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-gray-50">
-                          <td className="border border-slate-300 p-2 text-center font-semibold">بيت</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashBreakdown.home || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-gray-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold">بنك</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashBreakdown.bank || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-gray-50">
-                          <td className="border border-slate-300 p-2 text-center font-semibold">درج</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashBreakdown.drawer || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        {/* Explicit Vodafone Row - only show if value > 0 */}
-                        {Number(cashBreakdown.vodafone || 0) > 0 && (
-                          <tr className="bg-gray-100">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">فودافون</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(cashBreakdown.vodafone || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                        )}
-                        {/* Custom Cash Rows - filter out vodafone-related */}
-                        {(cashBreakdown.customRows || [])
-                          .filter(row => {
-                            const name = (row.name || '').toLowerCase().trim();
-                            const isVodafone = name.includes('vodafone') || name.includes('فودافون') || name === 'فودافون';
-                            return !isVodafone && Number(row.amount || 0) > 0;
-                          })
-                          .map((row, idx) => (
-                            <tr key={row.id} className={idx % 2 === 0 ? "bg-gray-100" : "bg-gray-50"}>
-                              <td className="border border-slate-300 p-2 text-center font-semibold">{row.name}</td>
-                              <td className="border border-slate-300 p-2 text-center border-r-0">
-                                {Number(row.amount || 0).toLocaleString()}
-                              </td>
-                            </tr>
-                          ))}
-                        <tr className="bg-green-200">
-                          <td className="border border-slate-300 p-2 text-center font-bold">المجموع</td>
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(cashManual || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Final Balance Table */}
-                  <div className="bg-white rounded-lg border border-slate-200 overflow-hidden table-container page-break-before">
-                    <div className="bg-orange-400 text-white p-3 text-center font-bold print-header">
-                      مخازن نهائي
-                    </div>
-                    <table className="w-full border-collapse text-sm">
-                      <tbody>
-                        <tr className="bg-orange-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">مخازن</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-orange-50">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">الكاش</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(cashManual || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-orange-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-orange-200">ديون ليه</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0">
-                            {Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}
-                          </td>
-                        </tr>
-                        {/* Subtotal before deducting ديون عليه */}
-                        <tr className="bg-slate-100">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-slate-200">المجموع</td>
-                          <td className="border border-slate-300 p-2 text-center font-semibold border-r-0">
-                            {Number((totals.sumByExpense?.['مخازن'] || 0) + Number(cashManual || 0) + (totals.sumByExpense?.['ديون ليه'] || 0)).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-blue-50">
-                          <td className="border border-slate-300 p-2 text-center font-semibold bg-blue-200">ديون عليه</td>
-                          <td className="border border-slate-300 p-2 text-center border-r-0 text-red-600">
-                            -{Math.abs(Number(totals.sumByExpense?.['ديون عليه'] || 0)).toLocaleString()}
-                          </td>
-                        </tr>
-                        <tr className="bg-green-200">
-                          <td className="border border-slate-300 p-2 text-center font-bold">مخازن نهائي</td>
-                          <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                            {Number(correctFinalBalance).toLocaleString()}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-
-                  {/* Profit Comparison Tables */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 break-inside-avoid">
-                    {/* Previous Month Comparison */}
-                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden break-inside-avoid">
-                      <div className="bg-blue-500 text-white p-3 text-center font-bold">
-                        مقارنة بالشهر الماضي
-                      </div>
-                      <table className="w-full border-collapse text-sm">
-                        <tbody>
-                          <tr className="bg-blue-100">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">الشهر الماضي</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(lastMonthClosing || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-blue-50">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">الشهر الحالي</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(correctFinalBalance).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-green-200">
-                            <td className="border border-slate-300 p-2 text-center font-bold">الفرق</td>
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {formatNumberWithParens(Number(compareLastMonth || 0))}
-                            </td>
-                          </tr>
-                          <tr className="bg-blue-100">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">المصروفات من حساب المحل</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(cashBreakdown.outletExpenses || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-green-300">
-                            <td className="border border-slate-300 p-2 text-center font-bold">الباقي</td>
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {formatNumberWithParens(Number(compareLastMonth || 0) - Number(cashBreakdown.outletExpenses || 0))}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Net Profit */}
-                    <div className="bg-white rounded-lg border border-slate-200 overflow-hidden table-container h-fit">
-                      <div className="bg-green-600 text-white p-3 text-center font-bold print-header">
-                        صافي الربح (النتيجة)
-                      </div>
-                      <table className="w-full border-collapse text-sm">
-                        <tbody>
-                          <tr className="bg-green-100">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">مصروفات</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(totals.totalExpenses || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-green-50">
-                            <td className="border border-slate-300 p-2 text-center font-semibold">أرباح</td>
-                            <td className="border border-slate-300 p-2 text-center border-r-0">
-                              {Number(totals.totalProfits || 0).toLocaleString()}
-                            </td>
-                          </tr>
-                          <tr className="bg-green-200">
-                            <td className="border border-slate-300 p-2 text-center font-bold">صافي الربح</td>
-                            <td className="border border-slate-300 p-2 text-center font-bold border-r-0">
-                              {formatNumberWithParens(Number(totals.netProfit || 0))}
-                            </td>
-                          </tr>
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Shareholders Impact Summary for this result */}
-                <div className="mt-6 bg-gradient-to-br from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-200 shadow-sm">
-                  <div className="text-emerald-700 font-semibold mb-3">تأثير التقرير على أرصدة المساهمين</div>
-                  <div className="overflow-auto rounded-lg border border-emerald-200 bg-white">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-emerald-50">
-                          <th className="p-2 border border-emerald-200 text-right">المساهم</th>
-                          <th className="p-2 border border-emerald-200 text-center">قبل</th>
-                          <th className="p-2 border border-emerald-200 text-center">التغيير</th>
-                          <th className="p-2 border border-emerald-200 text-center">بعد</th>
-                          <th className="p-2 border border-emerald-200 text-center">التفاصيل</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {shareholders.map(s => {
-                          const hist = (shareHistory && shareHistory[s.id]) || [];
-                          // Find transaction specifically for THIS report using currentReportId
-                          const reportTxn = hist.find(txn =>
-                            txn.reportId === currentReportId ||
-                            txn.reportId?.startsWith(`${currentReportId}_profit_`) ||
-                            txn.reportId?.startsWith(`${currentReportId}_edit_`) ||
-                            txn.reportId?.startsWith(`${currentReportId}_reversal_`) ||
-                            txn.reportId?.startsWith(`${currentReportId}_skip_`)
-                          ) as ShareTxn | undefined;
-                          if (!reportTxn || reportTxn.source !== 'auto') return null;
-
-                          // ✅ Calculate using centralized formulas from profitCalculations.ts
-                          const currentDifference = compareLastMonth || 0;
-                          const currentFinalBalance = correctFinalBalance || 0;
-                          const profitPerPound = calculateProfitPerPound(currentDifference, currentFinalBalance);
-                          const shareholderPercentage = s.percentage;
-
-                          // Calculate shareholder's delta
-                          const calculatedDelta = calculateShareholderDelta(Number(reportTxn.fromAmount), profitPerPound, shareholderPercentage);
-                          const calculatedNewBalance = Number(reportTxn.fromAmount) + calculatedDelta;
-
-                          return (
-                            <tr key={`sh-imp-${s.id}`} className="odd:bg-white even:bg-emerald-50/40">
-                              <td className="p-2 border border-emerald-200 text-right font-medium">{s.name}</td>
-                              <td className="p-2 border border-emerald-200 text-center">{Number(reportTxn.fromAmount).toLocaleString()}</td>
-                              <td className="p-2 border border-emerald-200 text-center text-emerald-700">
-                                {calculatedDelta >= 0 ? '+' : ''}{Number(calculatedDelta).toLocaleString()}
-                              </td>
-                              <td className="p-2 border border-emerald-200 text-center font-semibold">{Number(calculatedNewBalance).toLocaleString()}</td>
-                              <td className="p-2 border border-emerald-200 text-right">
-                                <div className="bg-gradient-to-br from-emerald-50 to-green-50 p-3 rounded-lg border border-emerald-300 shadow-sm">
-                                  <div className="space-y-2 text-xs">
-                                    {/* Step 1: Combined calculation - Profit per pound with percentage */}
-                                    <div className="bg-blue-50 p-2 rounded border border-blue-200">
-                                      <div className="text-blue-700 font-medium mb-1 text-right text-[10px]">حساب ربح الجنيه:</div>
-                                      <div className="flex items-center gap-1 font-mono text-[9px]">
-                                        <div className="bg-blue-100 px-1.5 py-0.5 rounded border border-blue-300">
-                                          <div className="text-[7px] text-blue-600">الفرق</div>
-                                          <div className="text-slate-900 font-bold">{Number(currentDifference).toLocaleString()}</div>
-                                        </div>
-                                        <span className="font-bold text-blue-600">÷</span>
-                                        <div className="bg-blue-100 px-1.5 py-0.5 rounded border border-blue-300">
-                                          <div className="text-[7px] text-blue-600">مخازن نهائي</div>
-                                          <div className="text-slate-900 font-bold">{Number(currentFinalBalance).toLocaleString()}</div>
-                                        </div>
-                                        <span className="font-bold text-purple-600">×</span>
-                                        <div className="bg-purple-100 px-1.5 py-0.5 rounded border border-purple-300">
-                                          <div className="text-[7px] text-purple-600">نسبة {s.name}</div>
-                                          <div className="text-slate-900 font-bold">{s.percentage}%</div>
-                                        </div>
-                                        <span className="font-bold text-emerald-600">=</span>
-                                        <div className="bg-gradient-to-br from-blue-200 to-purple-200 px-1.5 py-0.5 rounded border-2 border-blue-400 shadow-sm">
-                                          <div className="text-[7px] text-blue-700">ربح الجنيه</div>
-                                          <div className="text-blue-800 font-bold">{(profitPerPound * shareholderPercentage / 100).toFixed(6)}</div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Step 2: Shareholder calculation formula */}
-                                    <div className="bg-white p-2 rounded border border-emerald-200">
-                                      <div className="text-emerald-700 font-medium mb-1 text-right text-[10px]">حساب نصيب {s.name}:</div>
-                                      <div className="flex items-center gap-1 font-mono text-[9px]">
-                                        <div className="bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">
-                                          <div className="text-[7px] text-emerald-600">رصيد {s.name}</div>
-                                          <div className="text-slate-900 font-bold">{Number(reportTxn.fromAmount).toLocaleString()}</div>
-                                        </div>
-                                        <span className="font-bold text-emerald-600">×</span>
-                                        <div className="bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-300">
-                                          <div className="text-[7px] text-emerald-600">ربح الجنيه</div>
-                                          <div className="text-slate-900 font-bold">{(profitPerPound * shareholderPercentage / 100).toFixed(6)}</div>
-                                        </div>
-                                        <span className="font-bold text-green-600">=</span>
-                                        <div className="bg-gradient-to-br from-emerald-200 to-green-200 px-1.5 py-0.5 rounded border-2 border-emerald-400 shadow-sm">
-                                          <div className="text-[7px] text-emerald-700">التغيير</div>
-                                          <div className="text-emerald-800 font-bold">{(() => {
-                                            const formatted = calculatedDelta.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
-                                            return (calculatedDelta >= 0 ? '+' : '') + formatted;
-                                          })()}</div>
-                                        </div>
-                                      </div>
-                                    </div>
-
-                                    {/* Step 3: Final balance */}
-                                    <div className="bg-emerald-100 p-2 rounded border border-emerald-300">
-                                      <div className="text-emerald-700 font-medium mb-1 text-right text-[10px]">الرصيد النهائي:</div>
-                                      <div className="flex items-center gap-1 font-mono text-[9px]">
-                                        {(() => {
-                                          // Already calculated above using centralized formula
-                                          const newBalance = calculatedNewBalance;
-                                          return (
-                                            <>
-                                              <div className="bg-white px-1.5 py-0.5 rounded border border-emerald-300">
-                                                <div className="text-[7px] text-emerald-600">الرصيد السابق</div>
-                                                <div className="text-slate-900 font-bold">{Number(reportTxn.fromAmount).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</div>
-                                              </div>
-                                              <span className="font-bold text-emerald-600">{calculatedDelta >= 0 ? '+' : '-'}</span>
-                                              <div className="bg-white px-1.5 py-0.5 rounded border border-emerald-300">
-                                                <div className="text-[7px] text-emerald-600">التغيير</div>
-                                                <div className="text-slate-900 font-bold">{Math.abs(calculatedDelta).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</div>
-                                              </div>
-                                              <span className="font-bold text-green-600">=</span>
-                                              <div className="bg-gradient-to-br from-green-300 to-emerald-300 px-1.5 py-0.5 rounded border-2 border-green-500 shadow-md">
-                                                <div className="text-[7px] text-green-800">الرصيد الجديد</div>
-                                                <div className="text-green-900 font-bold">{newBalance.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</div>
-                                              </div>
-                                            </>
-                                          );
-                                        })()}
-                                      </div>
-                                    </div>
-                                  </div>
+                              <td className="border border-slate-200 p-1 text-center">
+                                <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="absolute inset-y-0 right-0 rounded-full" style={{ width: `${Math.min(Number(pct), 100)}%`, background: `linear-gradient(to left, ${item.color}, ${item.color}88)` }} />
+                                  <span className="relative text-[9px] font-bold text-slate-700 leading-4">{pct}%</span>
                                 </div>
                               </td>
                             </tr>
@@ -3590,6 +3381,516 @@ export default function AdminProfit() {
                         })}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* ══════════════ SECTION 2: CASH DETAILS ══════════════ */}
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden table-container page-break-before shadow-sm">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-teal-50 to-white border-b-2 border-teal-400">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">2</div>
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm leading-tight">الكاش</div>
+                          <div className="text-[10px] text-slate-500 font-medium">توزيع السيولة النقدية</div>
+                        </div>
+                      </div>
+                      <div className="text-[10px] font-bold text-teal-700 bg-teal-50 px-2 py-0.5 rounded-full border border-teal-200 tabular-nums" dir="ltr">
+                        Σ {Number(cashManual || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="bg-slate-50/80">
+                          <th className="border border-slate-200 p-2 text-center font-bold text-slate-700 text-xs">البند</th>
+                          <th className="border border-slate-200 p-2 text-center font-bold text-slate-700 text-xs">المبلغ</th>
+                          <th className="border border-slate-200 p-2 text-center font-bold text-slate-700 bg-teal-50/60 text-xs w-[80px]">النسبة</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(() => {
+                          const cashTotal = Number(cashManual || 1);
+                          const cashItems = [
+                            { name: 'المصروفات من حساب المحل', value: Number(cashBreakdown.outletExpenses || 0), icon: '🏪' },
+                            { name: 'بيت', value: Number(cashBreakdown.home || 0), icon: '🏠' },
+                            { name: 'بنك', value: Number(cashBreakdown.bank || 0), icon: '🏦' },
+                            { name: 'درج', value: Number(cashBreakdown.drawer || 0), icon: '📦' },
+                          ];
+                          if (Number(cashBreakdown.vodafone || 0) > 0) {
+                            cashItems.push({ name: 'فودافون', value: Number(cashBreakdown.vodafone || 0), icon: '📱' });
+                          }
+                          (cashBreakdown.customRows || [])
+                            .filter(row => {
+                              const name = (row.name || '').toLowerCase().trim();
+                              const isVodafone = name.includes('vodafone') || name.includes('فودافون') || name === 'فودافون';
+                              return !isVodafone && Number(row.amount || 0) > 0;
+                            })
+                            .forEach(row => {
+                              cashItems.push({ name: row.name, value: Number(row.amount || 0), icon: '💰' });
+                            });
+                          return cashItems.map((item, idx) => {
+                            const pct = cashTotal > 0 ? ((item.value / cashTotal) * 100).toFixed(1) : '0';
+                            return (
+                              <tr key={idx} className={idx % 2 === 0 ? 'bg-slate-50/30' : 'bg-white'}>
+                                <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: '3px solid #14b8a6' }}>
+                                  <div className="flex items-center justify-center gap-1.5">
+                                    <span className="text-xs">{item.icon}</span>
+                                    {item.name}
+                                  </div>
+                                </td>
+                                <td className="border border-slate-200 p-2 text-center tabular-nums font-semibold">{item.value.toLocaleString()}</td>
+                                <td className="border border-slate-200 p-1 text-center">
+                                  <div className="relative h-4 bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="absolute inset-y-0 right-0 bg-gradient-to-l from-teal-400 to-teal-300 rounded-full" style={{ width: `${Math.min(Number(pct), 100)}%` }} />
+                                    <span className="relative text-[9px] font-bold text-slate-700 leading-4">{pct}%</span>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })()}
+                        <tr className="bg-gradient-to-r from-teal-50 to-emerald-50">
+                          <td className="border border-slate-200 p-2 text-center font-black text-teal-800" style={{ borderRight: '3px solid #0d9488' }}>
+                            <div className="flex items-center justify-center gap-1.5">
+                              <span className="text-xs">✅</span>
+                              المجموع
+                            </div>
+                          </td>
+                          <td className="border border-slate-200 p-2 text-center font-black text-teal-800 tabular-nums text-base">
+                            {Number(cashManual || 0).toLocaleString()}
+                          </td>
+                          <td className="border border-slate-200 p-1 text-center">
+                            <div className="bg-teal-500 text-white text-[9px] font-black rounded-full px-2 py-0.5 inline-block">100%</div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* ══════════════ SECTION 3: FINAL BALANCE ══════════════ */}
+                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden table-container page-break-before shadow-sm">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-amber-50 to-white border-b-2 border-amber-400">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">3</div>
+                        <div>
+                          <div className="font-bold text-slate-800 text-sm leading-tight">مخازن نهائي</div>
+                          <div className="text-[10px] text-slate-500 font-medium">حساب الرصيد النهائي</div>
+                        </div>
+                      </div>
+                    </div>
+                    {/* Premium Visual Equation */}
+                    <div className="p-5 bg-gradient-to-br from-slate-50/50 to-white">
+                      <div className="flex flex-wrap items-center justify-center gap-3">
+                        {/* مخازن */}
+                        <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/50 px-4 py-2.5 rounded-xl border border-emerald-200 text-center min-w-[100px] shadow-sm">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-emerald-400" />
+                            <div className="text-[10px] font-bold text-emerald-600">مخازن</div>
+                          </div>
+                          <div className="text-base font-black text-emerald-800 tabular-nums" dir="ltr">{Number(totals.sumByExpense?.['مخازن'] || 0).toLocaleString()}</div>
+                          {Number(correctFinalBalance || 0) > 0 && (
+                            <div className="text-[8px] text-emerald-500 font-semibold mt-0.5" dir="ltr">
+                              {((Number(totals.sumByExpense?.['مخازن'] || 0) / Number(correctFinalBalance || 1)) * 100).toFixed(0)}% من الإجمالي
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <span className="text-white font-black text-sm">+</span>
+                        </div>
+                        {/* الكاش */}
+                        <div className="bg-gradient-to-br from-teal-50 to-teal-100/50 px-4 py-2.5 rounded-xl border border-teal-200 text-center min-w-[100px] shadow-sm">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-teal-400" />
+                            <div className="text-[10px] font-bold text-teal-600">الكاش</div>
+                          </div>
+                          <div className="text-base font-black text-teal-800 tabular-nums" dir="ltr">{Number(cashManual || 0).toLocaleString()}</div>
+                          {Number(correctFinalBalance || 0) > 0 && (
+                            <div className="text-[8px] text-teal-500 font-semibold mt-0.5" dir="ltr">
+                              {((Number(cashManual || 0) / Number(correctFinalBalance || 1)) * 100).toFixed(0)}% من الإجمالي
+                            </div>
+                          )}
+                        </div>
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <span className="text-white font-black text-sm">+</span>
+                        </div>
+                        {/* ديون ليه */}
+                        <div className="bg-gradient-to-br from-blue-50 to-blue-100/50 px-4 py-2.5 rounded-xl border border-blue-200 text-center min-w-[100px] shadow-sm">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-blue-400" />
+                            <div className="text-[10px] font-bold text-blue-600">ديون ليه</div>
+                          </div>
+                          <div className="text-base font-black text-blue-800 tabular-nums" dir="ltr">{Number(totals.sumByExpense?.['ديون ليه'] || 0).toLocaleString()}</div>
+                        </div>
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-red-400 to-red-500 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <span className="text-white font-black text-sm">−</span>
+                        </div>
+                        {/* ديون عليه */}
+                        <div className="bg-gradient-to-br from-red-50 to-red-100/50 px-4 py-2.5 rounded-xl border border-red-200 text-center min-w-[100px] shadow-sm">
+                          <div className="flex items-center justify-center gap-1 mb-1">
+                            <div className="w-2 h-2 rounded-full bg-red-400" />
+                            <div className="text-[10px] font-bold text-red-500">ديون عليه</div>
+                          </div>
+                          <div className="text-base font-black text-red-700 tabular-nums" dir="ltr">{Math.abs(Number(totals.sumByExpense?.['ديون عليه'] || 0)).toLocaleString()}</div>
+                        </div>
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center flex-shrink-0 shadow-sm">
+                          <span className="text-white font-black text-sm">=</span>
+                        </div>
+                        {/* مخازن نهائي - THE RESULT */}
+                        <div className="relative bg-gradient-to-br from-emerald-100 via-green-100 to-teal-100 px-5 py-3 rounded-2xl border-2 border-emerald-400 text-center min-w-[130px] shadow-md overflow-hidden">
+                          <div className="absolute top-0 left-0 w-12 h-12 bg-gradient-to-br from-emerald-300/30 to-transparent rounded-br-[30px]" />
+                          <div className="relative">
+                            <div className="text-[10px] font-black text-emerald-700 mb-0.5 tracking-wide">مخازن نهائي</div>
+                            <div className="text-xl font-black text-emerald-900 tabular-nums tracking-tight" dir="ltr">{Number(correctFinalBalance).toLocaleString()}</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ══════════════ SECTION 4 & 5: COMPARISON + NET PROFIT ══════════════ */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 break-inside-avoid">
+                    {/* Previous Month Comparison */}
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden break-inside-avoid shadow-sm">
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-50 to-white border-b-2 border-blue-400">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">4</div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm leading-tight">مقارنة بالشهر الماضي</div>
+                            <div className="text-[10px] text-slate-500 font-medium">تحليل التغيّر الشهري</div>
+                          </div>
+                        </div>
+                        {/* Growth badge */}
+                        <div className={`flex items-center gap-0.5 text-[10px] font-bold px-2 py-0.5 rounded-full ${Number(compareLastMonth || 0) >= 0 ? 'text-emerald-700 bg-emerald-50 border border-emerald-200' : 'text-red-600 bg-red-50 border border-red-200'}`}>
+                          {Number(compareLastMonth || 0) >= 0 ? '↑' : '↓'}
+                          {Number(lastMonthClosing || 0) > 0
+                            ? `${Math.abs((Number(compareLastMonth || 0) / Number(lastMonthClosing || 1)) * 100).toFixed(1)}%`
+                            : '—'}
+                        </div>
+                      </div>
+                      <table className="w-full border-collapse text-sm">
+                        <tbody>
+                          <tr className="bg-blue-50/30">
+                            <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: '3px solid #3b82f6' }}>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-blue-300" />
+                                الشهر الماضي
+                              </div>
+                            </td>
+                            <td className="border border-slate-200 p-2 text-center tabular-nums font-semibold">
+                              {Number(lastMonthClosing || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-white">
+                            <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: '3px solid #3b82f6' }}>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                الشهر الحالي
+                              </div>
+                            </td>
+                            <td className="border border-slate-200 p-2 text-center tabular-nums font-semibold">
+                              {Number(correctFinalBalance).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-gradient-to-r from-emerald-50 to-green-50">
+                            <td className="border border-slate-200 p-2 text-center font-bold text-emerald-800" style={{ borderRight: '3px solid #10b981' }}>
+                              <div className="flex items-center justify-center gap-1.5">
+                                {Number(compareLastMonth || 0) >= 0 ? (
+                                  <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                                ) : (
+                                  <svg className="w-3.5 h-3.5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                                )}
+                                الفرق
+                              </div>
+                            </td>
+                            <td className="border border-slate-200 p-2 text-center font-black text-emerald-800 tabular-nums">
+                              {formatNumberWithParens(Number(compareLastMonth || 0))}
+                            </td>
+                          </tr>
+                          <tr className="bg-blue-50/30">
+                            <td className="border border-slate-200 p-2 text-center font-medium text-slate-700" style={{ borderRight: '3px solid #3b82f6' }}>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span className="text-xs">🏪</span>
+                                المصروفات من حساب المحل
+                              </div>
+                            </td>
+                            <td className="border border-slate-200 p-2 text-center tabular-nums font-semibold">
+                              {Number(cashBreakdown.outletExpenses || 0).toLocaleString()}
+                            </td>
+                          </tr>
+                          <tr className="bg-gradient-to-r from-emerald-100/80 to-green-100/80">
+                            <td className="border border-slate-200 p-2 text-center font-black text-emerald-900" style={{ borderRight: '3px solid #059669' }}>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span className="text-xs">💎</span>
+                                الباقي
+                              </div>
+                            </td>
+                            <td className="border border-slate-200 p-2 text-center font-black text-emerald-900 tabular-nums text-base">
+                              {formatNumberWithParens(Number(compareLastMonth || 0) - Number(cashBreakdown.outletExpenses || 0))}
+                            </td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {/* Net Profit — Hero Card */}
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                      <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-green-50 to-white border-b-2 border-green-500">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">5</div>
+                          <div>
+                            <div className="font-bold text-slate-800 text-sm leading-tight">صافي الربح</div>
+                            <div className="text-[10px] text-slate-500 font-medium">النتيجة النهائية</div>
+                          </div>
+                        </div>
+                      </div>
+                      {/* Hero net profit display */}
+                      <div className="flex-1 flex flex-col items-center justify-center p-5 bg-gradient-to-br from-slate-50/50 to-white">
+                        {/* Expense vs Profit chips */}
+                        <div className="flex items-center gap-3 mb-3">
+                          <div className="bg-red-50 px-3 py-1.5 rounded-lg border border-red-200 text-center">
+                            <div className="text-[9px] font-bold text-red-500 mb-0.5">مصروفات</div>
+                            <div className="text-sm font-black text-red-700 tabular-nums" dir="ltr">{Number(totals.totalExpenses || 0).toLocaleString()}</div>
+                          </div>
+                          <div className="w-5 h-5 rounded-full bg-slate-300 flex items-center justify-center">
+                            <span className="text-white font-black text-[10px]">−</span>
+                          </div>
+                          <div className="bg-green-50 px-3 py-1.5 rounded-lg border border-green-200 text-center">
+                            <div className="text-[9px] font-bold text-green-500 mb-0.5">أرباح</div>
+                            <div className="text-sm font-black text-green-700 tabular-nums" dir="ltr">{Number(totals.totalProfits || 0).toLocaleString()}</div>
+                          </div>
+                        </div>
+                        {/* Big result */}
+                        <div className={`relative px-6 py-3 rounded-2xl border-2 shadow-md text-center ${Number(totals.netProfit || 0) >= 0
+                          ? 'bg-gradient-to-br from-emerald-100 via-green-100 to-teal-50 border-emerald-400'
+                          : 'bg-gradient-to-br from-red-100 via-red-50 to-orange-50 border-red-400'}`}>
+                          <div className="absolute top-0 left-0 w-10 h-10 bg-gradient-to-br from-white/40 to-transparent rounded-br-[20px]" />
+                          <div className="relative">
+                            <div className={`text-[10px] font-black mb-0.5 ${Number(totals.netProfit || 0) >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                              {Number(totals.netProfit || 0) >= 0 ? '📈 ربح صافي' : '📉 خسارة'}
+                            </div>
+                            <div className={`text-2xl font-black tabular-nums tracking-tight ${Number(totals.netProfit || 0) >= 0 ? 'text-emerald-900' : 'text-red-700'}`} dir="ltr">
+                              {formatNumberWithParens(Number(totals.netProfit || 0))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ══════════════ SECTION 6: SHAREHOLDERS IMPACT ══════════════ */}
+                <div className="mt-5 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                  <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-violet-50 to-white border-b-2 border-violet-400">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">6</div>
+                      <div>
+                        <div className="font-bold text-slate-800 text-sm leading-tight">تأثير التقرير على أرصدة المساهمين</div>
+                        <div className="text-[10px] text-slate-500 font-medium">تفاصيل حسابات كل مساهم</div>
+                      </div>
+                    </div>
+                    <div className="text-[10px] font-bold text-violet-600 bg-violet-50 px-2 py-0.5 rounded-full border border-violet-200">
+                      {shareholders.filter(s => {
+                        const hist = (shareHistory && shareHistory[s.id]) || [];
+                        const reportTxn = hist.find(txn =>
+                          txn.reportId === currentReportId ||
+                          txn.reportId?.startsWith(`${currentReportId}_profit_`) ||
+                          txn.reportId?.startsWith(`${currentReportId}_edit_`) ||
+                          txn.reportId?.startsWith(`${currentReportId}_reversal_`) ||
+                          txn.reportId?.startsWith(`${currentReportId}_skip_`)
+                        );
+                        return reportTxn && reportTxn.source === 'auto';
+                      }).length} مساهم
+                    </div>
+                  </div>
+
+                  <div className="p-3 space-y-3">
+                    {shareholders.map((s, sIdx) => {
+                      const hist = (shareHistory && shareHistory[s.id]) || [];
+                      const reportTxn = hist.find(txn =>
+                        txn.reportId === currentReportId ||
+                        txn.reportId?.startsWith(`${currentReportId}_profit_`) ||
+                        txn.reportId?.startsWith(`${currentReportId}_edit_`) ||
+                        txn.reportId?.startsWith(`${currentReportId}_reversal_`) ||
+                        txn.reportId?.startsWith(`${currentReportId}_skip_`)
+                      ) as ShareTxn | undefined;
+                      if (!reportTxn || reportTxn.source !== 'auto') return null;
+
+                      const currentDifference = compareLastMonth || 0;
+                      const currentFinalBalance = correctFinalBalance || 0;
+                      const profitPerPound = calculateProfitPerPound(currentDifference, currentFinalBalance);
+                      const shareholderPercentage = s.percentage;
+                      const calculatedDelta = calculateShareholderDelta(Number(reportTxn.fromAmount), profitPerPound, shareholderPercentage);
+                      const calculatedNewBalance = Number(reportTxn.fromAmount) + calculatedDelta;
+                      const growthPct = Number(reportTxn.fromAmount) > 0 ? ((calculatedDelta / Number(reportTxn.fromAmount)) * 100).toFixed(2) : '0';
+
+                      const avatarColors = [
+                        'from-violet-500 to-purple-600',
+                        'from-blue-500 to-indigo-600',
+                        'from-emerald-500 to-teal-600',
+                        'from-amber-500 to-orange-600',
+                        'from-rose-500 to-pink-600',
+                      ];
+                      const avatarColor = avatarColors[sIdx % avatarColors.length];
+
+                      return (
+                        <div key={`sh-imp-${s.id}`} className="rounded-xl border border-slate-200 overflow-hidden shadow-sm bg-white">
+                          {/* ── Shareholder Header ── */}
+                          <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
+                            <div className="flex items-center gap-2.5">
+                              <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${avatarColor} text-white flex items-center justify-center text-sm font-black shadow-sm`}>
+                                {s.name.charAt(0)}
+                              </div>
+                              <div>
+                                <div className="font-bold text-slate-800 text-sm leading-tight">{s.name}</div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[9px] font-bold text-violet-600 bg-violet-50 px-1.5 py-0.5 rounded border border-violet-200">نسبة {s.percentage}%</span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Growth indicator */}
+                            <div className={`flex items-center gap-1 text-xs font-black px-2.5 py-1 rounded-full ${calculatedDelta >= 0
+                              ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                              : 'text-red-600 bg-red-50 border border-red-200'}`}>
+                              {calculatedDelta >= 0 ? (
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                              ) : (
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                              )}
+                              <span className="tabular-nums">{calculatedDelta >= 0 ? '+' : ''}{growthPct}%</span>
+                            </div>
+                          </div>
+
+                          {/* ── Before → Delta → After Strip ── */}
+                          <div className="px-4 py-3 bg-gradient-to-r from-slate-50/80 to-white border-b border-slate-100">
+                            <div className="flex items-center justify-center gap-3">
+                              {/* Before */}
+                              <div className="bg-white px-4 py-2.5 rounded-xl border border-slate-200 text-center min-w-[110px] shadow-sm">
+                                <div className="text-[10px] font-bold text-slate-400 mb-1 uppercase tracking-wider">قبل</div>
+                                <div className="text-base font-black text-slate-800 tabular-nums" dir="ltr">{Number(reportTxn.fromAmount).toLocaleString()}</div>
+                              </div>
+                              {/* Delta Arrow */}
+                              <div className="flex flex-col items-center gap-1">
+                                <div className={`px-3 py-1 rounded-full text-xs font-black tabular-nums shadow-sm ${calculatedDelta >= 0
+                                  ? 'bg-gradient-to-r from-emerald-100 to-green-100 text-emerald-700 border border-emerald-300'
+                                  : 'bg-gradient-to-r from-red-100 to-orange-100 text-red-600 border border-red-300'}`}>
+                                  {calculatedDelta >= 0 ? '+' : ''}{Number(calculatedDelta).toLocaleString()}
+                                </div>
+                                <svg className="w-5 h-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                              </div>
+                              {/* After */}
+                              <div className={`px-4 py-2.5 rounded-xl border-2 text-center min-w-[110px] shadow-md ${calculatedDelta >= 0
+                                ? 'bg-gradient-to-br from-emerald-50 via-green-50 to-teal-50 border-emerald-400'
+                                : 'bg-gradient-to-br from-red-50 via-red-50 to-orange-50 border-red-400'}`}>
+                                <div className={`text-[10px] font-bold mb-1 uppercase tracking-wider ${calculatedDelta >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>بعد</div>
+                                <div className={`text-base font-black tabular-nums ${calculatedDelta >= 0 ? 'text-emerald-900' : 'text-red-700'}`} dir="ltr">{Number(calculatedNewBalance).toLocaleString()}</div>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* ── Detailed Calculation Steps ── */}
+                          <div className="px-4 py-3 space-y-3">
+                            {/* Step 1: Profit per pound */}
+                            <div className="bg-gradient-to-br from-blue-50/80 to-indigo-50/40 p-3.5 rounded-xl border border-blue-200">
+                              <div className="flex items-center gap-2 mb-2.5">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-[9px] font-black flex-shrink-0 shadow-sm">1</div>
+                                <span className="text-xs font-bold text-blue-800">حساب ربح الجنيه</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                                <div className="bg-white px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm text-center min-w-[70px]">
+                                  <div className="text-[9px] text-blue-500 font-semibold mb-0.5">الفرق</div>
+                                  <div className="text-sm font-black text-slate-900 tabular-nums">{Number(currentDifference).toLocaleString()}</div>
+                                </div>
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-blue-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                                  <span className="text-white font-black text-xs">÷</span>
+                                </div>
+                                <div className="bg-white px-3 py-1.5 rounded-lg border border-blue-200 shadow-sm text-center min-w-[70px]">
+                                  <div className="text-[9px] text-blue-500 font-semibold mb-0.5">مخازن نهائي</div>
+                                  <div className="text-sm font-black text-slate-900 tabular-nums">{Number(currentFinalBalance).toLocaleString()}</div>
+                                </div>
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-400 to-purple-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                                  <span className="text-white font-black text-xs">×</span>
+                                </div>
+                                <div className="bg-white px-3 py-1.5 rounded-lg border border-purple-200 shadow-sm text-center min-w-[60px]">
+                                  <div className="text-[9px] text-purple-500 font-semibold mb-0.5">نسبة {s.name}</div>
+                                  <div className="text-sm font-black text-slate-900 tabular-nums">{s.percentage}%</div>
+                                </div>
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-sm flex-shrink-0">
+                                  <span className="text-white font-black text-xs">=</span>
+                                </div>
+                                <div className="bg-gradient-to-br from-blue-200 to-indigo-200 px-3 py-1.5 rounded-lg border-2 border-blue-400 shadow-md text-center min-w-[80px]">
+                                  <div className="text-[9px] text-blue-700 font-bold mb-0.5">ربح الجنيه</div>
+                                  <div className="text-sm font-black text-blue-900 tabular-nums">{(profitPerPound * shareholderPercentage / 100).toFixed(6)}</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Step 2: Shareholder delta */}
+                            <div className="bg-gradient-to-br from-emerald-50/80 to-green-50/40 p-3.5 rounded-xl border border-emerald-200">
+                              <div className="flex items-center gap-2 mb-2.5">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center text-[9px] font-black flex-shrink-0 shadow-sm">2</div>
+                                <span className="text-xs font-bold text-emerald-800">حساب نصيب {s.name}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                                <div className="bg-white px-3 py-1.5 rounded-lg border border-emerald-200 shadow-sm text-center min-w-[70px]">
+                                  <div className="text-[9px] text-emerald-500 font-semibold mb-0.5">رصيد {s.name}</div>
+                                  <div className="text-sm font-black text-slate-900 tabular-nums">{Number(reportTxn.fromAmount).toLocaleString()}</div>
+                                </div>
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                                  <span className="text-white font-black text-xs">×</span>
+                                </div>
+                                <div className="bg-white px-3 py-1.5 rounded-lg border border-emerald-200 shadow-sm text-center min-w-[70px]">
+                                  <div className="text-[9px] text-emerald-500 font-semibold mb-0.5">ربح الجنيه</div>
+                                  <div className="text-sm font-black text-slate-900 tabular-nums">{(profitPerPound * shareholderPercentage / 100).toFixed(6)}</div>
+                                </div>
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-sm flex-shrink-0">
+                                  <span className="text-white font-black text-xs">=</span>
+                                </div>
+                                <div className="bg-gradient-to-br from-emerald-200 to-green-200 px-3 py-1.5 rounded-lg border-2 border-emerald-400 shadow-md text-center min-w-[80px]">
+                                  <div className="text-[9px] text-emerald-700 font-bold mb-0.5">التغيير</div>
+                                  <div className="text-sm font-black text-emerald-900 tabular-nums">{(() => {
+                                    const formatted = calculatedDelta.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+                                    return (calculatedDelta >= 0 ? '+' : '') + formatted;
+                                  })()}</div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Step 3: Final balance */}
+                            <div className="bg-gradient-to-br from-green-50/80 to-emerald-50/60 p-3.5 rounded-xl border border-green-200">
+                              <div className="flex items-center gap-2 mb-2.5">
+                                <div className="w-5 h-5 rounded-full bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center text-[9px] font-black flex-shrink-0 shadow-sm">3</div>
+                                <span className="text-xs font-bold text-green-800">الرصيد النهائي</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                                {(() => {
+                                  const newBalance = calculatedNewBalance;
+                                  return (
+                                    <>
+                                      <div className="bg-white px-3 py-1.5 rounded-lg border border-emerald-200 shadow-sm text-center min-w-[70px]">
+                                        <div className="text-[9px] text-emerald-500 font-semibold mb-0.5">الرصيد السابق</div>
+                                        <div className="text-sm font-black text-slate-900 tabular-nums">{Number(reportTxn.fromAmount).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</div>
+                                      </div>
+                                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                                        <span className="text-white font-black text-xs">{calculatedDelta >= 0 ? '+' : '-'}</span>
+                                      </div>
+                                      <div className="bg-white px-3 py-1.5 rounded-lg border border-emerald-200 shadow-sm text-center min-w-[70px]">
+                                        <div className="text-[9px] text-emerald-500 font-semibold mb-0.5">التغيير</div>
+                                        <div className="text-sm font-black text-slate-900 tabular-nums">{Math.abs(calculatedDelta).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</div>
+                                      </div>
+                                      <div className="w-6 h-6 rounded-full bg-gradient-to-br from-slate-600 to-slate-700 flex items-center justify-center shadow-sm flex-shrink-0">
+                                        <span className="text-white font-black text-xs">=</span>
+                                      </div>
+                                      <div className="bg-gradient-to-br from-green-300 to-emerald-300 px-3.5 py-2 rounded-xl border-2 border-green-500 shadow-md text-center min-w-[90px]">
+                                        <div className="text-[9px] text-green-800 font-bold mb-0.5">الرصيد الجديد</div>
+                                        <div className="text-base font-black text-green-900 tabular-nums">{newBalance.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 })}</div>
+                                      </div>
+                                    </>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               </div>
@@ -3998,150 +4299,161 @@ export default function AdminProfit() {
                             </div>
                           )}
                           {source === 'report' && (
-                            <div className="space-y-4">
+                            <div className="space-y-3">
                               {/* Base Value + Shareholders Total Cards */}
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 {/* Editable Base Value Card */}
-                                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl p-5 border border-blue-200">
-                                  <div className="flex flex-col gap-2 mb-4">
-                                    <div className="flex items-center justify-between">
-                                      <div className="text-base font-semibold text-blue-700 flex items-center gap-2">
-                                        <Wallet className="w-5 h-5" />
-                                        القيمة الأساسية
-                                      </div>
+                                <div className="group relative bg-gradient-to-br from-teal-50/80 via-emerald-50/60 to-cyan-50/40 rounded-2xl p-4 border border-teal-200/80 hover:border-teal-300 hover:shadow-xl transition-all duration-300 flex flex-col">
+                                  {/* Decorative corner accent */}
+                                  <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-teal-200/30 to-transparent rounded-tl-2xl rounded-br-[48px] pointer-events-none" />
+
+                                  <div className="relative flex items-center gap-2.5 mb-2.5">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-teal-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-300">
+                                      <Wallet className="w-4 h-4 text-white" />
                                     </div>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => setShowBaseEditor(!showBaseEditor)}
-                                      className="text-blue-600 border-blue-300 hover:bg-blue-100 text-xs h-8 w-full"
-                                    >
-                                      <Edit3 className="w-4 h-4 ml-1" />
-                                      {showBaseEditor ? 'إغلاق' : 'تعديل القيمة'}
-                                    </Button>
+                                    <div>
+                                      <div className="text-sm font-bold text-teal-800 tracking-tight">القيمة الأساسية</div>
+                                      <div className="text-[10px] text-teal-600/80 font-medium">رأس المال الثابت</div>
+                                    </div>
                                   </div>
-                                  {showBaseEditor ? (
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        type="text"
-                                        value={formatNumber(baseClosingValue)}
-                                        onChange={(e) => {
-                                          const v = e.target.value;
-                                          if (!validateNumericInput(v)) return;
-                                          const n = sanitizeNumericValue(v);
-                                          setBaseClosingValue(n);
-                                          // Recalculate lastMonthClosing
-                                          const shareholdersTotal = shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0);
-                                          setLastMonthClosing(n + shareholdersTotal);
-                                        }}
-                                        className="text-center font-bold text-lg bg-white"
-                                      />
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setShowBaseEditor(false)}
-                                        className="border-blue-300"
-                                      >
-                                        <Check className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <div className="text-2xl font-bold text-blue-800">
-                                      {Number(baseClosingValue || 0).toLocaleString()}
-                                    </div>
-                                  )}
-                                  <div className="text-xs text-blue-600 mt-2">رأس المال الثابت</div>
+
+                                  <div className="flex-1 flex flex-col justify-center">
+                                    {showBaseEditor ? (
+                                      <div className="flex items-center gap-2.5">
+                                        <Input
+                                          type="text"
+                                          value={formatNumber(baseClosingValue)}
+                                          onChange={(e) => {
+                                            const v = e.target.value;
+                                            if (!validateNumericInput(v)) return;
+                                            const n = sanitizeNumericValue(v);
+                                            setBaseClosingValue(n);
+                                            const shareholdersTotal = shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0);
+                                            setLastMonthClosing(n + shareholdersTotal);
+                                          }}
+                                          className="text-center font-bold text-lg bg-white/90 border-teal-300 focus:border-teal-500 focus:ring-teal-200 rounded-xl h-10"
+                                        />
+                                        <Button
+                                          size="sm"
+                                          onClick={() => setShowBaseEditor(false)}
+                                          className="bg-teal-600 hover:bg-teal-700 text-white rounded-xl h-10 w-10 p-0 shadow-md"
+                                        >
+                                          <Check className="w-5 h-5" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="text-2xl font-black text-teal-900 tabular-nums tracking-tight" dir="ltr">
+                                        {Number(baseClosingValue || 0).toLocaleString()}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setShowBaseEditor(!showBaseEditor)}
+                                    className="mt-2.5 text-teal-700 border-teal-300/80 hover:bg-teal-100/60 hover:border-teal-400 text-xs h-8 w-full rounded-xl font-semibold transition-all duration-200"
+                                  >
+                                    <Edit3 className="w-3.5 h-3.5 ml-1.5" />
+                                    {showBaseEditor ? 'إغلاق' : 'تعديل القيمة'}
+                                  </Button>
                                 </div>
 
                                 {/* Shareholders Total Card */}
-                                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 rounded-xl p-5 border border-purple-200">
-                                  <div className="flex flex-col gap-2 mb-4">
-                                    <div className="flex items-center justify-between">
-                                      <div className="text-base font-semibold text-purple-700 flex items-center gap-2">
-                                        <Users className="w-5 h-5" />
-                                        أرصدة الشركاء
-                                      </div>
+                                <div className="group relative bg-gradient-to-br from-violet-50/80 via-purple-50/60 to-fuchsia-50/40 rounded-2xl p-4 border border-violet-200/80 hover:border-violet-300 hover:shadow-xl transition-all duration-300 flex flex-col">
+                                  {/* Decorative corner accent */}
+                                  <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-violet-200/30 to-transparent rounded-tl-2xl rounded-br-[48px] pointer-events-none" />
+
+                                  <div className="relative flex items-center gap-2.5 mb-2.5">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-lg flex items-center justify-center shadow-sm group-hover:scale-105 transition-transform duration-300">
+                                      <Users className="w-4 h-4 text-white" />
                                     </div>
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setShowShareholdersBreakdown(!showShareholdersBreakdown)}
-                                        className="text-purple-600 border-purple-300 hover:bg-purple-100 text-xs h-8 flex-1"
-                                      >
-                                        <Eye className="w-4 h-4 ml-1" />
-                                        {showShareholdersBreakdown ? 'إخفاء التفاصيل' : 'عرض التفاصيل'}
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setShowShareholdersEditor(!showShareholdersEditor)}
-                                        className="text-purple-600 border-purple-300 hover:bg-purple-100 text-xs h-8 flex-1"
-                                      >
-                                        <Edit3 className="w-4 h-4 ml-1" />
-                                        تعديل القيمة
-                                      </Button>
+                                    <div>
+                                      <div className="text-sm font-bold text-violet-800 tracking-tight">أرصدة الشركاء</div>
+                                      <div className="text-[10px] text-violet-600/80 font-medium">إجمالي {shareholders.length} شريك</div>
                                     </div>
                                   </div>
-                                  {showShareholdersEditor ? (
-                                    <div className="flex items-center gap-2">
-                                      <Input
-                                        type="text"
-                                        value={formatNumber(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0))}
-                                        onChange={(e) => {
-                                          const v = e.target.value;
-                                          if (!validateNumericInput(v)) return;
-                                          const n = sanitizeNumericValue(v);
-                                          setShareholdersOverride(n);
-                                          // Recalculate lastMonthClosing
-                                          setLastMonthClosing(baseClosingValue + n);
-                                        }}
-                                        className="text-center font-bold text-lg bg-white"
-                                      />
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setShowShareholdersEditor(false)}
-                                        className="border-purple-300"
-                                      >
-                                        <Check className="w-4 h-4" />
-                                      </Button>
-                                    </div>
-                                  ) : (
-                                    <div className="text-2xl font-bold text-purple-800">
-                                      {Number(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}
-                                      {shareholdersOverride !== null && (
-                                        <span className="text-xs text-orange-600 mr-2">(معدّل)</span>
-                                      )}
-                                    </div>
-                                  )}
-                                  <div className="text-xs text-purple-600 mt-2">
-                                    إجمالي {shareholders.length} شريك
+
+                                  <div className="flex-1 flex flex-col justify-center">
+                                    {showShareholdersEditor ? (
+                                      <div className="flex items-center gap-2.5">
+                                        <Input
+                                          type="text"
+                                          value={formatNumber(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0))}
+                                          onChange={(e) => {
+                                            const v = e.target.value;
+                                            if (!validateNumericInput(v)) return;
+                                            const n = sanitizeNumericValue(v);
+                                            setShareholdersOverride(n);
+                                            setLastMonthClosing(baseClosingValue + n);
+                                          }}
+                                          className="text-center font-bold text-lg bg-white/90 border-violet-300 focus:border-violet-500 focus:ring-violet-200 rounded-xl h-10"
+                                        />
+                                        <Button
+                                          size="sm"
+                                          onClick={() => setShowShareholdersEditor(false)}
+                                          className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl h-10 w-10 p-0 shadow-md"
+                                        >
+                                          <Check className="w-5 h-5" />
+                                        </Button>
+                                      </div>
+                                    ) : (
+                                      <div className="text-2xl font-black text-violet-900 tabular-nums tracking-tight" dir="ltr">
+                                        {Number(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}
+                                        {shareholdersOverride !== null && (
+                                          <span className="text-xs font-semibold text-amber-600 mr-2 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">(معدّل)</span>
+                                        )}
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <div className="flex items-center gap-2 mt-2.5">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setShowShareholdersBreakdown(!showShareholdersBreakdown)}
+                                      className="text-violet-700 border-violet-300/80 hover:bg-violet-100/60 hover:border-violet-400 text-xs h-8 flex-1 rounded-xl font-semibold transition-all duration-200"
+                                    >
+                                      <Eye className="w-3.5 h-3.5 ml-1.5" />
+                                      {showShareholdersBreakdown ? 'إخفاء' : 'التفاصيل'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => setShowShareholdersEditor(!showShareholdersEditor)}
+                                      className="text-violet-700 border-violet-300/80 hover:bg-violet-100/60 hover:border-violet-400 text-xs h-8 flex-1 rounded-xl font-semibold transition-all duration-200"
+                                    >
+                                      <Edit3 className="w-3.5 h-3.5 ml-1.5" />
+                                      تعديل القيمة
+                                    </Button>
                                   </div>
 
                                   {/* Shareholders Breakdown */}
                                   {showShareholdersBreakdown && (
-                                    <div className="mt-3 pt-3 border-t border-purple-200 space-y-2">
-                                      <div className="text-xs font-semibold text-purple-700 mb-2">تفاصيل أرصدة الشركاء:</div>
+                                    <div className="mt-4 pt-4 border-t border-violet-200/80 space-y-2 animate-fade-in">
+                                      <div className="text-xs font-bold text-violet-700 mb-2.5 flex items-center gap-1.5">
+                                        <div className="w-1.5 h-1.5 rounded-full bg-violet-500" />
+                                        تفاصيل أرصدة الشركاء
+                                      </div>
                                       {shareholders.length === 0 ? (
-                                        <div className="text-xs text-slate-500">لا يوجد شركاء</div>
+                                        <div className="text-xs text-slate-500 text-center py-3">لا يوجد شركاء</div>
                                       ) : (
                                         shareholders.map((sh, idx) => (
-                                          <div key={sh.id} className="flex items-center justify-between bg-white/60 rounded-lg px-3 py-2 text-sm">
-                                            <span className="font-medium text-purple-800">{sh.name}</span>
-                                            <span className="font-bold text-purple-700">{Number(sh.amount || 0).toLocaleString()}</span>
+                                          <div key={sh.id} className="flex items-center justify-between bg-white/70 backdrop-blur-sm rounded-xl px-3.5 py-2.5 text-sm border border-violet-100/60 hover:border-violet-200 transition-colors">
+                                            <span className="font-semibold text-violet-800">{sh.name}</span>
+                                            <span className="font-bold text-violet-700 tabular-nums" dir="ltr">{Number(sh.amount || 0).toLocaleString()}</span>
                                           </div>
                                         ))
                                       )}
-                                      <div className="flex items-center justify-between bg-purple-100 rounded-lg px-3 py-2 text-sm font-bold border border-purple-300">
-                                        <span className="text-purple-800">المجموع المحسوب</span>
-                                        <span className="text-purple-900">{Number(shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}</span>
+                                      <div className="flex items-center justify-between bg-violet-100/80 rounded-xl px-3.5 py-2.5 text-sm font-bold border border-violet-300/60">
+                                        <span className="text-violet-800">المجموع المحسوب</span>
+                                        <span className="text-violet-900 tabular-nums" dir="ltr">{Number(shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}</span>
                                       </div>
                                       {shareholdersOverride !== null && (
-                                        <div className="flex items-center justify-between bg-orange-100 rounded-lg px-3 py-2 text-sm border border-orange-300">
-                                          <span className="text-orange-800 font-medium">القيمة المعدّلة يدوياً</span>
+                                        <div className="flex items-center justify-between bg-amber-50/80 rounded-xl px-3.5 py-2.5 text-sm border border-amber-200/60">
+                                          <span className="text-amber-800 font-semibold">القيمة المعدّلة يدوياً</span>
                                           <div className="flex items-center gap-2">
-                                            <span className="font-bold text-orange-900">{Number(shareholdersOverride).toLocaleString()}</span>
+                                            <span className="font-bold text-amber-900 tabular-nums" dir="ltr">{Number(shareholdersOverride).toLocaleString()}</span>
                                             <Button
                                               size="sm"
                                               variant="ghost"
@@ -4150,7 +4462,7 @@ export default function AdminProfit() {
                                                 const calculated = shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0);
                                                 setLastMonthClosing(baseClosingValue + calculated);
                                               }}
-                                              className="h-6 px-2 text-xs text-orange-700 hover:bg-orange-200"
+                                              className="h-7 px-2.5 text-xs text-amber-700 hover:bg-amber-200/60 rounded-lg font-semibold"
                                             >
                                               إلغاء التعديل
                                             </Button>
@@ -4162,28 +4474,52 @@ export default function AdminProfit() {
                                 </div>
                               </div>
 
-                              {/* Final Calculation Card */}
-                              <div className="bg-gradient-to-r from-emerald-50 to-green-50 rounded-xl p-4 border border-emerald-300">
-                                <div className="text-sm font-semibold text-emerald-700 mb-3 flex items-center gap-2">
-                                  <Calculator className="w-4 h-4" />
-                                  الإجمالي (الشهر الماضي)
+                              {/* Final Calculation Summary */}
+                              <div className="relative bg-gradient-to-br from-emerald-50/80 via-green-50/60 to-teal-50/40 rounded-2xl p-3.5 border border-emerald-200/80 overflow-hidden">
+                                {/* Decorative background pattern */}
+                                <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '24px 24px' }} />
+
+                                <div className="relative flex items-center gap-2 mb-2.5">
+                                  <div className="w-7 h-7 bg-gradient-to-br from-emerald-500 to-green-600 rounded-md flex items-center justify-center shadow-sm">
+                                    <Calculator className="w-3.5 h-3.5 text-white" />
+                                  </div>
+                                  <span className="text-xs font-bold text-emerald-800">الإجمالي (الشهر الماضي)</span>
                                 </div>
-                                <div className="flex items-center gap-3 flex-wrap">
-                                  <div className="bg-white/80 px-3 py-2 rounded-lg border border-emerald-200">
-                                    <span className="text-sm text-slate-600">القيمة الأساسية</span>
-                                    <div className="font-bold text-blue-700">{Number(baseClosingValue || 0).toLocaleString()}</div>
+
+                                <div className="relative flex flex-col sm:flex-row items-center justify-center gap-2.5 sm:gap-3">
+                                  {/* Base Value Chip */}
+                                  <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl border border-teal-200/80 shadow-sm text-center min-w-[120px] hover:shadow-md transition-shadow duration-200">
+                                    <div className="text-[10px] font-semibold text-teal-600 mb-0.5">القيمة الأساسية</div>
+                                    <div className="text-base font-black text-teal-800 tabular-nums" dir="ltr">{Number(baseClosingValue || 0).toLocaleString()}</div>
                                   </div>
-                                  <span className="text-xl font-bold text-emerald-600">+</span>
-                                  <div className="bg-white/80 px-3 py-2 rounded-lg border border-emerald-200">
-                                    <span className="text-sm text-slate-600">أرصدة الشركاء {shareholdersOverride !== null && <span className="text-orange-600">(معدّل)</span>}</span>
-                                    <div className="font-bold text-purple-700">{Number(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}</div>
+
+                                  {/* Plus Operator */}
+                                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-green-500 flex items-center justify-center shadow-sm flex-shrink-0">
+                                    <span className="text-white font-black text-sm leading-none">+</span>
                                   </div>
-                                  <span className="text-xl font-bold text-emerald-600">=</span>
-                                  <div className="bg-emerald-100 px-4 py-2 rounded-lg border-2 border-emerald-400">
-                                    <span className="text-sm text-emerald-700">الإجمالي</span>
-                                    <div className="text-xl font-bold text-emerald-800">{Number(baseClosingValue + (shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0))).toLocaleString()}</div>
+
+                                  {/* Shareholders Chip */}
+                                  <div className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-xl border border-violet-200/80 shadow-sm text-center min-w-[120px] hover:shadow-md transition-shadow duration-200">
+                                    <div className="text-[10px] font-semibold text-violet-600 mb-0.5">
+                                      أرصدة الشركاء
+                                      {shareholdersOverride !== null && <span className="text-amber-500 mr-1">(معدّل)</span>}
+                                    </div>
+                                    <div className="text-base font-black text-violet-800 tabular-nums" dir="ltr">{Number(shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0)).toLocaleString()}</div>
+                                  </div>
+
+                                  {/* Equals Operator */}
+                                  <div className="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-500 to-green-600 flex items-center justify-center shadow-sm flex-shrink-0">
+                                    <span className="text-white font-black text-sm leading-none">=</span>
+                                  </div>
+
+                                  {/* Total Chip (Accented) */}
+                                  <div className="bg-gradient-to-br from-emerald-100 to-green-100 px-5 py-2 rounded-xl border-2 border-emerald-400/80 shadow-lg text-center min-w-[140px] relative">
+                                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-emerald-400 rounded-full animate-pulse" />
+                                    <div className="text-[10px] font-bold text-emerald-700 mb-0.5">الإجمالي</div>
+                                    <div className="text-lg font-black text-emerald-900 tabular-nums" dir="ltr">{Number(baseClosingValue + (shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0))).toLocaleString()}</div>
                                   </div>
                                 </div>
+
                                 {/* Auto-update lastMonthClosing when values change */}
                                 {(() => {
                                   const shareholdersTotal = shareholdersOverride ?? shareholders.reduce((sum, sh) => sum + Number(sh.amount || 0), 0);

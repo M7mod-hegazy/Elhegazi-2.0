@@ -297,7 +297,7 @@ const SpecialOffersContent = () => {
                       reviews: 0,
                       discount: product.discount,
                       onSale: product.onSale,
-                    }}
+                    } as unknown as Product}
                     className="h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                   />
                   {/* Discount Badge */}

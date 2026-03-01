@@ -23,6 +23,7 @@ type ApiProduct = {
   sku?: string;
   categorySlug?: string;
   price: number;
+  originalPrice?: number;
   description?: string;
   image?: string;
   images?: string[];
@@ -32,6 +33,8 @@ type ApiProduct = {
   salesCount?: number;
   createdAt: string;
   updatedAt: string;
+  rating?: number;
+  reviews?: number;
 };
 
 const BestSellersContent = () => {
@@ -253,8 +256,8 @@ const BestSellersContent = () => {
       <div className="container mx-auto px-4 py-8">
         {filteredProducts.length > 0 ? (
           <div className={`grid gap-6 ${viewMode === 'grid'
-              ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
-              : 'grid-cols-1'
+            ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
+            : 'grid-cols-1'
             }`}>
             {filteredProducts.map((product, index) => (
               <ScrollAnimation key={product._id} delay={index * 0.1}>
@@ -271,7 +274,7 @@ const BestSellersContent = () => {
                       featured: product.featured,
                       rating: product.rating || 0,
                       reviews: product.reviews || 0,
-                    }}
+                    } as unknown as Product}
                     className="h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                   />
                   {/* Best Seller Badge */}
@@ -285,8 +288,8 @@ const BestSellersContent = () => {
                   {index < 3 && (
                     <div className="absolute top-3 left-3 z-10">
                       <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white font-bold text-sm ${index === 0 ? 'bg-yellow-500' :
-                          index === 1 ? 'bg-gray-400' :
-                            'bg-orange-600'
+                        index === 1 ? 'bg-gray-400' :
+                          'bg-orange-600'
                         }`}>
                         {index + 1}
                       </div>

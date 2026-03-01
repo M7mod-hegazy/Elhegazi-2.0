@@ -2176,128 +2176,113 @@ const AdminQRCodes = () => {
                           <>
                             <div className="relative w-full flex justify-center mb-6">
                               <div
-                                className="overflow-hidden bg-white shadow-2xl transition-transform duration-300 ring-1 ring-slate-200"
                                 style={{
-                                  width: getPageWidthPx(),
-                                  height: getPageHeightPx(),
-                                  backgroundColor: settings.backgroundColor,
-                                  transformOrigin: 'top center',
-                                  transform: 'scale(0.55)',
-                                  marginBottom: '-45%' /* adjust for scaling */
+                                  width: `${parseInt(getPageWidthPx()) * 0.55}px`,
+                                  height: `${parseInt(getPageHeightPx()) * 0.55}px`,
+                                  position: 'relative'
                                 }}
                               >
-                                {/* Full Page Grid Layout (mirrors print) */}
                                 <div
-                                  className="p-0"
+                                  className="overflow-hidden bg-white shadow-2xl transition-transform duration-300 ring-1 ring-slate-200 absolute top-0 left-0"
                                   style={{
-                                    display: 'grid',
-                                    gridTemplateColumns: `repeat(${settings.itemsPerRow}, 1fr)`,
-                                    gap: `${settings.margin}px`,
-                                    alignContent: 'start',
-                                    justifyItems: 'stretch',
-                                    boxSizing: 'border-box',
-                                    height: '100%'
+                                    width: getPageWidthPx(),
+                                    height: getPageHeightPx(),
+                                    backgroundColor: settings.backgroundColor,
+                                    transformOrigin: 'top left',
+                                    transform: 'scale(0.55)',
                                   }}
                                 >
-                                  {/* Render actual page products only (no placeholders) */}
-                                  {selectedProducts
-                                    .slice((currentPage - 1) * getItemsPerPage(), Math.min(currentPage * getItemsPerPage(), selectedProducts.length))
-                                    .map((product) => (
-                                      <div
-                                        key={product.id}
-                                        className="text-center w-full flex flex-col items-center"
-                                        style={{
-                                          padding: '4px',
-                                          border: settings.addBorder ? `3px solid ${settings.borderColor}` : 'none',
-                                          boxShadow: settings.addBorder ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
-                                          borderRadius: '2px',
-                                          backgroundColor: '#ffffff',
-                                          maxWidth: '100%',
-                                          minWidth: 0
-                                        }}
-                                      >
-                                        <div className="flex justify-center mb-1 w-full">
-                                          <QRCodeImage
-                                            product={product}
-                                            className="block w-full h-auto"
-                                            fitContainer
-                                            imgStyle={{ imageRendering: 'crisp-edges', mixBlendMode: 'multiply' }}
-                                          />
+                                  {/* Full Page Grid Layout (mirrors print) */}
+                                  <div
+                                    className="p-0"
+                                    style={{
+                                      display: 'grid',
+                                      gridTemplateColumns: `repeat(${settings.itemsPerRow}, 1fr)`,
+                                      gap: `${settings.margin}px`,
+                                      alignContent: 'start',
+                                      justifyItems: 'stretch',
+                                      boxSizing: 'border-box',
+                                      height: '100%'
+                                    }}
+                                  >
+                                    {/* Render actual page products only (no placeholders) */}
+                                    {selectedProducts
+                                      .slice((currentPage - 1) * getItemsPerPage(), Math.min(currentPage * getItemsPerPage(), selectedProducts.length))
+                                      .map((product) => (
+                                        <div
+                                          key={product.id}
+                                          className="text-center w-full flex flex-col items-center"
+                                          style={{
+                                            padding: '4px',
+                                            border: settings.addBorder ? `3px solid ${settings.borderColor}` : 'none',
+                                            boxShadow: settings.addBorder ? '0 1px 3px rgba(0,0,0,0.2)' : 'none',
+                                            borderRadius: '2px',
+                                            backgroundColor: '#ffffff',
+                                            maxWidth: '100%',
+                                            minWidth: 0
+                                          }}
+                                        >
+                                          <div className="flex justify-center mb-1 w-full">
+                                            <QRCodeImage
+                                              product={product}
+                                              className="block w-full h-auto"
+                                              fitContainer
+                                              imgStyle={{ imageRendering: 'crisp-edges', mixBlendMode: 'multiply' }}
+                                            />
+                                          </div>
+                                          {settings.showProductCode && (
+                                            <div
+                                              className="font-bold truncate w-full px-1"
+                                              style={{
+                                                color: settings.foregroundColor,
+                                                fontSize: `${getTextSizes().productCode}pt`,
+                                                lineHeight: '1.2',
+                                                marginBottom: '1px'
+                                              }}
+                                              title={product.sku}
+                                            >
+                                              {product.sku}
+                                            </div>
+                                          )}
+                                          {settings.showProductName && (
+                                            <div
+                                              className="text-slate-600 leading-tight w-full px-1"
+                                              style={{
+                                                fontSize: `${getTextSizes().productName}pt`,
+                                                lineHeight: '1.2',
+                                                overflow: 'hidden',
+                                                textOverflow: 'ellipsis',
+                                                display: '-webkit-box',
+                                                WebkitLineClamp: 2,
+                                                WebkitBoxOrient: 'vertical',
+                                                marginBottom: '1px'
+                                              }}
+                                              title={product.nameAr}
+                                            >
+                                              {product.nameAr}
+                                            </div>
+                                          )}
+                                          {settings.showPrice && (
+                                            <div
+                                              className="text-blue-600 font-bold w-full"
+                                              style={{
+                                                fontSize: `${getTextSizes().productPrice}pt`,
+                                                lineHeight: '1.2',
+                                                marginTop: '2px'
+                                              }}
+                                            >
+                                              {product.price.toLocaleString()} ج.م
+                                            </div>
+                                          )}
                                         </div>
-                                        {settings.showProductCode && (
-                                          <div
-                                            className="font-bold truncate w-full px-1"
-                                            style={{
-                                              color: settings.foregroundColor,
-                                              fontSize: `${getTextSizes().productCode}pt`,
-                                              lineHeight: '1.2',
-                                              marginBottom: '1px'
-                                            }}
-                                            title={product.sku}
-                                          >
-                                            {product.sku}
-                                          </div>
-                                        )}
-                                        {settings.showProductName && (
-                                          <div
-                                            className="text-slate-600 leading-tight w-full px-1"
-                                            style={{
-                                              fontSize: `${getTextSizes().productName}pt`,
-                                              lineHeight: '1.2',
-                                              overflow: 'hidden',
-                                              textOverflow: 'ellipsis',
-                                              display: '-webkit-box',
-                                              WebkitLineClamp: 2,
-                                              WebkitBoxOrient: 'vertical',
-                                              marginBottom: '1px'
-                                            }}
-                                            title={product.nameAr}
-                                          >
-                                            {product.nameAr}
-                                          </div>
-                                        )}
-                                        {settings.showPrice && (
-                                          <div
-                                            className="text-blue-600 font-bold w-full"
-                                            style={{
-                                              fontSize: `${getTextSizes().productPrice}pt`,
-                                              lineHeight: '1.2',
-                                              marginTop: '2px'
-                                            }}
-                                          >
-                                            {product.price.toLocaleString()} ج.م
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
+                                      ))}
+                                  </div>
                                 </div>
                               </div>
                             </div>
 
                             {/* A4 Preview Controls */}
                             <div className="flex justify-center gap-3 w-full sticky bottom-0 z-10 p-2 pt-8">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => {
-                                  const element = document.querySelector('.overflow-hidden.bg-white.shadow-2xl') as HTMLElement;
-                                  if (element) {
-                                    // Make sure it toggles margins too so it doesn't leave huge whitespace when zoomed out
-                                    if (element.style.transform === 'scale(1)') {
-                                      element.style.transform = 'scale(0.55)';
-                                      element.style.marginBottom = '-45%';
-                                    } else {
-                                      element.style.transform = 'scale(1)';
-                                      element.style.marginBottom = '20px';
-                                    }
-                                  }
-                                }}
-                                className="border-slate-300 bg-white font-bold hover:bg-slate-100 hover:border-slate-400 text-slate-800 transition-all duration-200 shadow font-medium h-10 px-5"
-                              >
-                                <Maximize2 className="w-4 h-4 mr-2" />
-                                تكبير / تصغير
-                              </Button>
-
                               <Button
                                 onClick={handlePrintAll}
                                 disabled={selectedProducts.length === 0}

@@ -291,7 +291,7 @@ const LatestProductsContent = () => {
                       featured: product.featured,
                       rating: product.rating || 0,
                       reviews: product.reviews || 0,
-                    }}
+                    } as unknown as Product}
                     className="h-full hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                   />
                   {/* New Badge */}
