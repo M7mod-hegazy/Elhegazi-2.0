@@ -3214,9 +3214,9 @@ export default function AdminProfit() {
                   </div>
                 </div>
 
-                <div className="space-y-5">
+                <div className="space-y-8">
                   {/* ══════════════ SECTION 1: EXPENSES TABLE ══════════════ */}
-                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden table-container shadow-sm">
+                  <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden table-container shadow-md ring-1 ring-slate-100">
                     <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-emerald-50 to-white border-b-2 border-emerald-400">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">1</div>
@@ -3384,7 +3384,7 @@ export default function AdminProfit() {
                   </div>
 
                   {/* ══════════════ SECTION 2: CASH DETAILS ══════════════ */}
-                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden table-container page-break-before shadow-sm">
+                  <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden table-container page-break-before shadow-md ring-1 ring-slate-100">
                     <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-teal-50 to-white border-b-2 border-teal-400">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">2</div>
@@ -3466,7 +3466,7 @@ export default function AdminProfit() {
                   </div>
 
                   {/* ══════════════ SECTION 3: FINAL BALANCE ══════════════ */}
-                  <div className="bg-white rounded-xl border border-slate-200 overflow-hidden table-container page-break-before shadow-sm">
+                  <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden table-container page-break-before shadow-md ring-1 ring-slate-100">
                     <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-amber-50 to-white border-b-2 border-amber-400">
                       <div className="flex items-center gap-2.5">
                         <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">3</div>
@@ -3546,9 +3546,9 @@ export default function AdminProfit() {
                   </div>
 
                   {/* ══════════════ SECTION 4 & 5: COMPARISON + NET PROFIT ══════════════ */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 break-inside-avoid">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5 break-inside-avoid">
                     {/* Previous Month Comparison */}
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden break-inside-avoid shadow-sm">
+                    <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden break-inside-avoid shadow-md ring-1 ring-slate-100">
                       <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-blue-50 to-white border-b-2 border-blue-400">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">4</div>
@@ -3631,7 +3631,7 @@ export default function AdminProfit() {
                     </div>
 
                     {/* Net Profit — Hero Card */}
-                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm flex flex-col">
+                    <div className="bg-white rounded-xl border-2 border-slate-200 overflow-hidden shadow-md ring-1 ring-slate-100 flex flex-col">
                       <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-green-50 to-white border-b-2 border-green-500">
                         <div className="flex items-center gap-2.5">
                           <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-green-500 to-emerald-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">5</div>
@@ -3677,7 +3677,7 @@ export default function AdminProfit() {
                 </div>
 
                 {/* ══════════════ SECTION 6: SHAREHOLDERS IMPACT ══════════════ */}
-                <div className="mt-5 bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+                <div className="mt-8 bg-white rounded-xl border-2 border-slate-200 overflow-hidden shadow-md ring-1 ring-slate-100">
                   <div className="flex items-center justify-between px-4 py-2.5 bg-gradient-to-r from-violet-50 to-white border-b-2 border-violet-400">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center text-[10px] font-black shadow-sm">6</div>
@@ -3731,7 +3731,7 @@ export default function AdminProfit() {
                       const avatarColor = avatarColors[sIdx % avatarColors.length];
 
                       return (
-                        <div key={`sh-imp-${s.id}`} className="rounded-xl border border-slate-200 overflow-hidden shadow-sm bg-white">
+                        <div key={`sh-imp-${s.id}`} className="rounded-xl border-2 border-slate-200 overflow-hidden shadow-md ring-1 ring-slate-100 bg-white">
                           {/* ── Shareholder Header ── */}
                           <div className="flex items-center justify-between px-3 py-2 bg-gradient-to-r from-slate-50 to-white border-b border-slate-100">
                             <div className="flex items-center gap-2.5">
