@@ -1234,69 +1234,146 @@ export default function AdminProfit() {
 
   // When preview is open and an exportAction is set, capture and process
   useEffect(() => {
-    (async () => {
-      if (!showPreview || !exportAction) return;
-      try {
-        const node = exportRef.current;
-        if (!node) return;
-        const html2canvas = (await import('html2canvas')).default;
-        const canvas = await html2canvas(node, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
-        const imgData = canvas.toDataURL('image/png');
-        if (exportAction === 'pdf') {
-          const { jsPDF } = await import('jspdf');
-          const pdf = new jsPDF('l', 'pt', 'a4');
-          const pageW = pdf.internal.pageSize.getWidth();
-          const pageH = pdf.internal.pageSize.getHeight();
-          const ratio = Math.min(pageW / canvas.width, pageH / canvas.height);
-          const imgW = canvas.width * ratio; const imgH = canvas.height * ratio;
-          const x = (pageW - imgW) / 2; const y = (pageH - imgH) / 2;
-          pdf.addImage(imgData, 'PNG', x, y, imgW, imgH);
-          pdf.save(`profit-${Date.now()}.pdf`);
-        } else if (exportAction === 'image') {
-          const a = document.createElement('a');
-          a.href = imgData;
-          a.download = `profit-${Date.now()}.png`;
-          a.click();
-        } else if (exportAction === 'print') {
-          // Print via hidden iframe (no new tab)
-          const iframe = document.createElement('iframe');
-          iframe.style.position = 'fixed';
-          iframe.style.right = '0';
-          iframe.style.bottom = '0';
-          iframe.style.width = '0';
-          iframe.style.height = '0';
-          iframe.style.border = '0';
-          document.body.appendChild(iframe);
-          const doc = iframe.contentDocument || iframe.contentWindow?.document;
-          if (doc) {
-            doc.open();
-            doc.write(`<html dir="rtl"><head><title>${fixText('طباعة التقرير')}</title></head><body style="margin:0"><img id="printImg" src="${imgData}" style="width:100%"/></body></html>`);
-            doc.close();
-            const imgEl = (doc.getElementById('printImg') as HTMLImageElement | null);
-            const doPrint = () => {
-              try {
-                iframe.contentWindow?.focus();
-                iframe.contentWindow?.print();
-              } catch (err) { console.error(err); }
-              // Cleanup iframe after a short delay
-              setTimeout(() => { try { document.body.removeChild(iframe); } catch (err) { console.log('Iframe cleanup error:', err); } }, 1000);
-            };
-            if (imgEl) {
-              if (imgEl.complete) doPrint();
-              else imgEl.addEventListener('load', doPrint, { once: true });
-            } else {
-              setTimeout(doPrint, 500);
-            }
-          } else {
-            toast({ title: fixText('فشل الطباعة'), description: fixText('تعذر إنشاء معاينة الطباعة'), variant: 'destructive' });
+    if (!showPreview || !exportAction) return;
+    // Wait a frame + small delay to ensure the DOM is fully painted
+    const rafId = requestAnimationFrame(() => {
+      const timer = setTimeout(async () => {
+        try {
+          const node = exportRef.current;
+          if (!node) {
+            toast({ title: fixText('فشل التصدير'), description: fixText('لم يتم العثور على محتوى التقرير'), variant: 'destructive' });
+            setExportAction(null);
+            return;
           }
+
+          // Temporarily expand the node to its full content width for capture
+          const parentEl = node.parentElement;
+          const origWidth = node.style.width;
+          const origMaxWidth = node.style.maxWidth;
+          const origMargin = node.style.margin;
+          const origParentOverflow = parentEl?.style.overflow || '';
+          const origParentMaxWidth = parentEl?.style.maxWidth || '';
+
+          // Expand: let content breathe to its natural width
+          const fullWidth = Math.max(node.scrollWidth, node.offsetWidth, 794);
+          node.style.width = `${fullWidth}px`;
+          node.style.maxWidth = 'none';
+          node.style.margin = '0';
+          if (parentEl) {
+            parentEl.style.overflow = 'visible';
+            parentEl.style.maxWidth = 'none';
+          }
+
+          // Force a reflow so the browser recalculates layout
+          void node.offsetHeight;
+
+          // Capture the node as a PNG data URL using html-to-image (primary) with html2canvas fallback
+          let imgData: string;
+          try {
+            const { toPng } = await import('html-to-image');
+            imgData = await toPng(node, {
+              quality: 1,
+              pixelRatio: 2,
+              backgroundColor: '#ffffff',
+              cacheBust: true,
+              skipAutoScale: true,
+              width: fullWidth,
+              height: node.scrollHeight,
+              style: {
+                transform: 'none',
+                transformOrigin: 'top left',
+              },
+            });
+          } catch (primaryErr) {
+            console.warn('html-to-image failed, falling back to html2canvas:', primaryErr);
+            const html2canvas = (await import('html2canvas')).default;
+            const canvas = await html2canvas(node, {
+              scale: 2,
+              useCORS: true,
+              backgroundColor: '#ffffff',
+              width: fullWidth,
+              height: node.scrollHeight,
+              scrollX: 0,
+              scrollY: 0,
+            });
+            imgData = canvas.toDataURL('image/png');
+          } finally {
+            // Restore original styles
+            node.style.width = origWidth;
+            node.style.maxWidth = origMaxWidth;
+            node.style.margin = origMargin;
+            if (parentEl) {
+              parentEl.style.overflow = origParentOverflow;
+              parentEl.style.maxWidth = origParentMaxWidth;
+            }
+          }
+
+          if (exportAction === 'pdf') {
+            const { jsPDF } = await import('jspdf');
+            const pdf = new jsPDF('l', 'pt', 'a4');
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+            // Create a temporary image to get dimensions
+            const img = new Image();
+            img.src = imgData;
+            await new Promise<void>((res) => { img.onload = () => res(); if (img.complete) res(); });
+            const ratio = Math.min(pageW / img.width, pageH / img.height);
+            const imgW = img.width * ratio; const imgH = img.height * ratio;
+            const x = (pageW - imgW) / 2; const y = (pageH - imgH) / 2;
+            pdf.addImage(imgData, 'PNG', x, y, imgW, imgH);
+            pdf.save(`profit-${Date.now()}.pdf`);
+          } else if (exportAction === 'image') {
+            const a = document.createElement('a');
+            a.href = imgData;
+            a.download = `profit-${Date.now()}.png`;
+            a.style.display = 'none';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => { try { document.body.removeChild(a); } catch {} }, 100);
+          } else if (exportAction === 'print') {
+            // Print via hidden iframe (no new tab)
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            document.body.appendChild(iframe);
+            const doc = iframe.contentDocument || iframe.contentWindow?.document;
+            if (doc) {
+              doc.open();
+              doc.write(`<html dir="rtl"><head><title>${fixText('طباعة التقرير')}</title></head><body style="margin:0"><img id="printImg" src="${imgData}" style="width:100%"/></body></html>`);
+              doc.close();
+              const imgEl = (doc.getElementById('printImg') as HTMLImageElement | null);
+              const doPrint = () => {
+                try {
+                  iframe.contentWindow?.focus();
+                  iframe.contentWindow?.print();
+                } catch (err) { console.error(err); }
+                // Cleanup iframe after a short delay
+                setTimeout(() => { try { document.body.removeChild(iframe); } catch (err) { console.log('Iframe cleanup error:', err); } }, 1000);
+              };
+              if (imgEl) {
+                if (imgEl.complete) doPrint();
+                else imgEl.addEventListener('load', doPrint, { once: true });
+              } else {
+                setTimeout(doPrint, 500);
+              }
+            } else {
+              toast({ title: fixText('فشل الطباعة'), description: fixText('تعذر إنشاء معاينة الطباعة'), variant: 'destructive' });
+            }
+          }
+        } catch (e) {
+          console.error('Export failed:', e);
+          toast({ title: fixText('فشل التصدير'), description: fixText('تعذر إنشاء الملف، حاول مجددا'), variant: 'destructive' });
+        } finally {
+          setExportAction(null);
         }
-      } catch (e) {
-        toast({ title: fixText('فشل التصدير'), description: fixText('تعذر إنشاء الملف، حاول مجددا'), variant: 'destructive' });
-      } finally {
-        setExportAction(null);
-      }
-    })();
+      }, 300); // 300ms delay to ensure paint
+      return () => clearTimeout(timer);
+    });
+    return () => cancelAnimationFrame(rafId);
   }, [showPreview, exportAction, toast]);
 
 

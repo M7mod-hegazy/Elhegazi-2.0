@@ -39,7 +39,15 @@ app.use('*', async (c, next) => {
 
 // ===== HEALTH CHECK =====
 app.get('/health', (c) => {
-  return c.json({ ok: true, status: 'healthy', timestamp: new Date().toISOString() });
+  return c.json({
+    ok: true,
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    mongoState: mongoose.connection.readyState,
+    hasMongoUri: !!process.env.MONGODB_URI,
+    mongoUriPrefix: process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 30) + '...' : 'NOT SET',
+    dbName: process.env.MONGODB_DB || 'appdb',
+  });
 });
 
 // ===== PROFIT SETTINGS =====

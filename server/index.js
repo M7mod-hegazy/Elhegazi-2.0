@@ -93,15 +93,19 @@ app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 
 // Attach minimal auth user from headers (to be replaced by real auth)
-app.use(async (req, _res, next) => {
-  const userId = req.header('x-user-id');
-  if (userId) req.user = { _id: userId };
-  next();
-});
-
-// Dev fallback identity: when no headers, resolve by ADMIN_DEV_USER_EMAIL
+// Also validates user exists in DB; falls back to dev admin if ID is stale/invalid
 app.use(async (req, _res, next) => {
   try {
+    const userId = req.header('x-user-id');
+    if (userId) {
+      // Verify user actually exists in the database
+      const existingUser = await User.findById(userId).select('_id email').lean();
+      if (existingUser) {
+        req.user = { _id: String(existingUser._id), email: existingUser.email };
+      }
+      // If user ID is stale/invalid, fall through to dev fallback below
+    }
+    // Dev fallback identity: when no valid user resolved, resolve by ADMIN_DEV_USER_EMAIL
     if (!req.user && process.env.ADMIN_DEV_USER_EMAIL) {
       const u = await User.findOne({ email: process.env.ADMIN_DEV_USER_EMAIL }).select('_id').lean();
       if (u) req.user = { _id: String(u._id), email: process.env.ADMIN_DEV_USER_EMAIL };

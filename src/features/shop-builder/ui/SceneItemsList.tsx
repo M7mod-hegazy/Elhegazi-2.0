@@ -46,8 +46,8 @@ export const SceneItemsList: React.FC = () => {
   const totalColumns = layout.walls.reduce((sum, wall) => sum + (wall.columns?.length || 0), 0);
 
   return (
-    <div className="w-full max-w-3xl mx-auto bg-white rounded-2xl border-2 shadow-xl overflow-hidden" style={{ borderColor: primaryColor }}>
-      <div className="px-4 py-3 text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
+    <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl border border-zinc-200/60 shadow-xl overflow-hidden flex flex-col max-h-full">
+      <div className="px-4 py-3 border-b border-zinc-200/60 bg-zinc-50/50 text-zinc-800">
         <h3 className="text-lg font-bold flex items-center gap-2">
           <Layers className="h-5 w-5" />
           عناصر المشهد
@@ -55,15 +55,15 @@ export const SceneItemsList: React.FC = () => {
       </div>
 
       {/* Two Column Layout */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 divide-y sm:divide-y-0 sm:divide-x" style={{ borderColor: primaryColor }}>
+      <div className="flex flex-col divide-y divide-zinc-100 overflow-y-auto min-h-0 min-h-[300px]">
         {/* Products Section - RIGHT COLUMN */}
-        <div className="order-2" style={{ background: `linear-gradient(135deg, ${secondaryColor}08 0%, white 100%)` }}>
+        <div className="order-1 flex flex-col flex-shrink-0 relative">
           <button
             onClick={() => toggleSection('products')}
-            className="w-full px-3 py-3 flex items-center justify-between transition-colors hover:opacity-80"
+            className="w-full px-3 py-3 flex items-center justify-between transition-colors hover:bg-zinc-50 sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-zinc-100/50"
           >
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md text-white" style={{ background: `linear-gradient(135deg, ${secondaryColor} 0%, ${primaryColor} 100%)` }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm text-zinc-600 bg-zinc-100 border border-zinc-200/50">
                 <Box className="h-4 w-4" />
               </div>
               <div className="text-right">
@@ -101,14 +101,14 @@ export const SceneItemsList: React.FC = () => {
                   return (
                     <div
                       key={product.id}
-                      className={`group flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${selectedProductId === product.id
-                        ? 'border-purple-500 bg-purple-50 shadow-md'
-                        : 'border-slate-200 hover:border-purple-300 hover:bg-purple-50/50'
+                      className={`group flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${selectedProductId === product.id
+                        ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
+                        : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
                         }`}
                       onClick={() => selectProduct(product.id)}
                     >
                       {/* Product Image/Icon */}
-                      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-purple-100 to-purple-200 flex items-center justify-center overflow-hidden border-2 border-purple-300 flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center overflow-hidden border border-zinc-200/60 flex-shrink-0">
                         {isImageUrl ? (
                           <img
                             src={thumbnailUrl}
@@ -152,13 +152,13 @@ export const SceneItemsList: React.FC = () => {
         </div>
 
         {/* Walls Section - LEFT COLUMN */}
-        <div className="order-1" style={{ background: `linear-gradient(135deg, ${primaryColor}08 0%, white 100%)` }}>
+        <div className="order-2 flex flex-col flex-shrink-0 relative">
           <button
             onClick={() => toggleSection('walls')}
-            className="w-full px-3 py-3 flex items-center justify-between transition-colors hover:opacity-80"
+            className="w-full px-3 py-3 flex items-center justify-between transition-colors hover:bg-zinc-50 border-t border-zinc-100/50 sticky top-0 bg-white/90 backdrop-blur-md z-10"
           >
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-md text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm text-zinc-600 bg-zinc-100 border border-zinc-200/50">
                 <Grid3x3 className="h-4 w-4" />
               </div>
               <div className="text-right">
@@ -193,9 +193,9 @@ export const SceneItemsList: React.FC = () => {
                     <div key={wall.id} className="space-y-1">
                       {/* Wall Item */}
                       <div
-                        className={`group flex items-center gap-2 p-2 rounded-lg border-2 transition-all cursor-pointer ${selectedWallId === wall.id
-                          ? 'border-blue-500 bg-blue-50 shadow-md'
-                          : 'border-slate-200 hover:border-blue-300 hover:bg-blue-50/50'
+                        className={`group flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${selectedWallId === wall.id
+                          ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
+                          : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
                           }`}
                         onClick={() => selectWall(wall.id)}
                       >
@@ -206,7 +206,7 @@ export const SceneItemsList: React.FC = () => {
                               e.stopPropagation();
                               toggleWall(wall.id);
                             }}
-                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-blue-200 transition-colors flex-shrink-0"
+                            className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-200 transition-colors flex-shrink-0 text-zinc-600"
                           >
                             {isExpanded ? (
                               <ChevronDown className="h-3 w-3 text-blue-600" />
@@ -253,14 +253,14 @@ export const SceneItemsList: React.FC = () => {
                           {wall.columns!.map((column, colIndex) => (
                             <div
                               key={column.id}
-                              className={`group flex items-center gap-1.5 p-1.5 rounded-lg border-2 transition-all cursor-pointer ${selectedColumnId === column.id
-                                ? 'border-amber-500 bg-amber-50 shadow-md'
-                                : 'border-slate-200 hover:border-amber-300 hover:bg-amber-50/50'
+                              className={`group flex items-center gap-1.5 p-1.5 rounded-lg border transition-all cursor-pointer ${selectedColumnId === column.id
+                                ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
+                                : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
                                 }`}
                               onClick={() => selectColumn(column.id)}
                             >
-                              <div className="w-6 h-6 rounded bg-gradient-to-br from-amber-100 to-amber-200 flex items-center justify-center border-2 border-amber-300 flex-shrink-0">
-                                <Box className="h-3 w-3 text-amber-600" />
+                              <div className="w-6 h-6 rounded bg-zinc-100 flex items-center justify-center border border-zinc-200 flex-shrink-0">
+                                <Box className="h-3 w-3 text-zinc-600" />
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="font-semibold text-slate-900 text-[10px]">عمود {colIndex + 1}</p>

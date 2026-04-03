@@ -450,68 +450,54 @@ const ShopBuilderContent = () => {
   }, []);
 
   return (
-    <div className="min-h-screen text-slate-900 relative overflow-y-auto" style={{ background: `linear-gradient(135deg, ${primaryColor}08 0%, ${secondaryColor}08 100%)` }} dir="rtl" data-shop-builder-container>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6 relative">
-        {/* Modern Professional Header */}
-        <header className="pt-4 pb-2 lg:pt-6 lg:pb-4">
-          <div className="rounded-2xl shadow-lg overflow-hidden" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
-            <div className="p-4 lg:p-6 text-white">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 lg:gap-6">
-                {/* Left: Shop Info */}
-                <div className="space-y-4">
-                  <div>
-                    <p className="text-sm font-medium opacity-90">Shop Name</p>
-                    <p className="text-2xl font-bold">{layout.shopName || 'Your Shop'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium opacity-90">Category</p>
-                    <p className="text-lg font-semibold">{layout.field || 'Not Set'}</p>
-                  </div>
-                </div>
-
-                {/* Center: Divider */}
-                <div className="hidden md:flex items-center justify-center">
-                  <div className="w-px h-24" style={{ backgroundColor: 'rgba(255,255,255,0.2)' }}></div>
-                </div>
-
-                {/* Right: Date & Time */}
-                <div className="space-y-4 md:text-right">
-                  <div>
-                    <p className="text-sm font-medium opacity-90">Current Time</p>
-                    <p className="text-2xl font-bold font-mono">{currentTime}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm font-medium opacity-90">Date</p>
-                    <p className="text-lg font-semibold">{currentDate}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
+    <div className="min-h-screen w-full flex flex-col overflow-y-auto text-zinc-800 bg-zinc-50 font-sans selection:bg-slate-200 pb-12" dir="rtl" data-shop-builder-container>
+      {/* Avant-Garde Minimal Top Nav */}
+      <header className="flex-shrink-0 h-14 bg-white/70 backdrop-blur-xl border-b border-zinc-200/50 px-6 flex items-center justify-between z-40 transition-all sticky top-0 mix-blend-luminosity">
+        <div className="flex items-center gap-6">
+          <div className="flex items-baseline gap-2 group cursor-default">
+             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
+             <span className="font-bold text-lg tracking-tight text-zinc-900 group-hover:text-black transition-colors">{layout.shopName || 'مساحة العمل'}</span>
+             <span className="text-xs font-medium text-zinc-400">/ {layout.field || 'بدون فئة'}</span>
           </div>
-        </header>
+        </div>
+        <div className="flex items-center gap-4 text-xs font-mono font-semibold text-zinc-400">
+           <span className="px-2 py-1 bg-zinc-100/50 rounded-md tracking-wider border border-zinc-200/50 shadow-sm">{currentDate}</span>
+           <span className="px-2 py-1 bg-zinc-100/50 rounded-md tracking-wider border border-zinc-200/50 shadow-sm">{currentTime}</span>
+        </div>
+      </header>
 
-        <div>
-          <BuilderToolbar
-            transformMode={transformMode}
-            onTransformModeChange={setTransformMode}
-            onResetCamera={handleResetCamera}
-            onSnapshot={handleSnapshot}
-            onFullscreen={handleFullscreen}
-            onClearSelection={handleClearSelection}
-          />
+      {/* Main App Workspace */}
+      <div 
+        className="flex-1 w-full relative flex flex-col px-4 pt-3 pb-4 gap-3 overflow-hidden" 
+        style={{ 
+          background: `radial-gradient(circle at 50% 50%, rgba(0,0,0,0.03) 1px, transparent 1px)`, 
+          backgroundSize: '24px 24px' 
+        }}
+      >
+        {/* Floating Toolbar positioned top center */}
+        <div className="flex justify-center z-30 pointer-events-none sticky top-0 mb-1">
+           <div className="pointer-events-auto transform shadow-sm hover:shadow-md transition-shadow rounded-2xl bg-white/90 backdrop-blur-lg border border-zinc-100">
+             <BuilderToolbar
+               transformMode={transformMode}
+               onTransformModeChange={setTransformMode}
+               onResetCamera={handleResetCamera}
+               onSnapshot={handleSnapshot}
+               onFullscreen={handleFullscreen}
+               onClearSelection={handleClearSelection}
+             />
+           </div>
         </div>
 
-        <div className="grid gap-4 lg:gap-6 lg:grid-cols-2">
+        {/* Editor Split Views */}
+        <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-[60vh] lg:min-h-[calc(100vh-140px)] w-full max-w-[1920px] mx-auto">
           <div ref={floorplan2DRef} className={cn(
-            "rounded-2xl border-2 bg-white p-4 shadow-xl h-[400px] lg:h-[600px] flex flex-col relative transition-all duration-300",
-            isDrawingMode
-              ? `ring-2 shadow-lg`
-              : "border-slate-300"
+            "flex-1 rounded-2xl bg-white/90 backdrop-blur-lg shadow-sm border overflow-hidden relative flex flex-col group transition-all duration-500",
+            isDrawingMode ? "border-transparent ring-2 ring-primary/40 shadow-xl" : "border-zinc-200/60 hover:border-zinc-300"
           )}
-            style={isDrawingMode ? { borderColor: primaryColor, backgroundColor: `${primaryColor}05`, boxShadow: `0 0 20px ${primaryColor}30` } : {}}>
-            <div className="flex items-center justify-between mb-3">
+            style={isDrawingMode ? { backgroundColor: `${primaryColor}03` } : {}}>
+            <div className="flex items-center justify-between mb-3 p-3 pb-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-bold" style={{ color: primaryColor }}>مُحرِّر المخطط ثنائي الأبعاد</h2>
+                <h2 className="text-zinc-800 tracking-tight font-bold">مُحرِّر المخطط ثنائي الأبعاد</h2>
                 {isDrawingMode && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-full animate-pulse text-white" style={{ backgroundColor: primaryColor, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
                     <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'white' }}></span>
@@ -666,9 +652,9 @@ const ShopBuilderContent = () => {
             })()}
           </div>
 
-          <div ref={three3DRef} className="rounded-2xl border-2 bg-white shadow-xl h-[400px] lg:h-[600px] flex flex-col relative overflow-hidden" style={{ borderColor: secondaryColor }} data-three-container>
-            <div className="flex items-center justify-between p-3 bg-white border-b" style={{ borderColor: secondaryColor }}>
-              <h2 className="text-lg font-bold" style={{ color: secondaryColor }}>معاينة ثلاثية الأبعاد تفاعلية</h2>
+          <div ref={three3DRef} className="flex-1 rounded-2xl bg-white/90 backdrop-blur-lg shadow-sm border border-zinc-200/60 flex flex-col relative overflow-hidden group hover:border-zinc-300 transition-colors duration-500" data-three-container>
+            <div className="flex items-center justify-between p-3 bg-white/80 backdrop-blur-sm border-b border-zinc-100 z-10">
+              <h2 className="text-zinc-800 tracking-tight font-bold">معاينة ثلاثية الأبعاد تفاعلية</h2>
               <div className="flex items-center gap-2">
                 {/* Camera Mode Toggle Buttons */}
                 <div className="flex gap-1 rounded-lg p-1" style={{ backgroundColor: `${primaryColor}10` }}>
@@ -774,11 +760,11 @@ const ShopBuilderContent = () => {
           const similarCount = layout.products.filter(p => p.modelUrl === product.modelUrl).length;
 
           return (
-            <div className="w-full max-w-3xl mx-auto bg-white border-2 border-purple-300 rounded-xl shadow-lg overflow-hidden">
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-white/90 backdrop-blur-xl border border-zinc-200/60 rounded-2xl shadow-2xl overflow-hidden hover:shadow-primary/5 transition-all">
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
                 {/* Product Name Badge */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-purple-500 to-purple-600 rounded-lg shadow-sm">
-                  <span className="text-sm font-bold text-white">📦 {product.name}</span>
+                <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid ${primaryColor}40`, color: primaryColor }}>
+                  <span className="text-sm font-bold">📦 {product.name}</span>
                 </div>
 
                 <div className="hidden sm:block h-8 w-px bg-purple-200" />
@@ -786,7 +772,8 @@ const ShopBuilderContent = () => {
                 {/* Focus Camera Button */}
                 <button
                   onClick={() => handleFocusOnProduct(product.id)}
-                  className="h-9 px-4 flex items-center gap-2 bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg shadow-sm transition-all font-semibold text-xs"
+                  className="h-9 px-4 flex items-center gap-2 text-white rounded-xl shadow-lg transition-all hover:-translate-y-0.5 font-semibold text-xs"
+                  style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, boxShadow: `0 8px 16px -6px ${primaryColor}50` }}
                   title="تركيز الكاميرا على المنتج"
                 >
                   <Focus className="h-4 w-4" />
@@ -1016,19 +1003,20 @@ const ShopBuilderContent = () => {
           if (!wall) return null;
 
           return (
-            <div className="w-full bg-white border-2 border-emerald-300 rounded-xl shadow-lg overflow-visible">
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-white/90 backdrop-blur-xl border border-zinc-200/60 rounded-2xl shadow-2xl overflow-visible hover:shadow-primary/5 transition-all">
               <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
                 {/* Wall Name Badge */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-lg shadow-sm">
-                  <span className="text-sm font-bold text-white">🧱 جدار</span>
+                <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid ${secondaryColor}40`, color: secondaryColor }}>
+                  <span className="text-sm font-bold">🧱 جدار</span>
                 </div>
 
-                <div className="h-8 w-px bg-emerald-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
 
                 {/* Height Control */}
                 <div className="flex flex-col gap-1">
                   <label
-                    className="text-[10px] font-semibold text-emerald-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-emerald-100"
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: secondaryColor }}
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
                       wall.height || 3,
@@ -1051,16 +1039,18 @@ const ShopBuilderContent = () => {
                       const height = Number(e.target.value);
                       upsertWall({ id: wall.id, height });
                     }}
-                    className="w-16 h-9 text-center text-xs border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                    className="w-16 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: secondaryColor }}
                   />
                 </div>
 
-                <div className="h-8 w-px bg-emerald-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
 
                 {/* Thickness Control */}
                 <div className="flex flex-col gap-1">
                   <label
-                    className="text-[10px] font-semibold text-emerald-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-emerald-100"
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: secondaryColor }}
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
                       wall.thickness || 0.2,
@@ -1083,16 +1073,18 @@ const ShopBuilderContent = () => {
                       const thickness = Number(e.target.value);
                       upsertWall({ id: wall.id, thickness });
                     }}
-                    className="w-16 h-9 text-center text-xs border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                    className="w-16 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: secondaryColor }}
                   />
                 </div>
 
-                <div className="h-8 w-px bg-emerald-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
 
                 {/* Length Control */}
                 <div className="flex flex-col gap-1">
                   <label
-                    className="text-[10px] font-semibold text-emerald-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-emerald-100"
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: secondaryColor }}
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
                       Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y),
@@ -1138,16 +1130,18 @@ const ShopBuilderContent = () => {
                         });
                       }
                     }}
-                    className="w-16 h-9 text-center text-xs border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                    className="w-16 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: secondaryColor }}
                   />
                 </div>
 
-                <div className="h-8 w-px bg-emerald-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
 
                 {/* Angle Control */}
                 <div className="flex flex-col gap-1">
                   <label
-                    className="text-[10px] font-semibold text-emerald-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-emerald-100"
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: secondaryColor }}
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
                       Math.round((Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x) * 180 / Math.PI)),
@@ -1183,11 +1177,12 @@ const ShopBuilderContent = () => {
                         }
                       });
                     }}
-                    className="w-14 h-9 text-center text-xs border border-emerald-200 rounded-md focus:outline-none focus:ring-1 focus:ring-emerald-400 bg-white"
+                    className="w-14 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: secondaryColor }}
                   />
                 </div>
 
-                <div className="h-8 w-px bg-emerald-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
 
                 {/* Texture Selector */}
                 <div className="flex flex-col gap-1 relative texture-dropdown">
@@ -1311,19 +1306,20 @@ const ShopBuilderContent = () => {
           if (!wall || !column) return null;
 
           return (
-            <div className="w-full bg-white border-2 border-amber-300 rounded-xl shadow-lg overflow-x-auto">
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-white/90 backdrop-blur-xl border border-zinc-200/60 rounded-2xl shadow-2xl overflow-x-auto hover:shadow-primary/5 transition-all scrollbar-hide">
               <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
                 {/* Column Name Badge */}
-                <div className="flex items-center gap-2 px-3 py-2 bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg shadow-sm">
-                  <span className="text-sm font-bold text-white">🏛️ عمود</span>
+                <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid #d9770640`, color: "#d97706" }}>
+                  <span className="text-sm font-bold">🏛️ عمود</span>
                 </div>
 
-                <div className="h-8 w-px bg-amber-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
 
                 {/* Width Control */}
                 <div className="flex flex-col gap-1">
                   <label
-                    className="text-[10px] font-semibold text-amber-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-amber-100"
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: "#d97706" }}
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
                       column.width || 0.4,
@@ -1352,16 +1348,18 @@ const ShopBuilderContent = () => {
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
                     }}
-                    className="w-16 h-9 text-center text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
+                    className="w-16 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: "#d97706" }}
                   />
                 </div>
 
-                <div className="h-8 w-px bg-amber-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
 
                 {/* Position Control */}
                 <div className="flex flex-col gap-1">
                   <label
-                    className="text-[10px] font-semibold text-amber-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-amber-100"
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: "#d97706" }}
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
                       column.position || 0.5,
@@ -1391,16 +1389,18 @@ const ShopBuilderContent = () => {
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
                     }}
-                    className="w-14 h-9 text-center text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
+                    className="w-14 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: "#d97706" }}
                   />
                 </div>
 
-                <div className="h-8 w-px bg-amber-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
 
                 {/* Depth Control */}
                 <div className="flex flex-col gap-1">
                   <label
-                    className="text-[10px] font-semibold text-amber-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-amber-100"
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: "#d97706" }}
                     onMouseDown={(e) => handleScrubbyStart(
                       e,
                       column.depth || 0.4,
@@ -1429,7 +1429,8 @@ const ShopBuilderContent = () => {
                       );
                       upsertWall({ id: wall.id, columns: updatedColumns });
                     }}
-                    className="w-14 h-9 text-center text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
+                    className="w-14 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: "#d97706" }}
                   />
                 </div>
 
@@ -1542,7 +1543,9 @@ const ShopBuilderContent = () => {
         })()}
 
         {/* Scene Items List - Organized view of all elements */}
-        <SceneItemsList />
+        <div className="w-full max-w-[1920px] mx-auto mt-4 px-2">
+          <SceneItemsList />
+        </div>
       </div>
     </div>
   );
