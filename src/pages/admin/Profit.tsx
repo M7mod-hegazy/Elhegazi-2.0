@@ -209,6 +209,10 @@ export default function AdminProfit() {
   const { isMobile, isTablet } = useDeviceDetection();
   const exportRef = useRef<HTMLDivElement | null>(null);
   const [exportAction, setExportAction] = useState<null | 'print' | 'pdf' | 'image'>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportPhase, setExportPhase] = useState<'idle' | 'freeze' | 'scanning' | 'flash' | 'done'>('idle');
+  const [exportType, setExportType] = useState<'image' | 'excel' | null>(null);
+  const [exportProgress, setExportProgress] = useState(0);
   const [previewLayout, setPreviewLayout] = useState<'summary' | 'a4'>('summary');
   // Global (template) lists used when starting new reports
   const [globalBranches, setGlobalBranches] = useState<Branch[]>(defaultBranches);
@@ -1232,192 +1236,179 @@ export default function AdminProfit() {
     }
   }, [searchParams, reports, navigate, toast, cashBreakdown.customRows]);
 
+  // Helper: animate export phases
+  const runExportAnimation = useCallback(async (type: 'image' | 'excel', doWork: () => Promise<void>) => {
+    setExportType(type);
+    setIsExporting(true);
+    setExportProgress(0);
+    setExportPhase('freeze');
+
+    // Phase 1: Freeze (content goes grayscale + blur)
+    await new Promise(r => setTimeout(r, 400));
+    setExportPhase('scanning');
+    setExportProgress(10);
+
+    // Yield to the browser so the scanning overlay is actually painted
+    // before the heavy synchronous DOM traversal of export libraries freezes the main thread.
+    await new Promise(r => setTimeout(r, 100));
+
+    // Phase 2: Scanning animation (progress ticks while real work happens)
+    const progressInterval = setInterval(() => {
+      setExportProgress(prev => {
+        if (prev >= 85) { clearInterval(progressInterval); return 85; }
+        return prev + Math.random() * 8 + 2;
+      });
+    }, 120);
+
+    try {
+      await doWork();
+      clearInterval(progressInterval);
+      setExportProgress(100);
+
+      // Phase 3: Flash
+      setExportPhase('flash');
+      await new Promise(r => setTimeout(r, 350));
+
+      // Phase 4: Done
+      setExportPhase('done');
+      await new Promise(r => setTimeout(r, 1200));
+    } catch (e) {
+      clearInterval(progressInterval);
+      console.error('Export failed:', e);
+      toast({ title: fixText('فشل التصدير'), description: fixText('تعذر إنشاء الملف، حاول مجددا'), variant: 'destructive' });
+    } finally {
+      setIsExporting(false);
+      setExportPhase('idle');
+      setExportType(null);
+      setExportProgress(0);
+    }
+  }, [toast]);
+
   // When preview is open and an exportAction is set, capture and process
   useEffect(() => {
     if (!showPreview || !exportAction) return;
-    // Wait a frame + small delay to ensure the DOM is fully painted
-    const rafId = requestAnimationFrame(() => {
-      const timer = setTimeout(async () => {
-        try {
-          const node = exportRef.current;
-          if (!node) {
-            toast({ title: fixText('فشل التصدير'), description: fixText('لم يتم العثور على محتوى التقرير'), variant: 'destructive' });
-            setExportAction(null);
-            return;
-          }
-
-          // Temporarily expand the node to its full content width for capture
-          const parentEl = node.parentElement;
-          const origWidth = node.style.width;
-          const origMaxWidth = node.style.maxWidth;
-          const origMargin = node.style.margin;
-          const origParentOverflow = parentEl?.style.overflow || '';
-          const origParentMaxWidth = parentEl?.style.maxWidth || '';
-
-          // Expand: let content breathe to its natural width
-          const fullWidth = Math.max(node.scrollWidth, node.offsetWidth, 794);
-          node.style.width = `${fullWidth}px`;
-          node.style.maxWidth = 'none';
-          node.style.margin = '0';
-          if (parentEl) {
-            parentEl.style.overflow = 'visible';
-            parentEl.style.maxWidth = 'none';
-          }
-
-          // Force a reflow so the browser recalculates layout
-          void node.offsetHeight;
-
-          // Capture the node as a PNG data URL using html-to-image (primary) with html2canvas fallback
-          let imgData: string;
+    if (exportAction === 'print') {
+      // Print has no overlay animation — run immediately
+      const rafId = requestAnimationFrame(() => {
+        const timer = setTimeout(async () => {
           try {
-            const { toPng } = await import('html-to-image');
-            imgData = await toPng(node, {
-              quality: 1,
-              pixelRatio: 2,
-              backgroundColor: '#ffffff',
-              cacheBust: true,
-              skipAutoScale: true,
-              width: fullWidth,
-              height: node.scrollHeight,
-              style: {
-                transform: 'none',
-                transformOrigin: 'top left',
-              },
-            });
-          } catch (primaryErr) {
-            console.warn('html-to-image failed, falling back to html2canvas:', primaryErr);
-            const html2canvas = (await import('html2canvas')).default;
-            const canvas = await html2canvas(node, {
-              scale: 2,
-              useCORS: true,
-              backgroundColor: '#ffffff',
-              width: fullWidth,
-              height: node.scrollHeight,
-              scrollX: 0,
-              scrollY: 0,
-            });
-            imgData = canvas.toDataURL('image/png');
-          } finally {
-            // Restore original styles
-            node.style.width = origWidth;
-            node.style.maxWidth = origMaxWidth;
-            node.style.margin = origMargin;
-            if (parentEl) {
-              parentEl.style.overflow = origParentOverflow;
-              parentEl.style.maxWidth = origParentMaxWidth;
-            }
-          }
+            const node = exportRef.current;
+            if (!node) return;
+            const parentEl = node.parentElement;
+            const origWidth = node.style.width;
+            const origMaxWidth = node.style.maxWidth;
+            const origMargin = node.style.margin;
+            const origParentOverflow = parentEl?.style.overflow || '';
+            const origParentMaxWidth = parentEl?.style.maxWidth || '';
+            const fullWidth = Math.max(node.scrollWidth, node.offsetWidth, 794);
+            node.style.width = `${fullWidth}px`;
+            node.style.maxWidth = 'none';
+            node.style.margin = '0';
+            if (parentEl) { parentEl.style.overflow = 'visible'; parentEl.style.maxWidth = 'none'; }
+            void node.offsetHeight;
 
-          if (exportAction === 'pdf') {
-            const { jsPDF } = await import('jspdf');
-            const pdf = new jsPDF('l', 'pt', 'a4');
-            const pageW = pdf.internal.pageSize.getWidth();
-            const pageH = pdf.internal.pageSize.getHeight();
-            // Create a temporary image to get dimensions
-            const img = new Image();
-            img.src = imgData;
-            await new Promise<void>((res) => { img.onload = () => res(); if (img.complete) res(); });
-            const ratio = Math.min(pageW / img.width, pageH / img.height);
-            const imgW = img.width * ratio; const imgH = img.height * ratio;
-            const x = (pageW - imgW) / 2; const y = (pageH - imgH) / 2;
-            pdf.addImage(imgData, 'PNG', x, y, imgW, imgH);
-            pdf.save(`profit-${Date.now()}.pdf`);
-          } else if (exportAction === 'image') {
-            const a = document.createElement('a');
-            a.href = imgData;
-            a.download = `profit-${Date.now()}.png`;
-            a.style.display = 'none';
-            document.body.appendChild(a);
-            a.click();
-            setTimeout(() => { try { document.body.removeChild(a); } catch {} }, 100);
-          } else if (exportAction === 'print') {
-            // Print via hidden iframe (no new tab)
+            let imgData: string;
+            try {
+              const { toPng } = await import('html-to-image');
+              imgData = await toPng(node, { quality: 1, pixelRatio: 4, backgroundColor: '#ffffff', cacheBust: true, skipAutoScale: true, width: fullWidth, height: node.scrollHeight, style: { transform: 'none', transformOrigin: 'top left' } });
+            } catch {
+              const html2canvas = (await import('html2canvas')).default;
+              const canvas = await html2canvas(node, { scale: 4, useCORS: true, backgroundColor: '#ffffff', width: fullWidth, height: node.scrollHeight, scrollX: 0, scrollY: 0 });
+              imgData = canvas.toDataURL('image/png');
+            } finally {
+              node.style.width = origWidth; node.style.maxWidth = origMaxWidth; node.style.margin = origMargin;
+              if (parentEl) { parentEl.style.overflow = origParentOverflow; parentEl.style.maxWidth = origParentMaxWidth; }
+            }
+
             const iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.right = '0';
-            iframe.style.bottom = '0';
-            iframe.style.width = '0';
-            iframe.style.height = '0';
-            iframe.style.border = '0';
+            iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
             document.body.appendChild(iframe);
             const doc = iframe.contentDocument || iframe.contentWindow?.document;
             if (doc) {
               doc.open();
               doc.write(`<html dir="rtl"><head><title>${fixText('طباعة التقرير')}</title></head><body style="margin:0"><img id="printImg" src="${imgData}" style="width:100%"/></body></html>`);
               doc.close();
-              const imgEl = (doc.getElementById('printImg') as HTMLImageElement | null);
+              const imgEl = doc.getElementById('printImg') as HTMLImageElement | null;
               const doPrint = () => {
-                try {
-                  iframe.contentWindow?.focus();
-                  iframe.contentWindow?.print();
-                } catch (err) { console.error(err); }
-                // Cleanup iframe after a short delay
-                setTimeout(() => { try { document.body.removeChild(iframe); } catch (err) { console.log('Iframe cleanup error:', err); } }, 1000);
+                try { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); } catch (err) { console.error(err); }
+                setTimeout(() => { try { document.body.removeChild(iframe); } catch {} }, 1000);
               };
-              if (imgEl) {
-                if (imgEl.complete) doPrint();
-                else imgEl.addEventListener('load', doPrint, { once: true });
-              } else {
-                setTimeout(doPrint, 500);
-              }
-            } else {
-              toast({ title: fixText('فشل الطباعة'), description: fixText('تعذر إنشاء معاينة الطباعة'), variant: 'destructive' });
+              if (imgEl) { if (imgEl.complete) doPrint(); else imgEl.addEventListener('load', doPrint, { once: true }); }
+              else setTimeout(doPrint, 500);
             }
+          } catch (e) {
+            console.error('Print failed:', e);
+            toast({ title: fixText('فشل الطباعة'), description: fixText('تعذر إنشاء معاينة الطباعة'), variant: 'destructive' });
+          } finally {
+            setExportAction(null);
           }
-        } catch (e) {
-          console.error('Export failed:', e);
-          toast({ title: fixText('فشل التصدير'), description: fixText('تعذر إنشاء الملف، حاول مجددا'), variant: 'destructive' });
-        } finally {
-          setExportAction(null);
-        }
-      }, 300); // 300ms delay to ensure paint
-      return () => clearTimeout(timer);
-    });
-    return () => cancelAnimationFrame(rafId);
-  }, [showPreview, exportAction, toast]);
-
-
-
-  // Export to Excel (XLSX)
-  const exportToExcel = async () => {
-    try {
-      const xlsx = await import('xlsx');
-      // Sheet 1: Table (Branches x Expenses)
-      const header = ['الفرع \\\u0020بند', ...expenses];
-      const rows = branches.map(b => {
-        const vals = branchRows.find(r => r.name === b)?.values as Record<string, number> | undefined;
-        return [b, ...expenses.map(e => Number(vals?.[e] || 0))];
+        }, 300);
+        return () => clearTimeout(timer);
       });
-      const totalsRow = ['الإجمالي', ...expenses.map(e => Number(totals.sumByExpense?.[e] || 0))];
-      const aoa = [header, ...rows, totalsRow];
-      const ws1 = xlsx.utils.aoa_to_sheet(aoa);
-
-      // Sheet 2: Summary
-      const summary = [
-        ['اسم التقرير', reportName || '—'],
-        ['العنوان', title || '—'],
-        ['الفترة', range?.from ? new Date(range.from).toLocaleDateString('ar-EG') : '—', range?.to ? new Date(range.to).toLocaleDateString('ar-EG') : '—'],
-        ['مخازن نهائي (الشهر الحالي)', Number(correctFinalBalance)],
-        ['صافي الربح', Number(totals.netProfit || 0)],
-        ['فرق المخازن', Number(compareLastMonth || 0)],
-        ['صافي الربح - فرق المخازن', Math.abs(Number(totals.netProfit || 0) - Number(compareLastMonth || 0))],
-        [],
-        ['الكاش - المحل', Number(cashBreakdown.outletExpenses || 0)],
-        ['الكاش - بيت', Number(cashBreakdown.home || 0)],
-        ['الكاش - بنك', Number(cashBreakdown.bank || 0)],
-        ['الكاش - درج', Number(totals.sumByExpense?.['كاش الدرج'] || 0)],
-      ];
-      const ws2 = xlsx.utils.aoa_to_sheet(summary);
-
-      const wb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(wb, ws1, 'جدول');
-      xlsx.utils.book_append_sheet(wb, ws2, 'ملخص');
-      xlsx.writeFile(wb, `profit-${Date.now()}.xlsx`);
-      toast({ title: fixText('تم التنزيل'), description: fixText('تم تنزيل ملف Excel'), variant: 'default' });
-    } catch (e: unknown) {
-      toast({ title: fixText('فشل التصدير'), description: (e as Error).message, variant: 'destructive' });
+      return () => cancelAnimationFrame(rafId);
     }
-  };
+
+    // Image / PDF export — with freeze-frame animation
+    const action = exportAction;
+    setExportAction(null); // clear immediately to avoid re-trigger
+    runExportAnimation('image', async () => {
+      const node = exportRef.current;
+      if (!node) throw new Error('No export node');
+
+      const parentEl = node.parentElement;
+      const origWidth = node.style.width;
+      const origMaxWidth = node.style.maxWidth;
+      const origMargin = node.style.margin;
+      const origParentOverflow = parentEl?.style.overflow || '';
+      const origParentMaxWidth = parentEl?.style.maxWidth || '';
+      const fullWidth = Math.max(node.scrollWidth, node.offsetWidth, 794);
+      node.style.width = `${fullWidth}px`;
+      node.style.maxWidth = 'none';
+      node.style.margin = '0';
+      if (parentEl) { parentEl.style.overflow = 'visible'; parentEl.style.maxWidth = 'none'; }
+      void node.offsetHeight;
+
+      let imgData: string;
+      try {
+        const { toPng } = await import('html-to-image');
+        imgData = await toPng(node, { quality: 1, pixelRatio: 4, backgroundColor: '#ffffff', cacheBust: true, skipAutoScale: true, width: fullWidth, height: node.scrollHeight, style: { transform: 'none', transformOrigin: 'top left' } });
+      } catch {
+        const html2canvas = (await import('html2canvas')).default;
+        const canvas = await html2canvas(node, { scale: 4, useCORS: true, backgroundColor: '#ffffff', width: fullWidth, height: node.scrollHeight, scrollX: 0, scrollY: 0 });
+        imgData = canvas.toDataURL('image/png');
+      } finally {
+        node.style.width = origWidth; node.style.maxWidth = origMaxWidth; node.style.margin = origMargin;
+        if (parentEl) { parentEl.style.overflow = origParentOverflow; parentEl.style.maxWidth = origParentMaxWidth; }
+      }
+
+      if (action === 'pdf') {
+        const { jsPDF } = await import('jspdf');
+        const pdf = new jsPDF('l', 'pt', 'a4');
+        const pageW = pdf.internal.pageSize.getWidth();
+        const pageH = pdf.internal.pageSize.getHeight();
+        const img = new Image(); img.src = imgData;
+        await new Promise<void>((res) => { img.onload = () => res(); if (img.complete) res(); });
+        const ratio = Math.min(pageW / img.width, pageH / img.height);
+        const imgW = img.width * ratio; const imgH = img.height * ratio;
+        pdf.addImage(imgData, 'PNG', (pageW - imgW) / 2, (pageH - imgH) / 2, imgW, imgH);
+        const pdfFileName = (reportName || title || 'تقرير الأرباح').replace(/[\\/:*?"<>|]/g, '').trim();
+        pdf.save(`${pdfFileName}.pdf`);
+      } else {
+        const a = document.createElement('a');
+        a.href = imgData;
+        const imgFileName = (reportName || title || 'تقرير الأرباح').replace(/[\\/:*?"<>|]/g, '').trim();
+        a.download = `${imgFileName}.png`;
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        a.click();
+        setTimeout(() => { try { document.body.removeChild(a); } catch {} }, 100);
+      }
+    });
+  }, [showPreview, exportAction, toast, runExportAnimation, reportName, title]);
+
+
+
+
 
   // Prefill from aggregate endpoint when date range changes
   const lastFetchedRangeRef = useRef<string>('');
@@ -1502,6 +1493,61 @@ export default function AdminProfit() {
   const perPoundProfitComputed = useMemo(() => {
     return calculateProfitPerPound(Number(compareLastMonth || 0), correctFinalBalance);
   }, [correctFinalBalance, compareLastMonth]);
+
+  // Export to Excel (XLSX) — with animation overlay
+  const exportToExcel = useCallback(async () => {
+    if (isExporting) return;
+    runExportAnimation('excel', async () => {
+      const xlsx = await import('xlsx');
+      // Sheet 1: Table (Branches x Expenses)
+      const header = ['الفرع \\\u0020بند', ...expenses];
+      const rows = branches.map(b => {
+        const vals = branchRows.find(r => r.name === b)?.values as Record<string, number> | undefined;
+        return [b, ...expenses.map(e => Number(vals?.[e] || 0))];
+      });
+      const totalsRow = ['الإجمالي', ...expenses.map(e => Number(totals.sumByExpense?.[e] || 0))];
+      const aoa = [header, ...rows, totalsRow];
+      const ws1 = xlsx.utils.aoa_to_sheet(aoa);
+      // Set column widths
+      ws1['!cols'] = [{ wch: 20 }, ...expenses.map(() => ({ wch: 15 }))];
+
+      // Sheet 2: Summary
+      const summary: (string | number)[][] = [
+        ['اسم التقرير', reportName || '—'],
+        ['العنوان', title || '—'],
+        ['الفترة', range?.from ? new Date(range.from).toLocaleDateString('ar-EG') : '—', range?.to ? new Date(range.to).toLocaleDateString('ar-EG') : '—'],
+        [],
+        ['مخازن نهائي (الشهر الحالي)', Number(correctFinalBalance)],
+        ['صافي الربح', Number(totals.netProfit || 0)],
+        ['إجمالي الأرباح', Number(totals.totalProfits || 0)],
+        ['إجمالي المصروفات', Number(totals.totalExpenses || 0)],
+        ['فرق المخازن', Number(compareLastMonth || 0)],
+        ['صافي الربح - فرق المخازن', Math.abs(Number(totals.netProfit || 0) - Number(compareLastMonth || 0))],
+        [],
+        ['— تفاصيل الكاش —', ''],
+        ['المصروفات من حساب المحل', Number(cashBreakdown.outletExpenses || 0)],
+        ['بيت', Number(cashBreakdown.home || 0)],
+        ['بنك', Number(cashBreakdown.bank || 0)],
+        ['درج', Number(totals.sumByExpense?.['كاش الدرج'] || 0)],
+      ];
+      if (Number(cashBreakdown.vodafone || 0) > 0) {
+        summary.push(['فودافون', Number(cashBreakdown.vodafone || 0)]);
+      }
+      (cashBreakdown.customRows || []).filter(row => Number(row.amount || 0) > 0).forEach(row => {
+        summary.push([row.name || 'مخصص', Number(row.amount || 0)]);
+      });
+      summary.push(['إجمالي الكاش', Number(cashManual || 0)]);
+
+      const ws2 = xlsx.utils.aoa_to_sheet(summary);
+      ws2['!cols'] = [{ wch: 30 }, { wch: 18 }, { wch: 18 }];
+
+      const wb = xlsx.utils.book_new();
+      xlsx.utils.book_append_sheet(wb, ws1, 'جدول');
+      xlsx.utils.book_append_sheet(wb, ws2, 'ملخص');
+      const xlsxFileName = (reportName || title || 'تقرير الأرباح').replace(/[\\/:*?"<>|]/g, '').trim();
+      xlsx.writeFile(wb, `${xlsxFileName}.xlsx`);
+    });
+  }, [isExporting, runExportAnimation, expenses, branches, branchRows, totals, reportName, title, range, correctFinalBalance, compareLastMonth, cashBreakdown, cashManual]);
 
   // Pagination calculations
   const totalPages = Math.ceil(reports.length / itemsPerPage);
@@ -3115,24 +3161,22 @@ export default function AdminProfit() {
                 <div className="flex flex-wrap items-center gap-2">
                   <Button
                     size="sm"
+                    disabled={isExporting}
                     onClick={() => setExportAction('print')}
-                    className="bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary shadow-md"
+                    className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white shadow-md hover:shadow-emerald-200/50 hover:shadow-lg transition-all duration-200"
                   >
                     <Printer className="w-4 h-4 mr-1" />طباعة
                   </Button>
                   <Button
                     size="sm"
+                    disabled={isExporting}
                     onClick={async () => {
                       if (currentReportId) {
-                        // Open comprehensive edit modal instead of wizard
                         const localReport = reports.find(report => report._id === currentReportId);
                         if (localReport) {
-
-
                           setQuickEditReport(localReport);
                           setShowQuickEditModal(true);
                         } else {
-
                           const resp = await apiGet<ProfitReportDoc>(`/api/profit-reports/${currentReportId}`);
                           if (resp.ok) {
                             setQuickEditReport((resp as { ok: true; item: ProfitReportDoc }).item);
@@ -3141,30 +3185,115 @@ export default function AdminProfit() {
                         }
                       }
                     }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white shadow-md"
+                    variant="secondary"
+                    className="bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200 shadow-sm"
                   >
-                    <Edit className="w-4 h-4 mr-1" />تعديل شامل
+                    <Edit className="w-4 h-4 ml-2" />تعديل شامل
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    disabled={isExporting}
                     onClick={exportToExcel}
-                    className="border-slate-300 hover:border-slate-400 hover:bg-slate-50"
+                    variant="outline"
+                    className="bg-white border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 shadow-sm"
                   >
-                    <Download className="w-4 h-4 mr-1" />تنزيل Excel
+                    <Download className="w-4 h-4 ml-2" />تنزيل Excel
                   </Button>
                   <Button
                     size="sm"
-                    variant="outline"
+                    disabled={isExporting}
                     onClick={() => setExportAction('image')}
-                    className="border-slate-300 hover:border-slate-400 hover:bg-slate-50"
+                    className="bg-slate-900 text-white hover:bg-slate-800 shadow-sm"
                   >
-                    <ImageIcon className="w-4 h-4 mr-1" />تنزيل صورة
+                    <ImageIcon className="w-4 h-4 ml-2" />تنزيل صورة
                   </Button>
                 </div>
               </div>
             </DialogHeader>
-            <div className="overflow-auto border-0 rounded-xl bg-gradient-to-br from-white to-slate-50/30 p-1 shadow-inner">
+
+            {/* ═══ Export Animation Overlay (Minimal Glass) ═══ */}
+            {isExporting && (
+              <div
+                className="absolute inset-0 z-[100] flex items-center justify-center rounded-xl"
+                style={{
+                  background: exportPhase === 'flash' ? 'rgba(255,255,255,1)' : 'rgba(255, 255, 255, 0.4)',
+                  backdropFilter: exportPhase === 'flash' ? 'none' : 'blur(4px)',
+                  transition: 'all 0.4s ease',
+                }}
+              >
+                {exportPhase === 'flash' && (
+                  <div className="absolute inset-0 bg-white rounded-xl" style={{ animation: 'exportFlash 0.35s ease-out forwards' }} />
+                )}
+
+                {exportPhase !== 'flash' && exportPhase !== 'done' && (
+                  <div 
+                    className="bg-white/90 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.08)] border border-white/60 rounded-2xl p-6 flex flex-col items-center justify-center gap-4 min-w-[240px]"
+                    style={{ animation: 'premiumFadeIn 0.4s ease-out forwards' }}
+                  >
+                    {/* Smooth minimal spinner */}
+                    <div className="relative w-9 h-9 flex items-center justify-center">
+                      <svg className="w-9 h-9 animate-spin text-slate-100" viewBox="0 0 24 24" fill="none">
+                        <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" />
+                        <path className={exportType === 'excel' ? 'text-emerald-500' : 'text-violet-500'} fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                    </div>
+
+                    <div className="text-center space-y-3 w-full">
+                      <div className="font-semibold text-slate-700 text-[14px]">
+                        {exportPhase === 'freeze' ? 'جاري التحضير...' : 'جاري المعالجة...'}
+                      </div>
+                      
+                      {/* Thin clean track bar */}
+                      <div className="w-full bg-slate-100 h-1 rounded-full overflow-hidden relative">
+                        <div
+                          className="h-full rounded-full transition-all duration-300 ease-out"
+                          style={{
+                            width: `${exportProgress}%`,
+                            background: exportType === 'excel' ? '#10b981' : '#8b5cf6',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {exportPhase === 'done' && (
+                  <div 
+                    className="bg-white/95 backdrop-blur-xl shadow-[0_10px_40px_rgb(0,0,0,0.1)] border border-white/60 rounded-2xl p-6 flex flex-col items-center justify-center gap-3 min-w-[240px]"
+                    style={{ animation: 'premiumPopIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards' }}
+                  >
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-500 mb-1">
+                      <Check strokeWidth={3} className="w-6 h-6" />
+                    </div>
+                    <div className="font-bold text-slate-800 text-[15px]">
+                      تمت العملية بنجاح
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+              <style>{`
+                @keyframes exportFlash {
+                  0% { opacity: 1; }
+                  100% { opacity: 0; }
+                }
+                @keyframes premiumFadeIn {
+                  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+                  to { opacity: 1; transform: translateY(0) scale(1); }
+                }
+                @keyframes premiumPopIn {
+                  0% { opacity: 0; transform: scale(0.9) translateY(4px); }
+                  50% { transform: scale(1.02) translateY(0); }
+                  100% { opacity: 1; transform: scale(1) translateY(0); }
+                }
+              `}</style>
+
+            {/* Container for the content - no more jumping or scaling, just static underneath the blur */}
+            <div
+              className="overflow-auto border border-slate-100 rounded-xl bg-slate-50/50 p-1 relative"
+              style={{ pointerEvents: isExporting ? 'none' : 'auto' }}
+            >
               <div
                 ref={exportRef}
                 className="p-8 bg-white rounded-lg shadow-sm"
