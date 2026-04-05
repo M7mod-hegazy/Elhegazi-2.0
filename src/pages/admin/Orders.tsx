@@ -49,10 +49,10 @@ import { Order, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { logHistory } from '@/lib/history';
-import { 
-  Search, 
-  Eye, 
-  Printer, 
+import {
+  Search,
+  Eye,
+  Printer,
   Clock,
   CheckCircle,
   XCircle,
@@ -86,12 +86,12 @@ import {
 const AdminOrders = () => {
   // Set page title
   usePageTitle('إدارة الطلبات');
-  
+
   const navigate = useNavigate();
   const { user } = useDualAuth();
   const { toast } = useToast();
   const { isMobile, isTablet } = useDeviceDetection();
-  
+
   // State
   const [orders, setOrders] = useState<Order[]>([]);
   const [teamMembers, setTeamMembers] = useState<{ id: string; name: string; email: string }[]>([]);
@@ -124,7 +124,7 @@ const AdminOrders = () => {
   const [minTotal, setMinTotal] = useState('');
   const [maxTotal, setMaxTotal] = useState('');
   const [cancellationFilter, setCancellationFilter] = useState('all');
-  
+
   // State for expandable rows
   const [expandedOrders, setExpandedOrders] = useState<string[]>([]);
   const [expandedMobileProducts, setExpandedMobileProducts] = useState<string[]>([]);
@@ -183,17 +183,17 @@ const AdminOrders = () => {
   // Enhanced filter orders
   const filteredOrders = orders.filter(order => {
     const matchesSearch = (order.id?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                       (order.userId?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-                       (order.orderNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      (order.userId?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (order.orderNumber?.toLowerCase() || '').includes(searchTerm.toLowerCase());
     const matchesStatus = !statusFilter || statusFilter === 'all' || order.status === statusFilter;
     const matchesAssignedTo = !assignedToFilter || order.notes?.includes(assignedToFilter);
     const matchesTag = !tagFilter || (order.notes && order.notes.includes(tagFilter));
     const matchesMinTotal = !minTotal || (order.total || 0) >= parseFloat(minTotal);
     const matchesMaxTotal = !maxTotal || (order.total || 0) <= parseFloat(maxTotal);
-    const matchesCancellation = cancellationFilter === 'all' || 
-                            (cancellationFilter === 'pending' && order.cancellationRequested && order.status !== 'cancelled') ||
-                            (cancellationFilter === 'none' && !order.cancellationRequested);
-  
+    const matchesCancellation = cancellationFilter === 'all' ||
+      (cancellationFilter === 'pending' && order.cancellationRequested && order.status !== 'cancelled') ||
+      (cancellationFilter === 'none' && !order.cancellationRequested);
+
     return matchesSearch && matchesStatus && matchesAssignedTo && matchesTag && matchesMinTotal && matchesMaxTotal && matchesCancellation;
   });
 
@@ -205,8 +205,8 @@ const AdminOrders = () => {
   // Handle status change
   const handleStatusChange = (orderId: string, newStatus: Order['status']) => {
     const oldStatus = orders.find(o => o.id === orderId)?.status;
-    const updatedOrders = orders.map(order => 
-      order.id === orderId 
+    const updatedOrders = orders.map(order =>
+      order.id === orderId
         ? { ...order, status: newStatus, updatedAt: new Date().toISOString() }
         : order
     );
@@ -225,7 +225,7 @@ const AdminOrders = () => {
       note: `Order ${orderId} status changed`,
       meta: { orderId, oldStatus: oldStatus ?? null, newStatus }
     });
-    
+
     toast({
       title: "تم تحديث حالة الطلب",
       description: `تم تغيير حالة الطلب إلى ${getStatusLabel(newStatus)}`,
@@ -273,7 +273,7 @@ const AdminOrders = () => {
   // Print order
   const handlePrint = (order: Order) => {
     if (!order) return;
-    
+
     // Create printable content with better formatting
     const printContent = `
       <!DOCTYPE html>
@@ -331,7 +331,7 @@ const AdminOrders = () => {
       </body>
       </html>
     `;
-    
+
     const printWindow = window.open('', '_blank');
     if (printWindow) {
       printWindow.document.write(printContent);
@@ -363,22 +363,22 @@ const AdminOrders = () => {
         '/api/orders/bulk/status',
         { orderIds: selectedOrders, status: bulkAction, note: bulkNote || undefined, sendEmail: false }
       );
-      
+
       if (!res.ok) throw new Error((res as { error?: string }).error || 'Bulk update failed');
-      
+
       // Update local state
-      const updatedOrders = orders.map(order => 
-        selectedOrders.includes(order.id) 
+      const updatedOrders = orders.map(order =>
+        selectedOrders.includes(order.id)
           ? { ...order, status: bulkAction as Order['status'], updatedAt: new Date().toISOString() }
           : order
       );
       setOrders(updatedOrders);
-      
+
       // Clear selection
       setSelectedOrders([]);
       setBulkAction('');
       setBulkNote('');
-      
+
       toast({
         title: 'نجاح',
         description: `تم تحديث ${selectedOrders.length} طلب بنجاح`,
@@ -396,19 +396,19 @@ const AdminOrders = () => {
   // Handle assign order
   const handleAssignOrder = async (orderId: string, assigneeId: string) => {
     try {
-      const res = await apiPatchJson<Order, Partial<Order>>(`/api/orders/${orderId}`, { 
+      const res = await apiPatchJson<Order, Partial<Order>>(`/api/orders/${orderId}`, {
         assignedTo: assigneeId
       });
-      
+
       if (res.ok && res.item) {
         // Update local state
-        const updatedOrders = orders.map(order => 
-          order.id === orderId 
+        const updatedOrders = orders.map(order =>
+          order.id === orderId
             ? { ...order, assignedTo: assigneeId }
             : order
         );
         setOrders(updatedOrders);
-        
+
         toast({
           title: "نجاح",
           description: "تم تعيين الطلب للموظف بنجاح",
@@ -442,21 +442,21 @@ const AdminOrders = () => {
         '/api/orders/bulk/assign',
         { orderIds: selectedOrders, assignedTo: selectedAssignee }
       );
-      
+
       if (!res.ok) throw new Error((res as unknown as { error: string }).error || 'Bulk assign failed');
-      
+
       // Update local state
-      const updatedOrders = orders.map(order => 
-        selectedOrders.includes(order.id) 
+      const updatedOrders = orders.map(order =>
+        selectedOrders.includes(order.id)
           ? { ...order, assignedTo: selectedAssignee }
           : order
       );
       setOrders(updatedOrders);
-      
+
       // Clear selection
       setSelectedOrders([]);
       setSelectedAssignee('');
-      
+
       toast({
         title: 'نجاح',
         description: `تم تعيين ${selectedOrders.length} طلب للموظف بنجاح`,
@@ -487,15 +487,15 @@ const AdminOrders = () => {
         `/api/orders/${orderId}/notes`,
         { text: noteText }
       );
-      
+
       if (res.ok && res.item) {
-        setOrders(orders.map(order => 
+        setOrders(orders.map(order =>
           order.id === orderId ? res.item! : order
         ));
-        
+
         setNoteDialogOrderId(null);
         setNoteText('');
-        
+
         toast({
           title: "نجاح",
           description: "تمت إضافة الملاحظة بنجاح",
@@ -521,7 +521,7 @@ const AdminOrders = () => {
 
   // Handle save order
   const handleSaveOrder = (updatedOrder: Order) => {
-    setOrders(orders.map(o => 
+    setOrders(orders.map(o =>
       o.id === updatedOrder.id ? updatedOrder : o
     ));
   };
@@ -534,7 +534,7 @@ const AdminOrders = () => {
 
   // Handle save order after cancellation
   const handleSaveOrderAfterCancellation = (updatedOrder: Order) => {
-    setOrders(orders.map(o => 
+    setOrders(orders.map(o =>
       o.id === updatedOrder.id ? updatedOrder : o
     ));
   };
@@ -547,7 +547,7 @@ const AdminOrders = () => {
 
   // Handle save order after refund
   const handleSaveOrderAfterRefund = (updatedOrder: Order) => {
-    setOrders(orders.map(o => 
+    setOrders(orders.map(o =>
       o.id === updatedOrder.id ? updatedOrder : o
     ));
   };
@@ -578,22 +578,22 @@ const AdminOrders = () => {
     // Ignore if clicking on interactive elements
     const target = e.target as HTMLElement;
     if (target.closest('button, select, a, [role="button"], [role="combobox"]')) return;
-    
+
     e.preventDefault();
     e.stopPropagation();
-    
+
     if (!orderId) {
       console.error('No orderId provided to handleRowClick');
       return;
     }
-    
+
     // Use same logic as checkbox
     setSelectedOrders(prev => {
 
 
       const isSelected = prev.includes(orderId);
 
-      
+
       if (isSelected) {
         const newSelection = prev.filter(id => id !== orderId);
 
@@ -609,7 +609,7 @@ const AdminOrders = () => {
   // Toggle expand order details
   const toggleExpand = (orderId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setExpandedOrders(prev => 
+    setExpandedOrders(prev =>
       prev.includes(orderId) ? prev.filter(id => id !== orderId) : [...prev, orderId]
     );
   };
@@ -646,7 +646,7 @@ const AdminOrders = () => {
         setSelectedOrders([]);
       }
     };
-    
+
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
   }, [filteredOrders]);
@@ -663,8 +663,8 @@ const AdminOrders = () => {
             <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-medium mt-1 sm:mt-2">مراجعة ومتابعة طلبات العملاء</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size={isMobile ? "sm" : "default"}
               className="flex-1 sm:flex-none bg-gradient-to-r from-green-50 to-green-100 border-green-200 text-green-700 hover:from-green-100 hover:to-green-200 shadow-md text-xs sm:text-sm"
             >
@@ -672,8 +672,8 @@ const AdminOrders = () => {
               <span className="hidden sm:inline">تصدير الطلبات</span>
               <span className="sm:hidden">تصدير</span>
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size={isMobile ? "sm" : "default"}
               className="flex-1 sm:flex-none bg-gradient-to-r from-primary/5 to-primary/10 border-primary/20 text-primary hover:from-primary/10 hover:to-primary/20 shadow-md text-xs sm:text-sm"
             >
@@ -702,7 +702,7 @@ const AdminOrders = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-br from-primary/5 to-primary/10 border-primary/20 shadow-lg hover:shadow-xl transition-all duration-300 group">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -719,7 +719,7 @@ const AdminOrders = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-br from-green-50 to-green-100 border-green-200/50 shadow-lg hover:shadow-xl transition-all duration-300 group">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -736,7 +736,7 @@ const AdminOrders = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-br from-red-50 to-red-100 border-red-200/50 shadow-lg hover:shadow-xl transition-all duration-300 group">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -753,7 +753,7 @@ const AdminOrders = () => {
               </div>
             </CardContent>
           </Card>
-          
+
           <Card className="bg-gradient-to-br from-yellow-50 to-yellow-100 border-yellow-200/50 shadow-lg hover:shadow-xl transition-all duration-300 group">
             <CardContent className="p-4 sm:p-6">
               <div className="flex items-center justify-between">
@@ -813,8 +813,8 @@ const AdminOrders = () => {
                   </SelectContent>
                 </Select>
               </div>
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 size={isMobile ? "sm" : "default"}
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 className="h-10 sm:h-12 px-3 sm:px-4 bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-purple-200 shadow-md text-xs sm:text-sm"
@@ -829,7 +829,7 @@ const AdminOrders = () => {
                 )}
               </Button>
             </div>
-            
+
             {/* Advanced Filters */}
             {showAdvancedFilters && (
               <div className="mt-4 pt-4 border-t border-slate-200 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
@@ -913,7 +913,7 @@ const AdminOrders = () => {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Mobile Order Content */}
                 <div className="p-4 space-y-4">
                   {/* Order Items Summary */}
@@ -926,9 +926,9 @@ const AdminOrders = () => {
                         className="text-xs p-1 hover:bg-slate-200"
                         onClick={() => {
                           const orderId = order._id || order.id;
-                          setExpandedMobileProducts(prev => 
-                            prev.includes(orderId) 
-                              ? prev.filter(id => id !== orderId) 
+                          setExpandedMobileProducts(prev =>
+                            prev.includes(orderId)
+                              ? prev.filter(id => id !== orderId)
                               : [...prev, orderId]
                           );
                         }}
@@ -965,7 +965,7 @@ const AdminOrders = () => {
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Cancellation Request Badge */}
                   {hasCancellationRequest(order) && (
                     <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-lg p-2">
@@ -973,12 +973,12 @@ const AdminOrders = () => {
                       <span className="text-yellow-800 text-xs font-medium">طلب إلغاء قيد المراجعة</span>
                     </div>
                   )}
-                  
+
                   {/* Status Management */}
                   <div className="flex items-center gap-2">
                     <label className="text-sm font-medium text-slate-700">الحالة:</label>
-                    <Select 
-                      value={order.status} 
+                    <Select
+                      value={order.status}
                       onValueChange={(value) => handleStatusChange(order.id, value as Order['status'])}
                     >
                       <SelectTrigger className="flex-1 h-8 text-xs">
@@ -1012,16 +1012,16 @@ const AdminOrders = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  
+
                   {/* Action Buttons - All Actions for Mobile */}
                   <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100">
                     <Button
                       size="sm"
                       variant="outline"
-                      onClick={() => { 
+                      onClick={() => {
                         if (order.id || order._id) {
                           navigate(`/admin/order/${order.id || order._id}`);
-                          void logHistory({ section: 'orders', action: 'view_opened', note: `Viewed order ${order.id || order._id}`, meta: { orderId: order.id || order._id } }); 
+                          void logHistory({ section: 'orders', action: 'view_opened', note: `Viewed order ${order.id || order._id}`, meta: { orderId: order.id || order._id } });
                         }
                       }}
                       className="text-xs"
@@ -1086,441 +1086,440 @@ const AdminOrders = () => {
         ) : (
           // Desktop: Traditional Table Layout
           <Card className="bg-white/90 backdrop-blur-xl border-slate-200/50 shadow-2xl rounded-2xl overflow-hidden">
-          <CardHeader className="bg-gradient-to-r from-slate-50 via-primary/5 to-secondary/5 border-b border-slate-200/50 p-4 sm:p-6">
-            <div className="flex items-center justify-between flex-wrap gap-4">
-              <div className="flex items-center gap-3 sm:gap-4">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-lg">
-                  <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                    جدول الطلبات ({filteredOrders.length})
-                  </CardTitle>
-                  <p className="text-slate-600 mt-1 text-xs sm:text-sm">إجمالي الطلبات وحالتها</p>
-                </div>
-              </div>
-              
-              {/* Actions - Show when orders selected */}
-              {selectedOrders.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap bg-primary/5 px-4 py-2 rounded-lg border border-primary/20">
-                  <div className="flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-primary" />
-                    <span className="font-bold text-slate-900 text-sm">✓ {selectedOrders.length}</span>
+            <CardHeader className="bg-gradient-to-r from-slate-50 via-primary/5 to-secondary/5 border-b border-slate-200/50 p-4 sm:p-6">
+              <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-primary to-secondary rounded-2xl flex items-center justify-center shadow-lg">
+                    <Package className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                   </div>
-                  <div className="h-4 w-px bg-slate-300"></div>
-                  
-                  {selectedOrders.length === 1 && (() => {
-                    const order = orders.find(o => (o._id || o.id) === selectedOrders[0]);
-                    return order ? (
+                  <div>
+                    <CardTitle className="text-lg sm:text-xl lg:text-2xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+                      جدول الطلبات ({filteredOrders.length})
+                    </CardTitle>
+                    <p className="text-slate-600 mt-1 text-xs sm:text-sm">إجمالي الطلبات وحالتها</p>
+                  </div>
+                </div>
+
+                {/* Actions - Show when orders selected */}
+                {selectedOrders.length > 0 && (
+                  <div className="flex items-center gap-2 flex-wrap bg-primary/5 px-4 py-2 rounded-lg border border-primary/20">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 text-primary" />
+                      <span className="font-bold text-slate-900 text-sm">✓ {selectedOrders.length}</span>
+                    </div>
+                    <div className="h-4 w-px bg-slate-300"></div>
+
+                    {selectedOrders.length === 1 && (() => {
+                      const order = orders.find(o => (o._id || o.id) === selectedOrders[0]);
+                      return order ? (
+                        <>
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                            if (order.id || order._id) {
+                              navigate(`/admin/order/${order.id || order._id}`);
+                            }
+                          }}>
+                            <Eye className="w-3 h-3 mr-1" />
+                            عرض
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handlePrint(order)}>
+                            <Printer className="w-3 h-3 mr-1" />
+                            طباعة
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleEditOrder(order)}>
+                            <Edit className="w-3 h-3 mr-1" />
+                            تعديل
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleCustomerCommunication(order)}>
+                            <MessageCircle className="w-3 h-3 mr-1" />
+                            رسالة
+                          </Button>
+                          <Select
+                            value={order.status}
+                            onValueChange={(value) => handleStatusChange(order._id || order.id, value as Order['status'])}
+                          >
+                            <SelectTrigger className="w-[120px] h-8 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem key="pending" value="pending">قيد التجهيز</SelectItem>
+                              <SelectItem key="confirmed" value="confirmed">تم التأكيد</SelectItem>
+                              <SelectItem key="processing" value="processing">قيد التنفيذ</SelectItem>
+                              <SelectItem key="shipped" value="shipped">تم الشحن</SelectItem>
+                              <SelectItem key="delivered" value="delivered">تم التسليم</SelectItem>
+                              <SelectItem key="cancelled" value="cancelled">ملغي</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {(order.status === 'delivered' || order.status === 'shipped') && (
+                            <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handlePartialRefund(order)}>
+                              <Wallet className="w-3 h-3 mr-1" />
+                              استرداد
+                            </Button>
+                          )}
+                          {order.status !== 'cancelled' && order.status !== 'refunded' && (
+                            <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 hover:bg-red-50" onClick={() => handleOrderCancellation(order)}>
+                              <XCircle className="w-3 h-3 mr-1" />
+                              إلغاء
+                            </Button>
+                          )}
+                        </>
+                      ) : null;
+                    })()}
+
+                    {selectedOrders.length > 1 && (
                       <>
-                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { 
-                          if (order.id || order._id) {
-                            navigate(`/admin/order/${order.id || order._id}`);
-                          }
+                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
+                          selectedOrders.forEach(id => {
+                            const order = orders.find(o => (o._id || o.id) === id);
+                            if (order) handlePrint(order);
+                          });
                         }}>
-                          <Eye className="w-3 h-3 mr-1" />
-                          عرض
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handlePrint(order)}>
                           <Printer className="w-3 h-3 mr-1" />
-                          طباعة
+                          طباعة الكل
                         </Button>
-                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleEditOrder(order)}>
-                          <Edit className="w-3 h-3 mr-1" />
-                          تعديل
-                        </Button>
-                        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handleCustomerCommunication(order)}>
-                          <MessageCircle className="w-3 h-3 mr-1" />
-                          رسالة
-                        </Button>
-                        <Select 
-                          value={order.status} 
-                          onValueChange={(value) => handleStatusChange(order._id || order.id, value as Order['status'])}
-                        >
+                        <Select value={bulkAction} onValueChange={setBulkAction}>
                           <SelectTrigger className="w-[120px] h-8 text-xs">
-                            <SelectValue />
+                            <SelectValue placeholder="تغيير الحالة" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem key="pending" value="pending">قيد التجهيز</SelectItem>
                             <SelectItem key="confirmed" value="confirmed">تم التأكيد</SelectItem>
                             <SelectItem key="processing" value="processing">قيد التنفيذ</SelectItem>
                             <SelectItem key="shipped" value="shipped">تم الشحن</SelectItem>
                             <SelectItem key="delivered" value="delivered">تم التسليم</SelectItem>
-                            <SelectItem key="cancelled" value="cancelled">ملغي</SelectItem>
                           </SelectContent>
                         </Select>
-                        {(order.status === 'delivered' || order.status === 'shipped') && (
-                          <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => handlePartialRefund(order)}>
-                            <Wallet className="w-3 h-3 mr-1" />
-                            استرداد
-                          </Button>
-                        )}
-                        {order.status !== 'cancelled' && order.status !== 'refunded' && (
-                          <Button size="sm" variant="outline" className="h-8 text-xs text-red-600 hover:bg-red-50" onClick={() => handleOrderCancellation(order)}>
-                            <XCircle className="w-3 h-3 mr-1" />
-                            إلغاء
-                          </Button>
-                        )}
+                        <Button size="sm" className="h-8 text-xs" onClick={handleBulkStatusChange} disabled={!bulkAction}>
+                          تطبيق
+                        </Button>
                       </>
-                    ) : null;
-                  })()}
-                  
-                  {selectedOrders.length > 1 && (
-                    <>
-                      <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => {
-                        selectedOrders.forEach(id => {
-                          const order = orders.find(o => (o._id || o.id) === id);
-                          if (order) handlePrint(order);
-                        });
-                      }}>
-                        <Printer className="w-3 h-3 mr-1" />
-                        طباعة الكل
-                      </Button>
-                      <Select value={bulkAction} onValueChange={setBulkAction}>
-                        <SelectTrigger className="w-[120px] h-8 text-xs">
-                          <SelectValue placeholder="تغيير الحالة" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem key="confirmed" value="confirmed">تم التأكيد</SelectItem>
-                          <SelectItem key="processing" value="processing">قيد التنفيذ</SelectItem>
-                          <SelectItem key="shipped" value="shipped">تم الشحن</SelectItem>
-                          <SelectItem key="delivered" value="delivered">تم التسليم</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button size="sm" className="h-8 text-xs" onClick={handleBulkStatusChange} disabled={!bulkAction}>
-                        تطبيق
-                      </Button>
-                    </>
-                  )}
-                  
-                  <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSelectedOrders([])}>
-                    <X className="w-3 h-3 mr-1" />
-                    إلغاء
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-6">
-            <div className="overflow-x-auto rounded-xl sm:rounded-2xl border border-slate-200/50 shadow-lg">
-              <div className="min-w-[700px] sm:min-w-0"> {/* Ensure minimum width for mobile horizontal scroll */}
-              <Table className="bg-white/50">
-                <TableHeader className="bg-gradient-to-r from-slate-100 via-primary/5 to-secondary/5">
-                  <TableRow className="border-b-2 border-slate-200/50">
-                    <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm w-12 text-center border-r border-slate-300">
-                      <div className="flex items-center justify-center" title="تحديد الكل / إلغاء التحديد">
-                        <Checkbox
-                          checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
-                          onCheckedChange={selectAllOrders}
-                          className="cursor-pointer transition-all hover:scale-110"
-                        />
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm w-12 text-center border-r border-slate-300">
-                      <span className="text-xs text-slate-500">تفاصيل</span>
-                    </TableHead>
-                    <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300">
-                      <div className="flex items-center justify-center gap-1 sm:gap-2">
-                        <Package className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
-                        <span>رقم الطلب</span>
-                      </div>
-                    </TableHead>
-                    <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300">العميل</TableHead>
-                    <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300 hidden sm:table-cell">التاريخ</TableHead>
-                    <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300 hidden md:table-cell">عدد المنتجات</TableHead>
-                    <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300">المجموع</TableHead>
-                    <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center">الحالة</TableHead>
-                  </TableRow>
-                </TableHeader>
-                  <TableBody className="divide-y divide-slate-200">
-                    {filteredOrders.map((order, index) => {
-                      console.log(`Order ${index}:`, { 
-                        id: order.id, 
-                        _id: order._id, 
-                        orderNumber: order.orderNumber,
-                        shippingAddress: order.shippingAddress,
-                        userId: order.userId
-                      });
-                      return (
-                      <React.Fragment key={order.id || order._id || `order-${index}`}>
-                      <TableRow 
-                        onClick={(e) => handleRowClick(order._id || order.id, e)}
-                        className={`cursor-pointer transition-all duration-200 border-l-4 ${
-                          selectedOrders.includes(order._id || order.id) 
-                            ? 'bg-gradient-to-r from-primary/10 to-secondary/5 border-l-primary shadow-md' 
-                            : 'border-l-transparent hover:border-l-primary/30 hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5'
-                        }`}
-                      >
-                        <TableCell className="text-center border-r border-slate-200">
-                          <div 
-                            className="flex items-center justify-center" 
-                            title={selectedOrders.includes(order._id || order.id) ? "إلغاء التحديد" : "تحديد الطلب"}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const orderId = order._id || order.id;
+                    )}
 
-
-                              
-                              setSelectedOrders(prev => {
-                                const isCurrentlySelected = prev.includes(orderId);
-
-                                
-                                if (isCurrentlySelected) {
-                                  const newSelection = prev.filter(id => id !== orderId);
-
-                                  return newSelection;
-                                } else {
-                                  const newSelection = [...prev, orderId];
-
-                                  return newSelection;
-                                }
-                              });
-                            }}
-                          >
+                    <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => setSelectedOrders([])}>
+                      <X className="w-3 h-3 mr-1" />
+                      إلغاء
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-3 sm:p-6">
+              <div className="overflow-x-auto rounded-xl sm:rounded-2xl border border-slate-200/50 shadow-lg">
+                <div className="min-w-[700px] sm:min-w-0"> {/* Ensure minimum width for mobile horizontal scroll */}
+                  <Table className="bg-white/50">
+                    <TableHeader className="bg-gradient-to-r from-slate-100 via-primary/5 to-secondary/5">
+                      <TableRow className="border-b-2 border-slate-200/50">
+                        <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm w-12 text-center border-r border-slate-300">
+                          <div className="flex items-center justify-center" title="تحديد الكل / إلغاء التحديد">
                             <Checkbox
-                              checked={selectedOrders.includes(order._id || order.id)}
-                              className="cursor-pointer transition-all hover:scale-110 data-[state=checked]:bg-primary data-[state=checked]:border-primary pointer-events-none"
+                              checked={selectedOrders.length === filteredOrders.length && filteredOrders.length > 0}
+                              onCheckedChange={selectAllOrders}
+                              className="cursor-pointer transition-all hover:scale-110"
                             />
                           </div>
-                        </TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()} className="text-center border-r border-slate-200">
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={(e) => toggleExpand(order._id || order.id, e)}
-                            className="p-1 h-8 w-8 rounded-full hover:bg-primary/10 transition-all"
-                            title={expandedOrders.includes(order._id || order.id) ? "إخفاء التفاصيل" : "عرض التفاصيل"}
-                          >
-                            {expandedOrders.includes(order._id || order.id) ? (
-                              <ChevronUp className="w-4 h-4 text-primary" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4 text-slate-600" />
-                            )}
-                          </Button>
-                        </TableCell>
-                        <TableCell className="text-center border-r border-slate-200">
-                          <div className="space-y-1">
-                            <div className="flex items-center justify-center gap-2">
-                              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center relative">
-                                <Package className="w-4 h-4 text-white" />
-                                {hasCancellationRequest(order) && (
-                                  <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
-                                    <AlertCircle className="w-2 h-2 text-white" />
-                                  </div>
-                                )}
-                              </div>
-                              <span className="font-bold text-base text-slate-900">#{order.orderNumber || order.id?.slice(-6) || 'N/A'}</span>
-                            </div>
-                            <p className="text-xs text-slate-400 font-mono pl-10 truncate max-w-[200px]">{order.id}</p>
+                        </TableHead>
+                        <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm w-12 text-center border-r border-slate-300">
+                          <span className="text-xs text-slate-500">تفاصيل</span>
+                        </TableHead>
+                        <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300">
+                          <div className="flex items-center justify-center gap-1 sm:gap-2">
+                            <Package className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+                            <span>رقم الطلب</span>
                           </div>
-                        </TableCell>
-                        <TableCell className="sm:hidden text-center border-r border-slate-200">
-                          <div className="space-y-0.5">
-                            <p className="font-semibold text-sm text-slate-900">{order.shippingAddress?.name || 'عميل'}</p>
-                            <p className="text-xs text-slate-600 truncate max-w-[150px]">{order.shippingAddress?.email || order.shippingAddress?.phone || 'لا يوجد'}</p>
-                            <p className="text-xs text-slate-400 font-mono">ID: #{order.userId?.slice(-6) || 'N/A'}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-center border-r border-slate-200">
-                          <div className="space-y-0.5">
-                            <p className="font-semibold text-sm text-slate-900">{order.shippingAddress?.name || 'عميل'}</p>
-                            <p className="text-xs text-slate-600 truncate max-w-[200px]">{order.shippingAddress?.email || 'لا يوجد بريد'}</p>
-                            <p className="text-xs text-slate-400 font-mono">ID: #{order.userId?.slice(-6) || 'N/A'}</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden sm:table-cell text-center border-r border-slate-200">
-                          <div className="space-y-1">
-                            <p className="font-semibold text-slate-900 text-xs md:text-sm">
-                              {new Date(order.createdAt).toLocaleDateString('ar-EG')}
-                            </p>
-                            <p className="text-xs text-slate-500 hidden md:block">
-                              {new Date(order.createdAt).toLocaleTimeString('ar-EG')}
-                            </p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="hidden md:table-cell text-center border-r border-slate-200">
-                          <Badge 
-                            variant="secondary" 
-                            className="bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 border-purple-300 font-semibold text-xs"
-                          >
-                            {order.items.length} منتج
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-center border-r border-slate-200">
-                          <div className="flex items-center justify-center gap-1 md:gap-2">
-                            <TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-green-600" />
-                            <p className="font-bold text-sm md:text-lg text-green-600">{order.total.toFixed(2)} ج.م</p>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex justify-center">
-                          <Select 
-                            value={order.status} 
-                            onValueChange={(value) => handleStatusChange(order.id, value as Order['status'])}
-                          >
-                            <SelectTrigger className={`w-28 md:w-36 font-semibold shadow-md transition-all duration-200 text-xs md:text-sm ${getStatusColor(order.status)}`}>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="pending" className="text-orange-700">
-                                <div className="flex items-center gap-1 md:gap-2">
-                                  <Clock className="w-3 h-3 md:w-4 md:h-4" />
-                                  <span className="text-xs md:text-sm">قيد التجهيز</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="confirmed" className="text-primary">
-                                <div className="flex items-center gap-1 md:gap-2">
-                                  <Package className="w-3 h-3 md:w-4 md:h-4" />
-                                  <span className="text-xs md:text-sm">تم التأكيد</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="delivered" className="text-green-700">
-                                <div className="flex items-center gap-1 md:gap-2">
-                                  <CheckCircle className="w-3 h-3 md:w-4 md:h-4" />
-                                  <span className="text-xs md:text-sm">تم التسليم</span>
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="cancelled" className="text-red-700">
-                                <div className="flex items-center gap-1 md:gap-2">
-                                  <XCircle className="w-3 h-3 md:w-4 md:h-4" />
-                                  <span className="text-xs md:text-sm">ملغي</span>
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                          </div>
-                        </TableCell>
+                        </TableHead>
+                        <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300">العميل</TableHead>
+                        <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300 hidden sm:table-cell">التاريخ</TableHead>
+                        <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300 hidden md:table-cell">عدد المنتجات</TableHead>
+                        <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center border-r border-slate-300">المجموع</TableHead>
+                        <TableHead className="font-bold text-slate-700 bg-gradient-to-r from-slate-100 to-primary/5 text-xs sm:text-sm text-center">الحالة</TableHead>
                       </TableRow>
-                      
-                      {/* Expandable Order Details */}
-                      {expandedOrders.includes(order._id || order.id) && (
-                        <TableRow className="bg-slate-50">
-                          <TableCell colSpan={9} className="p-0">
-                            <div className="p-4 space-y-4 animate-in slide-in-from-top-2">
-                              {/* Products List */}
-                              <div className="bg-white rounded-lg p-4 border border-slate-200">
-                                <div className="flex items-center gap-2 mb-3">
-                                  <Package className="w-4 h-4 text-purple-600" />
-                                  <h4 className="font-semibold text-slate-900">المنتجات ({order.items?.length || 0})</h4>
-                                </div>
-                                <div className="space-y-2 max-h-60 overflow-y-auto">
-                                  {(order.items || []).map((item, idx) => (
-                                    <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
-                                      <div className="flex items-center gap-2">
-                                        <div className="w-10 h-10 bg-white rounded border border-slate-200 flex items-center justify-center">
-                                          {item.product?.image ? (
-                                            <img src={item.product.image} alt="" className="w-full h-full object-cover rounded" />
-                                          ) : (
-                                            <Package className="w-4 h-4 text-slate-400" />
-                                          )}
-                                        </div>
-                                        <div>
-                                          <p className="text-sm font-medium text-slate-900">{item.product?.nameAr || 'منتج'}</p>
-                                          <p className="text-xs text-slate-500">الكمية: {item.quantity}</p>
-                                        </div>
-                                      </div>
-                                      <p className="text-sm font-bold text-slate-900">{(item.price * item.quantity).toFixed(2)} ج.م</p>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                              
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {/* Shipping Address */}
-                                <div className="bg-white rounded-lg p-4 border border-slate-200">
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <MapPin className="w-4 h-4 text-primary" />
-                                    <h4 className="font-semibold text-slate-900">عنوان الشحن</h4>
-                                  </div>
-                                  <p className="text-sm text-slate-700 mb-2">
-                                    {order.shippingAddress?.street || 'غير محدد'}<br />
-                                    {order.shippingAddress?.city || ''} {order.shippingAddress?.state || ''}<br />
-                                    {order.shippingAddress?.postalCode || ''} {order.shippingAddress?.country || ''}
-                                  </p>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => copyToClipboard(
-                                      `${order.shippingAddress?.street}, ${order.shippingAddress?.city}, ${order.shippingAddress?.state}`,
-                                      'العنوان'
-                                    )}
-                                    className="mt-2"
-                                  >
-                                    <Copy className="w-3 h-3 mr-1" />
-                                    نسخ العنوان
-                                  </Button>
-                                </div>
+                    </TableHeader>
+                    <TableBody className="divide-y divide-slate-200">
+                      {filteredOrders.map((order, index) => {
+                        console.log(`Order ${index}:`, {
+                          id: order.id,
+                          _id: order._id,
+                          orderNumber: order.orderNumber,
+                          shippingAddress: order.shippingAddress,
+                          userId: order.userId
+                        });
+                        return (
+                          <React.Fragment key={order.id || order._id || `order-${index}`}>
+                            <TableRow
+                              onClick={(e) => handleRowClick(order._id || order.id, e)}
+                              className={`cursor-pointer transition-all duration-200 border-l-4 ${selectedOrders.includes(order._id || order.id)
+                                  ? 'bg-gradient-to-r from-primary/10 to-secondary/5 border-l-primary shadow-md'
+                                  : 'border-l-transparent hover:border-l-primary/30 hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5'
+                                }`}
+                            >
+                              <TableCell className="text-center border-r border-slate-200">
+                                <div
+                                  className="flex items-center justify-center"
+                                  title={selectedOrders.includes(order._id || order.id) ? "إلغاء التحديد" : "تحديد الطلب"}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const orderId = order._id || order.id;
 
-                                {/* Contact Info */}
-                                <div className="bg-white rounded-lg p-4 border border-slate-200">
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <Phone className="w-4 h-4 text-green-600" />
-                                    <h4 className="font-semibold text-slate-900">معلومات الاتصال</h4>
+
+
+                                    setSelectedOrders(prev => {
+                                      const isCurrentlySelected = prev.includes(orderId);
+
+
+                                      if (isCurrentlySelected) {
+                                        const newSelection = prev.filter(id => id !== orderId);
+
+                                        return newSelection;
+                                      } else {
+                                        const newSelection = [...prev, orderId];
+
+                                        return newSelection;
+                                      }
+                                    });
+                                  }}
+                                >
+                                  <Checkbox
+                                    checked={selectedOrders.includes(order._id || order.id)}
+                                    className="cursor-pointer transition-all hover:scale-110 data-[state=checked]:bg-primary data-[state=checked]:border-primary pointer-events-none"
+                                  />
+                                </div>
+                              </TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()} className="text-center border-r border-slate-200">
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  onClick={(e) => toggleExpand(order._id || order.id, e)}
+                                  className="p-1 h-8 w-8 rounded-full hover:bg-primary/10 transition-all"
+                                  title={expandedOrders.includes(order._id || order.id) ? "إخفاء التفاصيل" : "عرض التفاصيل"}
+                                >
+                                  {expandedOrders.includes(order._id || order.id) ? (
+                                    <ChevronUp className="w-4 h-4 text-primary" />
+                                  ) : (
+                                    <ChevronDown className="w-4 h-4 text-slate-600" />
+                                  )}
+                                </Button>
+                              </TableCell>
+                              <TableCell className="text-center border-r border-slate-200">
+                                <div className="space-y-1">
+                                  <div className="flex items-center justify-center gap-2">
+                                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center relative">
+                                      <Package className="w-4 h-4 text-white" />
+                                      {hasCancellationRequest(order) && (
+                                        <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-500 rounded-full flex items-center justify-center">
+                                          <AlertCircle className="w-2 h-2 text-white" />
+                                        </div>
+                                      )}
+                                    </div>
+                                    <span className="font-bold text-base text-slate-900">#{order.orderNumber || order.id?.slice(-6) || 'N/A'}</span>
                                   </div>
-                                  {order.shippingAddress?.phone ? (
-                                    <div className="space-y-2">
-                                      <p className="text-sm text-slate-700">
-                                        {order.shippingAddress.phone}
-                                      </p>
-                                      {isMobileDevice() ? (
-                                        <a
-                                          href={`tel:${order.shippingAddress.phone}`}
-                                          className="inline-flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm"
-                                        >
-                                          <Phone className="w-4 h-4" />
-                                          اتصال الآن
-                                        </a>
-                                      ) : (
+                                  <p className="text-xs text-slate-400 font-mono pl-10 truncate max-w-[200px]">{order.id}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="sm:hidden text-center border-r border-slate-200">
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold text-sm text-slate-900">{order.shippingAddress?.name || 'عميل'}</p>
+                                  <p className="text-xs text-slate-600 truncate max-w-[150px]">{order.shippingAddress?.email || order.shippingAddress?.phone || 'لا يوجد'}</p>
+                                  <p className="text-xs text-slate-400 font-mono">ID: #{order.userId?.slice(-6) || 'N/A'}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden sm:table-cell text-center border-r border-slate-200">
+                                <div className="space-y-0.5">
+                                  <p className="font-semibold text-sm text-slate-900">{order.shippingAddress?.name || 'عميل'}</p>
+                                  <p className="text-xs text-slate-600 truncate max-w-[200px]">{order.shippingAddress?.email || 'لا يوجد بريد'}</p>
+                                  <p className="text-xs text-slate-400 font-mono">ID: #{order.userId?.slice(-6) || 'N/A'}</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden sm:table-cell text-center border-r border-slate-200">
+                                <div className="space-y-1">
+                                  <p className="font-semibold text-slate-900 text-xs md:text-sm">
+                                    {new Date(order.createdAt).toLocaleDateString('ar-EG')}
+                                  </p>
+                                  <p className="text-xs text-slate-500 hidden md:block">
+                                    {new Date(order.createdAt).toLocaleTimeString('ar-EG')}
+                                  </p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="hidden md:table-cell text-center border-r border-slate-200">
+                                <Badge
+                                  variant="secondary"
+                                  className="bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 border-purple-300 font-semibold text-xs"
+                                >
+                                  {order.items.length} منتج
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-center border-r border-slate-200">
+                                <div className="flex items-center justify-center gap-1 md:gap-2">
+                                  <TrendingUp className="w-3 h-3 md:w-4 md:h-4 text-green-600" />
+                                  <p className="font-bold text-sm md:text-lg text-green-600">{order.total.toFixed(2)} ج.م</p>
+                                </div>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex justify-center">
+                                  <Select
+                                    value={order.status}
+                                    onValueChange={(value) => handleStatusChange(order.id, value as Order['status'])}
+                                  >
+                                    <SelectTrigger className={`w-28 md:w-36 font-semibold shadow-md transition-all duration-200 text-xs md:text-sm ${getStatusColor(order.status)}`}>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="pending" className="text-orange-700">
+                                        <div className="flex items-center gap-1 md:gap-2">
+                                          <Clock className="w-3 h-3 md:w-4 md:h-4" />
+                                          <span className="text-xs md:text-sm">قيد التجهيز</span>
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="confirmed" className="text-primary">
+                                        <div className="flex items-center gap-1 md:gap-2">
+                                          <Package className="w-3 h-3 md:w-4 md:h-4" />
+                                          <span className="text-xs md:text-sm">تم التأكيد</span>
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="delivered" className="text-green-700">
+                                        <div className="flex items-center gap-1 md:gap-2">
+                                          <CheckCircle className="w-3 h-3 md:w-4 md:h-4" />
+                                          <span className="text-xs md:text-sm">تم التسليم</span>
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="cancelled" className="text-red-700">
+                                        <div className="flex items-center gap-1 md:gap-2">
+                                          <XCircle className="w-3 h-3 md:w-4 md:h-4" />
+                                          <span className="text-xs md:text-sm">ملغي</span>
+                                        </div>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+
+                            {/* Expandable Order Details */}
+                            {expandedOrders.includes(order._id || order.id) && (
+                              <TableRow className="bg-slate-50">
+                                <TableCell colSpan={9} className="p-0">
+                                  <div className="p-4 space-y-4 animate-in slide-in-from-top-2">
+                                    {/* Products List */}
+                                    <div className="bg-white rounded-lg p-4 border border-slate-200">
+                                      <div className="flex items-center gap-2 mb-3">
+                                        <Package className="w-4 h-4 text-purple-600" />
+                                        <h4 className="font-semibold text-slate-900">المنتجات ({order.items?.length || 0})</h4>
+                                      </div>
+                                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                                        {(order.items || []).map((item, idx) => (
+                                          <div key={idx} className="flex items-center justify-between p-2 bg-slate-50 rounded-lg">
+                                            <div className="flex items-center gap-2">
+                                              <div className="w-10 h-10 bg-white rounded border border-slate-200 flex items-center justify-center">
+                                                {item.product?.image ? (
+                                                  <img src={item.product.image} alt="" className="w-full h-full object-cover rounded" />
+                                                ) : (
+                                                  <Package className="w-4 h-4 text-slate-400" />
+                                                )}
+                                              </div>
+                                              <div>
+                                                <p className="text-sm font-medium text-slate-900">{item.product?.nameAr || 'منتج'}</p>
+                                                <p className="text-xs text-slate-500">الكمية: {item.quantity}</p>
+                                              </div>
+                                            </div>
+                                            <p className="text-sm font-bold text-slate-900">{(item.price * item.quantity).toFixed(2)} ج.م</p>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                      {/* Shipping Address */}
+                                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                                        <div className="flex items-center gap-2 mb-3">
+                                          <MapPin className="w-4 h-4 text-primary" />
+                                          <h4 className="font-semibold text-slate-900">عنوان الشحن</h4>
+                                        </div>
+                                        <p className="text-sm text-slate-700 mb-2">
+                                          {order.shippingAddress?.street || 'غير محدد'}<br />
+                                          {order.shippingAddress?.city || ''} {order.shippingAddress?.state || ''}<br />
+                                          {order.shippingAddress?.postalCode || ''} {order.shippingAddress?.country || ''}
+                                        </p>
                                         <Button
                                           size="sm"
                                           variant="outline"
-                                          onClick={() => copyToClipboard(order.shippingAddress.phone, 'رقم الهاتف')}
+                                          onClick={() => copyToClipboard(
+                                            `${order.shippingAddress?.street}, ${order.shippingAddress?.city}, ${order.shippingAddress?.state}`,
+                                            'العنوان'
+                                          )}
+                                          className="mt-2"
                                         >
                                           <Copy className="w-3 h-3 mr-1" />
-                                          نسخ الرقم
+                                          نسخ العنوان
                                         </Button>
-                                      )}
-                                    </div>
-                                  ) : (
-                                    <p className="text-sm text-slate-500">لا يوجد رقم هاتف</p>
-                                  )}
-                                </div>
-                              </div>
+                                      </div>
 
-                              {/* Quick Info */}
-                              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
-                                  <p className="text-xs text-slate-600">المنتجات</p>
-                                  <p className="text-lg font-bold text-slate-900">{order.items?.length || 0}</p>
-                                </div>
-                                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
-                                  <p className="text-xs text-slate-600">طريقة الدفع</p>
-                                  <p className="text-sm font-semibold text-slate-900">{order.paymentMethod || 'N/A'}</p>
-                                </div>
-                                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
-                                  <p className="text-xs text-slate-600">حالة الدفع</p>
-                                  <p className="text-sm font-semibold text-slate-900">{order.paymentStatus || 'N/A'}</p>
-                                </div>
-                                <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
-                                  <p className="text-xs text-slate-600">رقم التتبع</p>
-                                  <p className="text-sm font-semibold text-slate-900">{order.trackingNumber || 'لا يوجد'}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )}
-                      </React.Fragment>
-                    );
-                    })}
-                  </TableBody>
-                </Table>
+                                      {/* Contact Info */}
+                                      <div className="bg-white rounded-lg p-4 border border-slate-200">
+                                        <div className="flex items-center gap-2 mb-3">
+                                          <Phone className="w-4 h-4 text-green-600" />
+                                          <h4 className="font-semibold text-slate-900">معلومات الاتصال</h4>
+                                        </div>
+                                        {order.shippingAddress?.phone ? (
+                                          <div className="space-y-2">
+                                            <p className="text-sm text-slate-700">
+                                              {order.shippingAddress.phone}
+                                            </p>
+                                            {isMobileDevice() ? (
+                                              <a
+                                                href={`tel:${order.shippingAddress.phone}`}
+                                                className="inline-flex items-center gap-2 px-3 py-2 bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors text-sm"
+                                              >
+                                                <Phone className="w-4 h-4" />
+                                                اتصال الآن
+                                              </a>
+                                            ) : (
+                                              <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => copyToClipboard(order.shippingAddress.phone, 'رقم الهاتف')}
+                                              >
+                                                <Copy className="w-3 h-3 mr-1" />
+                                                نسخ الرقم
+                                              </Button>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <p className="text-sm text-slate-500">لا يوجد رقم هاتف</p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Quick Info */}
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                      <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                                        <p className="text-xs text-slate-600">المنتجات</p>
+                                        <p className="text-lg font-bold text-slate-900">{order.items?.length || 0}</p>
+                                      </div>
+                                      <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                                        <p className="text-xs text-slate-600">طريقة الدفع</p>
+                                        <p className="text-sm font-semibold text-slate-900">{order.paymentMethod || 'N/A'}</p>
+                                      </div>
+                                      <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                                        <p className="text-xs text-slate-600">حالة الدفع</p>
+                                        <p className="text-sm font-semibold text-slate-900">{order.paymentStatus || 'N/A'}</p>
+                                      </div>
+                                      <div className="bg-white rounded-lg p-3 border border-slate-200 text-center">
+                                        <p className="text-xs text-slate-600">رقم التتبع</p>
+                                        <p className="text-sm font-semibold text-slate-900">{order.trackingNumber || 'لا يوجد'}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            )}
+                          </React.Fragment>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
         )}
-        
+
         {/* Edit Order Dialog */}
         <OrderEditDialog
           order={editingOrder}
@@ -1528,7 +1527,7 @@ const AdminOrders = () => {
           onOpenChange={setIsEditDialogOpen}
           onSave={handleSaveOrder}
         />
-        
+
         {/* Partial Refund Dialog */}
         <PartialRefundDialog
           order={refundOrder}
@@ -1536,7 +1535,7 @@ const AdminOrders = () => {
           onOpenChange={setIsRefundDialogOpen}
           onSave={handleSaveOrderAfterRefund}
         />
-        
+
         {/* Order Cancellation Dialog */}
         <OrderCancellationDialog
           order={cancellationOrder}
@@ -1544,7 +1543,7 @@ const AdminOrders = () => {
           onOpenChange={setIsCancellationDialogOpen}
           onSave={handleSaveOrderAfterCancellation}
         />
-        
+
         {/* Customer Communication Dialog */}
         <CustomerCommunicationDialog
           order={communicationOrder}

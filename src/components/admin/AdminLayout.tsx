@@ -111,14 +111,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20" dir="rtl">
-      {/* Animated background elements */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-10 left-10 w-32 h-32 bg-blue-500/10 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-20 w-40 h-40 bg-purple-500/10 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-48 h-48 bg-indigo-500/5 rounded-full blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
-      </div>
-      
+    <div className="min-h-screen bg-background" dir="rtl">
       <AdminSidebar 
         collapsed={collapsed} 
         onToggle={toggleSidebar}
@@ -128,9 +121,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       />
       <div className={cn(
         "flex flex-col min-h-screen transition-all duration-300 ease-in-out",
-        // On mobile, no left margin as sidebar is overlay
-        // On desktop, use responsive margins
-        isMobile ? "ml-0" : (collapsed ? "ml-16" : "ml-80")
+        // On mobile, no padding as sidebar is overlay
+        // On desktop, use padding-right for RTL (sidebar is on the right)
+        isMobile ? "pr-0" : (collapsed ? "pr-20" : "pr-72")
       )}>
         <AdminHeader user={adminUser} onToggleSidebar={toggleSidebar} />
         <main className="flex-1 overflow-y-auto">

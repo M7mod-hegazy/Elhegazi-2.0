@@ -1,19 +1,705 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ShopBuilderProvider, useShopBuilder } from './store';
+import type { ShopBuilderWall, ShopBuilderSlatWall, ShopBuilderSlatAccessory, ShopBuilderColumn } from './types';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import FloorplanCanvas from './floorplan/FloorplanCanvas';
 import ThreeScene, { type ThreeSceneHandle, type TransformMode, WALL_TEXTURES } from './three/ThreeScene';
 import BuilderToolbar from './ui/BuilderToolbar';
 import { SceneItemsList } from './ui/SceneItemsList';
 import { Button } from '@/components/ui/button';
-import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock } from 'lucide-react';
+import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock, Plus, ChevronUp, Grid3x3 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useShopSetup } from '@/hooks/useShopSetup';
 import { useTheme } from '@/context/ThemeContext';
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const DEFAULT_TRANSFORM_MODE: TransformMode = 'translate';
+
+function InteractiveAccessoryNode({
+   accessory,
+   slatWidth,
+   slatHeight,
+   slatSpacing,
+   isActive,
+   onActivate,
+   updateAccessory,
+   activeSide
+}: {
+   accessory: ShopBuilderSlatAccessory;
+   slatWidth: number;
+   slatHeight: number;
+   slatSpacing: number;
+   isActive: boolean;
+   onActivate: () => void;
+   updateAccessory: (updates: Partial<ShopBuilderSlatAccessory>) => void;
+   activeSide: 'front' | 'back';
+}) {
+   const widthPct = (accessory.width / slatWidth) * 100;
+   const visualX = activeSide === 'back' ? 1 - accessory.position.x : accessory.position.x;
+   const leftPct = visualX * 100;
+   const bottomPct = accessory.position.y * 100;
+
+   const handlePointerDown = (e: React.PointerEvent) => {
+      onActivate();
+      e.stopPropagation();
+      e.preventDefault();
+
+      const el = e.currentTarget as HTMLDivElement;
+      el.setPointerCapture(e.pointerId);
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startVisualX = activeSide === 'back' ? 1 - accessory.position.x : accessory.position.x;
+      const startPosY = accessory.position.y;
+      
+      const parent = el.parentElement;
+      if (!parent) return;
+      const rect = parent.getBoundingClientRect();
+
+      const handleMove = (moveEvent: PointerEvent) => {
+         const dx = moveEvent.clientX - startX;
+         const dy = startY - moveEvent.clientY;
+         
+         let newVisualX = startVisualX + (dx / rect.width);
+         let newY = startPosY + (dy / rect.height);
+         
+         const intervalY = slatSpacing / slatHeight;
+         newY = Math.round(newY / intervalY) * intervalY;
+
+         newVisualX = Math.max(0, Math.min(1, newVisualX));
+         newY = Math.max(0, Math.min(1, newY));
+
+         const newX = activeSide === 'back' ? 1 - newVisualX : newVisualX;
+         updateAccessory({ position: { x: newX, y: newY } });
+      };
+
+      const handleUp = (upEvent: PointerEvent) => {
+         el.releasePointerCapture(upEvent.pointerId);
+         el.removeEventListener('pointermove', handleMove);
+         el.removeEventListener('pointerup', handleUp);
+      };
+
+      el.addEventListener('pointermove', handleMove);
+      el.addEventListener('pointerup', handleUp);
+   };
+
+   let colorCls, bgCls;
+   if (accessory.type === 'shelf') {
+       colorCls = 'border-amber-600';
+       bgCls = 'bg-amber-500';
+   } else if (accessory.type === 'hook_single') {
+       colorCls = 'border-blue-500';
+       bgCls = 'bg-blue-400';
+   } else if (accessory.type === 'hook_waterfall') {
+       colorCls = 'border-zinc-500';
+       bgCls = 'bg-zinc-400';
+   }
+
+   return (
+      <div
+         onPointerDown={handlePointerDown}
+         title={accessory.type === 'shelf' ? "رف" : accessory.type === 'hook_single' ? "خطاف مفرد" : "خطاف ملابس"}
+         className={`absolute flex border-2 shadow-sm transition-colors cursor-move ${isActive ? `border-primary bg-primary/20 z-20` : `${colorCls} ${bgCls} border-opacity-70 z-10`} ${accessory.type === 'shelf' ? 'rounded-sm' : 'rounded-full'}`}
+         style={{
+            left: `${leftPct}%`,
+            bottom: `${bottomPct}%`,
+            width: accessory.type === 'shelf' ? `${widthPct}%` : '12px',
+            height: '12px',
+            transform: 'translateX(-50%) translateY(50%)'
+         }}
+      >
+         {accessory.type === 'hook_single' && <div className="absolute inset-0 m-auto w-1.5 h-1.5 rounded-full bg-white opacity-60" />}
+         {accessory.type === 'hook_waterfall' && (
+            <div className="absolute inset-0 flex flex-col justify-around items-center py-0.5">
+               <div className="w-1 h-1 rounded-full bg-white opacity-70"/>
+               <div className="w-1 h-1 rounded-full bg-white opacity-70"/>
+            </div>
+         )}
+      </div>
+   );
+}
+
+function InteractiveSlatNode({
+  slat,
+  wallLength,
+  wallHeight,
+  isActive,
+  onActivate,
+  updateSlat,
+  containerRef,
+  activeAccessoryId,
+  setActiveAccessoryId,
+  updateAccessory,
+  activeSide
+}: {
+  slat: ShopBuilderSlatWall;
+  wallLength: number;
+  wallHeight: number;
+  isActive: boolean;
+  onActivate: () => void;
+  updateSlat: (updates: Partial<ShopBuilderSlatWall>) => void;
+  containerRef: React.RefObject<HTMLDivElement>;
+  activeAccessoryId: string | null;
+  setActiveAccessoryId: (id: string | null) => void;
+  updateAccessory: (accId: string, updates: Partial<ShopBuilderSlatAccessory>) => void;
+  activeSide: 'front' | 'back';
+}) {
+  const width = slat.fillType === 'full' ? wallLength : (slat.width || 1);
+  const widthPct = (width / wallLength) * 100;
+  const heightPct = (slat.height / wallHeight) * 100;
+  const bottomPct = (slat.bottomOffset / wallHeight) * 100;
+  const visualPos = activeSide === 'back' ? 1 - slat.position! : slat.position!;
+  const leftPct = slat.fillType === 'full' ? 0 : (visualPos - (width/wallLength/2)) * 100;
+
+  const handlePointerDown = (e: React.PointerEvent) => {
+    onActivate();
+    if (slat.fillType === 'full') return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const el = e.currentTarget as HTMLDivElement;
+    el.setPointerCapture(e.pointerId);
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    const startVisualPos = activeSide === 'back' ? 1 - (slat.position || 0.5) : (slat.position || 0.5);
+    const startBottom = slat.bottomOffset;
+    
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    
+    const handleMove = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = startY - moveEvent.clientY; 
+      
+      const dxMeters = (dx / rect.width) * wallLength;
+      const dyMeters = (dy / rect.height) * wallHeight;
+      
+      let newVisualPos = startVisualPos + (dxMeters / wallLength);
+      let newBottom = startBottom + dyMeters;
+      
+      const widthInMeters = slat.width || 1;
+      
+      newVisualPos = Math.max((widthInMeters / wallLength / 2), Math.min(1 - (widthInMeters / wallLength / 2), newVisualPos));
+      newBottom = Math.max(0, Math.min(wallHeight - slat.height, newBottom));
+      
+      const newPos = activeSide === 'back' ? 1 - newVisualPos : newVisualPos;
+      updateSlat({ position: newPos, bottomOffset: newBottom });
+    };
+    
+    const handleUp = (upEvent: PointerEvent) => {
+      el.releasePointerCapture(upEvent.pointerId);
+      el.removeEventListener('pointermove', handleMove);
+      el.removeEventListener('pointerup', handleUp);
+    };
+    
+    el.addEventListener('pointermove', handleMove);
+    el.addEventListener('pointerup', handleUp);
+  };
+
+  const handleResizeStart = (e: React.PointerEvent, dirX: number, dirY: number) => {
+    // If full, cannot resize horizontally. But they CAN resize vertically.
+    if (slat.fillType === 'full' && dirX !== 0) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    onActivate();
+    
+    const el = e.currentTarget as HTMLDivElement;
+    el.setPointerCapture(e.pointerId);
+    
+    const startX = e.clientX;
+    const startY = e.clientY;
+    
+    const startWidth = slat.width || 1;
+    const startHeight = slat.height;
+    const startVisualPos = activeSide === 'back' ? 1 - (slat.position || 0.5) : (slat.position || 0.5);
+    const startBottom = slat.bottomOffset;
+    
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    
+    const startLeft = (startVisualPos * wallLength) - (startWidth / 2);
+    const startRight = (startVisualPos * wallLength) + (startWidth / 2);
+    const startBottomEdge = startBottom;
+    const startTopEdge = startBottom + startHeight;
+
+    const handleMove = (moveEvent: PointerEvent) => {
+      const dx = moveEvent.clientX - startX;
+      const dy = startY - moveEvent.clientY; 
+      
+      const dxMeters = (dx / rect.width) * wallLength;
+      const dyMeters = (dy / rect.height) * wallHeight;
+
+      let newLeft = startLeft;
+      let newRight = startRight;
+      let newBottom = startBottomEdge;
+      let newTop = startTopEdge;
+
+      if (dirX === 1) newRight += dxMeters; 
+      if (dirX === -1) newLeft += dxMeters; 
+      if (dirY === 1) newTop += dyMeters; 
+      if (dirY === -1) newBottom += dyMeters; 
+
+      if (newLeft < 0) newLeft = 0;
+      if (newRight > wallLength) newRight = wallLength;
+      if (newBottom < 0) newBottom = 0;
+      if (newTop > wallHeight) newTop = wallHeight;
+
+      if (newRight - newLeft < 0.1) {
+         if (dirX === 1) newRight = newLeft + 0.1;
+         if (dirX === -1) newLeft = newRight - 0.1;
+      }
+      if (newTop - newBottom < 0.1) {
+         if (dirY === 1) newTop = newBottom + 0.1;
+         if (dirY === -1) newBottom = newTop - 0.1;
+      }
+
+      const endWidth = newRight - newLeft;
+      const endHeight = newTop - newBottom;
+      const endVisualPos = (newLeft + (endWidth / 2)) / wallLength;
+      const endBottomOffset = newBottom;
+      const endPos = activeSide === 'back' ? 1 - endVisualPos : endVisualPos;
+
+      updateSlat({
+         width: endWidth,
+         height: endHeight,
+         position: endPos,
+         bottomOffset: endBottomOffset
+      });
+    };
+    
+    const handleUp = (upEvent: PointerEvent) => {
+      el.releasePointerCapture(upEvent.pointerId);
+      el.removeEventListener('pointermove', handleMove);
+      el.removeEventListener('pointerup', handleUp);
+    };
+    
+    el.addEventListener('pointermove', handleMove);
+    el.addEventListener('pointerup', handleUp);
+  };
+
+  return (
+    <div
+      onPointerDown={handlePointerDown}
+      className={`absolute transition-colors cursor-move shadow-md ${
+        isActive ? 'ring-2 ring-primary z-10' : 'ring-1 ring-black/20 hover:ring-2 hover:ring-black/30'
+      }`}
+      style={{
+        left: `${leftPct}%`,
+        bottom: `${bottomPct}%`,
+        width: `${widthPct}%`,
+        height: `${heightPct}%`,
+        backgroundColor: slat.systemType === 'supermarket_shelves' ? '#fff' : (slat.color || '#f5f5f5'),
+        backgroundImage: slat.systemType === 'supermarket_shelves' 
+           ? `repeating-linear-gradient(90deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 4px, transparent 4px, transparent ${Math.max(1, ((slat.uprightSpacing || 1.0) / width) * 100)}%), 
+              repeating-linear-gradient(0deg, transparent, transparent calc(${100 / (slat.shelfCount || 5)}% - 4px), ${slat.color || '#e11d48'} calc(${100 / (slat.shelfCount || 5)}% - 4px), ${slat.color || '#e11d48'} ${100 / (slat.shelfCount || 5)}%)`
+           : `repeating-linear-gradient(0deg, transparent, transparent calc(100% - 2px), rgba(0,0,0,0.2) calc(100% - 2px), rgba(0,0,0,0.2) 100%)`,
+        backgroundSize: slat.systemType === 'supermarket_shelves' 
+           ? `100% 100%, 100% 100%` 
+           : `100% ${100 / (slat.height / Math.max(0.01, slat.slatSpacing))}%`,
+      }}
+    >
+      {isActive && (
+        <div className="absolute top-0 right-0 p-1 bg-primary text-primary-foreground text-[10px] rounded-bl-md font-bold pointer-events-none">
+          محدد
+        </div>
+      )}
+      
+      {/* Resize Handles */}
+      {isActive && slat.fillType === 'partial' && (
+        <>
+          <div onPointerDown={e => handleResizeStart(e, -1, 1)} className="absolute w-3 h-3 bg-white border-2 border-primary rounded-full cursor-nwse-resize -left-1.5 -top-1.5" />
+          <div onPointerDown={e => handleResizeStart(e, 1, 1)} className="absolute w-3 h-3 bg-white border-2 border-primary rounded-full cursor-nesw-resize -right-1.5 -top-1.5" />
+          <div onPointerDown={e => handleResizeStart(e, -1, -1)} className="absolute w-3 h-3 bg-white border-2 border-primary rounded-full cursor-nesw-resize -left-1.5 -bottom-1.5" />
+          <div onPointerDown={e => handleResizeStart(e, 1, -1)} className="absolute w-3 h-3 bg-white border-2 border-primary rounded-full cursor-nwse-resize -right-1.5 -bottom-1.5" />
+          <div onPointerDown={e => handleResizeStart(e, -1, 0)} className="absolute w-3 h-6 bg-white border-2 border-primary rounded-full cursor-ew-resize -left-1.5 top-1/2 -mt-3" />
+          <div onPointerDown={e => handleResizeStart(e, 1, 0)} className="absolute w-3 h-6 bg-white border-2 border-primary rounded-full cursor-ew-resize -right-1.5 top-1/2 -mt-3" />
+        </>
+      )}
+      
+      {/* Vertical Handles (available for both partial and full if active) */}
+      {isActive && (
+        <>
+          <div onPointerDown={e => handleResizeStart(e, 0, 1)} className="absolute h-3 w-6 bg-white border-2 border-primary rounded-full cursor-ns-resize left-1/2 -ml-3 -top-1.5" />
+          <div onPointerDown={e => handleResizeStart(e, 0, -1)} className="absolute h-3 w-6 bg-white border-2 border-primary rounded-full cursor-ns-resize left-1/2 -ml-3 -bottom-1.5" />
+        </>
+      )}
+
+      {/* Render Accessories */}
+      {slat.accessories?.map(acc => (
+          <InteractiveAccessoryNode 
+             key={acc.id}
+             accessory={acc}
+             slatWidth={width}
+             slatHeight={slat.height}
+             slatSpacing={slat.slatSpacing || 0.15}
+             isActive={activeAccessoryId === acc.id}
+             onActivate={() => setActiveAccessoryId(acc.id)}
+             updateAccessory={(updates) => updateAccessory(acc.id, updates)}
+             activeSide={activeSide}
+          />
+      ))}
+    </div>
+  );
+}
+
+function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }: { targetId: string, type: 'wall' | 'column', primaryColor: string, secondaryColor: string }) {
+  const { layout, addSlatWallToWall, updateSlatWall, removeSlatWall, addAccessoryToSlat, updateAccessory, removeAccessory } = useShopBuilder();
+  const [activeSide, setActiveSide] = useState<'front'|'back'>('front');
+  const [activeId, setActiveId] = useState<string|null>(null);
+  const [activeAccessoryId, setActiveAccessoryId] = useState<string|null>(null);
+  const [insertSystemType, setInsertSystemType] = useState<string>('slat');
+  const [isAddingNewSystem, setIsAddingNewSystem] = useState<boolean>(false);
+  
+  let targetObject: ShopBuilderWall | ShopBuilderColumn | undefined;
+  let wallLength = 1;
+  let wallHeight = 1;
+  
+  if (type === 'wall') {
+     targetObject = layout.walls.find(w => w.id === targetId);
+     if (targetObject) {
+         wallLength = Math.hypot(targetObject.end.x - targetObject.start.x, targetObject.end.y - targetObject.start.y);
+         wallHeight = targetObject.height;
+     }
+  } else {
+     const wallContext = layout.walls.find(w => w.columns?.some(c => c.id === targetId));
+     targetObject = wallContext?.columns?.find(c => c.id === targetId);
+     if (targetObject) {
+         wallLength = targetObject.width;
+         wallHeight = targetObject.height;
+     }
+  }
+
+  if (!targetObject) return null;
+  
+  const slatWalls = targetObject.slatWalls?.filter(s => s.side === activeSide) || [];
+  const selectedSlat = slatWalls.find(s => s.id === activeId);
+
+   const containerRef = useRef<HTMLDivElement>(null);
+   
+   return (
+     <div className="flex flex-col md:flex-row gap-6 mt-4 w-full" style={{ minHeight: 460 }}>
+       {/* 2D Canvas */}
+       <div className="flex-1 min-w-[280px] min-h-[400px] relative bg-zinc-100 rounded-xl border border-zinc-200 overflow-auto flex items-center justify-center p-6" onPointerDown={(e) => { if (e.target === e.currentTarget) setActiveId(null); }}>
+          <div className="w-full h-full flex items-center justify-center overflow-auto min-h-0">
+             <div 
+                ref={containerRef}
+                className="bg-zinc-200 relative shadow-inner overflow-visible border-2 border-zinc-300 pointer-events-auto select-none shrink-0" 
+                style={{ 
+                   aspectRatio: `${wallLength} / ${wallHeight}`,
+                   maxWidth: wallLength > wallHeight ? '100%' : 'none',
+                   maxHeight: wallLength > wallHeight ? 'none' : '100%',
+                   minWidth: Math.min(120, wallLength * 500),
+                   ...(wallLength > wallHeight ? { width: '100%' } : { height: '100%' })
+                }}
+                onPointerDown={(e) => { if (e.target === e.currentTarget) setActiveId(null); }}
+             >
+                {/* Draw Columns - only show on the active side */}
+             {type === 'wall' && (targetObject as ShopBuilderWall).columns
+                ?.filter(col => {
+                   const side = (col.side === 'front' || col.side === 'back') ? col.side : 'front';
+                   return side === activeSide;
+                })
+                .map(col => {
+                const wLen = wallLength || 1;
+                const wHei = wallHeight || 1;
+                const widthPct = ((col.width || 0.4) / wLen) * 100;
+                const heightPct = ((col.height || 3) / wHei) * 100;
+                
+                // If viewing from back, left and right are reversed
+                const visualPos = activeSide === 'back' ? 1 - (col.position || 0.5) : (col.position || 0.5);
+                const leftPct = visualPos * 100 - (widthPct / 2);
+                
+                return (
+                   <div 
+                      key={col.id}
+                      className="absolute bottom-0 bg-stone-300/80 border border-stone-400 z-20 flex flex-col items-center justify-center text-[10px] text-stone-600 font-bold pointer-events-none transition-all"
+                      style={{
+                         left: `${Math.max(0, leftPct)}%`,
+                         width: `${Math.min(100 - Math.max(0, leftPct), widthPct)}%`,
+                         height: `${Math.min(100, heightPct)}%`
+                      }}
+                   >
+                      <div className="bg-white/90 px-1.5 py-0.5 rounded text-[9px] shadow-sm border border-stone-200">عمود</div>
+                   </div>
+                );
+             })}
+             {/* Draw Slats */}
+             {slatWalls.map(slat => (
+                <InteractiveSlatNode
+                   key={slat.id}
+                   slat={slat}
+                   wallLength={wallLength}
+                   wallHeight={wallHeight}
+                   isActive={activeId === slat.id}
+                   onActivate={() => { setActiveId(slat.id); setActiveAccessoryId(null); }}
+                   updateSlat={(updates) => updateSlatWall(targetId, slat.id, updates)}
+                   containerRef={containerRef}
+                   activeAccessoryId={activeAccessoryId}
+                   setActiveAccessoryId={setActiveAccessoryId}
+                   updateAccessory={(accId, updates) => updateAccessory(targetId, slat.id, accId, updates)}
+                   activeSide={activeSide}
+                />
+             ))}
+          </div>
+          </div>
+       </div>
+       
+       {/* Controller Sidebar */}
+       <div className="w-full md:w-[340px] md:max-w-[340px] flex-shrink-0 flex flex-col gap-4 overflow-y-auto pr-2 pb-4" style={{ maxHeight: 500 }}>
+          
+          {/* Active Side Toggle (Global) */}
+          <div className="flex bg-zinc-100 rounded-lg p-1">
+             <button onClick={() => {setActiveSide('front'); setActiveId(null)}} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeSide === 'front' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>الوجه الأمامي</button>
+             <button onClick={() => {setActiveSide('back'); setActiveId(null)}} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeSide === 'back' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>الوجه الخلفي</button>
+          </div>
+
+           {!isAddingNewSystem ? (
+             <button
+                onClick={() => {
+                   setIsAddingNewSystem(true);
+                   setActiveId(null);
+                }}
+                className="w-full py-4 mt-2 bg-white hover:bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-blue-400 text-zinc-600 hover:text-blue-600 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+             >
+                <Plus className="w-5 h-5"/>
+                إضافة نظام عرض جديد
+             </button>
+           ) : (
+             <div className="flex flex-col gap-4 p-4 bg-white rounded-xl border-2 border-blue-100 shadow-md relative overflow-hidden">
+                <button 
+                  onClick={() => setIsAddingNewSystem(false)}
+                  className="absolute top-3 left-3 text-zinc-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <h3 className="font-bold text-zinc-800 text-sm mb-1 pb-2 border-b border-zinc-100">إضافة نظام جديد</h3>
+                
+                {/* System Type Selector */}
+                <div className="flex flex-col gap-1.5 flex-shrink-0">
+                    <label className="text-xs font-bold text-zinc-600">1. نوع النظام</label>
+                    <select 
+                       value={insertSystemType} 
+                       onChange={e => setInsertSystemType(e.target.value)} 
+                       className="w-full p-2 border border-zinc-200 rounded-lg text-sm bg-zinc-50 outline-none focus:border-blue-500 font-semibold text-zinc-700"
+                    >
+                       <option value="slat">جدار شرائحي (Slat Wall)</option>
+                       <option value="supermarket_shelves">أرفف سوبر ماركت (Supermarket Shelves)</option>
+                    </select>
+                </div>
+
+               {/* Side Toggle removed from here (moved to top of sidebar) */}
+      
+               {/* Add Actions */}
+               <div className="flex gap-2 flex-shrink-0 pt-2 border-t border-zinc-100">
+                  <button
+                     onClick={() => {
+                       if (slatWalls.some(s => s.fillType === 'full' && s.side === activeSide)) return alert('لا يمكن الإضافة، يوجد نظام يشغل كامل الجدار على هذا الوجه.');
+                       const id = addSlatWallToWall(targetId, activeSide);
+                       updateSlatWall(targetId, id, { systemType: insertSystemType as 'slat' | 'supermarket_shelves' });
+                       setActiveId(id);
+                       setIsAddingNewSystem(false);
+                     }}
+                     className="flex-1 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors border border-blue-200 flex flex-col items-center justify-center gap-1"
+                     style={{ color: primaryColor }}
+                  >
+                     <Plus className="w-4 h-4"/>
+                     كامل الجدار
+                  </button>
+                  <button
+                     onClick={() => {
+                       if (slatWalls.some(s => s.fillType === 'full' && s.side === activeSide)) return alert('لا يمكن الإضافة، يوجد نظام يشغل كامل الجدار على هذا الوجه.');
+                       const id = addSlatWallToWall(targetId, activeSide);
+                       updateSlatWall(targetId, id, { systemType: insertSystemType as 'slat' | 'supermarket_shelves', fillType: 'partial', position: 0.5, width: Math.min(1, wallLength), height: Math.min(2, wallHeight) });
+                      setActiveId(id);
+                      setIsAddingNewSystem(false);
+                    }}
+                    className="flex-1 py-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 rounded-lg text-xs font-bold transition-colors border border-zinc-200 flex flex-col items-center justify-center gap-1"
+                 >
+                    <Plus className="w-4 h-4 text-zinc-500"/>
+                    جزء فقط
+                 </button>
+              </div>
+            </div>
+           )}
+
+         {/* Selected Editor */}
+         {selectedSlat ? (
+            activeAccessoryId && selectedSlat.accessories?.find(a => a.id === activeAccessoryId) ? (
+                 (() => {
+                    const acc = selectedSlat.accessories?.find(a => a.id === activeAccessoryId)!;
+                    return (
+                        <div className="flex flex-col gap-4 p-4 border border-zinc-200 rounded-xl bg-white shadow-sm">
+                           <div className="flex justify-between items-center pb-2 border-b border-zinc-100">
+                             <h3 className="font-bold text-sm" style={{ color: primaryColor }}>إعدادات الرف</h3>
+                             <button onClick={() => { removeAccessory(targetId, selectedSlat.id, acc.id); setActiveAccessoryId(null); }} className="text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors"><Trash2 className="w-4 h-4"/></button>
+                           </div>
+                           
+                           {/* Color */}
+                           <div className="flex flex-col gap-1.5">
+                              <label className="text-xs font-semibold text-zinc-600">اللون الأساسي</label>
+                              <input type="color" value={acc.color || '#d97706'} onChange={e => updateAccessory(targetId, selectedSlat.id, acc.id, {color: e.target.value})} className="w-full h-8 rounded-md cursor-pointer border border-zinc-200"/>
+                           </div>
+
+                             {/* Dimensions */}
+                             <div className="flex gap-2">
+                               <div className="flex flex-col gap-1.5 flex-1">
+                                  <label className="text-[10px] font-semibold text-zinc-500">العرض (م)</label>
+                                  <input type="number" step="0.1" value={acc.width} onChange={e => updateAccessory(targetId, selectedSlat.id, acc.id, {width: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                               </div>
+                               <div className="flex flex-col gap-1.5 flex-1">
+                                  <label className="text-[10px] font-semibold text-zinc-500">العمق (م)</label>
+                                  <input type="number" step="0.1" value={acc.depth} onChange={e => updateAccessory(targetId, selectedSlat.id, acc.id, {depth: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                               </div>
+                             </div>
+
+                           <button onClick={() => setActiveAccessoryId(null)} className="mt-4 p-2 w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs rounded-lg font-semibold transition-colors">
+                             العودة إلى إعدادات النظام
+                           </button>
+                        </div>
+                    )
+                 })()
+            ) : (
+            <div className="flex flex-col gap-4 p-4 border border-zinc-200 rounded-xl bg-white shadow-sm">
+               <div className="flex justify-between items-center pb-2 border-b border-zinc-100">
+                 <h3 className="font-bold text-sm" style={{ color: primaryColor }}>إعدادات النظام</h3>
+                 <button onClick={() => { removeSlatWall(targetId, selectedSlat.id); setActiveId(null); }} className="text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors"><Trash2 className="w-4 h-4"/></button>
+               </div>
+               
+               {/* System Type */}
+               <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-zinc-600">نوع النظام</label>
+                  <select 
+                     value={selectedSlat.systemType || 'slat'} 
+                     onChange={e => updateSlatWall(targetId, selectedSlat.id, {systemType: e.target.value as any})} 
+                     className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"
+                  >
+                     <option value="slat">جدار شرائحي (Slat Wall)</option>
+                     <option value="supermarket_shelves">أرفف سوبر ماركت (Supermarket Shelves)</option>
+                  </select>
+               </div>
+               
+               {/* Color */}
+               <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-zinc-600">اللون الأساسي</label>
+                  <input type="color" value={selectedSlat.color || '#f5f5f5'} onChange={e => updateSlatWall(targetId, selectedSlat.id, {color: e.target.value})} className="w-full h-8 rounded-md cursor-pointer border border-zinc-200"/>
+               </div>
+
+               {(!selectedSlat.systemType || selectedSlat.systemType === 'slat') && (
+                 /* Spacing */
+                 <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-zinc-600">المسافة بين الشرائح (م)</label>
+                    <input type="number" step="0.01" min="0.05" value={selectedSlat.slatSpacing} onChange={e => updateSlatWall(targetId, selectedSlat.id, {slatSpacing: Number(e.target.value)})} className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"/>
+                 </div>
+               )}
+
+               {selectedSlat.systemType === 'supermarket_shelves' && (
+                 <>
+                   <div className="flex gap-2">
+                     <div className="flex flex-col gap-1.5 flex-1">
+                        <label className="text-[10px] font-semibold text-zinc-500">عدد الأرفف الأفقية</label>
+                        <input type="number" step="1" min="1" value={selectedSlat.shelfCount || 5} onChange={e => updateSlatWall(targetId, selectedSlat.id, {shelfCount: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                     </div>
+                     <div className="flex flex-col gap-1.5 flex-1">
+                        <label className="text-[10px] font-semibold text-zinc-500">عمق الرف (م)</label>
+                        <input type="number" step="0.05" min="0.2" value={selectedSlat.shelfDepth || 0.4} onChange={e => updateSlatWall(targetId, selectedSlat.id, {shelfDepth: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                     </div>
+                   </div>
+                   <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-semibold text-zinc-600">المسافة بين الأعمدة (م)</label>
+                      <input type="number" step="0.1" min="0.6" value={selectedSlat.uprightSpacing || 1.0} onChange={e => updateSlatWall(targetId, selectedSlat.id, {uprightSpacing: Number(e.target.value)})} className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"/>
+                   </div>
+                 </>
+               )}
+
+               {selectedSlat.fillType === 'partial' ? (
+                  <>
+                     <div className="flex gap-2">
+                       <div className="flex flex-col gap-1.5 flex-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">العرض (م)</label>
+                          <input type="number" step="0.1" value={selectedSlat.width || 1} onChange={e => updateSlatWall(targetId, selectedSlat.id, {width: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                       </div>
+                       <div className="flex flex-col gap-1.5 flex-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">الارتفاع (م)</label>
+                          <input type="number" step="0.1" value={selectedSlat.height} onChange={e => updateSlatWall(targetId, selectedSlat.id, {height: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                       </div>
+                     </div>
+                     <div className="flex gap-2">
+                       <div className="flex flex-col gap-1.5 flex-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">الموضع الأفقي (0-1)</label>
+                          <input type="number" step="0.05" min="0" max="1" value={selectedSlat.position || 0.5} onChange={e => updateSlatWall(targetId, selectedSlat.id, {position: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                       </div>
+                       <div className="flex flex-col gap-1.5 flex-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">الارتفاع من الأرض (م)</label>
+                          <input type="number" step="0.1" value={selectedSlat.bottomOffset} onChange={e => updateSlatWall(targetId, selectedSlat.id, {bottomOffset: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                       </div>
+                     </div>
+                  </>
+               ) : (
+                  <>
+                     <div className="flex flex-col gap-1.5 flex-1 mt-2">
+                        <label className="text-[10px] font-semibold text-zinc-500">الارتفاع (م)</label>
+                        <input type="number" step="0.1" value={selectedSlat.height} onChange={e => updateSlatWall(targetId, selectedSlat.id, {height: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                     </div>
+                     <div className="flex flex-col gap-1.5 flex-1">
+                        <label className="text-[10px] font-semibold text-zinc-500">الارتفاع من الأرض (م)</label>
+                        <input type="number" step="0.1" value={selectedSlat.bottomOffset} onChange={e => updateSlatWall(targetId, selectedSlat.id, {bottomOffset: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                     </div>
+                  </>
+               )}
+
+               {(!selectedSlat.systemType || selectedSlat.systemType === 'slat') && (
+                 <div className="pt-4 border-t border-zinc-100 flex flex-col gap-3">
+                    <label className="text-xs font-semibold text-zinc-600">إضافة الملحقات (Accessories)</label>
+                    <div className="grid grid-cols-3 gap-2">
+                       <button onClick={() => {
+                          const accId = addAccessoryToSlat(targetId, selectedSlat.id, 'shelf');
+                          setActiveAccessoryId(accId);
+                       }} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
+                          <div className="w-full aspect-square rounded-md bg-zinc-100 overflow-hidden relative">
+                             <img src="https://static.commerceplatform.services/images/zoom/swws1224mp.rw_zoom.jpg" alt="رف خشبي" className="w-full h-full object-cover mix-blend-darken" />
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-700">رف مسطح</span>
+                       </button>
+                       <button onClick={() => {
+                          const accId = addAccessoryToSlat(targetId, selectedSlat.id, 'hook_single');
+                          setActiveAccessoryId(accId);
+                       }} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
+                          <div className="w-full aspect-square rounded-md bg-zinc-100 overflow-hidden relative">
+                             <img src="https://m.media-amazon.com/images/I/51H+WnKu2fL._AC_SX679_.jpg" alt="شوك تعليق" className="w-full h-full object-cover mix-blend-multiply" />
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-700">شوك مفرد</span>
+                       </button>
+                       <button onClick={() => {
+                          const accId = addAccessoryToSlat(targetId, selectedSlat.id, 'hook_waterfall');
+                          setActiveAccessoryId(accId);
+                       }} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
+                          <div className="w-full aspect-square rounded-md bg-zinc-100 overflow-hidden relative">
+                             <img src="https://s.alicdn.com/@sc04/kf/H3e06bf17449d413f8eebd8b07b989664K/Wholesale-Retail-Store-Metal-Waterfall-Display-Hook-with-Bins-Chrome-Finish-Slatwall-Compatible-Displays-for-Shop-Showcase.jpg_300x300.jpg" alt="خطاف ملابس" className="w-full h-full object-cover" />
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-700">خطاف ملابس</span>
+                       </button>
+                    </div>
+                 </div>
+               )}
+            </div>
+            )
+         ) : (
+            <div className="flex-1 flex items-center justify-center text-center p-6 text-zinc-400 text-xs border-2 border-dashed border-zinc-200 rounded-xl bg-zinc-50/50">
+               الرجاء تحديد جدار شرائحي من معاينة الـ 2D أو إضافة واحد جديد للبدء بالتعديل.
+            </div>
+         )}
+      </div>
+    </div>
+  )
+}
+
 
 // Helper to format Gregorian date and time
 const formatGregorianDateTime = () => {
@@ -99,6 +785,11 @@ const ShopBuilderContent = () => {
     removeWall,
     addColumnToWall,
     removeColumn,
+    addSlatWallToWall,
+    updateSlatWall,
+    removeSlatWall,
+    selectedSlatWallId,
+    selectSlatWall,
     isDrawingMode,
     setDrawingMode
   } = useShopBuilder();
@@ -435,6 +1126,14 @@ const ShopBuilderContent = () => {
     threeRef.current.focusOnProduct(productId);
   }, [layout.products]);
 
+  // Function to focus camera on selected wall
+  const handleFocusOnWall = useCallback((wallId: string, side: 'front' | 'back' = 'front') => {
+    const wall = layout.walls.find(w => w.id === wallId);
+    if (!wall || !threeRef.current) return;
+
+    threeRef.current.focusOnWall(wallId, side);
+  }, [layout.walls]);
+
   const { primaryColor, secondaryColor } = useTheme();
   const { timeStr, dateStr } = formatGregorianDateTime();
   const [currentTime, setCurrentTime] = useState(timeStr);
@@ -594,7 +1293,7 @@ const ShopBuilderContent = () => {
                             upsertWall({ id: wall.id, height });
                           }}
                           className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
-                          style={{ border: `1px solid ${primaryColor}40`, focusRing: `1px solid ${primaryColor}` }}
+                          style={{ border: `1px solid ${primaryColor}40` }}
                         />
                       </div>
 
@@ -613,7 +1312,7 @@ const ShopBuilderContent = () => {
                             upsertWall({ id: wall.id, thickness });
                           }}
                           className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
-                          style={{ border: `1px solid ${primaryColor}40`, focusRing: `1px solid ${primaryColor}` }}
+                          style={{ border: `1px solid ${primaryColor}40` }}
                         />
                       </div>
 
@@ -633,11 +1332,121 @@ const ShopBuilderContent = () => {
 
                       <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
 
+
+
                       {/* Delete Button */}
                       <button
                         onClick={() => {
                           removeWall(wall.id);
                           selectWall(null);
+                        }}
+                        className="h-9 px-3 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                        style={{ background: `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)` }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>حذف</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Slat Wall Settings Panel */}
+            {(is2DFullscreen || hasEnteredFullscreen) && selectedSlatWallId && (() => {
+              const wall = layout.walls.find(w => w.slatWalls?.some(s => s.id === selectedSlatWallId));
+              const slatWall = wall?.slatWalls?.find(s => s.id === selectedSlatWallId);
+              if (!wall || !slatWall) return null;
+
+              return (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-auto w-full max-w-4xl px-4">
+                  <div className="bg-white rounded-xl shadow-2xl overflow-visible" style={{ border: `2px solid ${primaryColor}` }}>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-sm text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
+                        <span className="text-sm font-bold">🛒 أنظمة العرض</span>
+                      </div>
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>النوع</label>
+                        <select
+                          value={slatWall.fillType}
+                          onChange={(e) => updateSlatWall(wall.id, slatWall.id, { fillType: e.target.value as 'full' | 'partial' })}
+                          className="w-24 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        >
+                          <option value="full">كامل الجدار</option>
+                          <option value="partial">مساحة جزئية</option>
+                        </select>
+                      </div>
+
+                      {slatWall.fillType === 'partial' && (
+                        <>
+                          <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>العرض (م)</label>
+                            <input
+                              type="number" step="0.1" min="0.5"
+                              value={(slatWall.width || 1).toFixed(1)}
+                              onChange={(e) => updateSlatWall(wall.id, slatWall.id, { width: Number(e.target.value) })}
+                              className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
+                              style={{ border: `1px solid ${primaryColor}40` }}
+                            />
+                          </div>
+                          <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>الموضع %</label>
+                            <input
+                              type="range" min="0" max="1" step="0.01"
+                              value={slatWall.position || 0.5}
+                              onChange={(e) => updateSlatWall(wall.id, slatWall.id, { position: Number(e.target.value) })}
+                              className="w-20 h-9"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>الارتفاع (م)</label>
+                        <input
+                          type="number" step="0.1" min="0.5" max="4"
+                          value={(slatWall.height || 2).toFixed(1)}
+                          onChange={(e) => updateSlatWall(wall.id, slatWall.id, { height: Number(e.target.value) })}
+                          className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>عن الأرض (م)</label>
+                        <input
+                          type="number" step="0.1" min="0" max="2"
+                          value={(slatWall.bottomOffset || 0).toFixed(1)}
+                          onChange={(e) => updateSlatWall(wall.id, slatWall.id, { bottomOffset: Number(e.target.value) })}
+                          className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>اللون</label>
+                        <input
+                          type="color"
+                          value={slatWall.color || '#f5f5f5'}
+                          onChange={(e) => updateSlatWall(wall.id, slatWall.id, { color: e.target.value })}
+                          className="w-12 h-9 rounded-lg cursor-pointer shadow-sm"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <button
+                        onClick={() => {
+                          removeSlatWall(wall.id, slatWall.id);
                         }}
                         className="h-9 px-3 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
                         style={{ background: `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)` }}
@@ -1012,6 +1821,31 @@ const ShopBuilderContent = () => {
 
                 <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
 
+                {/* Focus Wall */}
+                <div className="relative group/focus">
+                  <button
+                    onClick={() => handleFocusOnWall(wall.id, 'front')}
+                    className="h-9 px-4 flex items-center gap-2 text-white rounded-xl shadow-lg transition-all hover:-translate-y-0.5 font-semibold text-xs"
+                    style={{ background: `linear-gradient(135deg, ${secondaryColor} 0%, ${primaryColor} 100%)`, boxShadow: `0 8px 16px -6px ${secondaryColor}50` }}
+                    title="تركيز الكاميرا على الجدار"
+                  >
+                    <Focus className="h-4 w-4" />
+                    <span>تركيز</span>
+                    <ChevronUp className="h-3 w-3 opacity-70" />
+                  </button>
+                  {/* Dropdown on hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-white border border-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover/focus:opacity-100 group-hover/focus:visible transition-all z-50 overflow-hidden flex flex-col">
+                    <button onClick={() => handleFocusOnWall(wall.id, 'front')} className="w-full px-3 py-2 text-xs font-bold text-center hover:bg-zinc-50 border-b border-zinc-100 transition-colors text-zinc-700">
+                      الوجه الأمامي
+                    </button>
+                    <button onClick={() => handleFocusOnWall(wall.id, 'back')} className="w-full px-3 py-2 text-xs font-bold text-center hover:bg-zinc-50 transition-colors text-zinc-700">
+                      الوجه الخلفي
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
                 {/* Height Control */}
                 <div className="flex flex-col gap-1">
                   <label
@@ -1184,93 +2018,66 @@ const ShopBuilderContent = () => {
 
                 <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
 
-                {/* Texture Selector */}
-                <div className="flex flex-col gap-1 relative texture-dropdown">
-                  <label className="text-[10px] font-semibold text-emerald-600">🖼️ نسيج</label>
-                  <button
-                    type="button"
-                    onClick={() => setShowWallTextureDropdown(!showWallTextureDropdown)}
-                    className="w-28 h-9 px-2 flex items-center gap-2 text-xs border border-emerald-200 rounded-md bg-white hover:border-emerald-400 focus:outline-none focus:ring-1 focus:ring-emerald-400 cursor-pointer"
-                  >
-                    {wall.texture ? (
-                      <>
-                        <img src={WALL_TEXTURES[wall.texture as keyof typeof WALL_TEXTURES]?.preview || WALL_TEXTURES[wall.texture as keyof typeof WALL_TEXTURES]?.map} alt="" className="w-5 h-5 rounded border border-emerald-300 object-cover" crossOrigin="anonymous" />
-                        <span className="flex-1 text-left truncate">{WALL_TEXTURE_OPTIONS.find(t => t.key === wall.texture)?.label || 'نسيج'}</span>
-                      </>
-                    ) : (
-                      <span className="flex-1 text-left">افتراضي</span>
-                    )}
-                    <span className="text-emerald-400">▼</span>
-                  </button>
-                  {showWallTextureDropdown && (
-                    <div className="absolute top-full left-0 mt-1 w-36 bg-white border-2 border-emerald-300 rounded-md shadow-lg z-50 overflow-hidden">
-                      <div className="max-h-[200px] overflow-y-auto">
-                        {WALL_TEXTURE_OPTIONS.map((option) => (
-                          <button
-                            key={option.key}
-                            type="button"
-                            onClick={() => {
-                              upsertWall({ id: wall.id, texture: option.key as any });
-                              setShowWallTextureDropdown(false);
-                            }}
-                            className="w-full px-2 py-2 flex items-center gap-2 hover:bg-emerald-50 text-xs text-right"
-                          >
-                            {option.preview ? (
-                              <img src={option.preview} alt="" className="w-6 h-6 rounded border border-emerald-200 object-cover" crossOrigin="anonymous" />
-                            ) : (
-                              <div className="w-6 h-6 rounded border border-emerald-200 bg-gray-100" />
-                            )}
-                            <span className="flex-1">{option.label}</span>
-                          </button>
-                        ))}
-                      </div>
+                {/* Slat Wall Manager Dialog */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button
+                      className="h-9 px-4 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                      style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>أنظمة العرض</span>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col overflow-hidden bg-white/95 backdrop-blur-xl border border-zinc-200/60 shadow-2xl" dir="rtl">
+                    <DialogHeader className="flex-none pb-4 border-b border-zinc-100">
+                      <DialogTitle className="text-xl" style={{ color: primaryColor }}>مدير أنظمة العرض (Display Systems)</DialogTitle>
+                      <DialogDescription>
+                        قم بتوزيع الشرائح على الجدار بشكل حر. استخدم المعاينة ثنائية الأبعاد (2D) لإضافة وتعديل الشرائح.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                      <SlatWallManagerContent targetId={wall.id} type="wall" primaryColor={primaryColor} secondaryColor={secondaryColor} />
                     </div>
-                  )}
+                  </DialogContent>
+                </Dialog>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Column Management Button via Hover Dropdown */}
+                <div className="relative group/column">
+                  <button
+                    className="h-9 px-4 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:-translate-y-0.5"
+                    style={{ backgroundColor: secondaryColor }}
+                    title="خيارات الأعمدة"
+                  >
+                    <span>🏛️ عمود</span>
+                    <ChevronUp className="h-3 w-3 opacity-70" />
+                  </button>
+                  {/* Dropdown Menu */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-white border border-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover/column:opacity-100 group-hover/column:visible transition-all z-50 overflow-hidden flex flex-col">
+                    {/* List Existing Columns */}
+                    {wall.columns && wall.columns.length > 0 && wall.columns.map((col, idx) => (
+                      <button 
+                        key={col.id} 
+                        onClick={() => selectColumn(col.id)} 
+                        className="w-full px-3 py-2 text-xs font-bold text-center hover:bg-zinc-50 border-b border-zinc-100 transition-colors text-zinc-700 flex justify-between items-center"
+                      >
+                         <span>عمود {idx + 1}</span>
+                         <span className="text-[10px] text-zinc-400">تحديد</span>
+                      </button>
+                    ))}
+                    {/* Add New Column */}
+                    <button 
+                      onClick={() => addColumnToWall(wall.id, 0.5, 'front')} 
+                      className="w-full px-3 py-2 text-xs font-bold text-center hover:bg-blue-50 transition-colors text-blue-600 bg-blue-50/50 flex justify-center items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> إضافة عمود جديد
+                    </button>
+                  </div>
                 </div>
 
-                {/* Apply to All Walls Button */}
-                <button
-                  onClick={() => {
-                    // Apply current wall's texture to all walls
-                    layout.walls.forEach(w => {
-                      if (w.id !== wall.id) {
-                        upsertWall({ id: w.id, texture: wall.texture });
-                      }
-                    });
-                  }}
-                  className="h-9 px-3 text-xs font-semibold bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-                  title="تطبيق النسيج على جميع الجدران"
-                >
-                  <Palette className="h-4 w-4" />
-                  <span>تطبيق على الكل</span>
-                </button>
-
-                <div className="h-8 w-px bg-emerald-200" />
-
-                {/* Color Picker */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-semibold text-emerald-600">🎨 لون</label>
-                  <input
-                    type="color"
-                    value={wall.color || '#64748b'}
-                    onChange={(e) => upsertWall({ id: wall.id, color: e.target.value })}
-                    className="w-12 h-9 rounded-lg border border-emerald-200 cursor-pointer shadow-sm"
-                    title={wall.color || '#64748b'}
-                  />
-                </div>
-
-                <div className="h-8 w-px bg-emerald-200" />
-
-                {/* Add Column Button */}
-                <button
-                  onClick={() => addColumnToWall(wall.id, 0.5)}
-                  className="h-9 px-4 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-                  title="إضافة عمود"
-                >
-                  <span>🏛️ عمود</span>
-                </button>
-
-                <div className="h-8 w-px bg-emerald-200" />
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
 
                 {/* Delete Button */}
                 <button
@@ -1280,7 +2087,7 @@ const ShopBuilderContent = () => {
                       selectWall(null);
                     }
                   }}
-                  className="h-9 px-4 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                  className="h-9 px-4 text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-500 hover:text-white border border-red-200 rounded-lg flex items-center gap-2 transition-all shadow-sm"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>حذف</span>
@@ -1312,6 +2119,19 @@ const ShopBuilderContent = () => {
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid #d9770640`, color: "#d97706" }}>
                   <span className="text-sm font-bold">🏛️ عمود</span>
                 </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
+
+                {/* Back to Wall Button */}
+                <button
+                  onClick={() => {
+                     selectColumn(null);
+                     selectWall(wall.id);
+                  }}
+                  className="h-9 px-3 text-xs font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <span>العودة للجدار 🔙</span>
+                </button>
 
                 <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
 
@@ -1474,45 +2294,23 @@ const ShopBuilderContent = () => {
 
                 <div className="h-8 w-px bg-amber-200" />
 
-                {/* Side Control */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-semibold text-amber-600">↔️ جانب</label>
-                  <select
-                    value={column.side || 'center'}
-                    onChange={(e) => {
-                      const side = e.target.value as 'center' | 'left' | 'right';
-                      const updatedColumns = wall.columns?.map(c =>
-                        c.id === column.id ? { ...c, side } : c
-                      );
-                      upsertWall({ id: wall.id, columns: updatedColumns });
-                    }}
-                    className="h-9 px-2 text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white cursor-pointer"
-                  >
-                    <option value="center">وسط</option>
-                    <option value="left">يسار</option>
-                    <option value="right">يمين</option>
-                  </select>
-                </div>
-
                 <div className="h-8 w-px bg-amber-200" />
 
-                {/* Color Picker */}
-                <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-semibold text-amber-600">🎨 لون</label>
-                  <input
-                    type="color"
-                    value={column.color || '#64748b'}
-                    onChange={(e) => {
-                      const color = e.target.value;
-                      const updatedColumns = wall.columns?.map(c =>
-                        c.id === column.id ? { ...c, color } : c
-                      );
-                      upsertWall({ id: wall.id, columns: updatedColumns });
-                    }}
-                    className="w-12 h-9 rounded-lg border border-amber-200 cursor-pointer shadow-sm"
-                    title={column.color || '#64748b'}
-                  />
-                </div>
+                {/* Side Control */}
+                <button
+                  onClick={() => {
+                     const nextSide = (column.side || 'front') === 'front' ? 'back' : 'front';
+                     const updatedColumns = wall.columns?.map(c =>
+                       c.id === column.id ? { ...c, side: nextSide as 'front' | 'back' } : c
+                     );
+                     upsertWall({ id: wall.id, columns: updatedColumns });
+                  }}
+                  className="h-9 px-4 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg flex items-center gap-2 transition-colors"
+                  title="تبديل الوجه"
+                >
+                  <RotateCcw className="h-4 w-4 text-amber-600" />
+                  <span>الوجه: {(column.side || 'front') === 'front' ? 'أمامي' : 'خلفي'}</span>
+                </button>
 
                 <div className="h-8 w-px bg-amber-200" />
 
@@ -1531,7 +2329,10 @@ const ShopBuilderContent = () => {
 
                 {/* Close Button */}
                 <button
-                  onClick={() => selectWall(null)}
+                  onClick={() => {
+                     selectColumn(null);
+                     selectWall(null);
+                  }}
                   className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                   title="إغلاق"
                 >

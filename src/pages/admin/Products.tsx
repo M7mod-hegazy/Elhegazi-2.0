@@ -2613,20 +2613,26 @@ const AdminProducts = () => {
                               </TableCell>
 
                               <TableCell className="text-center" style={{ width: columnWidths.image }}>
-                                <div className="relative inline-block group">
-                                  <img
-                                    src={optimizeImage(getProductPrimaryImage(product) || '', { w: 64 })}
-                                    alt={product.nameAr}
-                                    className="w-14 h-14 object-cover rounded-2xl border-2 border-slate-200 shadow-lg transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl cursor-zoom-in ring-2 ring-transparent group-hover:ring-blue-200"
-                                    loading="lazy"
-                                    decoding="async"
-                                    srcSet={buildSrcSet(getProductPrimaryImage(product) || '', 64)}
-                                    sizes="64px"
-                                    onClick={() => {
-                                      const src = getProductPrimaryImage(product);
-                                      if (src) setImagePreview(src);
-                                    }}
-                                  />
+                                <div className="relative inline-flex items-center justify-center group w-14 h-14">
+                                  {getProductPrimaryImage(product) ? (
+                                    <img
+                                      src={optimizeImage(getProductPrimaryImage(product) || '', { w: 64 })}
+                                      alt={product.nameAr}
+                                      className="w-14 h-14 object-cover rounded-2xl border-2 border-slate-200 shadow-sm transition-all duration-300 group-hover:scale-110 group-hover:shadow-xl cursor-zoom-in ring-2 ring-transparent group-hover:ring-blue-200"
+                                      loading="lazy"
+                                      decoding="async"
+                                      srcSet={buildSrcSet(getProductPrimaryImage(product) || '', 64)}
+                                      sizes="64px"
+                                      onClick={() => {
+                                        const src = getProductPrimaryImage(product);
+                                        if (src) setImagePreview(src);
+                                      }}
+                                    />
+                                  ) : (
+                                    <div className="w-14 h-14 bg-slate-100 rounded-2xl border-2 border-slate-200 flex items-center justify-center shadow-sm">
+                                      <Package className="w-6 h-6 text-slate-400" />
+                                    </div>
+                                  )}
                                   {product.featured && (
                                     <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-r from-yellow-400 to-yellow-500 rounded-full flex items-center justify-center shadow-lg animate-pulse">
                                       <Star className="w-3 h-3 text-white" />
@@ -2758,23 +2764,32 @@ const AdminProducts = () => {
                               </TableCell>
 
                               <TableCell className="text-center" style={{ width: columnWidths.status }}>
-                                <div className="flex items-center justify-center gap-2">
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <span className={`dot ${product.isHidden ? 'dot-warning' : 'dot-success'}`} />
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      {product.isHidden ? 'هذا المنتج مخفي' : 'هذا المنتج ظاهر'}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                  <span className="text-sm">
-                                    {product.isHidden ? 'مخفي' : 'ظاهر'}
-                                  </span>
-                                  {product.featured && (
-                                    <Badge variant="secondary" className="bg-amber-50 text-amber-700 border-amber-200">
-                                      مميز
-                                    </Badge>
-                                  )}
+                                <div className="flex flex-col items-center justify-center gap-1">
+                                  <div className="flex items-center gap-2">
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <span className={`w-2.5 h-2.5 rounded-full ${product.isHidden ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`} />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        {product.isHidden ? 'هذا المنتج مخفي' : 'هذا المنتج ظاهر'}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                    <span className={`text-xs font-semibold ${product.isHidden ? 'text-amber-600' : 'text-green-600'}`}>
+                                      {product.isHidden ? 'مخفي' : 'ظاهر'}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col gap-1 items-center">
+                                    {product.featured && (
+                                      <Badge variant="secondary" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-[10px] w-fit">
+                                        مميز
+                                      </Badge>
+                                    )}
+                                    {product.stock !== undefined && (
+                                      <Badge variant="outline" className={`text-[10px] w-fit ${product.stock <= 5 ? 'border-red-200 text-red-600' : 'text-slate-500'}`}>
+                                        المخزون: {product.stock}
+                                      </Badge>
+                                    )}
+                                  </div>
                                 </div>
                               </TableCell>
 

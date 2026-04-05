@@ -6,8 +6,38 @@ export interface ShopBuilderColumn {
   depth: number; // Column depth (along wall)
   height: number; // Column height
   shape: 'square' | 'round' | 'rectangular';
-  side: 'center' | 'left' | 'right'; // Which side of wall the column extends from
+  side: 'front' | 'back'; // Which face of the wall the column extends from
   color: string;
+  slatWalls?: ShopBuilderSlatWall[]; // Slat walls attached to this column
+}
+
+export interface ShopBuilderSlatAccessory {
+  id: string;
+  type: 'shelf' | 'hook_single' | 'hook_waterfall' | 'basket';
+  position: { x: number; y: number }; // local percentage coordinates on the slat wall (0-1)
+  width: number; // width in meters
+  depth: number; // depth/extrusion in meters
+  color: string;
+}
+
+export interface ShopBuilderSlatWall {
+  id: string;
+  wallId: string;
+  side: 'front' | 'back'; // Which face of the wall (based on start->end direction)
+  systemType?: 'slat' | 'supermarket_shelves'; // Type of presentation system
+  fillType: 'full' | 'partial';
+  position?: number; // Center position along wall (0 to 1), required if partial
+  width?: number; // Width of panel, required if partial
+  height: number; // Height of panel
+  bottomOffset: number; // Offset from floor
+  color: string;
+  slatSpacing: number; // Distance between grooves
+  accessories?: ShopBuilderSlatAccessory[]; // Added accessories list
+  
+  // Supermarket shelves specific properties
+  shelfCount?: number;     
+  shelfDepth?: number;     
+  uprightSpacing?: number; 
 }
 
 export interface ShopBuilderWall {
@@ -19,6 +49,7 @@ export interface ShopBuilderWall {
   color: string;
   texture?: 'painted_white' | 'painted_beige' | 'painted_rough' | 'wallpaper_damask' | 'brick_red' | 'brick_white' | 'concrete_smooth' | 'concrete_panels' | 'wood_planks' | 'wood_panels' | 'marble_white' | 'tiles_white' | 'tiles_ceramic' | 'stone_wall' | 'stone_blocks'; // Wall texture type
   columns?: ShopBuilderColumn[]; // Columns attached to this wall
+  slatWalls?: ShopBuilderSlatWall[]; // Slat walls attached to this wall
 }
 
 export interface ShopBuilderProduct {
@@ -49,4 +80,6 @@ export interface ShopBuilderLayout {
   defaultWallColor?: string; // Default wall color for new walls
   createdAt?: string;
   updatedAt?: string;
+  shopName?: string;
+  field?: string;
 }

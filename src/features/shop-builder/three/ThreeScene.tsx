@@ -15,7 +15,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { useShopBuilder } from '../store';
-import type { ShopBuilderProduct, ShopBuilderWall, ShopBuilderColumn } from '../types';
+import type { ShopBuilderProduct, ShopBuilderWall, ShopBuilderColumn, ShopBuilderSlatWall } from '../types';
 import type { CameraMode } from '../store';
 
 // Texture loader
@@ -161,6 +161,7 @@ export interface ThreeSceneHandle {
   snapshot: () => string | null;
   toggleFullscreen: () => void;
   focusOnProduct: (productId: string) => void;
+  focusOnWall: (wallId: string, side?: 'front' | 'back') => void;
 }
 
 interface ProductEntry {
@@ -188,6 +189,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
   const productMapRef = useRef<Map<string, ProductEntry>>(new Map());
   const wallMeshRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const columnMeshRef = useRef<Map<string, THREE.Mesh>>(new Map());
+  const slatWallMeshRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const cachedModelsRef = useRef<Map<string, THREE.Group>>(new Map());
   const mixersRef = useRef<THREE.AnimationMixer[]>([]);
   const texturesCache = useRef<Map<string, THREE.Texture>>(new Map());
@@ -670,6 +672,58 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     animateCamera();
   }, []);
 
+  const focusOnWall = useCallback((wallId: string, side: 'front' | 'back' = 'front') => {
+    const camera = cameraRef.current;
+    const controls = orbitControlsRef.current;
+    const walls = layout.walls || [];
+    const wall = walls.find(w => w.id === wallId);
+    
+    if (!camera || !controls || !wall) return;
+    
+    const start = new THREE.Vector3(wall.start.x, 0, wall.start.y);
+    const end = new THREE.Vector3(wall.end.x, 0, wall.end.y);
+    
+    const wallDir = end.clone().sub(start).normalize();
+    const normal = new THREE.Vector3(-wallDir.z, 0, wallDir.x);
+    if (side === 'back') {
+       normal.negate();
+    }
+    
+    const center = start.clone().lerp(end, 0.5);
+    center.y = wall.height / 2;
+    
+    const wallLength = start.distanceTo(end);
+    const fov = camera.fov * (Math.PI / 180);
+    const dist = Math.max(wallLength, wall.height) / (2 * Math.tan(fov / 2)) * 1.5; // 1.5 padding to see comfortably
+    
+    // Position straight out from the wall
+    const newCameraPosition = center.clone().add(normal.multiplyScalar(dist));
+    
+    const startPosition = camera.position.clone();
+    const startTarget = controls.target.clone();
+    const duration = 1000;
+    const startTime = Date.now();
+    
+    const animateCamera = () => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      const eased = progress < 0.5
+        ? 2 * progress * progress
+        : 1 - Math.pow(-2 * progress + 2, 2) / 2;
+      
+      camera.position.lerpVectors(startPosition, newCameraPosition, eased);
+      controls.target.lerpVectors(startTarget, center, eased);
+      controls.update();
+      
+      if (progress < 1) {
+        requestAnimationFrame(animateCamera);
+      }
+    };
+    
+    animateCamera();
+  }, [layout.walls]);
+
   useImperativeHandle(
     ref,
     () => ({
@@ -677,8 +731,9 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       snapshot,
       toggleFullscreen,
       focusOnProduct,
+      focusOnWall,
     }),
-    [resetCamera, snapshot, toggleFullscreen, focusOnProduct]
+    [resetCamera, snapshot, toggleFullscreen, focusOnProduct, focusOnWall]
   );
 
   useEffect(() => {
@@ -931,6 +986,30 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         });
       }
 
+      // Render slat walls for this wall
+      if (wall.slatWalls && wall.slatWalls.length > 0) {
+        wall.slatWalls.forEach((slat) => {
+          const slatKey = `${wall.id}-${slat.id}`;
+          const existingSlat = slatWallMeshRef.current.get(slatKey);
+          
+          if (existingSlat) {
+            scene.remove(existingSlat);
+            existingSlat.traverse((child) => {
+               if (child instanceof THREE.Mesh) {
+                  child.geometry?.dispose();
+                  if (child.material?.map) child.material.map.dispose();
+                  child.material?.dispose();
+               }
+            });
+            slatWallMeshRef.current.delete(slatKey);
+          }
+          
+          const slatMesh = createSlatWallMesh(wall, slat);
+          slatWallMeshRef.current.set(slatKey, slatMesh);
+          scene.add(slatMesh);
+        });
+      }
+
       // Render columns for this wall
       if (wall.columns && wall.columns.length > 0) {
         wall.columns.forEach((column) => {
@@ -970,6 +1049,30 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
           mesh.material.dispose();
         }
         columnMeshRef.current.delete(key);
+      }
+    });
+
+    // Remove slat walls that no longer exist
+    const currentSlatKeys = new Set<string>();
+    layout.walls.forEach((wall) => {
+      if (wall.slatWalls) {
+        wall.slatWalls.forEach((slat) => {
+          currentSlatKeys.add(`${wall.id}-${slat.id}`);
+        });
+      }
+    });
+
+    slatWallMeshRef.current.forEach((mesh, key) => {
+      if (!currentSlatKeys.has(key)) {
+        scene.remove(mesh);
+        mesh.traverse((child) => {
+           if (child instanceof THREE.Mesh) {
+              child.geometry?.dispose();
+              if (child.material?.map) child.material.map.dispose();
+              child.material?.dispose();
+           }
+        });
+        slatWallMeshRef.current.delete(key);
       }
     });
   }, [layout.walls]);
@@ -1012,7 +1115,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         if (oldGrid.material instanceof THREE.Material) {
           oldGrid.material.dispose();
         } else if (Array.isArray(oldGrid.material)) {
-          oldGrid.material.forEach(mat => mat.dispose());
+          (oldGrid.material as THREE.Material[]).forEach(mat => mat.dispose());
         }
       }
     }
@@ -1552,12 +1655,12 @@ function createColumnMesh(wall: ShopBuilderWall, column: ShopBuilderColumn, text
   const wallDir = end.clone().sub(start).normalize();
   const perpDir = new THREE.Vector3(-wallDir.z, 0, wallDir.x); // Perpendicular in XZ plane
 
-  // Apply side offset
+  // Apply side offset (match slat wall: front = +perp, back = -perp)
   let sideOffset = 0;
-  if (column.side === 'left') {
-    sideOffset = -column.width / 2;
-  } else if (column.side === 'right') {
-    sideOffset = column.width / 2;
+  if (column.side === 'front') {
+    sideOffset = (column.depth || 0.4) / 2;
+  } else if (column.side === 'back') {
+    sideOffset = -(column.depth || 0.4) / 2;
   }
 
   const columnPos = baseColumnPos.clone().add(perpDir.multiplyScalar(sideOffset));
@@ -1566,10 +1669,10 @@ function createColumnMesh(wall: ShopBuilderWall, column: ShopBuilderColumn, text
   
   if (column.shape === 'round') {
     // Cylinder for round columns
-    geometry = new THREE.CylinderGeometry(column.width / 2, column.width / 2, column.height, 16);
+    geometry = new THREE.CylinderGeometry((column.width || 0.4) / 2, (column.width || 0.4) / 2, column.height, 16);
   } else {
     // Box for square/rectangular columns
-    geometry = new THREE.BoxGeometry(column.depth, column.height, column.width);
+    geometry = new THREE.BoxGeometry(column.width || 0.4, column.height || 3, column.depth || 0.4);
   }
 
   // Use wall texture for column
@@ -1615,6 +1718,367 @@ function createColumnMesh(wall: ShopBuilderWall, column: ShopBuilderColumn, text
   return mesh;
 }
 
+function createSlatGeometry(width: number, height: number, spacing: number = 0.15): THREE.BufferGeometry {
+  const thickness = 0.02; // 2cm thick
+  return new THREE.BoxGeometry(width, height, thickness);
+}
+
+function updateSlatWallPosition(mesh: THREE.Object3D, wall: ShopBuilderWall, slat: ShopBuilderSlatWall, start: THREE.Vector3, end: THREE.Vector3, slatPos: number) {
+  const basePos = start.clone().lerp(end, slatPos);
+  
+  // Wall direction
+  const wallDir = end.clone().sub(start).normalize();
+  const perpDir = new THREE.Vector3(-wallDir.z, 0, wallDir.x);
+  
+  const sideMultiplier = slat.side === 'front' ? 1 : -1;
+  // Offset by half wall thickness + half slat thickness
+  const offsetDist = (wall.thickness / 2 + 0.01) * sideMultiplier;
+  
+  const finalPos = basePos.add(perpDir.multiplyScalar(offsetDist));
+  
+  mesh.position.set(finalPos.x, slat.bottomOffset + (slat.height / 2), finalPos.z);
+  
+  const angle = Math.atan2(end.z - start.z, end.x - start.x);
+  // If it's on the front, face outward (rotate 90 deg from wall). If back, rotate -90.
+  mesh.rotation.y = -angle + (slat.side === 'back' ? Math.PI : 0);
+}
+
+const slatTextureCache = new Map<string, THREE.Texture>();
+
+function createSlatTexture(color: string, spacing: number): THREE.Texture {
+  const key = `${color}-${spacing}`;
+  if (slatTextureCache.has(key)) {
+     return slatTextureCache.get(key)!.clone();
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 512;
+  const ctx = canvas.getContext('2d');
+  if (ctx) {
+    // Fill base color
+    ctx.fillStyle = color;
+    ctx.fillRect(0, 0, 512, 512);
+
+    // Draw groove at the bottom
+    const grooveHeight = 512 * 0.15; // 15% of slat for realistic tight groove
+    
+    const gradient = ctx.createLinearGradient(0, 512 - grooveHeight, 0, 512);
+    gradient.addColorStop(0, 'rgba(0,0,0,0.7)');
+    gradient.addColorStop(0.5, 'rgba(0,0,0,0.9)');
+    gradient.addColorStop(1, 'rgba(0,0,0,0.5)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 512 - grooveHeight, 512, grooveHeight);
+    
+    // Top highlight
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(0, 0, 512, 512 * 0.05);
+
+    // Subtle bottom shadow leading into the groove
+    const subtleGrad = ctx.createLinearGradient(0, 512 - grooveHeight * 1.5, 0, 512 - grooveHeight);
+    subtleGrad.addColorStop(0, 'rgba(0,0,0,0)');
+    subtleGrad.addColorStop(1, 'rgba(0,0,0,0.2)');
+    ctx.fillStyle = subtleGrad;
+    ctx.fillRect(0, 512 - grooveHeight * 1.5, 512, grooveHeight * 0.5);
+  }
+  
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  
+  slatTextureCache.set(key, texture);
+  return texture.clone();
+}
+
+function syncSlatWallAccessories(mesh: THREE.Object3D, slat: ShopBuilderSlatWall, wallLength: number, wallThickness: number, wallColumns?: ShopBuilderColumn[]) {
+  // First, find and remove all existing accessories
+  const toRemove = mesh.children.filter(c => c.name.startsWith('accessory_'));
+  toRemove.forEach(c => {
+    mesh.remove(c);
+    if (c instanceof THREE.Mesh) {
+       c.geometry.dispose();
+       // Note: complex materials or children disposal omitted for brevity
+    }
+  });
+
+  if (!slat.accessories || slat.accessories.length === 0) return;
+
+  const slatWidth = slat.fillType === 'full' ? wallLength : (slat.width || 1);
+  const slatHeight = slat.height; // local Y from -height/2 to height/2
+
+  slat.accessories.forEach(acc => {
+     let accGroup = new THREE.Group();
+     accGroup.name = `accessory_${acc.id}`;
+     
+     if (acc.type === 'shelf') {
+        const geom = new THREE.BoxGeometry(acc.width, 0.02, acc.depth); // thin shelf
+        const mat = new THREE.MeshStandardMaterial({ color: acc.color || '#d97706', roughness: 0.6 });
+        const accMesh = new THREE.Mesh(geom, mat);
+        
+        // Add tiny white brackets underneath
+        const bracketGeom = new THREE.BoxGeometry(0.01, 0.1, acc.depth * 0.8);
+        const bracketMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const leftBracket = new THREE.Mesh(bracketGeom, bracketMat);
+        leftBracket.position.set(Math.max(-acc.width / 2 + 0.1, -acc.width/2), -0.05, 0); 
+        const rightBracket = new THREE.Mesh(bracketGeom, bracketMat);
+        rightBracket.position.set(Math.min(acc.width / 2 - 0.1, acc.width/2), -0.05, 0);
+
+        accGroup.add(accMesh);
+        accGroup.add(leftBracket);
+        accGroup.add(rightBracket);
+     } else if (acc.type === 'hook_single') {
+        const geom = new THREE.CylinderGeometry(0.005, 0.005, acc.depth, 8);
+        geom.rotateX(Math.PI / 2); // Make cylinder protrude along Z local axis
+        const mat = new THREE.MeshStandardMaterial({ color: acc.color || '#cccccc', metalness: 0.7, roughness: 0.2 });
+        const hookMesh = new THREE.Mesh(geom, mat);
+        
+        // small base plate against the wall
+        const baseGeom = new THREE.BoxGeometry(0.04, 0.04, 0.01);
+        const baseMesh = new THREE.Mesh(baseGeom, mat);
+        baseMesh.position.set(0, 0, -acc.depth / 2);
+        
+        accGroup.add(hookMesh);
+        accGroup.add(baseMesh);
+     } else if (acc.type === 'hook_waterfall') {
+        const geom = new THREE.CylinderGeometry(0.012, 0.012, acc.depth, 16);
+        geom.rotateX(Math.PI / 2); 
+        const mat = new THREE.MeshStandardMaterial({ color: acc.color || '#aaaaaa', metalness: 0.6, roughness: 0.3 });
+        const tube = new THREE.Mesh(geom, mat);
+        tube.rotation.x = Math.PI / 16; // slightly angles downward
+        
+        // add dividing balls for clothes hangers
+        const sphereGeom = new THREE.SphereGeometry(0.018, 12, 12);
+        const ballCount = Math.floor(acc.depth / 0.08); // ball every 8cm
+        for(let i=1; i<=ballCount; i++) {
+           const zPos = - (acc.depth / 2) + (i * 0.08);
+           const ball = new THREE.Mesh(sphereGeom, mat);
+           ball.position.set(0, 0, zPos);
+           tube.add(ball);
+        }
+        
+        const baseGeom = new THREE.BoxGeometry(0.05, 0.08, 0.01);
+        const baseMesh = new THREE.Mesh(baseGeom, mat);
+        baseMesh.position.set(0, 0, -acc.depth / 2);
+        
+        accGroup.add(tube);
+        accGroup.add(baseMesh);
+     } else {
+        // Fallback for hook/basket
+        const geom = new THREE.BoxGeometry(acc.width, 0.1, acc.depth);
+        const mat = new THREE.MeshStandardMaterial({ color: acc.color });
+        const accMesh = new THREE.Mesh(geom, mat);
+        accGroup.add(accMesh);
+     }
+
+     // acc.position.x/y is 0-1, so map 0-1 to -width/2 -> width/2
+     const localX = (acc.position.x - 0.5) * slatWidth;
+     const localY = (acc.position.y - 0.5) * slatHeight;
+     
+     // Determine if it is over a column to protrude it
+     let protrusion = 0;
+     const absoluteX = (slat.fillType === 'full' ? 0.5 : (slat.position || 0.5)) * wallLength - (slatWidth / 2) + acc.position.x * slatWidth;
+     
+     if (wallColumns) {
+        wallColumns.forEach(col => {
+           const colStart = (col.position || 0.5) * wallLength - ((col.width || 0.4) / 2);
+           const colEnd = colStart + (col.width || 0.4);
+           if (absoluteX >= colStart && absoluteX <= colEnd) {
+               const wThickness = wallThickness || 0.1;
+               const slatAnchorOffset = wThickness / 2 + 0.01;
+               const totalDepth = col.depth || 0.4;
+               
+               // Protrude the accessory over the column if they are on the same side
+               if (col.side === slat.side) {
+                   protrusion = Math.max(0, totalDepth - slatAnchorOffset) + 0.005;
+               }
+           }
+        });
+     }
+
+     const localZ = acc.depth / 2 + 0.01 + protrusion;
+
+     accGroup.position.set(localX, localY, localZ);
+     
+     mesh.add(accGroup);
+  });
+}
+
+function createSupermarketShelvesMesh(group: THREE.Group, slat: ShopBuilderSlatWall, segments: any[], wallLength: number, slatPosCenter: number) {
+   const shelfCount = slat.shelfCount || 5;
+   const shelfDepth = slat.shelfDepth || 0.4;
+   const uprightSpacing = slat.uprightSpacing || 1.0;
+   const sysHeight = slat.height || 2;
+   const color = slat.color || '#e11d48'; // default to red/pink accent
+   
+   const uprightMaterial = new THREE.MeshStandardMaterial({ color: '#f5f5f5', roughness: 0.6, metalness: 0.1 });
+   const shelfMaterial = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8 });
+   const accentMaterial = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5 });
+   const backPanelMaterial = new THREE.MeshStandardMaterial({ color: '#fcfcfc', roughness: 0.9 });
+   
+   const sideFlip = slat.side === 'back' ? -1 : 1;
+
+   segments.forEach(seg => {
+      const segWidth = seg.end - seg.start;
+      if (segWidth < 0.1) return;
+      
+      const baysCount = Math.ceil(segWidth / uprightSpacing);
+      const bayWidth = segWidth / baysCount;
+      
+      const segCenter = (seg.start + seg.end) / 2;
+      const segLocalX = (segCenter - (slatPosCenter * wallLength)) * sideFlip;
+
+      const segGroup = new THREE.Group();
+      segGroup.position.set(segLocalX, 0, seg.protrusion);
+      group.add(segGroup);
+      
+      const backGeom = new THREE.BoxGeometry(segWidth, sysHeight, 0.01);
+      const backMesh = new THREE.Mesh(backGeom, backPanelMaterial);
+      backMesh.position.set(0, 0, 0.005);
+      segGroup.add(backMesh);
+      
+      const uprightWidth = 0.04;
+      const uprightDepth = 0.04;
+      const uprightGeom = new THREE.BoxGeometry(uprightWidth, sysHeight, uprightDepth);
+      
+      for(let i = 0; i <= baysCount; i++) {
+         const upX = -segWidth/2 + i * bayWidth;
+         const upright = new THREE.Mesh(uprightGeom, uprightMaterial);
+         upright.position.set(upX, 0, 0.02 + 0.01);
+         segGroup.add(upright);
+      }
+      
+      for(let i = 0; i < baysCount; i++) {
+         const bayCenterX = -segWidth/2 + (i + 0.5) * bayWidth;
+         
+         for(let j = 0; j < shelfCount; j++) {
+             const isBaseShelf = j === 0;
+             const sDepth = isBaseShelf ? shelfDepth + 0.05 : shelfDepth;
+             const shelfY = 0.15 + j * ((sysHeight - 0.3) / Math.max(1, shelfCount - 1));
+             
+             const shelfGeom = new THREE.BoxGeometry(bayWidth - 0.01, 0.02, sDepth);
+             const shelfMesh = new THREE.Mesh(shelfGeom, shelfMaterial);
+             shelfMesh.position.set(bayCenterX, shelfY - sysHeight/2, sDepth/2 + 0.01);
+             segGroup.add(shelfMesh);
+             
+             const accentGeom = new THREE.BoxGeometry(bayWidth - 0.01, 0.03, 0.01);
+             const accentMesh = new THREE.Mesh(accentGeom, accentMaterial);
+             accentMesh.position.set(bayCenterX, shelfY - sysHeight/2 - 0.005, sDepth + 0.015);
+             segGroup.add(accentMesh);
+             
+             if (!isBaseShelf) {
+                 const bracketGeom = new THREE.BoxGeometry(0.01, 0.1, sDepth - 0.02);
+                 const leftBracket = new THREE.Mesh(bracketGeom, uprightMaterial);
+                 leftBracket.position.set(bayCenterX - bayWidth/2 + 0.02, shelfY - sysHeight/2 - 0.05, sDepth/2 + 0.01);
+                 const rightBracket = new THREE.Mesh(bracketGeom, uprightMaterial);
+                 rightBracket.position.set(bayCenterX + bayWidth/2 - 0.02, shelfY - sysHeight/2 - 0.05, sDepth/2 + 0.01);
+                 segGroup.add(leftBracket);
+                 segGroup.add(rightBracket);
+             } else {
+                 const legGeom = new THREE.BoxGeometry(0.04, 0.14, sDepth);
+                 const legLeft = new THREE.Mesh(legGeom, uprightMaterial);
+                 legLeft.position.set(bayCenterX - bayWidth/2 + 0.02, -sysHeight/2 + 0.07, sDepth/2 + 0.01);
+                 const legRight = new THREE.Mesh(legGeom, uprightMaterial);
+                 legRight.position.set(bayCenterX + bayWidth/2 - 0.02, -sysHeight/2 + 0.07, sDepth/2 + 0.01);
+                 segGroup.add(legLeft);
+                 segGroup.add(legRight);
+             }
+         }
+      }
+   });
+}
+
+function createSlatWallMesh(wall: ShopBuilderWall, slat: ShopBuilderSlatWall): THREE.Group {
+  const start = new THREE.Vector3(wall.start.x, 0, wall.start.y);
+  const end = new THREE.Vector3(wall.end.x, 0, wall.end.y);
+  const wallLength = start.distanceTo(end);
+
+  const slatWidth = slat.fillType === 'full' ? wallLength : (slat.width || 1);
+  const slatPosCenter = slat.fillType === 'full' ? 0.5 : (slat.position || 0.5);
+
+  const group = new THREE.Group();
+  
+  const texture = createSlatTexture(slat.color || '#f5f5f5', slat.slatSpacing || 0.15);
+  texture.repeat.set(1, (slat.height || 2) / Math.max(0.01, slat.slatSpacing || 0.15));
+
+  const material = new THREE.MeshStandardMaterial({
+    map: texture,
+    color: new THREE.Color(0xffffff),
+    roughness: 0.7,
+    metalness: 0.1,
+  });
+
+  // Calculate segments (incorporating columns!)
+  let segments = [{ 
+     start: (slatPosCenter * wallLength) - (slatWidth / 2), 
+     end: (slatPosCenter * wallLength) + (slatWidth / 2),
+     protrusion: 0 
+  }];
+  
+  if (wall.columns && wall.columns.length > 0) {
+    wall.columns.forEach(col => {
+      const colStart = (col.position || 0.5) * wallLength - ((col.width || 0.4) / 2) - 0.005;
+      const colEnd = (col.position || 0.5) * wallLength + ((col.width || 0.4) / 2) + 0.005;
+      
+      let protrusion = 0;
+      const wThickness = wall.thickness || 0.1;
+      const slatAnchorOffset = wThickness / 2 + 0.01;
+      const totalDepth = col.depth || 0.4;
+      
+      // Protrude the slat wall over the column if they are on the same side
+      if (col.side === slat.side) {
+          protrusion = Math.max(0, totalDepth - slatAnchorOffset) + 0.005;
+      }
+      
+      if (protrusion > 0.01) {
+          const newSegments: {start: number, end: number, protrusion: number}[] = [];
+          segments.forEach(seg => {
+             if (colEnd > seg.start && colStart < seg.end) {
+                if (seg.start < colStart) newSegments.push({ start: seg.start, end: colStart, protrusion: seg.protrusion });
+                
+                // Add the protruding over-column segment
+                newSegments.push({ 
+                   start: Math.max(seg.start, colStart), 
+                   end: Math.min(seg.end, colEnd), 
+                   protrusion: protrusion 
+                });
+                
+                if (seg.end > colEnd) newSegments.push({ start: colEnd, end: seg.end, protrusion: seg.protrusion });
+             } else {
+                newSegments.push(seg);
+             }
+          });
+          segments = newSegments;
+      }
+    });
+  }
+
+  if (slat.systemType === 'supermarket_shelves') {
+     createSupermarketShelvesMesh(group, slat, segments, wallLength, slatPosCenter);
+  } else {
+     const sideFlip = slat.side === 'back' ? -1 : 1;
+     segments.forEach(seg => {
+       const segWidth = seg.end - seg.start;
+       if (segWidth <= 0.01) return;
+       
+       const geometry = createSlatGeometry(segWidth, slat.height || 2, slat.slatSpacing || 0.15);
+       const mesh = new THREE.Mesh(geometry, material);
+       
+       const segCenter = (seg.start + seg.end) / 2;
+       const localX = (segCenter - (slatPosCenter * wallLength)) * sideFlip;
+       // localZ offsets it forwards from the wall mesh
+       mesh.position.set(localX, 0, seg.protrusion);
+       group.add(mesh);
+     });
+     
+     syncSlatWallAccessories(group, slat, wallLength, wall.thickness || 0.1, wall.columns);
+  }
+  
+  updateSlatWallPosition(group, wall, slat, start, end, slatPosCenter);
+  
+  return group;
+}
+
 function updateColumnMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, column: ShopBuilderColumn, texturesCache: Map<string, THREE.Texture>) {
   // Calculate column position along wall
   const start = new THREE.Vector3(wall.start.x, 0, wall.start.y);
@@ -1625,12 +2089,12 @@ function updateColumnMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, column: ShopB
   const wallDir = end.clone().sub(start).normalize();
   const perpDir = new THREE.Vector3(-wallDir.z, 0, wallDir.x); // Perpendicular in XZ plane
 
-  // Apply side offset
+  // Apply side offset (match slat wall: front = +perp, back = -perp)
   let sideOffset = 0;
-  if (column.side === 'left') {
-    sideOffset = -column.width / 2;
-  } else if (column.side === 'right') {
-    sideOffset = column.width / 2;
+  if (column.side === 'front') {
+    sideOffset = (column.depth || 0.4) / 2;
+  } else if (column.side === 'back') {
+    sideOffset = -(column.depth || 0.4) / 2;
   }
 
   const columnPos = baseColumnPos.clone().add(perpDir.multiplyScalar(sideOffset));
@@ -1638,9 +2102,9 @@ function updateColumnMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, column: ShopB
   // Update geometry
   mesh.geometry.dispose();
   if (column.shape === 'round') {
-    mesh.geometry = new THREE.CylinderGeometry(column.width / 2, column.width / 2, column.height, 16);
+    mesh.geometry = new THREE.CylinderGeometry((column.width || 0.4) / 2, (column.width || 0.4) / 2, column.height, 16);
   } else {
-    mesh.geometry = new THREE.BoxGeometry(column.depth, column.height, column.width);
+    mesh.geometry = new THREE.BoxGeometry(column.width || 0.4, column.height || 3, column.depth || 0.4);
   }
 
   // Update material with wall texture

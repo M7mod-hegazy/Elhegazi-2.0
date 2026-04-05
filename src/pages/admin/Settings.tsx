@@ -306,24 +306,27 @@ const AdminSettings = () => {
 
 
   const handleSaveTheme = async () => {
-
     try {
       // Clear theme cache before saving
       clearThemeCache();
       
+      const adminSecret = localStorage.getItem('ADMIN_SECRET');
+      const headers: Record<string, string> = {};
+      if (adminSecret) headers['x-admin-secret'] = adminSecret;
+
       // Save theme with colors only (logo is now fixed)
+      // Note: We include the full theme object for consistency
       const res = await apiPutJson('/api/settings', {
         theme: {
           primaryColor,
           secondaryColor
         }
-      });
+      }, headers);
       
       if (!res.ok) {
         throw new Error('error' in res ? res.error : 'Save failed');
       }
       
-
       toast({ title: 'تم الحفظ', description: 'سيتم تحديث الصفحة لتطبيق التغييرات' });
       
       // Clear cache again after successful save
@@ -335,7 +338,8 @@ const AdminSettings = () => {
       }, 1500);
     } catch (error) {
       console.error('Failed to save theme:', error);
-      toast({ title: 'خطأ', description: 'فشل حفظ الإعدادات', variant: 'destructive' });
+      const message = error instanceof Error ? error.message : 'فشل حفظ الإعدادات';
+      toast({ title: 'خطأ', description: message, variant: 'destructive' });
     }
   };
 

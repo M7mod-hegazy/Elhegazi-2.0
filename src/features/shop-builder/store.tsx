@@ -4,9 +4,11 @@ import {
   type ShopBuilderProduct,
   type ShopBuilderWall,
   type ShopBuilderColumn,
+  type ShopBuilderSlatWall,
   type ShopBuilderCameraState,
 } from './types';
 import { apiGet } from '@/lib/api';
+import type { ShopBuilderSlatAccessory } from './types';
 
 const STORAGE_KEY = 'shop-builder-design';
 
@@ -17,6 +19,7 @@ interface ShopBuilderContextValue {
   selectedProductId: string | null;
   selectedWallId: string | null;
   selectedColumnId: string | null;
+  selectedSlatWallId: string | null;
   isDrawingMode: boolean;
   setDrawingMode: (enabled: boolean) => void;
   cameraMode: CameraMode;
@@ -33,12 +36,19 @@ interface ShopBuilderContextValue {
   removeWall: (id: string) => void;
   upsertProduct: (product: Partial<ShopBuilderProduct> & { id?: string }) => string;
   removeProduct: (id: string) => void;
-  addColumnToWall: (wallId: string, position?: number) => string;
+  addColumnToWall: (wallId: string, position?: number, side?: 'front' | 'back') => string;
   updateColumn: (wallId: string, columnId: string, updates: Partial<ShopBuilderColumn>) => void;
   removeColumn: (wallId: string, columnId: string) => void;
   selectProduct: (id: string | null) => void;
   selectWall: (id: string | null) => void;
   selectColumn: (id: string | null) => void;
+  selectSlatWall: (id: string | null) => void;
+  addSlatWallToWall: (wallId: string, side?: 'front' | 'back') => string;
+  updateSlatWall: (wallId: string, slatWallId: string, updates: Partial<ShopBuilderSlatWall>) => void;
+  removeSlatWall: (wallId: string, slatWallId: string) => void;
+  addAccessoryToSlat: (wallId: string, slatWallId: string, type?: 'shelf' | 'hook_single' | 'hook_waterfall' | 'basket') => string;
+  updateAccessory: (wallId: string, slatWallId: string, accessoryId: string, updates: Partial<ShopBuilderSlatAccessory>) => void;
+  removeAccessory: (wallId: string, slatWallId: string, accessoryId: string) => void;
   importLayout: (next: ShopBuilderLayout) => void;
   exportLayout: () => ShopBuilderLayout;
   exportToFile: () => void;
@@ -126,11 +136,12 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
   const [selectedProductId, setSelectedProductId] = useState<string | null>(null);
   const [selectedWallId, setSelectedWallId] = useState<string | null>(null);
   const [selectedColumnId, setSelectedColumnId] = useState<string | null>(null);
+  const [selectedSlatWallId, setSelectedSlatWallId] = useState<string | null>(null);
   const [isDrawingMode, setIsDrawingMode] = useState(false);
   const [cameraMode, setCameraMode] = useState<CameraMode>('orbit');
   const [defaultWallThickness, setDefaultWallThickness] = useState(0.20); // Default 20cm
   
-  // Load defaults from MongoDB on mount
+  // Load defaults from MongoDB on mount and apply to localStorage
   useEffect(() => {
     const loadDefaults = async () => {
       try {
@@ -140,7 +151,8 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
         if (settings && settings.shopBuilderDefaults) {
           const { floorTexture, wallTexture, wallColor } = settings.shopBuilderDefaults;
           
-          // Apply defaults to layout - ALWAYS update from MongoDB
+          // Always apply defaults from MongoDB to localStorage
+          // This ensures settings saved in admin panel take effect on the main site
           setLayout((prev) => {
             const updated = {
               ...prev,
@@ -149,7 +161,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
               defaultWallColor: wallColor || '#ffffff',
             };
             
-            // Save to localStorage so it persists
+            // Save to localStorage so defaults persist
             saveToStorage(updated);
             
             return updated;
@@ -170,6 +182,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
       setSelectedProductId(null);
       setSelectedWallId(null);
       setSelectedColumnId(null);
+      setSelectedSlatWallId(null);
     }
   }, []);
 
@@ -217,7 +230,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
         end: { x: 2, y: 0 },
         height: 2.4, // Reduced from 3m to 2.4m for better proportions
         thickness: 0.2,
-        color: '#ffffff',
+        color: prev.defaultWallColor || '#ffffff',
         ...existingWall,  // Merge existing wall data first
         ...wall,          // Then apply updates
       } as ShopBuilderWall;
@@ -300,7 +313,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
   }, []);
 
   // Column management functions
-  const addColumnToWall = useCallback((wallId: string, position: number = 0.5) => {
+  const addColumnToWall = useCallback((wallId: string, position: number = 0.5, side: 'front' | 'back' = 'front') => {
     const columnId = crypto.randomUUID();
     setLayout((prev) => {
       const walls = prev.walls.map((wall) => {
@@ -313,7 +326,8 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
             depth: 0.5, // Default depth (عمق) = 0.5m
             height: wall.height, // Match wall height
             shape: 'square',
-            side: 'left', // Default side (جانب) = يسار (left)
+            side, // Use the provided side
+
             color: wall.color, // Match wall color
           };
           return {
@@ -360,6 +374,176 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
       return { ...prev, walls, updatedAt: now() };
     });
     setSelectedColumnId((current) => (current === columnId ? null : current));
+  }, []);
+
+  // Slat Wall management
+  const selectSlatWall = useCallback((id: string | null) => {
+    setSelectedSlatWallId(id);
+  }, []);
+
+  const addSlatWallToWall = useCallback((targetId: string, side: 'front' | 'back' = 'front') => {
+    const slatWallId = crypto.randomUUID();
+    setLayout((prev) => {
+      const walls = prev.walls.map((wall) => {
+        if (wall.id === targetId) {
+          const newSlatWall: ShopBuilderSlatWall = {
+             id: slatWallId,
+             wallId: targetId,
+             side,
+             fillType: 'full',
+             height: wall.height,
+             bottomOffset: 0,
+             color: '#f5f5f5', 
+             slatSpacing: 0.15, 
+          };
+          return { ...wall, slatWalls: [...(wall.slatWalls || []), newSlatWall] };
+        } else if (wall.columns?.some(c => c.id === targetId)) {
+           return {
+              ...wall,
+              columns: wall.columns.map(col => {
+                 if (col.id === targetId) {
+                    const newSlatWall: ShopBuilderSlatWall = {
+                       id: slatWallId,
+                       wallId: targetId,
+                       side,
+                       fillType: 'full',
+                       height: col.height,
+                       bottomOffset: 0,
+                       color: '#f5f5f5',
+                       slatSpacing: 0.15,
+                    };
+                    return { ...col, slatWalls: [...(col.slatWalls || []), newSlatWall] };
+                 }
+                 return col;
+              })
+           };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+    setSelectedSlatWallId(slatWallId);
+    return slatWallId;
+  }, []);
+
+  const updateSlatWall = useCallback((targetId: string, slatWallId: string, updates: Partial<ShopBuilderSlatWall>) => {
+    setLayout((prev) => {
+      const walls = prev.walls.map((wall) => {
+        if (wall.id === targetId && wall.slatWalls) {
+          return {
+            ...wall,
+            slatWalls: wall.slatWalls.map((slat) => slat.id === slatWallId ? { ...slat, ...updates } : slat),
+          };
+        } else if (wall.columns?.some(c => c.id === targetId)) {
+           return {
+              ...wall,
+              columns: wall.columns.map(col => {
+                 if (col.id === targetId && col.slatWalls) {
+                    return { ...col, slatWalls: col.slatWalls.map(slat => slat.id === slatWallId ? { ...slat, ...updates } : slat) };
+                 }
+                 return col;
+              })
+           }
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+  }, []);
+
+  const removeSlatWall = useCallback((targetId: string, slatWallId: string) => {
+    setLayout((prev) => {
+      const walls = prev.walls.map((wall) => {
+        if (wall.id === targetId && wall.slatWalls) {
+          return { ...wall, slatWalls: wall.slatWalls.filter((slat) => slat.id !== slatWallId) };
+        } else if (wall.columns?.some(c => c.id === targetId)) {
+           return {
+              ...wall,
+              columns: wall.columns.map(col => {
+                 if (col.id === targetId && col.slatWalls) {
+                    return { ...col, slatWalls: col.slatWalls.filter(slat => slat.id !== slatWallId) };
+                 }
+                 return col;
+              })
+           }
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+    setSelectedSlatWallId((current) => (current === slatWallId ? null : current));
+  }, []);
+
+  const addAccessoryToSlat = useCallback((targetId: string, slatWallId: string, type: 'shelf' | 'hook_single' | 'hook_waterfall' | 'basket' = 'shelf') => {
+    const accessoryId = crypto.randomUUID();
+    setLayout((prev) => {
+      const walls = prev.walls.map((wall) => {
+        
+        const mapSlat = (slat: ShopBuilderSlatWall) => {
+           if (slat.id === slatWallId) {
+              const defaultColor = type === 'shelf' ? '#d97706' : '#e5e7eb';
+              const defaultWidth = type === 'shelf' ? 0.8 : 0.05;
+              const defaultDepth = type === 'hook_waterfall' ? 0.4 : type === 'hook_single' ? 0.2 : 0.3;
+              return {
+                 ...slat,
+                 accessories: [...(slat.accessories || []), { id: accessoryId, type, position: { x: 0.5, y: 0.5 }, width: defaultWidth, depth: defaultDepth, color: defaultColor }]
+              }
+           }
+           return slat;
+        };
+
+        if (wall.id === targetId && wall.slatWalls) {
+          return { ...wall, slatWalls: wall.slatWalls.map(mapSlat) };
+        } else if (wall.columns?.some(c => c.id === targetId)) {
+           return { ...wall, columns: wall.columns.map(col => col.id === targetId && col.slatWalls ? { ...col, slatWalls: col.slatWalls.map(mapSlat) } : col) };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+    return accessoryId;
+  }, []);
+
+  const updateAccessory = useCallback((targetId: string, slatWallId: string, accessoryId: string, updates: Partial<ShopBuilderSlatAccessory>) => {
+    setLayout((prev) => {
+      const walls = prev.walls.map((wall) => {
+         const mapSlat = (slat: ShopBuilderSlatWall) => {
+            if (slat.id === slatWallId && slat.accessories) {
+               return { ...slat, accessories: slat.accessories.map(acc => acc.id === accessoryId ? { ...acc, ...updates } : acc) };
+            }
+            return slat;
+         };
+
+        if (wall.id === targetId && wall.slatWalls) {
+          return { ...wall, slatWalls: wall.slatWalls.map(mapSlat) };
+        } else if (wall.columns?.some(c => c.id === targetId)) {
+          return { ...wall, columns: wall.columns.map(col => col.id === targetId && col.slatWalls ? { ...col, slatWalls: col.slatWalls.map(mapSlat) } : col) };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+  }, []);
+
+  const removeAccessory = useCallback((targetId: string, slatWallId: string, accessoryId: string) => {
+    setLayout((prev) => {
+      const walls = prev.walls.map((wall) => {
+         const mapSlat = (slat: ShopBuilderSlatWall) => {
+            if (slat.id === slatWallId && slat.accessories) {
+               return { ...slat, accessories: slat.accessories.filter(acc => acc.id !== accessoryId) };
+            }
+            return slat;
+         };
+
+        if (wall.id === targetId && wall.slatWalls) {
+          return { ...wall, slatWalls: wall.slatWalls.map(mapSlat) };
+        } else if (wall.columns?.some(c => c.id === targetId)) {
+          return { ...wall, columns: wall.columns.map(col => col.id === targetId && col.slatWalls ? { ...col, slatWalls: col.slatWalls.map(mapSlat) } : col) };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
   }, []);
 
   const importLayout = useCallback((next: ShopBuilderLayout) => {
@@ -422,6 +606,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     selectedProductId,
     selectedWallId,
     selectedColumnId,
+    selectedSlatWallId,
     isDrawingMode,
     setDrawingMode,
     cameraMode,
@@ -444,6 +629,13 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     selectProduct,
     selectWall,
     selectColumn,
+    selectSlatWall,
+    addSlatWallToWall,
+    updateSlatWall,
+    removeSlatWall,
+    addAccessoryToSlat,
+    updateAccessory,
+    removeAccessory,
     importLayout,
     exportLayout,
     exportToFile,
@@ -464,6 +656,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     selectedProductId,
     selectedWallId,
     selectedColumnId,
+    selectedSlatWallId,
     isDrawingMode,
     setDrawingMode,
     cameraMode,
@@ -471,6 +664,10 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     selectProduct,
     selectWall,
     selectColumn,
+    selectSlatWall,
+    addSlatWallToWall,
+    updateSlatWall,
+    removeSlatWall,
     setCamera,
     setFloorTexture,
     setFloorSize,

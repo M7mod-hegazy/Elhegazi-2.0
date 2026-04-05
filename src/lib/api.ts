@@ -30,6 +30,11 @@ async function request(input: RequestInfo, init?: RequestInit): Promise<unknown>
     
     if (adminToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${adminToken}`);
     else if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+    
+    // Legacy support for admin secret override
+    const adminSecret = typeof window !== 'undefined' ? localStorage.getItem('ADMIN_SECRET') : null;
+    if (adminSecret && !headers.has('x-admin-secret')) headers.set('x-admin-secret', adminSecret);
+
     // Firebase mode: attach ID token if present and no Authorization provided yet
     if (!headers.has('Authorization') && auth?.currentUser?.getIdToken) {
       try {

@@ -206,8 +206,46 @@
   }
 }
 
+@keyframes splash-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 20px hsl(var(--primary) / 0.4)); }
+  50% { transform: scale(1.1); opacity: 0.8; filter: drop-shadow(0 0 40px hsl(var(--primary) / 0.6)); }
+}
+
+@keyframes splash-ring {
+  0% { transform: rotate(0deg); stroke-dashoffset: 280; }
+  50% { transform: rotate(180deg); stroke-dashoffset: 70; }
+  100% { transform: rotate(360deg); stroke-dashoffset: 280; }
+}
+
+@keyframes splash-text {
+  0%, 100% { opacity: 0.5; letter-spacing: 0.05em; }
+  50% { opacity: 1; letter-spacing: 0.15em; }
+}
+
+@keyframes splash-blob {
+  0%, 100% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+  33% { transform: translate(50px, -80px) scale(1.2); opacity: 0.5; }
+  66% { transform: translate(-40px, 40px) scale(0.8); opacity: 0.2; }
+}
+
 .animate-float {
   animation: float 6s ease-in-out infinite;
+}
+
+.animate-splash-pulse {
+  animation: splash-pulse 2s ease-in-out infinite;
+}
+
+.animate-splash-ring {
+  animation: splash-ring 2.5s ease-in-out infinite;
+}
+
+.animate-splash-text {
+  animation: splash-text 3s ease-in-out infinite;
+}
+
+.animate-splash-blob {
+  animation: splash-blob 10s ease-in-out infinite;
 }
 
 .animate-on-scroll {

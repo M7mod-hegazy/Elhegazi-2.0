@@ -493,7 +493,7 @@ app.post('/api/rbac/bootstrap-roles', async (req, res) => {
   }
 });
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } }); // 100MB for 3D models
 
 // unread support: lastSeenAt per admin
 app.get('/api/history/unread-count', async (req, res) => {
@@ -959,12 +959,12 @@ app.get('/api/home-config', async (req, res) => {
 // Upsert Home Config (single document)
 app.put('/api/home-config', async (req, res) => {
   try {
-    // Optional minimal admin check via header
-    if (process.env.ADMIN_SECRET) {
-      const hdr = req.header('x-admin-secret') || '';
-      if (hdr !== process.env.ADMIN_SECRET) {
-        return res.status(401).json({ ok: false, error: 'Unauthorized' });
-      }
+    // Admin authorization: accept EITHER static secret header OR authenticated admin user
+    const hdr = req.header('x-admin-secret') || '';
+    const hasValidSecret = process.env.ADMIN_SECRET && hdr === process.env.ADMIN_SECRET;
+    const hasValidUser = req.user && req.user._id;
+    if (!hasValidSecret && !hasValidUser) {
+      return res.status(403).json({ ok: false, error: 'Admin authentication required' });
     }
     const body = req.body || {};
     // Basic shape validation
@@ -1149,7 +1149,7 @@ app.post('/api/upload-3d-model', upload.single('file'), async (req, res) => {
     }
 
     // Check file type
-    const allowedTypes = ['.glb', '.gltf', '.obj', '.fbx'];
+    const allowedTypes = ['.glb', '.gltf', '.obj', '.fbx', '.glp'];
     const fileExt = path.extname(req.file.originalname).toLowerCase();
     
     if (!allowedTypes.includes(fileExt)) {
@@ -1160,32 +1160,49 @@ app.post('/api/upload-3d-model', upload.single('file'), async (req, res) => {
     }
 
     // Upload to Cloudinary with raw resource type for 3D files
-    // Include file extension in public_id to preserve it in the URL
-    const fileNameWithoutExt = path.basename(req.file.originalname, fileExt);
-    const publicId = `model_${Date.now()}${fileExt}`; // Include extension
+    const publicId = `model_${Date.now()}${fileExt}`;
+    const fileSizeMB = req.file.buffer.length / (1024 * 1024);
     
+    console.log(`📦 Uploading 3D model: ${req.file.originalname} (${fileSizeMB.toFixed(1)} MB)`);
+
     const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream({
+      const uploadOptions = {
         folder: '3d-models',
-        resource_type: 'raw', // Important for non-image files
+        resource_type: 'raw',
         public_id: publicId,
-        format: fileExt.substring(1), // Remove the dot from extension
-      }, (error, uploaded) => {
-        if (error) return reject(error);
-        resolve(uploaded);
-      });
-      stream.end(req.file.buffer);
+        chunk_size: 6 * 1024 * 1024, // 6MB chunks for large files
+      };
+
+      // Use upload_large_stream for chunked uploads (supports files > 10MB)
+      const stream = cloudinary.uploader.upload_large_stream
+        ? cloudinary.uploader.upload_large_stream(uploadOptions, (error, uploaded) => {
+            if (error) return reject(error);
+            resolve(uploaded);
+          })
+        : cloudinary.uploader.upload_stream(uploadOptions, (error, uploaded) => {
+            if (error) return reject(error);
+            resolve(uploaded);
+          });
+
+      // Write buffer in chunks to avoid memory pressure
+      const CHUNK = 4 * 1024 * 1024; // 4MB write chunks
+      let offset = 0;
+      while (offset < req.file.buffer.length) {
+        const end = Math.min(offset + CHUNK, req.file.buffer.length);
+        stream.write(req.file.buffer.slice(offset, end));
+        offset = end;
+      }
+      stream.end();
     });
 
     console.log('✅ 3D Model uploaded:', result.secure_url);
-    console.log('📦 File extension:', fileExt);
     
     return res.json({ 
       ok: true, 
       url: result.secure_url,
       publicId: result.public_id,
       fileSize: result.bytes,
-      format: fileExt.substring(1) // Return extension without dot
+      format: fileExt.substring(1)
     });
   } catch (err) {
     console.error('❌ 3D Model upload error:', err);
@@ -2810,12 +2827,12 @@ app.put('/api/settings', async (req, res) => {
       return res.status(503).json({ ok: false, error: 'Database not connected yet' });
     }
     
-    // Optional minimal admin check via header (same approach as home-config)
-    if (process.env.ADMIN_SECRET) {
-      const hdr = req.header('x-admin-secret') || '';
-      if (hdr !== process.env.ADMIN_SECRET) {
-        return res.status(401).json({ ok: false, error: 'Unauthorized' });
-      }
+    // Admin authorization: accept EITHER static secret header OR authenticated admin user
+    const hdr = req.header('x-admin-secret') || '';
+    const hasValidSecret = process.env.ADMIN_SECRET && hdr === process.env.ADMIN_SECRET;
+    const hasValidUser = req.user && req.user._id;
+    if (!hasValidSecret && !hasValidUser) {
+      return res.status(403).json({ ok: false, error: 'Admin authentication required' });
     }
     const body = req.body || {};
     const payload = {};

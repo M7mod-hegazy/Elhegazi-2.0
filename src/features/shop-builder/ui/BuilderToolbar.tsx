@@ -314,11 +314,11 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       end: { x: -2 + offset, y: 1.5 },
       height: 3,
       thickness: 0.25,
-      color: '#ffffff',
+      color: layout.defaultWallColor || '#ffffff',
     });
     selectWall(id);
     toast({ title: 'تم إضافة جدار جديد', description: 'يمكنك سحب أطرافه لتغيير الأبعاد.' });
-  }, [layout.walls.length, selectWall, toast, upsertWall]);
+  }, [layout.walls.length, layout.defaultWallColor, selectWall, toast, upsertWall]);
   const handleWallColorChange = useCallback(
     (value: string) => {
       setWallColor(value);
@@ -1166,7 +1166,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                       className={cn(
                         "flex items-center gap-3 p-3 rounded-lg border-2 transition-all hover:shadow-md",
                         layout.defaultWallTexture === option.key || (!layout.defaultWallTexture && option.key === '')
-                          ? "border-emerald-500 bg-emerald-50 shadow-md"
+                          ? "border-primary bg-primary/10 shadow-md"
                           : "border-slate-200 hover:border-slate-300 hover:bg-slate-50"
                       )}
                     >
@@ -1198,7 +1198,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
                   <input
                     type="color"
-                    value={layout.walls[0]?.color || '#64748b'}
+                    value={layout.defaultWallColor || '#ffffff'}
                     onChange={(e) => {
                       // Apply color to all walls
                       layout.walls.forEach(w => {
@@ -1211,7 +1211,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                   <div className="flex-1">
                     <p className="text-sm font-medium text-slate-700 mb-1">لون جميع الجدران</p>
                     <p className="text-xs text-slate-500">سيتم تطبيق اللون على جميع الجدران</p>
-                    <p className="text-xs font-mono text-slate-600 mt-1">{layout.walls[0]?.color || '#64748b'}</p>
+                    <p className="text-xs font-mono text-slate-600 mt-1">{layout.defaultWallColor || '#ffffff'}</p>
                   </div>
                 </div>
               </div>

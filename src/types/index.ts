@@ -10,6 +10,8 @@ export interface Product {
   images: string[];
   category: string;
   categoryAr: string;
+  categoryId?: string;
+  categorySlug?: string;
   // Deprecated: automatic stock tracking is being removed. Keep optional for backward compatibility.
   stock?: number;
   // New manual visibility flag: when true, product is hidden from storefront

@@ -104,6 +104,7 @@ app.get('/profit-reports/:id', async (c) => {
     const { default: ProfitReport } = await import('../server/models/ProfitReport.js');
     const id = c.req.param('id');
     const report = await ProfitReport.findById(id).lean().maxTimeMS(8000);
+    if (!report) return c.json({ ok: false, error: 'Profit report not found' }, 404);
     return c.json({ ok: true, item: report });
   } catch (err) {
     console.error('[API] Error:', err.message);
@@ -117,6 +118,7 @@ app.put('/profit-reports/:id', async (c) => {
     const id = c.req.param('id');
     const body = await c.req.json();
     const updated = await ProfitReport.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Profit report not found' }, 404);
     return c.json({ ok: true, item: updated });
   } catch (err) {
     console.error('[API] Error:', err.message);
@@ -128,7 +130,8 @@ app.delete('/profit-reports/:id', async (c) => {
   try {
     const { default: ProfitReport } = await import('../server/models/ProfitReport.js');
     const id = c.req.param('id');
-    await ProfitReport.findByIdAndDelete(id).maxTimeMS(8000);
+    const deleted = await ProfitReport.findByIdAndDelete(id).maxTimeMS(8000);
+    if (!deleted) return c.json({ ok: false, error: 'Profit report not found' }, 404);
     return c.json({ ok: true });
   } catch (err) {
     console.error('[API] Error:', err.message);
@@ -998,10 +1001,59 @@ app.post('/support/contact', async (c) => {
 // ===== 3D MODEL UPLOAD =====
 app.post('/upload-3d-model', async (c) => {
   try {
-    const body = await c.req.json();
-    return c.json({ ok: true, item: { message: '3D model uploaded', url: body.url } });
+    const formData = await c.req.formData();
+    const file = formData.get('file');
+
+    if (!file || typeof file === 'string') {
+      return c.json({ ok: false, error: 'file is required' }, 400);
+    }
+
+    // Check file extension
+    const allowedTypes = ['.glb', '.gltf', '.obj', '.fbx', '.glp'];
+    const fileName = file.name.toLowerCase();
+    const extIndex = fileName.lastIndexOf('.');
+    const fileExt = extIndex !== -1 ? fileName.substring(extIndex) : '';
+
+    if (!allowedTypes.includes(fileExt)) {
+      return c.json({ ok: false, error: `Invalid file type. Allowed types: ${allowedTypes.join(', ')}` }, 400);
+    }
+
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    const cloudinary = await import('cloudinary').then(m => m.v2);
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    const publicId = `model_${Date.now()}${fileExt}`;
+
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: '3d-models',
+          resource_type: 'raw',
+          public_id: publicId
+        },
+        (error, uploaded) => {
+          if (error) return reject(error);
+          resolve(uploaded);
+        }
+      );
+      stream.end(buffer);
+    });
+
+    return c.json({
+      ok: true,
+      url: result.secure_url,
+      publicId: result.public_id,
+      fileSize: result.bytes,
+      format: fileExt.substring(1)
+    });
   } catch (err) {
-    console.error('[API] Error:', err.message);
+    console.error('[API] 3D Model upload error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
   }
 });

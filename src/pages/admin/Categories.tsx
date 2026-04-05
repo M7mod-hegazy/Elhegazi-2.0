@@ -865,7 +865,7 @@ const Categories = () => {
                         <TableRow key={category.id} className="hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 border-l-4 border-l-transparent hover:border-l-primary/30">
                           <TableCell>
                             <div className="flex items-center gap-2 md:gap-3">
-                              {category.image && (
+                              {category.image ? (
                                 <img
                                   src={optimizeImage(category.image || '', { w: 64 })}
                                   alt={category.nameAr}
@@ -875,6 +875,10 @@ const Categories = () => {
                                   srcSet={buildSrcSet(category.image || '', 64)}
                                   sizes="64px"
                                 />
+                              ) : (
+                                <div className="w-8 h-8 md:w-12 md:h-12 bg-slate-100 rounded-lg md:rounded-xl border-2 border-slate-200 flex items-center justify-center shadow-md">
+                                  <Image className="w-4 h-4 md:w-6 md:h-6 text-slate-400" />
+                                </div>
                               )}
                               <div>
                                 <div className="font-semibold text-slate-900 text-sm md:text-base">{category.nameAr}</div>

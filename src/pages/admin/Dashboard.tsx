@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useEffect, useState, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import AdminLayout from '@/components/admin/AdminLayout';
 import ModernStatCard from '@/components/admin/ModernStatCard';
 import RevenueChart from '@/components/admin/charts/RevenueChart';
@@ -26,7 +27,8 @@ import {
   BarChart3,
   Activity,
   Zap,
-  Target
+  Target,
+  Grid3X3
 } from 'lucide-react';
 import { format, isWithinInterval, subDays } from 'date-fns';
 
@@ -147,6 +149,80 @@ const AdminDashboard = () => {
     return { orders: comparisonOrders, users: comparisonUsers };
   }, [orders, users, comparisonDateRange]);
 
+  // Real Analytics Processing
+  const chartData = useMemo(() => {
+    // Generate data for the last 7 days by default, or fit nicely into the selected date range.
+    const daysToShow = selectedDateRange ? Math.ceil((selectedDateRange.to.getTime() - selectedDateRange.from.getTime()) / (1000 * 3600 * 24)) : 7;
+    const end = selectedDateRange ? selectedDateRange.to : new Date();
+    
+    const dailyData = Array.from({ length: Math.max(1, daysToShow) }).map((_, i) => {
+      const date = subDays(end, daysToShow - 1 - i);
+      const startOfDay = new Date(date);
+      startOfDay.setHours(0,0,0,0);
+      const endOfDay = new Date(date);
+      endOfDay.setHours(23,59,59,999);
+      
+      const dayOrders = orders.filter(o => {
+        const d = new Date(o.createdAt);
+        return d >= startOfDay && d <= endOfDay;
+      });
+
+      const dayRevenue = dayOrders.reduce((sum, o) => sum + o.total, 0);
+      
+      // Calculate previous period for comparison
+      const prevDate = subDays(date, daysToShow);
+      const pStartOfDay = new Date(prevDate);
+      pStartOfDay.setHours(0,0,0,0);
+      const pEndOfDay = new Date(prevDate);
+      pEndOfDay.setHours(23,59,59,999);
+      
+      const prevOrders = orders.filter(o => {
+        const d = new Date(o.createdAt);
+        return d >= pStartOfDay && d <= pEndOfDay;
+      });
+      const prevRevenue = prevOrders.reduce((sum, o) => sum + o.total, 0);
+
+      const statusCounts = dayOrders.reduce((acc, o) => {
+        acc[o.status] = (acc[o.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+
+      return {
+        date: format(date, 'MMM dd'),
+        current: dayRevenue,
+        previous: prevRevenue,
+        orders: dayOrders.length,
+        pending: statusCounts['pending'] || 0,
+        confirmed: statusCounts['confirmed'] || 0,
+        delivered: statusCounts['delivered'] || 0,
+        cancelled: statusCounts['cancelled'] || 0,
+      };
+    });
+
+    const categoriesMap = new Map<string, number>();
+    products.forEach(p => {
+      const count = categoriesMap.get(p.category) || 0;
+      categoriesMap.set(p.category, count + 1);
+    });
+    
+    const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+    const categoryDataMap = Array.from(categoriesMap.entries())
+      .map(([name, value], i) => ({
+        name: name || 'غير مصنف',
+        value,
+        color: colors[i % colors.length]
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 5); // top 5 categories
+
+    return {
+      dailyData,
+      categoryData: categoryDataMap,
+      revenueChartData: dailyData.map(d => ({ date: d.date, current: d.current, previous: d.previous, orders: d.orders })),
+      ordersChartData: dailyData.map(d => ({ date: d.date, pending: d.pending, confirmed: d.confirmed, delivered: d.delivered, cancelled: d.cancelled }))
+    };
+  }, [orders, products, selectedDateRange]);
+
   // Calculate statistics
   const totalRevenue = filteredData.orders.reduce((sum, order) => sum + order.total, 0);
   const previousRevenue = comparisonData.orders.reduce((sum, order) => sum + order.total, 0);
@@ -174,7 +250,7 @@ const AdminDashboard = () => {
 
   const handleDateRangeChange = (dateRange: DateRange, comparisonRange?: DateRange) => {
     setSelectedDateRange(dateRange);
-    setComparisonDateRange(comparisonRange || null);
+setComparisonDateRange(comparisonRange || null);
   };
 
   const handleRefresh = () => {
@@ -182,514 +258,289 @@ const AdminDashboard = () => {
   };
 
   return (
-      <AdminLayout>
-      <div className="space-y-6 sm:space-y-8 bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/20 min-h-screen p-4 sm:p-6 -m-4 sm:-m-6">
-        {/* Modern Header */}
-        <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6">
-          <div className="space-y-1 sm:space-y-2">
-            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              لوحة التحكم
-            </h1>
-            <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-medium">مرحباً بك في نظام إدارة المتجر المتطور</p>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-slate-500">
-              <div className="flex items-center gap-1">
-                <Activity className="w-3 h-3 sm:w-4 sm:h-4 text-green-500" />
-                <span>النظام يعمل بكفاءة</span>
-              </div>
-              <div className="flex items-center gap-1">
-                <Zap className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
-                <span className="hidden sm:inline">آخر تحديث: </span>
-                <span className="sm:hidden">محدث: </span>
-                <span className="hidden sm:inline">{new Date().toLocaleString('ar-SA')}</span>
-                <span className="sm:hidden">{new Date().toLocaleTimeString('ar-SA', { hour: '2-digit', minute: '2-digit' })}</span>
-              </div>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
-            <Button 
-              onClick={handleRefresh} 
-              variant="outline" 
-              size={isMobile ? "sm" : "sm"}
-              disabled={isRefreshing}
-              className="flex-1 sm:flex-none bg-white/80 hover:bg-white border-primary/20 shadow-md text-xs sm:text-sm"
-            >
-              <RefreshCw className={`w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span className="hidden sm:inline">{isRefreshing ? 'جارِ التحديث...' : 'تحديث البيانات'}</span>
-              <span className="sm:hidden">{isRefreshing ? 'تحديث...' : 'تحديث'}</span>
-            </Button>
-          </div>
-        </div>
+    <AdminLayout>
+      <div className="bg-background min-h-screen transition-colors duration-300">
         
-        {/* Date Range Selector */}
-        <DateRangeSelector 
-          onDateRangeChange={handleDateRangeChange}
-          isLoading={isRefreshing}
-          onRefresh={handleRefresh}
-        />
-
-        {/* Revolutionary Mobile vs Desktop Stats Layout */}
+        {/* --- MOBILE VIEW --- */}
         {isMobile ? (
-          <div className="space-y-6">
-            {/* Mobile: Horizontal Scrolling Stats Cards */}
-            <div className="relative">
-              <h3 className="text-lg font-bold text-slate-900 mb-3 px-1">الإحصائيات الرئيسية</h3>
-              <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-hide snap-x snap-mandatory">
-                <div className="flex-none w-72 snap-center">
-                  <ModernStatCard
-                    title="إجمالي المبيعات"
-                    value={`${totalRevenue.toLocaleString()} ج.م`}
-                    subtitle={selectedDateRange ? `خلال ${selectedDateRange.label}` : "إجمالي قيمة الطلبات"}
-                    icon={<DollarSign className="w-6 h-6" />}
-                    iconColor="text-emerald-600"
-                    backgroundColor="bg-emerald-50"
-                    gradient="from-emerald-50 via-green-50 to-teal-50"
-                    buttonText="عرض التفاصيل"
-                    onButtonClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'orders_stats_button', meta: { to: '/admin/orders' } }); } catch (e) { /* no-op */ } navigate('/admin/orders'); }}
-                    trend={{ value: revenueGrowth, label: "مقارنة مع الفترة السابقة", isPositive: revenueGrowth >= 0 }}
-                    isLoading={isLoading}
-                  />
+          <div className="p-4 space-y-6 pb-20">
+            {/* Mobile Header */}
+            <div className="flex justify-between items-center bg-primary text-primary-foreground rounded-3xl p-6 shadow-xl relative overflow-hidden">
+              <div className="absolute -right-10 -top-10 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+              <div className="relative z-10">
+                <h1 className="text-2xl font-black mb-1">لوحة القيادة</h1>
+                <p className="text-primary-foreground/80 text-sm">مرحباً بك مجدداً</p>
+              </div>
+              <Button 
+                onClick={handleRefresh} 
+                variant="ghost" 
+                size="icon" 
+                className="text-white hover:bg-white/20 rounded-full h-10 w-10 relative z-10 shrink-0"
+              >
+                <RefreshCw className={`w-5 h-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
+
+            {/* Mobile App Grid (Springboard) */}
+            <div>
+              <h2 className="text-lg font-bold text-foreground mb-4 px-2">الوصول السريع</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div 
+                  onClick={() => navigate('/admin/products')}
+                  className="bg-card text-card-foreground p-5 rounded-[2rem] border border-border shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-transform"
+                >
+                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Package className="w-7 h-7 text-primary" />
+                  </div>
+                  <span className="font-bold text-sm">المنتجات</span>
                 </div>
-                
-                <div className="flex-none w-72 snap-center">
-                  <ModernStatCard
-                    title="الطلبات اليوم"
-                    value={todayOrders}
-                    subtitle="طلبات جديدة اليوم"
-                    icon={<ShoppingCart className="w-6 h-6" />}
-                    iconColor="text-primary"
-                    backgroundColor="bg-primary/5"
-                    gradient="from-primary/5 via-secondary/5 to-primary/10"
-                    buttonText="إدارة الطلبات"
-                    onButtonClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'today_orders_button', meta: { to: '/admin/orders' } }); } catch (e) { /* no-op */ } navigate('/admin/orders'); }}
-                    isLoading={isLoading}
-                  />
+
+                <div 
+                  onClick={() => navigate('/admin/orders')}
+                  className="bg-card text-card-foreground p-5 rounded-[2rem] border border-border shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-transform"
+                >
+                  <div className="w-14 h-14 bg-secondary/10 rounded-full flex items-center justify-center">
+                    <ShoppingCart className="w-7 h-7 text-secondary" />
+                  </div>
+                  <span className="font-bold text-sm">الطلبات</span>
                 </div>
-                
-                <div className="flex-none w-72 snap-center">
-                  <ModernStatCard
-                    title="المنتجات"
-                    value={products.length}
-                    subtitle={`منها ${lowStockProducts.length} منتج بمخزون منخفض`}
-                    icon={<Package className="w-6 h-6" />}
-                    iconColor="text-purple-600"
-                    backgroundColor="bg-purple-50"
-                    gradient="from-purple-50 via-violet-50 to-fuchsia-50"
-                    buttonText="إدارة المنتجات"
-                    onButtonClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'products_stats_button', meta: { to: '/admin/products' } }); } catch (e) { /* no-op */ } navigate('/admin/products'); }}
-                    isLoading={isLoading}
-                  />
+
+                <div 
+                  onClick={() => navigate('/admin/categories')}
+                  className="bg-card text-card-foreground p-5 rounded-[2rem] border border-border shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-transform"
+                >
+                  <div className="w-14 h-14 bg-primary/10 rounded-full flex items-center justify-center">
+                    <Target className="w-7 h-7 text-primary" />
+                  </div>
+                  <span className="font-bold text-sm">فئات المتجر</span>
                 </div>
-                
-                <div className="flex-none w-72 snap-center">
-                  <ModernStatCard
-                    title="العملاء الجدد"
-                    value={newUsersCount}
-                    subtitle={selectedDateRange ? `خلال ${selectedDateRange.label}` : "مستخدمين جدد"}
-                    icon={<Users className="w-6 h-6" />}
-                    iconColor="text-orange-600"
-                    backgroundColor="bg-orange-50"
-                    gradient="from-orange-50 via-amber-50 to-yellow-50"
-                    buttonText="عرض المستخدمين"
-                    onButtonClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'users_stats_button', meta: { to: '/admin/users' } }); } catch (e) { /* no-op */ } navigate('/admin/users'); }}
-                    trend={{ value: usersGrowth, label: "مقارنة مع الفترة السابقة", isPositive: usersGrowth >= 0 }}
-                    isLoading={isLoading}
-                  />
+
+                <div 
+                  onClick={() => navigate('/admin/users')}
+                  className="bg-card text-card-foreground p-5 rounded-[2rem] border border-border shadow-sm flex flex-col items-center justify-center gap-3 active:scale-95 transition-transform"
+                >
+                  <div className="w-14 h-14 bg-secondary/10 rounded-full flex items-center justify-center">
+                    <Users className="w-7 h-7 text-secondary" />
+                  </div>
+                  <span className="font-bold text-sm">المستخدمين</span>
                 </div>
               </div>
-              {/* Mobile scroll indicator */}
-              <div className="flex justify-center mt-2 space-x-1">
-                <div className="w-2 h-2 bg-primary rounded-full"></div>
-                <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
-                <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
-                <div className="w-2 h-2 bg-slate-300 rounded-full"></div>
+            </div>
+
+            {/* Mobile Status List */}
+            <div className="bg-card p-5 rounded-3xl border border-border shadow-sm">
+              <h2 className="text-lg font-bold text-foreground mb-4">نظرة عامة</h2>
+              <div className="space-y-4">
+                <div className="flex justify-between items-center pb-4 border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                      <Package className="w-5 h-5 text-primary" />
+                    </div>
+                    <span className="font-semibold text-foreground">إجمالي المنتجات</span>
+                  </div>
+                  <span className="font-black text-lg text-primary">{products.length}</span>
+                </div>
+                <div className="flex justify-between items-center pb-4 border-b border-border/50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-secondary/10 rounded-full flex items-center justify-center">
+                      <Users className="w-5 h-5 text-secondary" />
+                    </div>
+                    <span className="font-semibold text-foreground">إجمالي الحسابات</span>
+                  </div>
+                  <span className="font-black text-lg text-secondary">{users.length}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-destructive/10 rounded-full flex items-center justify-center">
+                      <Target className="w-5 h-5 text-destructive" />
+                    </div>
+                    <span className="font-semibold text-foreground">منتجات بدون مخزون</span>
+                  </div>
+                  <span className="font-black text-lg text-destructive">{outOfStockProducts.length}</span>
+                </div>
               </div>
             </div>
             
-            {/* Mobile: Enhanced Charts Section */}
-            <div className="space-y-4">
-              {/* Mobile Revenue Chart */}
-              <Card className="bg-white/90 backdrop-blur-xl border border-slate-200/50 shadow-lg rounded-2xl overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-primary/5 border-b border-slate-200/50 p-4">
-                  <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-primary" />
-                    أداء المبيعات
-                  </CardTitle>
-                  <CardDescription className="text-sm text-slate-600">
-                    {selectedDateRange?.label || 'آخر 7 أيام'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-3">
-                  <div className="h-48">
-                    <RevenueChart 
-                      data={[
-                        { date: 'Jan 01', current: 12000, previous: 10000, orders: 45 },
-                        { date: 'Jan 02', current: 15000, previous: 12000, orders: 52 },
-                        { date: 'Jan 03', current: 18000, previous: 14000, orders: 48 },
-                        { date: 'Jan 04', current: 22000, previous: 16000, orders: 61 },
-                        { date: 'Jan 05', current: 19000, previous: 15000, orders: 55 },
-                        { date: 'Jan 06', current: 25000, previous: 18000, orders: 67 },
-                        { date: 'Jan 07', current: 28000, previous: 20000, orders: 72 }
-                      ]}
-                      isLoading={isLoading}
-                      dateRange={selectedDateRange?.label || 'آخر 7 أيام'}
-                      comparisonEnabled={!!comparisonDateRange}
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Mobile Orders Status Chart */}
-              <Card className="bg-white/90 backdrop-blur-xl border border-slate-200/50 shadow-lg rounded-2xl">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-green-50 border-b border-slate-200/50 p-4">
-                  <CardTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                    <BarChart3 className="w-5 h-5 text-green-600" />
-                    حالة الطلبات
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-4">
-                  <div className="grid grid-cols-2 gap-3 mb-4">
-                    <div className="bg-yellow-50 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-yellow-800">{ordersByStatus.pending}</div>
-                      <div className="text-xs text-yellow-600">قيد الانتظار</div>
-                    </div>
-                    <div className="bg-primary/5 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-primary">{ordersByStatus.confirmed}</div>
-                      <div className="text-xs text-primary">مؤكدة</div>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-green-800">{ordersByStatus.delivered}</div>
-                      <div className="text-xs text-green-600">مُسلمة</div>
-                    </div>
-                    <div className="bg-red-50 rounded-lg p-3 text-center">
-                      <div className="text-2xl font-bold text-red-800">{ordersByStatus.cancelled}</div>
-                      <div className="text-xs text-red-600">ملغية</div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            
-            {/* Mobile: Action Cards */}
-            <div className="space-y-4">
-              {/* Mobile Inventory Alert */}
-              <Card className="bg-gradient-to-br from-white to-orange-50/50 border-orange-200/50 shadow-lg rounded-2xl">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-3 text-lg">
-                    <div className="w-10 h-10 bg-orange-100 rounded-xl flex items-center justify-center">
-                      <AlertTriangle className="w-5 h-5 text-orange-600" />
-                    </div>
-                    <div>
-                      <div className="text-slate-900">تنبيهات المخزون</div>
-                      <div className="text-sm text-slate-600 font-normal">منتجات تحتاج إلى إعادة تموين</div>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3 border border-red-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-red-500 rounded-full flex items-center justify-center">
-                          <Target className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-red-800">نفدت من المخزن</p>
-                          <p className="text-sm text-red-600">{outOfStockProducts.length} منتج</p>
-                        </div>
-                      </div>
-                      <Button size="sm" variant="outline" className="bg-white/80 hover:bg-white border-red-300 text-sm" onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'inventory_alert_view', meta: { to: '/admin/products', type: 'out_of_stock' } }); } catch (e) { /* no-op */ } navigate('/admin/products'); }}>
-                        <Eye className="w-4 h-4 mr-1" />
-                        عرض
-                      </Button>
-                    </div>
-                  </div>
-                  
-                  <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-3 border border-orange-200">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 bg-orange-500 rounded-full flex items-center justify-center">
-                          <BarChart3 className="w-4 h-4 text-white" />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-orange-800">مخزون منخفض</p>
-                          <p className="text-sm text-orange-600">{lowStockProducts.length} منتج</p>
-                        </div>
-                      </div>
-                      <Button size="sm" variant="outline" className="bg-white/80 hover:bg-white border-orange-300 text-sm" onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'inventory_alert_restock', meta: { to: '/admin/products', type: 'low_stock' } }); } catch (e) { /* no-op */ } navigate('/admin/products'); }}>
-                        <TrendingUp className="w-4 h-4 mr-1" />
-                        تحديث
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              {/* Mobile Quick Actions */}
-              <Card className="bg-gradient-to-br from-white to-primary/5 border-primary/20 shadow-lg rounded-2xl">
-                <CardHeader className="pb-3">
-                  <CardTitle className="flex items-center gap-3 text-lg">
-                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                      <Zap className="w-5 h-5 text-primary" />
-                    </div>
-                    <div>
-                      <div className="text-slate-900">إجراءات سريعة</div>
-                      <div className="text-sm text-slate-600 font-normal">الإجراءات الأكثر استخداماً</div>
-                    </div>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button 
-                    className="w-full justify-start h-12 bg-gradient-to-r from-primary/5 to-secondary/5 hover:from-primary/10 hover:to-secondary/10 text-slate-700 border border-primary/20 shadow-sm" 
-                    variant="outline"
-                    onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'quick_add_product', meta: { to: '/admin/products' } }); } catch (e) { /* no-op */ } navigate('/admin/products'); }}
-                  >
-                    <Plus className="w-5 h-5 mr-3 text-primary" />
-                    <div className="text-right">
-                      <div className="font-semibold">إضافة منتج جديد</div>
-                      <div className="text-xs text-slate-500">إضافة منتج جديد إلى المتجر</div>
-                    </div>
-                  </Button>
-                  
-                  <Button 
-                    className="w-full justify-start h-12 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 text-slate-700 border border-green-200 shadow-sm" 
-                    variant="outline"
-                    onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'quick_review_orders', meta: { to: '/admin/orders' } }); } catch (e) { /* no-op */ } navigate('/admin/orders'); }}
-                  >
-                    <Eye className="w-5 h-5 mr-3 text-green-600" />
-                    <div className="text-right">
-                      <div className="font-semibold">مراجعة الطلبات الجديدة</div>
-                      <div className="text-xs text-slate-500">عرض ومعالجة الطلبات الجديدة</div>
-                    </div>
-                  </Button>
-                  
-                  <Button 
-                    className="w-full justify-start h-12 bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 text-slate-700 border border-purple-200 shadow-sm" 
-                    variant="outline"
-                    onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'quick_qr_codes', meta: { to: '/admin/qr-codes' } }); } catch (e) { /* no-op */ } navigate('/admin/qr-codes'); }}
-                  >
-                    <Package className="w-5 h-5 mr-3 text-purple-600" />
-                    <div className="text-right">
-                      <div className="font-semibold">إنشاء رموز QR</div>
-                      <div className="text-xs text-slate-500">إنشاء رموز QR للمنتجات</div>
-                    </div>
-                  </Button>
-                </CardContent>
-              </Card>
+            {/* Direct Configuration Jump */}
+            <div 
+              onClick={() => navigate('/admin/home-config')}
+              className="bg-gradient-to-l from-primary/5 to-secondary/5 border border-primary/20 p-5 rounded-3xl flex justify-between items-center active:scale-95 transition-transform"
+            >
+              <div>
+                <h3 className="font-bold text-foreground text-lg mb-1">إعدادات واجهة المتجر</h3>
+                <p className="text-muted-foreground text-sm">تعديل شكل الصفحة الرئيسية</p>
+              </div>
+              <div className="w-12 h-12 bg-background rounded-full flex items-center justify-center shadow-sm">
+                <Zap className="w-6 h-6 text-primary" />
+              </div>
             </div>
           </div>
         ) : (
-          // Desktop: Traditional Grid Layout
-          <div className="space-y-6">
-            {/* Desktop Modern Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <ModernStatCard
-            title="إجمالي المبيعات"
-            value={`${totalRevenue.toLocaleString()} ج.م`}
-            subtitle={selectedDateRange ? `خلال ${selectedDateRange.label}` : "إجمالي قيمة الطلبات"}
-            icon={<DollarSign className="w-7 h-7" />}
-            iconColor="text-emerald-600"
-            backgroundColor="bg-emerald-50"
-            gradient="from-emerald-50 via-green-50 to-teal-50"
-            buttonText="عرض تفاصيل المبيعات"
-            onButtonClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'orders_stats_button', meta: { to: '/admin/orders' } }); } catch (e) { /* no-op */ } navigate('/admin/orders'); }}
-            trend={{ value: revenueGrowth, label: "مقارنة مع الفترة السابقة", isPositive: revenueGrowth >= 0 }}
-            isLoading={isLoading}
-          />
           
-          <ModernStatCard
-            title="الطلبات اليوم"
-            value={todayOrders}
-            subtitle="طلبات جديدة اليوم"
-            icon={<ShoppingCart className="w-7 h-7" />}
-            iconColor="text-primary"
-            backgroundColor="bg-primary/5"
-            gradient="from-primary/5 via-secondary/5 to-primary/10"
-            buttonText="إدارة الطلبات"
-            onButtonClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'today_orders_button', meta: { to: '/admin/orders' } }); } catch (e) { /* no-op */ } navigate('/admin/orders'); }}
-            isLoading={isLoading}
-          />
-          
-          <ModernStatCard
-            title="المنتجات"
-            value={products.length}
-            subtitle={`منها ${lowStockProducts.length} منتج بمخزون منخفض`}
-            icon={<Package className="w-7 h-7" />}
-            iconColor="text-purple-600"
-            backgroundColor="bg-purple-50"
-            gradient="from-purple-50 via-violet-50 to-fuchsia-50"
-            buttonText="إدارة المنتجات"
-            onButtonClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'products_stats_button', meta: { to: '/admin/products' } }); } catch (e) { /* no-op */ } navigate('/admin/products'); }}
-            isLoading={isLoading}
-          />
-          
-          <ModernStatCard
-            title="العملاء الجدد"
-            value={newUsersCount}
-            subtitle={selectedDateRange ? `خلال ${selectedDateRange.label}` : "مستخدمين جدد"}
-            icon={<Users className="w-7 h-7" />}
-            iconColor="text-orange-600"
-            backgroundColor="bg-orange-50"
-            gradient="from-orange-50 via-amber-50 to-yellow-50"
-            buttonText="عرض المستخدمين"
-            onButtonClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'users_stats_button', meta: { to: '/admin/users' } }); } catch (e) { /* no-op */ } navigate('/admin/users'); }}
-            trend={{ value: usersGrowth, label: "مقارنة مع الفترة السابقة", isPositive: usersGrowth >= 0 }}
-            isLoading={isLoading}
-          />
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-          <div className="lg:col-span-2">
-            <RevenueChart 
-              data={[
-                { date: 'Jan 01', current: 12000, previous: 10000, orders: 45 },
-                { date: 'Jan 02', current: 15000, previous: 12000, orders: 52 },
-                { date: 'Jan 03', current: 18000, previous: 14000, orders: 48 },
-                { date: 'Jan 04', current: 22000, previous: 16000, orders: 61 },
-                { date: 'Jan 05', current: 19000, previous: 15000, orders: 55 },
-                { date: 'Jan 06', current: 25000, previous: 18000, orders: 67 },
-                { date: 'Jan 07', current: 28000, previous: 20000, orders: 72 }
-              ]}
-              isLoading={isLoading}
-              dateRange={selectedDateRange?.label || 'آخر 7 أيام'}
-              comparisonEnabled={!!comparisonDateRange}
-            />
-          </div>
-          
-          <OrdersChart 
-            data={[
-              { date: 'Jan 01', pending: 12, confirmed: 25, delivered: 8, cancelled: 2 },
-              { date: 'Jan 02', pending: 15, confirmed: 28, delivered: 12, cancelled: 1 },
-              { date: 'Jan 03', pending: 10, confirmed: 32, delivered: 15, cancelled: 3 },
-              { date: 'Jan 04', pending: 18, confirmed: 35, delivered: 18, cancelled: 2 },
-              { date: 'Jan 05', pending: 14, confirmed: 30, delivered: 22, cancelled: 1 },
-              { date: 'Jan 06', pending: 20, confirmed: 38, delivered: 25, cancelled: 4 },
-              { date: 'Jan 07', pending: 16, confirmed: 42, delivered: 28, cancelled: 2 }
-            ]}
-            isLoading={isLoading}
-          />
-          
-          <CategoryDistribution 
-            data={[
-              { name: 'إلكترونيات', value: 45, color: '#3b82f6' },
-              { name: 'ملابس', value: 32, color: '#10b981' },
-              { name: 'مجوهرات', value: 28, color: '#f59e0b' },
-              { name: 'كتب', value: 20, color: '#ef4444' },
-              { name: 'رياضة', value: 15, color: '#8b5cf6' },
-            ]}
-            isLoading={isLoading}
-          />
-        </div>
-
-        {/* Enhanced Inventory Alert & Quick Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
-          {/* Modern Inventory Alert */}
-          <Card className="bg-gradient-to-br from-white to-orange-50/50 border-orange-200/50 shadow-xl">
-            <CardHeader className="pb-3 sm:pb-4">
-              <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                  <AlertTriangle className="w-5 h-5 sm:w-6 sm:h-6 text-orange-600" />
-                </div>
-                <div>
-                  <div className="text-slate-900 text-base sm:text-lg">تنبيهات المخزون</div>
-                  <div className="text-xs sm:text-sm text-slate-600 font-normal">منتجات تحتاج إلى إعادة تموين</div>
-                </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 sm:space-y-4">
-              <div className="bg-gradient-to-r from-red-50 to-red-100 rounded-xl p-3 sm:p-4 border border-red-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-red-500 rounded-full flex items-center justify-center">
-                      <Target className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
-                    </div>
-                    <div>
-                      <p className="font-semibold text-red-800 text-sm sm:text-base">نفدت من المخزن</p>
-                      <p className="text-xs sm:text-sm text-red-600">{outOfStockProducts.length} منتج</p>
-                    </div>
-                  </div>
-                  <Button size="sm" variant="outline" className="bg-white/80 hover:bg-white border-red-300 text-xs sm:text-sm px-2 sm:px-3" onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'inventory_alert_view', meta: { to: '/admin/products', type: 'out_of_stock' } }); } catch (e) { /* no-op */ } navigate('/admin/products'); }}>
-                    <Eye className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                    <span className="hidden sm:inline">عرض</span>
-                    <span className="sm:hidden">عرض</span>
-                  </Button>
-                </div>
+          /* --- DESKTOP VIEW --- */
+          <div className="p-6 md:p-8 space-y-8 w-full">
+            {/* Avant-Garde Desktop Header */}
+            <div className="relative overflow-hidden bg-primary rounded-[2rem] p-8 md:p-10 shadow-2xl text-primary-foreground flex justify-between items-center">
+              <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2 pointer-events-none"></div>
+              <div className="absolute bottom-0 left-0 w-80 h-80 bg-black/10 rounded-full blur-3xl translate-y-1/3 -translate-x-1/3 pointer-events-none"></div>
+              
+              <div className="relative z-10">
+                <h1 className="text-3xl md:text-4xl font-black mb-3 tracking-tight drop-shadow-sm">لوحة القيادة المركزية</h1>
+                <p className="text-primary-foreground/90 text-base md:text-lg font-medium flex items-center gap-2">
+                  <Zap className="w-5 h-5" />
+                  مركز إدارة المتجر واستكشاف البيانات
+                </p>
               </div>
               
-              <div className="bg-gradient-to-r from-orange-50 to-orange-100 rounded-xl p-3 sm:p-4 border border-orange-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-8 h-8 sm:w-10 sm:h-10 bg-orange-500 rounded-full flex items-center justify-center">
-                      <BarChart3 className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              <div className="relative z-10 flex flex-col items-end gap-4">
+                 <Button 
+                  onClick={handleRefresh} 
+                  variant="outline" 
+                  size="lg"
+                  disabled={isRefreshing}
+                  className="bg-background/10 text-primary-foreground hover:bg-background/20 hover:text-white border-white/20 backdrop-blur-md rounded-2xl h-12 px-6 text-base font-bold transition-all"
+                 >
+                   <RefreshCw className={`w-5 h-5 mr-3 ${isRefreshing ? 'animate-spin' : ''}`} />
+                   {isRefreshing ? 'جار التحديث' : 'تحديث البيانات'}
+                 </Button>
+              </div>
+            </div>
+
+            {/* Main Desktop Layout Grid */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              
+              {/* Left Column (Main Launchpad) - Span 2 */}
+              <div className="xl:col-span-2 flex flex-col gap-6">
+                
+                {/* Smart Actions Grid */}
+                <div>
+                  <h2 className="text-2xl font-bold text-foreground mb-6 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                      <Target className="w-5 h-5 text-primary" />
                     </div>
-                    <div>
-                      <p className="font-semibold text-orange-800 text-sm sm:text-base">مخزون منخفض</p>
-                      <p className="text-xs sm:text-sm text-orange-600">{lowStockProducts.length} منتج</p>
+                    أدوات التحكم السريعة
+                  </h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Products Card */}
+                    <div 
+                      onClick={() => navigate('/admin/products')}
+                      className="group bg-card text-card-foreground border-2 border-transparent hover:border-primary/20 hover:shadow-xl transition-all duration-300 rounded-[2rem] p-8 cursor-pointer relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 rounded-full blur-2xl group-hover:bg-primary/10 transition-colors"></div>
+                      <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 text-primary group-hover:scale-110 transition-transform">
+                        <Package className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-2xl font-bold mb-2">إدارة المنتجات</h3>
+                      <p className="text-muted-foreground">أضف، عدل، وراقب حالة المخزن والأسعار بمرونة عالية.</p>
+                    </div>
+
+                    {/* Categories Card */}
+                    <div 
+                      onClick={() => navigate('/admin/categories')}
+                      className="group bg-card text-card-foreground border-2 border-transparent hover:border-secondary/20 hover:shadow-xl transition-all duration-300 rounded-[2rem] p-8 cursor-pointer relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 right-0 w-32 h-32 bg-secondary/5 rounded-full blur-2xl group-hover:bg-secondary/10 transition-colors"></div>
+                      <div className="w-16 h-16 bg-secondary/10 rounded-2xl flex items-center justify-center mb-6 text-secondary group-hover:scale-110 transition-transform">
+                        <Grid3X3 className="w-8 h-8" />
+                      </div>
+                      <h3 className="text-2xl font-bold mb-2">فئات المتجر</h3>
+                      <p className="text-muted-foreground">قم بتنظيم تصنيفات متجرك وترتيب الواجهة لعملائك.</p>
+                    </div>
+
+                    {/* Home Config Card */}
+                    <div 
+                      onClick={() => navigate('/admin/home-config')}
+                      className="group bg-card text-card-foreground border-2 border-transparent hover:border-primary/20 hover:shadow-xl transition-all duration-300 rounded-[2rem] p-8 cursor-pointer relative overflow-hidden md:col-span-2 bg-gradient-to-l from-primary/5 to-transparent"
+                    >
+                      <div className="flex justify-between items-center">
+                        <div>
+                          <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-6 text-primary group-hover:rotate-12 transition-transform">
+                            <Activity className="w-8 h-8" />
+                          </div>
+                          <h3 className="text-2xl font-bold mb-2">إعدادات واجهة المتجر</h3>
+                          <p className="text-muted-foreground max-w-lg">تحكم في كامل الصفحة الرئيسية للمتجر (السلايدر، العروض، وأقسام المنتجات المخصصة).</p>
+                        </div>
+                        <div className="hidden md:flex p-4 rounded-full border border-primary/20 bg-background text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                          <Eye className="w-8 h-8" />
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <Button size="sm" variant="outline" className="bg-white/80 hover:bg-white border-orange-300 text-xs sm:text-sm px-2 sm:px-3" onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'inventory_alert_restock', meta: { to: '/admin/products', type: 'low_stock' } }); } catch (e) { /* no-op */ } navigate('/admin/products'); }}>
-                    <TrendingUp className="w-3 h-3 sm:w-4 sm:h-4 mr-1" />
-                    <span className="hidden sm:inline">تحديث المخزون</span>
-                    <span className="sm:hidden">تحديث</span>
-                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Enhanced Quick Actions */}
-          <Card className="bg-gradient-to-br from-white to-primary/5 border-primary/20 shadow-xl">
-            <CardHeader className="pb-3 sm:pb-4">
-              <CardTitle className="flex items-center gap-2 sm:gap-3 text-lg sm:text-xl">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-xl flex items-center justify-center">
-                  <Zap className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+              </div>
+
+              {/* Right Column (Insights) - Span 1 */}
+              <div className="xl:col-span-1 flex flex-col gap-6">
+                
+                {/* Minimalist Data Summary */}
+                <div className="bg-card border border-border shadow-lg rounded-[2rem] p-8">
+                  <h3 className="text-xl font-bold text-foreground mb-6">نظرة سريعة</h3>
+                  
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between group cursor-pointer" onClick={() => navigate('/admin/products')}>
+                      <div>
+                        <p className="text-muted-foreground text-sm font-medium mb-1">إجمالي المنتجات</p>
+                        <p className="text-3xl font-black text-foreground group-hover:text-primary transition-colors">{products.length}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-full bg-primary/5 flex items-center justify-center text-primary">
+                        <Package className="w-6 h-6" />
+                      </div>
+                    </div>
+                    
+                    <div className="w-full h-px bg-border/50"></div>
+                    
+                    <div className="flex items-center justify-between group cursor-pointer" onClick={() => navigate('/admin/users')}>
+                      <div>
+                        <p className="text-muted-foreground text-sm font-medium mb-1">العملاء المسجلين</p>
+                        <p className="text-3xl font-black text-foreground group-hover:text-secondary transition-colors">{users.length}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-full bg-secondary/5 flex items-center justify-center text-secondary">
+                        <Users className="w-6 h-6" />
+                      </div>
+                    </div>
+
+                    <div className="w-full h-px bg-border/50"></div>
+
+                    <div className="flex items-center justify-between group cursor-pointer" onClick={() => navigate('/admin/orders')}>
+                      <div>
+                        <p className="text-muted-foreground text-sm font-medium mb-1">إجمالي الطلبات</p>
+                        <p className="text-3xl font-black text-foreground">{orders.length}</p>
+                      </div>
+                      <div className="w-12 h-12 rounded-full bg-foreground/5 flex items-center justify-center text-foreground">
+                        <ShoppingCart className="w-6 h-6" />
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-slate-900 text-base sm:text-lg">إجراءات سريعة</div>
-                  <div className="text-xs sm:text-sm text-slate-600 font-normal">الإجراءات الأكثر استخداماً</div>
+
+                {/* Intelligent Warning Block */}
+                <div className="bg-gradient-to-br from-card to-background border border-border shadow-sm rounded-[2rem] p-8">
+                  <h3 className="text-lg font-bold text-muted-foreground mb-4">تنبيهات تلقائية</h3>
+                  {outOfStockProducts.length > 0 ? (
+                    <div className="bg-destructive/10 border border-destructive/20 text-destructive p-4 rounded-xl flex items-start gap-3">
+                      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold mb-1">منتجات تفقد المخزون</p>
+                        <p className="text-sm opacity-90">يوجد {outOfStockProducts.length} منتج ليس لديه كمية متوفرة. <span className="underline cursor-pointer font-bold" onClick={() => navigate('/admin/products')}>راجع المنتجات</span></p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-primary/5 border border-primary/20 text-primary p-4 rounded-xl flex items-start gap-3">
+                      <Activity className="w-5 h-5 shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-bold mb-1">المخزون ممتاز</p>
+                        <p className="text-sm opacity-90">لا توجد أي نواقص في المستودع حالياً.</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 sm:space-y-3">
-              <Button 
-                className="w-full justify-start h-10 sm:h-12 bg-gradient-to-r from-primary/5 to-secondary/5 hover:from-primary/10 hover:to-secondary/10 text-slate-700 border border-primary/20 shadow-sm text-xs sm:text-sm" 
-                variant="outline"
-                onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'quick_add_product', meta: { to: '/admin/products' } }); } catch (e) { /* no-op */ } navigate('/admin/products'); }}
-              >
-                <Plus className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-primary" />
-                <div className="text-right">
-                  <div className="font-semibold">إضافة منتج جديد</div>
-                  <div className="text-xs text-slate-500 hidden sm:block">إضافة منتج جديد إلى المتجر</div>
-                </div>
-              </Button>
-              
-              <Button 
-                className="w-full justify-start h-10 sm:h-12 bg-gradient-to-r from-green-50 to-emerald-50 hover:from-green-100 hover:to-emerald-100 text-slate-700 border border-green-200 shadow-sm text-xs sm:text-sm" 
-                variant="outline"
-                onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'quick_review_orders', meta: { to: '/admin/orders' } }); } catch (e) { /* no-op */ } navigate('/admin/orders'); }}
-              >
-                <Eye className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-green-600" />
-                <div className="text-right">
-                  <div className="font-semibold">مراجعة الطلبات الجديدة</div>
-                  <div className="text-xs text-slate-500 hidden sm:block">عرض ومعالجة الطلبات الجديدة</div>
-                </div>
-              </Button>
-              
-              <Button 
-                className="w-full justify-start h-10 sm:h-12 bg-gradient-to-r from-purple-50 to-violet-50 hover:from-purple-100 hover:to-violet-100 text-slate-700 border border-purple-200 shadow-sm text-xs sm:text-sm" 
-                variant="outline"
-                onClick={async () => { try { await logHistory({ section: 'admin_dashboard', action: 'navigate', note: 'quick_qr_codes', meta: { to: '/admin/qr-codes' } }); } catch (e) { /* no-op */ } navigate('/admin/qr-codes'); }}
-              >
-                <Package className="w-4 h-4 sm:w-5 sm:h-5 mr-2 sm:mr-3 text-purple-600" />
-                <div className="text-right">
-                  <div className="font-semibold">إنشاء رموز QR</div>
-                  <div className="text-xs text-slate-500 hidden sm:block">إنشاء رموز QR للمنتجات</div>
-                </div>
-              </Button>
-            </CardContent>
-          </Card>
-        </div>
+
+              </div>
+            </div>
           </div>
         )}
+
       </div>
     </AdminLayout>
   );

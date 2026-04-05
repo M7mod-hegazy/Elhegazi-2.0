@@ -17,6 +17,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Progress } from '@/components/ui/progress';
 import { Input } from '@/components/ui/input';
 import AdminLayout from '@/components/admin/AdminLayout';
+import SmartProductSelector from '@/components/admin/SmartProductSelector';
 import { apiGet } from '@/lib/api';
 
 import { Product, Category } from '@/types';
@@ -136,12 +137,6 @@ const QRCodesPDFDocument = ({ products, settings }: { products: Product[]; setti
 };
 
 interface QRSettings {
-  productSelection: 'all' | 'category';
-  selectedCategory: string;
-  // When selecting by category, optionally enable SKU range within that category
-  categoryRangeEnabled: boolean;
-  fromCode: string;
-  toCode: string;
   size: number;
   showProductCode: boolean;
   showProductName: boolean;
@@ -165,11 +160,6 @@ const AdminQRCodes = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [settings, setSettings] = useState<QRSettings>({
-    productSelection: 'all',
-    selectedCategory: '',
-    categoryRangeEnabled: false,
-    fromCode: '',
-    toCode: '',
     size: 200,
     showProductCode: true,
     showProductName: true,
@@ -191,7 +181,6 @@ const AdminQRCodes = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
-  const [categorySearch, setCategorySearch] = useState('');
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [qrCache, setQrCache] = useState<{ [key: string]: string }>({});
 
@@ -218,11 +207,34 @@ const AdminQRCodes = () => {
     (async () => {
       try {
         const [prodRes, catRes] = await Promise.all([
-          apiGet<Product>('/api/products'),
-          apiGet<Category>('/api/categories'),
+          apiGet<Product>('/api/products?limit=1000&fields=_id,name,nameAr,price,sku,image,category,categoryId,categorySlug'),
+          apiGet<Category>('/api/categories?limit=500'),
         ]);
         if (!mounted) return;
-        if (prodRes.ok) setProducts(prodRes.items || []);
+        if (prodRes.ok) {
+          const mappedProducts = (prodRes.items || []).map((p: any) => ({
+            id: p._id,
+            name: p.name,
+            nameAr: p.nameAr,
+            description: p.description || '',
+            descriptionAr: '',
+            price: p.price,
+            image: p.image || '',
+            images: p.images || [],
+            category: p.categoryId || p.categorySlug || '',
+            categoryAr: '',
+            categoryId: p.categoryId,
+            categorySlug: p.categorySlug,
+            featured: !!p.featured,
+            sku: p.sku || '',
+            rating: 0,
+            reviews: 0,
+            tags: [],
+            createdAt: p.createdAt,
+            updatedAt: p.updatedAt,
+          }));
+          setProducts(mappedProducts);
+        }
         if (catRes.ok) setCategories(catRes.items || []);
       } catch (e) {
         // optionally show a toast
@@ -231,21 +243,11 @@ const AdminQRCodes = () => {
     return () => { mounted = false; };
   }, []);
 
-  // Update selected products based on settings
+  // Update selected products based on selection
   useEffect(() => {
-    let filtered: Product[] = [];
-
-    switch (settings.productSelection) {
-      case 'all':
-        filtered = products;
-        break;
-      case 'category':
-        filtered = products.filter(p => selectedProductIds.includes(p.id));
-        break;
-    }
-
+    const filtered = products.filter(p => selectedProductIds.includes(p.id));
     setSelectedProducts(filtered);
-  }, [products, settings.productSelection, selectedProductIds]);
+  }, [products, selectedProductIds]);
 
   // Reset to first page when layout settings change
   useEffect(() => {
@@ -1110,143 +1112,13 @@ const AdminQRCodes = () => {
 
           {/* Mobile Card Layout */}
           <div className="mx-3 space-y-4 pb-6 max-h-[calc(100vh-200px)] overflow-y-auto">
-            {/* Mobile Product Selection Card */}
-            <Card className="bg-white/95 backdrop-blur-xl border border-slate-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-              <CardHeader className="bg-gradient-to-r from-primary/5 to-secondary/5 border-b border-slate-100 pb-3">
-                <CardTitle className="flex items-center gap-2 text-lg font-bold text-slate-900">
-                  <div className="p-2 bg-gradient-to-br from-primary to-secondary rounded-lg shadow-md">
-                    <Settings className="w-4 h-4 text-white" />
-                  </div>
-                  اختيار المنتجات
-                </CardTitle>
-                <CardDescription className="text-slate-600 font-medium text-sm">
-                  حدد المنتجات المراد إنشاء رموز QR لها
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4 pt-4">
-                <RadioGroup
-                  value={settings.productSelection}
-                  onValueChange={(value: QRSettings['productSelection']) => setSettings({ ...settings, productSelection: value })}
-                  className="space-y-3"
-                >
-                  {/* Mobile All products option */}
-                  <div className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${settings.productSelection === 'all' ? 'bg-primary/5 border-primary/30' : 'hover:bg-slate-50 border-slate-200'}`}>
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="all" id="all-mobile" />
-                      <Label htmlFor="all-mobile" className="cursor-pointer font-medium">جميع المنتجات</Label>
-                    </div>
-                    <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-700 border font-bold">{products.length}</span>
-                  </div>
-
-                  {/* Mobile Category option */}
-                  <div className={`flex items-center justify-between p-3 rounded-lg border transition-all duration-200 ${settings.productSelection === 'category' ? 'bg-primary/5 border-primary/30' : 'hover:bg-slate-50 border-slate-200'}`}>
-                    <div className="flex items-center gap-2">
-                      <RadioGroupItem value="category" id="category-mobile" />
-                      <Label htmlFor="category-mobile" className="cursor-pointer font-medium">فئة محددة</Label>
-                    </div>
-                  </div>
-                </RadioGroup>
-
-                {settings.productSelection === 'category' && (
-                  <div className="space-y-3 rounded-xl border border-slate-200 p-3 bg-white shadow-sm mt-3">
-                    <Select
-                      value={settings.selectedCategory}
-                      onValueChange={(value) => {
-                        setSettings({ ...settings, selectedCategory: value });
-                        const catProducts = products.filter(p => p.category === value);
-                        setSelectedProductIds(catProducts.map(p => p.id));
-                        setCategorySearch('');
-                      }}
-                    >
-                      <SelectTrigger className="h-12">
-                        <SelectValue placeholder="اختر الفئة" />
-                      </SelectTrigger>
-                      <SelectContent className="max-h-60">
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.name} className="text-right">
-                            <div className="flex items-center justify-between w-full">
-                              <span className="font-medium">{cat.nameAr}</span>
-                              <span className="text-xs bg-slate-100 px-2 py-1 rounded-full">
-                                {products.filter(p => p.category === cat.name).length}
-                              </span>
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-
-                    {settings.selectedCategory && (
-                      <div className="pt-2 border-t border-slate-100 space-y-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <Label className="text-sm font-semibold text-slate-700">تحديد المنتجات</Label>
-                          <div className="flex gap-2">
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs px-2"
-                              onClick={() => {
-                                const catProducts = products.filter(p => p.category === settings.selectedCategory);
-                                setSelectedProductIds(catProducts.map(p => p.id));
-                              }}
-                            >
-                              الكل
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-7 text-xs px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
-                              onClick={() => setSelectedProductIds([])}
-                            >
-                              إلغاء
-                            </Button>
-                          </div>
-                        </div>
-                        <div className="relative">
-                          <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                          <Input
-                            placeholder="ابحث في منتجات الفئة..."
-                            value={categorySearch}
-                            onChange={(e) => setCategorySearch(e.target.value)}
-                            className="h-9 pr-9 text-sm"
-                          />
-                        </div>
-                        <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                          {products
-                            .filter(p => p.category === settings.selectedCategory)
-                            .filter(p => p.nameAr.toLowerCase().includes(categorySearch.toLowerCase()) || p.sku.toLowerCase().includes(categorySearch.toLowerCase()))
-                            .map(product => (
-                              <label key={product.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded cursor-pointer border border-transparent hover:border-slate-100 transition-colors">
-                                <input
-                                  type="checkbox"
-                                  checked={selectedProductIds.includes(product.id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedProductIds([...selectedProductIds, product.id]);
-                                    } else {
-                                      setSelectedProductIds(selectedProductIds.filter(id => id !== product.id));
-                                    }
-                                  }}
-                                  className="w-4 h-4 text-primary rounded border-slate-300 focus:ring-primary"
-                                />
-                                <div className="flex items-center gap-2 flex-1 min-w-0">
-                                  {product.image && <img src={product.image} className="w-8 h-8 rounded object-cover border border-slate-200" alt="" />}
-                                  <div className="flex flex-col min-w-0">
-                                    <span className="text-sm font-medium text-slate-700 truncate">{product.nameAr}</span>
-                                    <span className="text-xs text-slate-500 truncate">{product.sku}</span>
-                                  </div>
-                                </div>
-                              </label>
-                            ))}
-                          {products.filter(p => p.category === settings.selectedCategory).length === 0 && (
-                            <div className="text-center py-4 text-slate-500 text-sm">لا توجد منتجات في هذه الفئة</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            {/* Smart Product Selector - Mobile */}
+            <SmartProductSelector
+              products={products}
+              categories={categories}
+              selectedProductIds={selectedProductIds}
+              onSelectionChange={setSelectedProductIds}
+            />
 
             {/* Mobile QR Settings Card */}
             <Card className="bg-white/95 backdrop-blur-xl border border-slate-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -1520,152 +1392,13 @@ const AdminQRCodes = () => {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Left Column: Settings */}
                 <div className="space-y-8">
-                  {/* Product Selection Settings */}
-                  <Card className="bg-white/80 backdrop-blur-xl border border-slate-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
-                    <CardHeader className="bg-gradient-to-r from-primary/5 to-secondary/5 border-b border-slate-100">
-                      <CardTitle className="flex items-center gap-3 text-xl font-bold text-slate-900">
-                        <div className="p-2 bg-gradient-to-br from-primary to-secondary rounded-xl shadow-md">
-                          <Settings className="w-6 h-6 text-white" />
-                        </div>
-                        اختيار المنتجات
-                      </CardTitle>
-                      <CardDescription className="text-slate-600 font-medium">
-                        حدد المنتجات المراد إنشاء رموز QR لها
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                      <RadioGroup
-                        value={settings.productSelection}
-                        onValueChange={(value: QRSettings['productSelection']) => setSettings({ ...settings, productSelection: value })}
-                        className="grid grid-cols-2 gap-4"
-                      >
-                        <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer ${settings.productSelection === 'all' ? 'bg-primary/5 border-primary shadow-sm' : 'hover:bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
-                          <RadioGroupItem value="all" id="all-desktop" />
-                          <div className="font-bold flex-1 text-base select-none">جميع المنتجات</div>
-                          <span className="text-sm px-3 py-1.5 rounded-full bg-white shadow-sm border font-bold text-slate-700">{products.length}</span>
-                        </label>
-
-                        <label className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all duration-200 cursor-pointer ${settings.productSelection === 'category' ? 'bg-primary/5 border-primary shadow-sm' : 'hover:bg-slate-50 border-slate-200 hover:border-slate-300'}`}>
-                          <RadioGroupItem value="category" id="category-desktop" />
-                          <div className="font-bold flex-1 text-base select-none">فئة محددة</div>
-                        </label>
-                      </RadioGroup>
-
-                      {settings.productSelection === 'category' && (
-                        <div className="space-y-4 rounded-xl border border-slate-200 p-5 bg-slate-50/50 mt-4">
-                          <div className="space-y-2">
-                            <Label className="text-sm font-semibold text-slate-700">اختر الفئة</Label>
-                            <Select
-                              value={settings.selectedCategory}
-                              onValueChange={(value) => {
-                                setSettings({ ...settings, selectedCategory: value });
-                                const catProducts = products.filter(p => p.category === value);
-                                setSelectedProductIds(catProducts.map(p => p.id));
-                                setCategorySearch('');
-                              }}
-                            >
-                              <SelectTrigger className="h-12 bg-white">
-                                <SelectValue placeholder="اختر الفئة..." />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {categories.map((cat) => (
-                                  <SelectItem key={cat.id} value={cat.id} className="text-right">
-                                    <div className="flex items-center justify-between w-full pr-2">
-                                      <span className="font-medium text-sm">{cat.nameAr}</span>
-                                      <span className="text-xs bg-slate-100 px-2 py-1 rounded-full">
-                                        {products.filter(p => p.category === cat.id).length}
-                                      </span>
-                                    </div>
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-
-                          {settings.selectedCategory && (
-                            <div className="pt-4 border-t border-slate-200 space-y-4">
-                              <div className="flex items-center justify-between">
-                                <Label className="text-sm font-semibold text-slate-800">تحديد المنتجات (اختياري)</Label>
-                                <div className="flex gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 text-xs bg-white"
-                                    onClick={() => {
-                                      const catProducts = products.filter(p => p.category === settings.selectedCategory);
-                                      setSelectedProductIds(catProducts.map(p => p.id));
-                                    }}
-                                  >
-                                    تحديد الكل
-                                  </Button>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-8 text-xs bg-white text-red-600 hover:text-red-700 hover:bg-red-50"
-                                    onClick={() => setSelectedProductIds([])}
-                                  >
-                                    إلغاء التحديد
-                                  </Button>
-                                </div>
-                              </div>
-                              <div className="relative">
-                                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                                <Input
-                                  placeholder="ابحث في منتجات الفئة بالاسم أو الكود..."
-                                  value={categorySearch}
-                                  onChange={(e) => setCategorySearch(e.target.value)}
-                                  className="h-10 pr-9 bg-white"
-                                />
-                              </div>
-                              <div className="max-h-64 overflow-y-auto space-y-2 pr-2 custom-scrollbar p-2 bg-white rounded-lg border border-slate-200">
-                                {products
-                                  .filter(p => p.category === settings.selectedCategory)
-                                  .filter(p => p.nameAr.toLowerCase().includes(categorySearch.toLowerCase()) || p.sku.toLowerCase().includes(categorySearch.toLowerCase()))
-                                  .map(product => (
-                                    <label key={product.id} className="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg cursor-pointer border border-transparent hover:border-slate-200 transition-colors">
-                                      <input
-                                        type="checkbox"
-                                        checked={selectedProductIds.includes(product.id)}
-                                        onChange={(e) => {
-                                          if (e.target.checked) {
-                                            setSelectedProductIds([...selectedProductIds, product.id]);
-                                          } else {
-                                            setSelectedProductIds(selectedProductIds.filter(id => id !== product.id));
-                                          }
-                                        }}
-                                        className="w-4 h-4 text-primary rounded border-slate-300 focus:ring-primary mt-1"
-                                      />
-                                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                                        {product.image ? (
-                                          <img src={product.image} className="w-10 h-10 rounded-md object-cover border border-slate-200 shadow-sm" alt="" />
-                                        ) : (
-                                          <div className="w-10 h-10 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center">
-                                            <Package className="w-4 h-4 text-slate-400" />
-                                          </div>
-                                        )}
-                                        <div className="flex flex-col min-w-0">
-                                          <span className="text-sm font-semibold text-slate-800 truncate">{product.nameAr}</span>
-                                          <span className="text-xs text-slate-500 truncate mt-0.5">{product.sku} • {product.price} ج.م</span>
-                                        </div>
-                                      </div>
-                                    </label>
-                                  ))}
-                                {products.filter(p => p.category === settings.selectedCategory).length === 0 && (
-                                  <div className="text-center py-6 text-slate-500">
-                                    <Package className="w-8 h-8 mx-auto mb-2 opacity-20" />
-                                    لا توجد منتجات في هذه الفئة
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-xs text-slate-500 text-center font-medium">
-                                تم تحديد {selectedProductIds.length} من أصل {products.filter(p => p.category === settings.selectedCategory).length} منتج
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
+                  {/* Smart Product Selector - Desktop */}
+                  <SmartProductSelector
+                    products={products}
+                    categories={categories}
+                    selectedProductIds={selectedProductIds}
+                    onSelectionChange={setSelectedProductIds}
+                  />
 
                   {/* Enhanced Layout Settings */}
                   <Card className="bg-white/80 backdrop-blur-xl border border-slate-200/50 shadow-lg hover:shadow-xl transition-all duration-300">

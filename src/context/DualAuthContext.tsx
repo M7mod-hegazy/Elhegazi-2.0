@@ -49,24 +49,31 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
   const [loading, setLoading] = useState(true);
   
-  // Listen for 401 errors and auto-logout
+  // Listen for 401 errors and auto-logout — but ONLY for auth-related endpoints
   useEffect(() => {
     const handlePermissionDenied = (event: CustomEvent) => {
-      const { status } = event.detail;
+      const { status, url } = event.detail;
       if (status === 401) {
-        // Session expired - clear auth and notify
-        // Show notification
-        const toast = document.createElement('div');
-        toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-in slide-in-from-top';
-        toast.textContent = '⏱️ انتهت الجلسة - يرجى تسجيل الدخول مرة أخرى';
-        document.body.appendChild(toast);
-        setTimeout(() => toast.remove(), 5000);
+        // Only auto-logout if the 401 came from an actual auth endpoint
+        // (e.g. token expired on /api/auth/*, /api/users/sync)
+        // Do NOT logout for settings/config/other admin endpoints
+        const urlStr = typeof url === 'string' ? url : '';
+        const isAuthEndpoint = urlStr.includes('/api/auth/') || urlStr.includes('/api/users/sync');
         
-        // Clear localStorage and redirect to login
-        setTimeout(() => {
-          localStorage.clear();
-          window.location.href = '/admin/login';
-        }, 1000);
+        if (isAuthEndpoint) {
+          // Session truly expired — clear auth and redirect
+          const toast = document.createElement('div');
+          toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 animate-in slide-in-from-top';
+          toast.textContent = '⏱️ انتهت الجلسة - يرجى تسجيل الدخول مرة أخرى';
+          document.body.appendChild(toast);
+          setTimeout(() => toast.remove(), 5000);
+          
+          setTimeout(() => {
+            localStorage.clear();
+            window.location.href = '/admin/login';
+          }, 1000);
+        }
+        // For non-auth 401s, do nothing here — the calling code handles its own error toast
       }
     };
     
