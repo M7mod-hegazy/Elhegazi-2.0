@@ -6,9 +6,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertTriangle, Plus, Sliders, Trash2, Images, Search, X, LayoutDashboard, Hash, Edit2, Zap, Target, ExternalLink, FileText, Save, Type, Lightbulb, Award, Palette, Info } from 'lucide-react';
+import { AlertTriangle, Plus, Sliders, Trash2, Images, Search, X, LayoutDashboard, Hash, Edit2, Zap, Target, ExternalLink, FileText, Save, Type, Lightbulb, Award, Palette, Info, ChevronDown } from 'lucide-react';
 import type { HomeConfig, Slide } from '@/types/home-config';
 import { SelectionModal } from '@/components/admin/home-config/SelectionModal';
 import { apiGet, apiPutJson } from '@/lib/api';
@@ -59,11 +58,11 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
   // Also refresh when the modal is opened (in case storage changed elsewhere)
   useEffect(() => {
     if (!open) return;
-    // Always start collapsed for a cleaner 2-cards view.
+    // Always start collapsed only when opening the modal (not on every slide change).
     const allCollapsed = new Set((cfg.slides || []).map((_, i) => i));
     setCollapsed(allCollapsed);
     persistCollapsed(allCollapsed);
-  }, [open, cfg.slides]);
+  }, [open]);
 
   // Defer animations until after first paint to avoid initial content flash
   const [hydrated, setHydrated] = useState(false);
@@ -143,16 +142,105 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
     },
     {
       key: 'diagonals', label: 'Diagonals', preview: (
-        <div className="w-full h-12 relative overflow-hidden rounded-md">
-          <div className="absolute inset-0 bg-gradient-to-br from-amber-500/20 via-orange-500/20 to-yellow-500/20" />
-          <svg viewBox="0 0 100 24" className="absolute inset-0 w-full h-full opacity-60">
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-gradient-to-tr from-slate-900 to-slate-800">
+          <svg className="w-full h-full opacity-40" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <pattern id="mini-diag" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-                <line x1="0" y1="0" x2="0" y2="6" stroke="white" strokeWidth="0.6" />
+              <pattern id="pv-diag" width="20" height="20" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+                <animateTransform attributeName="patternTransform" type="translate" from="0 0" to="0 20" dur="2s" repeatCount="indefinite" />
+                <line x1="0" y1="0" x2="0" y2="20" stroke="white" strokeWidth="1.5" />
               </pattern>
             </defs>
-            <rect width="100%" height="100%" fill="url(#mini-diag)" />
+            <rect width="100%" height="100%" fill="url(#pv-diag)" />
           </svg>
+        </div>
+      )
+    },
+    {
+      key: 'lines', label: 'Lines', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-gradient-to-r from-zinc-900 to-zinc-800">
+          <svg className="w-full h-full opacity-50" preserveAspectRatio="none">
+            {Array.from({length: 8}).map((_, i) => (
+              <line key={i} x1={`${10 + i*12}%`} y1="0" x2={`${10 + i*12}%`} y2="100%" stroke="white" strokeWidth="1" strokeDasharray="10 5">
+                <animate attributeName="stroke-dashoffset" from="0" to="30" dur={`${1.5 + (i%2)}s`} repeatCount="indefinite" />
+              </line>
+            ))}
+          </svg>
+        </div>
+      )
+    },
+    {
+      key: 'cross', label: 'Cross', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-gradient-to-tl from-stone-900 to-stone-800">
+          <svg className="w-full h-full text-white opacity-40" fill="none" stroke="currentColor">
+            <defs>
+              <pattern id="pv-cross" width="24" height="24" patternUnits="userSpaceOnUse">
+                <g style={{ transformOrigin: '12px 12px' }} className="animate-[spin_4s_linear_infinite]">
+                  <path d="M12 4v16M4 12h16" strokeWidth="1" strokeLinecap="round" />
+                </g>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#pv-cross)" />
+          </svg>
+        </div>
+      )
+    },
+    {
+      key: 'checker', label: 'Checker', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-gradient-to-bl from-neutral-900 to-neutral-800">
+          <svg className="w-full h-full opacity-40">
+            <defs>
+              <pattern id="pv-checker" width="20" height="20" patternUnits="userSpaceOnUse">
+                <rect x="0" y="0" width="10" height="10" fill="white">
+                  <animate attributeName="opacity" values="0.1;0.9;0.1" dur="2s" repeatCount="indefinite" />
+                </rect>
+                <rect x="10" y="10" width="10" height="10" fill="white">
+                  <animate attributeName="opacity" values="0.9;0.1;0.9" dur="2s" repeatCount="indefinite" />
+                </rect>
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#pv-checker)" />
+          </svg>
+        </div>
+      )
+    },
+    {
+      key: 'noise', label: 'Noise', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-gradient-to-tr from-gray-900 to-gray-800 flex items-center justify-center blur-[1px]">
+          {Array.from({length: 3}).map((_, i) => (
+            <div key={i} className="absolute rounded-full bg-white opacity-60 animate-pulse" style={{
+              width: '40px', height: '40px', top: `${Math.random()*100}%`, left: `${Math.random()*100}%`,
+              animationDelay: `${i*0.5}s`, animationDuration: '3s'
+            }} />
+          ))}
+        </div>
+      )
+    },
+    {
+      key: 'scan', label: 'Scan', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-slate-900">
+          <div className="absolute inset-0 opacity-20 bg-[linear-gradient(0deg,rgba(255,255,255,0.5)1px,transparent_1px)] bg-[length:100%_4px]" />
+          <div className="absolute inset-x-0 h-4 bg-gradient-to-b from-transparent via-white/60 to-transparent flex items-center shadow-[0_0_5px_rgba(255,255,255,0.7)] animate-[pv-scan_2s_linear_infinite]" />
+          <style>{`@keyframes pv-scan { 0% { transform: translateY(-100%); } 100% { transform: translateY(50px); } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'mesh', label: 'Mesh', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-zinc-900" style={{ perspective: '400px' }}>
+          <div className="absolute w-[200%] h-[200%] -left-[50%] -top-[50%] opacity-40 bg-[linear-gradient(90deg,rgba(255,255,255,0.4)1px,transparent_1px),linear-gradient(0deg,rgba(255,255,255,0.4)1px,transparent_1px)] bg-[length:15px_15px] animate-[pv-mesh_5s_linear_infinite]"
+               style={{ transform: 'rotateX(60deg) translateZ(-20px)' }} />
+          <style>{`@keyframes pv-mesh { 0% { background-position: 0 0; } 100% { background-position: 0 100px; } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'ripples', label: 'Ripples', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-stone-900 flex items-center justify-center">
+          {Array.from({length: 3}).map((_, i) => (
+            <div key={i} className="absolute rounded-full border border-white opacity-40 animate-[pv-ripple_3s_infinite_cubic-bezier(0.1,0.8,0.3,1)]"
+                 style={{ animationDelay: `${i * 1}s` }} />
+          ))}
+          <style>{`@keyframes pv-ripple { 0% { width: 0; height: 0; opacity: 1; border-width: 2px; } 100% { width: 80px; height: 80px; opacity: 0; border-width: 1px;} }`}</style>
         </div>
       )
     },
@@ -162,6 +250,20 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
       )
     },
   ]), []);
+  const patternToIndex: Record<Exclude<NonNullable<Slide['pattern']>, 'custom'>, number> = {
+    grid: 0,
+    circles: 1,
+    waves: 2,
+    dots: 3,
+    diagonals: 4,
+    lines: 5,
+    cross: 6,
+    checker: 7,
+    noise: 8,
+    scan: 9,
+    mesh: 10,
+    ripples: 11
+  };
 
   // Per-slide product picker state
   const [pickerOpenIdx, setPickerOpenIdx] = useState<number | null>(null);
@@ -519,7 +621,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                 className={`transition-all duration-500 ease-out ${isCollapsed
                     ? 'bg-white border-slate-200 shadow-sm hover:shadow-md'
                     : 'bg-gradient-to-br from-white via-primary/5 to-secondary/5 border-primary/20 shadow-xl'
-                  } ${isEnabled ? 'ring-1 ring-green-200/70' : 'ring-1 ring-gray-200/70'} min-h-[220px] overflow-hidden rounded-2xl ${!isCollapsed ? 'md:col-span-2' : ''}`}
+                  } ${isEnabled ? 'ring-1 ring-green-200/70' : 'ring-1 ring-gray-200/70'} min-h-[220px] overflow-visible rounded-2xl ${!isCollapsed ? 'md:col-span-2' : ''}`}
               >
                 {/* Enhanced Slide Header */}
                 <div className={`transition-all duration-300 ${isCollapsed ? 'p-5' : 'p-6 border-b border-slate-200/50 bg-gradient-to-r from-slate-50/50 to-primary/5'
@@ -562,7 +664,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                           {hydrated && s.pattern !== 'custom' && (
                             <div className="absolute inset-0 opacity-20">
                               <BackgroundPattern
-                                slideIndex={{ grid: 0, circles: 1, waves: 2, dots: 3, diagonals: 4 }[s.pattern || 'grid'] || 0}
+                                slideIndex={patternToIndex[(s.pattern && s.pattern !== 'custom' ? s.pattern : 'grid') as Exclude<NonNullable<Slide['pattern']>, 'custom'>] || 0}
                                 isActive={true}
                               />
                             </div>
@@ -703,7 +805,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                         {/* Pattern */}
                         {hydrated && s.pattern !== 'custom' && (
                           <BackgroundPattern
-                            slideIndex={{ grid: 0, circles: 1, waves: 2, dots: 3, diagonals: 4 }[s.pattern || 'grid'] || 0}
+                            slideIndex={patternToIndex[(s.pattern && s.pattern !== 'custom' ? s.pattern : 'grid') as Exclude<NonNullable<Slide['pattern']>, 'custom'>] || 0}
                             isActive={true}
                           />
                         )}
@@ -905,32 +1007,35 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                             <span className="w-2 h-2 bg-green-500 rounded-full" />
                             رابط الزر
                           </Label>
-                          <div className="flex items-center gap-3">
+                          <div className="grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] gap-3 items-center">
                             <Input
                               value={s.buttonLink}
                               onChange={(e) => updateSlide(idx, { buttonLink: e.target.value })}
                               placeholder="/products أو https://example.com"
                               className="flex-1 px-4 py-3 text-base border-2 border-slate-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 rounded-xl transition-all duration-300 bg-white/80 backdrop-blur-sm"
                             />
-                            <Select
-                              value={selectedCategoryLink}
-                              onValueChange={(value) => {
-                                if (value === '__custom__') return;
-                                updateSlide(idx, { buttonLink: value });
-                              }}
-                            >
-                              <SelectTrigger className="w-[220px] border-2 border-green-200 text-green-700 rounded-xl bg-white/90">
-                                <SelectValue placeholder="اختيار سريع من الفئات" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="__custom__">رابط مخصص</SelectItem>
+                            <div className="relative">
+                              <select
+                                value={selectedCategoryLink}
+                                onChange={(e) => {
+                                  const value = e.target.value;
+                                  if (value === '__custom__') {
+                                    updateSlide(idx, { buttonLink: '' });
+                                    return;
+                                  }
+                                  updateSlide(idx, { buttonLink: value });
+                                }}
+                                className="h-12 w-full appearance-none rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                              >
+                                <option value="__custom__">رابط مخصص</option>
                                 {categories.map((c) => (
-                                  <SelectItem key={c.id} value={c.link}>
+                                  <option key={c.id} value={c.link}>
                                     {c.label}
-                                  </SelectItem>
+                                  </option>
                                 ))}
-                              </SelectContent>
-                            </Select>
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                            </div>
                             <div className="relative hidden">
                               <Button
                                 type="button"
@@ -1308,15 +1413,23 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                   </div>
                   <div className="space-y-3 lg:col-span-2">
                     <Label className="text-base font-semibold text-slate-700">{"\u0631\u0627\u0628\u0637 \u0627\u0644\u0632\u0631"}</Label>
-                    <div className="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-[220px_minmax(0,1fr)] gap-3 items-center">
+                      <div className="relative">
+                        <select
+                          value={categories.some((c) => c.link === editorSlide.buttonLink) ? editorSlide.buttonLink : '__custom__'}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value === '__custom__') { updateSlide(editorOpenIdx, { buttonLink: '' }); return; }
+                            updateSlide(editorOpenIdx, { buttonLink: value });
+                          }}
+                          className="h-12 w-full appearance-none rounded-xl border border-slate-300 bg-white px-4 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                        >
+                          <option value="__custom__">{"\u0631\u0627\u0628\u0637 \u0645\u062E\u0635\u0635"}</option>
+                          {categories.map((c) => (<option key={c.id} value={c.link}>{c.label}</option>))}
+                        </select>
+                        <ChevronDown className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                      </div>
                       <Input value={editorSlide.buttonLink} onChange={(e) => updateSlide(editorOpenIdx, { buttonLink: e.target.value })} className="border-2 border-slate-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 rounded-xl" />
-                      <Select value={categories.some((c) => c.link === editorSlide.buttonLink) ? editorSlide.buttonLink : '__custom__'} onValueChange={(value) => { if (value === '__custom__') return; updateSlide(editorOpenIdx, { buttonLink: value }); }}>
-                        <SelectTrigger className="border-2 border-green-200 rounded-xl"><SelectValue placeholder={"\u0627\u062E\u062A\u064A\u0627\u0631 \u0633\u0631\u064A\u0639 \u0645\u0646 \u0627\u0644\u0641\u0626\u0627\u062A"} /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="__custom__">{"\u0631\u0627\u0628\u0637 \u0645\u062E\u0635\u0635"}</SelectItem>
-                          {categories.map((c) => (<SelectItem key={c.id} value={c.link}>{c.label}</SelectItem>))}
-                        </SelectContent>
-                      </Select>
                     </div>
                   </div>
                   <div className="space-y-3">

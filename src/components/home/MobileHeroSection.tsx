@@ -28,6 +28,7 @@ interface MobileSlide {
   ctaText: string;
   ctaLink: string;
   bgGradient: string;
+  pattern?: string;
   badge: string;
   product: Product;
   products: Product[];
@@ -385,6 +386,7 @@ const MobileHeroSection: React.FC = () => {
       ctaText: s.buttonText || 'تسوق الآن',
       ctaLink: s.buttonLink || '/products',
       bgGradient: (s.bgGradient || (s.theme === 'sale' ? 'from-red-500 via-orange-500 to-yellow-500' : s.theme === 'quality' ? 'from-emerald-500 via-teal-500 to-cyan-500' : 'from-indigo-600 via-purple-600 to-pink-600')),
+      pattern: s.pattern || undefined,
       badge: s.badge || '',
       product: mobileProducts[0],
       products: [mobileProducts[0], mobileProducts[1], mobileProducts[2]],
@@ -589,10 +591,13 @@ const MobileHeroSection: React.FC = () => {
             <div className="absolute inset-0 bg-black/30" />
             {/* Match desktop hero background pattern via admin pattern key (render only for current slide) */}
             {mounted && index === currentSlide && (() => {
-              const key = (homeConfig?.slides?.[index] as ConfigSlide | undefined)?.pattern;
+              const key = slide.pattern as string | undefined;
               if (key === 'custom') return null;
-              const map: Record<string, number> = { grid: 0, circles: 1, waves: 2, dots: 3, diagonals: 4 };
-              const pIndex = key ? map[key] : index % 3;
+              const map: Record<string, number> = { 
+                grid: 0, circles: 1, waves: 2, dots: 3, diagonals: 4,
+                lines: 5, cross: 6, checker: 7, noise: 8, scan: 9, mesh: 10, ripples: 11
+              };
+              const pIndex = key && map[key] !== undefined ? map[key] : index % 3;
               return (
                 <BackgroundPattern slideIndex={pIndex} isActive={index === currentSlide} />
               );

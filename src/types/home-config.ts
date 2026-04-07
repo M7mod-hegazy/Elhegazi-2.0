@@ -15,7 +15,20 @@ export interface Slide {
   theme?: 'premium' | 'sale' | 'quality' | 'custom';
   bgGradient?: string;
   bgColor?: string;
-  pattern?: 'grid' | 'circles' | 'waves' | 'dots' | 'diagonals' | 'custom';
+  pattern?:
+    | 'grid'
+    | 'circles'
+    | 'waves'
+    | 'dots'
+    | 'diagonals'
+    | 'lines'
+    | 'cross'
+    | 'checker'
+    | 'noise'
+    | 'scan'
+    | 'mesh'
+    | 'ripples'
+    | 'custom';
   buttonColor?: string;
   textColor?: string;
   badge?: string;

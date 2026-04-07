@@ -35,6 +35,7 @@ interface HeroSlide {
   ctaLink: string;
   bgGradient: string;
   bgColor?: string;
+  pattern?: string;
   badge: string;
   features: string[];
   products: Product[];
@@ -216,6 +217,7 @@ const ModernHeroSlider: React.FC = () => {
         ctaLink: x.buttonLink || '/products',
         bgGradient: x.bgGradient || themeMap[x.theme || 'premium'] || themeMap.premium,
         bgColor: x.bgColor || '',
+        pattern: x.pattern || undefined,
         badge: x.badge || '',
         features: x.features || [],
         products: [],
@@ -249,6 +251,7 @@ const ModernHeroSlider: React.FC = () => {
           ctaLink: x.buttonLink || '/products',
           bgGradient: x.bgGradient || themeMap[x.theme || 'premium'] || themeMap.premium,
           bgColor: x.bgColor || '',
+          pattern: x.pattern || undefined,
           badge: x.badge || '',
           features: x.features || [],
           products: [],
@@ -283,6 +286,7 @@ const ModernHeroSlider: React.FC = () => {
             ctaLink: x.buttonLink || '/products',
             bgGradient: x.bgGradient || themeMap[x.theme || 'premium'] || themeMap.premium,
             bgColor: x.bgColor || '',
+            pattern: x.pattern || undefined,
             badge: x.badge || '',
             features: x.features || [],
             products: [],
@@ -526,10 +530,13 @@ const ModernHeroSlider: React.FC = () => {
 
             {/* Background Pattern per slide based on configured pattern key (deferred until mount) */}
             {mounted && (() => {
-              const key = homeConfig?.slides?.[index]?.pattern as ("grid" | "circles" | "waves" | "custom" | undefined);
+              const key = slide.pattern as string | undefined;
               if (key === 'custom') return null;
-              const map: Record<string, number> = { grid: 0, circles: 1, waves: 2, dots: 3, diagonals: 4 };
-              const pIndex = key ? map[key] : index % 3;
+              const map: Record<string, number> = { 
+                grid: 0, circles: 1, waves: 2, dots: 3, diagonals: 4,
+                lines: 5, cross: 6, checker: 7, noise: 8, scan: 9, mesh: 10, ripples: 11
+              };
+              const pIndex = key && map[key] !== undefined ? map[key] : index % 3;
               return (
                 <BackgroundPattern
                   slideIndex={pIndex}

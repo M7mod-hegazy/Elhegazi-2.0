@@ -1422,11 +1422,14 @@ const ShopBuilderContent = () => {
     addSlatWallToWall,
     updateSlatWall,
     removeSlatWall,
+    importLayout,
     selectedSlatWallId,
     selectSlatWall,
     isDrawingMode,
     setDrawingMode
   } = useShopBuilder();
+
+  const { primaryColor, secondaryColor } = useTheme();
 
   // Undo/Redo history - Track complete layout snapshots
   const [history, setHistory] = useState<any[]>([]);
@@ -1476,49 +1479,49 @@ const ShopBuilderContent = () => {
     if (historyIndex > 0) {
       isUndoRedoingRef.current = true;
       const prevState = history[historyIndex - 1];
-
-      // Clear current state
-      const currentWalls = [...layout.walls];
-      const currentProducts = [...layout.products];
-      currentWalls.forEach(w => removeWall(w.id));
-      currentProducts.forEach(p => removeProduct(p.id));
-
-      // Apply previous state
+      importLayout(prevState);
+      setHistoryIndex(historyIndex - 1);
+      lastSavedStateRef.current = JSON.stringify(prevState);
       setTimeout(() => {
-        prevState.walls.forEach((w: any) => upsertWall(w));
-        prevState.products.forEach((p: any) => upsertProduct(p));
-        setHistoryIndex(historyIndex - 1);
-        lastSavedStateRef.current = JSON.stringify(prevState);
-        setTimeout(() => {
-          isUndoRedoingRef.current = false;
-        }, 50);
+        isUndoRedoingRef.current = false;
       }, 50);
     }
-  }, [historyIndex, history, layout, upsertWall, upsertProduct, removeWall, removeProduct]);
+  }, [historyIndex, history, importLayout]);
 
   const handleRedo = useCallback(() => {
     if (historyIndex < history.length - 1) {
       isUndoRedoingRef.current = true;
       const nextState = history[historyIndex + 1];
-
-      // Clear current state
-      const currentWalls = [...layout.walls];
-      const currentProducts = [...layout.products];
-      currentWalls.forEach(w => removeWall(w.id));
-      currentProducts.forEach(p => removeProduct(p.id));
-
-      // Apply next state
+      importLayout(nextState);
+      setHistoryIndex(historyIndex + 1);
+      lastSavedStateRef.current = JSON.stringify(nextState);
       setTimeout(() => {
-        nextState.walls.forEach((w: any) => upsertWall(w));
-        nextState.products.forEach((p: any) => upsertProduct(p));
-        setHistoryIndex(historyIndex + 1);
-        lastSavedStateRef.current = JSON.stringify(nextState);
-        setTimeout(() => {
-          isUndoRedoingRef.current = false;
-        }, 50);
+        isUndoRedoingRef.current = false;
       }, 50);
     }
-  }, [historyIndex, history, layout, upsertWall, upsertProduct, removeWall, removeProduct]);
+  }, [historyIndex, history, importLayout]);
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      const isModifier = e.ctrlKey || e.metaKey;
+      if (!isModifier) return;
+
+      if (e.key.toLowerCase() === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        handleUndo();
+      } else if ((e.key.toLowerCase() === 'z' && e.shiftKey) || e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleRedo, handleUndo]);
 
   // Auto-enter fullscreen when wall mode is activated (only on initial entry)
   const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
@@ -1626,72 +1629,296 @@ const ShopBuilderContent = () => {
 
   const handleSnapshot = useCallback(async (): Promise<string | undefined> => {
     try {
-      const html2canvas = (await import('html2canvas')).default;
+      // ── 1) Capture source images ────────────────────────────────
       const threeSnapshot = threeRef.current?.snapshot();
-      const container = (document.querySelector('[data-shop-builder-container]') || document.body) as HTMLElement;
-      const threeContainer = container.querySelector('[data-three-container]') as HTMLElement;
+      const floorplanEl = document.querySelector('canvas[data-floorplan]') as HTMLCanvasElement
+        || document.querySelector('[data-shop-builder-container] canvas') as HTMLCanvasElement;
 
-      let originalDisplay = '';
-      if (threeContainer) {
-        originalDisplay = threeContainer.style.display;
-        threeContainer.style.display = 'none';
+      // ── 2) Report dimensions (landscape A4-like) ────────────────
+      const W = 2400;
+      const H = 1500;
+      const PAD = 60;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return undefined;
+
+      // ── 3) Background ───────────────────────────────────────────
+      const bgGrad = ctx.createLinearGradient(0, 0, 0, H);
+      bgGrad.addColorStop(0, '#f8fafc');
+      bgGrad.addColorStop(1, '#f1f5f9');
+      ctx.fillStyle = bgGrad;
+      ctx.fillRect(0, 0, W, H);
+
+      // ── 4) Header band ──────────────────────────────────────────
+      const headerH = 110;
+      const hGrad = ctx.createLinearGradient(0, 0, W, 0);
+      hGrad.addColorStop(0, primaryColor);
+      hGrad.addColorStop(1, secondaryColor);
+      ctx.fillStyle = hGrad;
+      ctx.fillRect(0, 0, W, headerH);
+
+      // Header shine line
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(0, headerH - 3, W, 3);
+
+      // Shop name (right-aligned for RTL)
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 38px Inter, Segoe UI, Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'middle';
+      const shopName = layout.shopName || 'تقرير المتجر';
+      ctx.fillText(shopName, W - PAD, headerH / 2 - 8);
+
+      // Subtitle (field/category)
+      ctx.font = '20px Inter, Segoe UI, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.75)';
+      const field = layout.field || 'تصميم المتجر';
+      ctx.fillText(field, W - PAD, headerH / 2 + 24);
+
+      // Date & Time (left-aligned)
+      const now = new Date();
+      const dateStr = now.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+      ctx.textAlign = 'left';
+      ctx.font = 'bold 22px Inter, Segoe UI, Arial, sans-serif';
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(dateStr, PAD, headerH / 2 - 8);
+      ctx.font = '18px Inter, Segoe UI, Arial, sans-serif';
+      ctx.fillStyle = 'rgba(255,255,255,0.7)';
+      ctx.fillText(timeStr, PAD, headerH / 2 + 20);
+
+      // ── 5) Section labels ───────────────────────────────────────
+      const viewsTop = headerH + 30;
+      const viewsH = H - headerH - 180; // leave space for stats bar
+      const viewGap = 30;
+      const threeW = Math.floor((W - PAD * 2 - viewGap) * 0.55);
+      const floorW = W - PAD * 2 - viewGap - threeW;
+
+      // Section label helper
+      const drawSectionLabel = (text: string, x: number, y: number) => {
+        ctx.font = 'bold 16px Inter, Segoe UI, Arial, sans-serif';
+        ctx.fillStyle = primaryColor;
+        ctx.textAlign = 'right';
+        ctx.fillText(text, x, y);
+        // Underline
+        ctx.strokeStyle = primaryColor;
+        ctx.lineWidth = 2;
+        const tw = ctx.measureText(text).width;
+        ctx.beginPath();
+        ctx.moveTo(x - tw, y + 8);
+        ctx.lineTo(x, y + 8);
+        ctx.stroke();
+      };
+
+      // 3D View label
+      const threeX = PAD;
+      drawSectionLabel('المنظور ثلاثي الأبعاد', threeX + threeW, viewsTop + 4);
+
+      // 2D View label
+      const floorX = PAD + threeW + viewGap;
+      drawSectionLabel('المخطط الأرضي', floorX + floorW, viewsTop + 4);
+
+      // ── 6) View card backgrounds ────────────────────────────────
+      const cardTop = viewsTop + 24;
+      const cardH = viewsH - 24;
+      const cardRadius = 16;
+
+      const drawCardBg = (x: number, y: number, w: number, h: number) => {
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(x + cardRadius, y);
+        ctx.lineTo(x + w - cardRadius, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + cardRadius);
+        ctx.lineTo(x + w, y + h - cardRadius);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - cardRadius, y + h);
+        ctx.lineTo(x + cardRadius, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - cardRadius);
+        ctx.lineTo(x, y + cardRadius);
+        ctx.quadraticCurveTo(x, y, x + cardRadius, y);
+        ctx.closePath();
+        // Fill white
+        ctx.fillStyle = '#ffffff';
+        ctx.fill();
+        // Border
+        ctx.strokeStyle = '#e2e8f0';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Shadow
+        ctx.shadowColor = 'rgba(0,0,0,0.06)';
+        ctx.shadowBlur = 12;
+        ctx.shadowOffsetY = 4;
+        ctx.fill();
+        ctx.restore();
+      };
+
+      drawCardBg(threeX, cardTop, threeW, cardH);
+      drawCardBg(floorX, cardTop, floorW, cardH);
+
+      // ── 7) Draw 3D snapshot ─────────────────────────────────────
+      const imgPad = 8;
+      if (threeSnapshot) {
+        await new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            ctx.save();
+            // Clip to rounded card interior
+            ctx.beginPath();
+            const ix = threeX + imgPad, iy = cardTop + imgPad, iw = threeW - imgPad * 2, ih = cardH - imgPad * 2;
+            const cr = cardRadius - 4;
+            ctx.moveTo(ix + cr, iy);
+            ctx.lineTo(ix + iw - cr, iy);
+            ctx.quadraticCurveTo(ix + iw, iy, ix + iw, iy + cr);
+            ctx.lineTo(ix + iw, iy + ih - cr);
+            ctx.quadraticCurveTo(ix + iw, iy + ih, ix + iw - cr, iy + ih);
+            ctx.lineTo(ix + cr, iy + ih);
+            ctx.quadraticCurveTo(ix, iy + ih, ix, iy + ih - cr);
+            ctx.lineTo(ix, iy + cr);
+            ctx.quadraticCurveTo(ix, iy, ix + cr, iy);
+            ctx.closePath();
+            ctx.clip();
+            // Draw maintaining aspect ratio
+            const imgAspect = img.width / img.height;
+            const boxAspect = iw / ih;
+            let sx = 0, sy = 0, sw = img.width, sh = img.height;
+            if (imgAspect > boxAspect) {
+              sw = img.height * boxAspect;
+              sx = (img.width - sw) / 2;
+            } else {
+              sh = img.width / boxAspect;
+              sy = (img.height - sh) / 2;
+            }
+            ctx.drawImage(img, sx, sy, sw, sh, ix, iy, iw, ih);
+            ctx.restore();
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = threeSnapshot;
+        });
+      } else {
+        // Placeholder
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(threeX + imgPad, cardTop + imgPad, threeW - imgPad * 2, cardH - imgPad * 2);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '20px Inter, Segoe UI, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('لا يوجد عرض ثلاثي الأبعاد', threeX + threeW / 2, cardTop + cardH / 2);
       }
 
-      const captureScale = 2;
-      const pageCanvas = await html2canvas(container, {
-        allowTaint: true,
-        useCORS: true,
-        scale: captureScale,
-        backgroundColor: '#ffffff',
-        logging: false,
-        scrollX: 0,
-        scrollY: -window.scrollY,
-        windowWidth: container.scrollWidth,
-        windowHeight: container.scrollHeight,
-        onclone: (clonedDoc) => {
-          clonedDoc.querySelectorAll('*').forEach((el: any) => {
-            el.style.visibility = 'visible';
-            el.style.opacity = '1';
-          });
-        },
+      // ── 8) Draw 2D floorplan ────────────────────────────────────
+      if (floorplanEl) {
+        ctx.save();
+        const ix = floorX + imgPad, iy = cardTop + imgPad, iw = floorW - imgPad * 2, ih = cardH - imgPad * 2;
+        const cr = cardRadius - 4;
+        ctx.beginPath();
+        ctx.moveTo(ix + cr, iy);
+        ctx.lineTo(ix + iw - cr, iy);
+        ctx.quadraticCurveTo(ix + iw, iy, ix + iw, iy + cr);
+        ctx.lineTo(ix + iw, iy + ih - cr);
+        ctx.quadraticCurveTo(ix + iw, iy + ih, ix + iw - cr, iy + ih);
+        ctx.lineTo(ix + cr, iy + ih);
+        ctx.quadraticCurveTo(ix, iy + ih, ix, iy + ih - cr);
+        ctx.lineTo(ix, iy + cr);
+        ctx.quadraticCurveTo(ix, iy, ix + cr, iy);
+        ctx.closePath();
+        ctx.clip();
+        // Fill background  
+        ctx.fillStyle = '#fafbfc';
+        ctx.fillRect(ix, iy, iw, ih);
+        // Draw floorplan canvas
+        const fpAspect = floorplanEl.width / floorplanEl.height;
+        const boxAspect = iw / ih;
+        let dw = iw, dh = ih, dx = ix, dy = iy;
+        if (fpAspect > boxAspect) {
+          dh = iw / fpAspect;
+          dy = iy + (ih - dh) / 2;
+        } else {
+          dw = ih * fpAspect;
+          dx = ix + (iw - dw) / 2;
+        }
+        ctx.drawImage(floorplanEl, dx, dy, dw, dh);
+        ctx.restore();
+      } else {
+        ctx.fillStyle = '#f1f5f9';
+        ctx.fillRect(floorX + imgPad, cardTop + imgPad, floorW - imgPad * 2, cardH - imgPad * 2);
+        ctx.fillStyle = '#94a3b8';
+        ctx.font = '20px Inter, Segoe UI, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('لا يوجد مخطط أرضي', floorX + floorW / 2, cardTop + cardH / 2);
+      }
+
+      // ── 9) Stats bar at bottom ──────────────────────────────────
+      const statsTop = H - 120;
+      const statsH = 90;
+      // Stats background
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(PAD, statsTop, W - PAD * 2, statsH);
+      ctx.strokeStyle = '#e2e8f0';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(PAD, statsTop, W - PAD * 2, statsH);
+
+      // Top accent line
+      ctx.fillStyle = primaryColor;
+      ctx.fillRect(PAD, statsTop, W - PAD * 2, 3);
+
+      // Stats data
+      const wallCount = layout.walls.length;
+      const productCount = layout.products.filter(p => !(p.metadata as any)?.autoHangFill).length;
+      const autoProducts = layout.products.filter(p => (p.metadata as any)?.autoHangFill).length;
+      const displaySystems = layout.walls.reduce((sum, w) => sum + (w.slatWalls?.length || 0), 0);
+      const floorSize = (layout as any).floorSize || 24;
+      const totalLength = layout.walls.reduce((sum, w) => {
+        const dx = w.end.x - w.start.x;
+        const dy = w.end.y - w.start.y;
+        return sum + Math.sqrt(dx * dx + dy * dy);
+      }, 0);
+
+      const stats = [
+        { label: 'الجدران', value: `${wallCount}`, icon: '🧱' },
+        { label: 'الطول الكلي', value: `${totalLength.toFixed(1)} م`, icon: '📏' },
+        { label: 'المنتجات', value: `${productCount}`, icon: '📦' },
+        { label: 'المنتجات التلقائية', value: `${autoProducts}`, icon: '🏷️' },
+        { label: 'أنظمة العرض', value: `${displaySystems}`, icon: '🛒' },
+        { label: 'مساحة الأرضية', value: `${floorSize}×${floorSize} م`, icon: '📐' },
+      ];
+
+      const statW = (W - PAD * 2) / stats.length;
+      stats.forEach((stat, i) => {
+        const cx = PAD + statW * i + statW / 2;
+        const cy = statsTop + statsH / 2;
+        // Separator
+        if (i > 0) {
+          ctx.strokeStyle = '#e2e8f0';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(PAD + statW * i, statsTop + 16);
+          ctx.lineTo(PAD + statW * i, statsTop + statsH - 16);
+          ctx.stroke();
+        }
+        // Value
+        ctx.fillStyle = '#18181b';
+        ctx.font = 'bold 28px Inter, Segoe UI, Arial, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${stat.icon} ${stat.value}`, cx, cy - 6);
+        // Label
+        ctx.fillStyle = '#71717a';
+        ctx.font = '14px Inter, Segoe UI, Arial, sans-serif';
+        ctx.fillText(stat.label, cx, cy + 22);
       });
 
-      if (threeContainer) {
-        threeContainer.style.display = originalDisplay;
-      }
+      // ── 10) Footer watermark ────────────────────────────────────
+      ctx.fillStyle = '#cbd5e1';
+      ctx.font = '12px Inter, Segoe UI, Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Shop Builder Report • Powered by الحقي', W / 2, H - 14);
 
-      if (threeSnapshot && threeContainer) {
-        const combinedCanvas = document.createElement('canvas');
-        combinedCanvas.width = pageCanvas.width;
-        combinedCanvas.height = pageCanvas.height;
-        const ctx = combinedCanvas.getContext('2d');
-        if (!ctx) return pageCanvas.toDataURL('image/png');
-        ctx.drawImage(pageCanvas, 0, 0);
-
-        const dataUrl: string = await new Promise((resolve) => {
-          const threeImg = new Image();
-          threeImg.onload = () => {
-            const rect = threeContainer.getBoundingClientRect();
-            const containerRect = container.getBoundingClientRect();
-            const x = (rect.left - containerRect.left) * captureScale;
-            const y = (rect.top - containerRect.top) * captureScale;
-            const w = rect.width * captureScale;
-            const h = rect.height * captureScale;
-            ctx.drawImage(threeImg, x, y, w, h);
-            resolve(combinedCanvas.toDataURL('image/png'));
-          };
-          threeImg.onerror = () => resolve(pageCanvas.toDataURL('image/png'));
-          threeImg.src = threeSnapshot;
-        });
-        return dataUrl;
-      }
-
-      return pageCanvas.toDataURL('image/png');
+      return canvas.toDataURL('image/png', 0.95);
     } catch (error) {
-      console.warn('html2canvas error:', error, 'using 3D snapshot fallback');
+      console.warn('Report generation error:', error);
       return threeRef.current?.snapshot();
     }
-  }, []);
+  }, [layout, primaryColor, secondaryColor]);
 
   const handleSnapshotDownload = useCallback(() => {
     const dataUrl = threeRef.current?.snapshot();
@@ -1760,7 +1987,7 @@ const ShopBuilderContent = () => {
     threeRef.current.focusOnWall(wallId, side);
   }, [layout.walls]);
 
-  const { primaryColor, secondaryColor } = useTheme();
+  // primaryColor, secondaryColor already declared above
   const { timeStr, dateStr } = formatGregorianDateTime();
   const [currentTime, setCurrentTime] = useState(timeStr);
   const [currentDate, setCurrentDate] = useState(dateStr);
@@ -1877,6 +2104,10 @@ const ShopBuilderContent = () => {
                 onSnapshot={handleSnapshot}
                 onFullscreen={handleFullscreen}
                 onClearSelection={handleClearSelection}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                canUndo={historyIndex > 0}
+                canRedo={historyIndex < history.length - 1}
               />
             </div>
           </div>
@@ -1916,33 +2147,6 @@ const ShopBuilderContent = () => {
             {/* Fullscreen Controls Overlay - Visible when fullscreen is active */}
             {(is2DFullscreen || hasEnteredFullscreen) && (
               <div className="absolute top-16 right-4 flex items-center gap-2 z-50 pointer-events-auto">
-                {/* Undo/Redo Buttons */}
-                <div className="flex items-center gap-1 bg-white rounded-lg border-2 p-1 shadow-lg" style={{ borderColor: primaryColor }}>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleUndo}
-                    disabled={historyIndex <= 0}
-                    className="h-8 w-8 p-0 disabled:opacity-30 transition-all"
-                    style={{ color: primaryColor }}
-                    title="تراجع"
-                  >
-                    <RotateCcw className="h-4 w-4" />
-                  </Button>
-                  <div className="w-px h-6" style={{ backgroundColor: primaryColor }} />
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={handleRedo}
-                    disabled={historyIndex >= history.length - 1}
-                    className="h-8 w-8 p-0 disabled:opacity-30 transition-all"
-                    style={{ color: primaryColor }}
-                    title="إعادة"
-                  >
-                    <RotateCcw className="h-4 w-4 scale-x-[-1]" />
-                  </Button>
-                </div>
-
                 {/* Edit Mode Toggle */}
                 <Button
                   onClick={() => {

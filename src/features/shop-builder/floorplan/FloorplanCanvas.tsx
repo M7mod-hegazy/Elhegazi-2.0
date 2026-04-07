@@ -78,6 +78,7 @@ const FloorplanCanvas: React.FC = () => {
   const [isCtrlPressed, setIsCtrlPressed] = useState(false);
   const [showLengthInput, setShowLengthInput] = useState(false);
   const [lengthInputValue, setLengthInputValue] = useState('');
+  const [lengthInputMode, setLengthInputMode] = useState<'draw' | 'selected' | null>(null);
   
   // Use ref for disableSnapping to avoid stale closure issues
   const disableSnappingRef = useRef(false);
@@ -1061,6 +1062,17 @@ const FloorplanCanvas: React.FC = () => {
     removeWall(selectedWallId);
   }, [selectedWallId, removeWall]);
 
+  const applySelectedWallLength = useCallback((length: number) => {
+    if (!selectedWall || !(length > 0)) return;
+    const dx = selectedWall.end.x - selectedWall.start.x;
+    const dy = selectedWall.end.y - selectedWall.start.y;
+    const angle = Math.atan2(dy, dx);
+    handleWallUpdate('end', {
+      x: selectedWall.start.x + length * Math.cos(angle),
+      y: selectedWall.start.y + length * Math.sin(angle),
+    });
+  }, [handleWallUpdate, selectedWall]);
+
   // Scrubby slider handlers
   const handleScrubbyStart = useCallback((e: React.MouseEvent, field: string, currentValue: number, step: number) => {
     e.preventDefault();
@@ -1122,47 +1134,74 @@ const FloorplanCanvas: React.FC = () => {
     };
   }, [handleScrubbyMove, handleScrubbyEnd]);
 
-  // Keyboard event handlers for drawing mode
+  // Keyboard event handlers: fast inline wall length typing (draw + selected wall)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') {
-        setIsShiftPressed(true);
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
       }
-      if (e.key === 'Control' || e.key === 'Meta') {
-        setIsCtrlPressed(true);
-      }
+
+      const isNumberKey = /^[0-9.]$/.test(e.key);
+      const openInlineLengthInput = (mode: 'draw' | 'selected', firstChar?: string) => {
+        setShowLengthInput(true);
+        setLengthInputMode(mode);
+        if (firstChar && /^[0-9.]$/.test(firstChar)) {
+          setLengthInputValue(firstChar === '.' ? '0.' : firstChar);
+        } else {
+          setLengthInputValue('');
+        }
+      };
+
+      if (e.key === 'Shift') setIsShiftPressed(true);
+      if (e.key === 'Control' || e.key === 'Meta') setIsCtrlPressed(true);
+
       if (e.key === 'Escape' && isDrawingMode) {
         setDrawingMode(false);
         setDrawingStartPoint(null);
         setDrawingPreviewPoint(null);
         setSnappedPoint(null);
         setShowLengthInput(false);
-      }
-      // Tab or L key to open length input
-      if ((e.key === 'Tab' || e.key === 'l' || e.key === 'L') && isDrawingMode && drawingStartPoint && !showLengthInput) {
-        e.preventDefault();
-        setShowLengthInput(true);
+        setLengthInputMode(null);
         setLengthInputValue('');
       }
-      // Enter key to confirm length input
-      if (e.key === 'Enter' && showLengthInput && lengthInputValue && drawingStartPoint && drawingPreviewPoint) {
+
+      if ((e.key === 'Tab' || e.key === 'l' || e.key === 'L') && isDrawingMode && drawingStartPoint && !showLengthInput) {
+        e.preventDefault();
+        openInlineLengthInput('draw');
+      }
+
+      if (isNumberKey && isDrawingMode && drawingStartPoint && !showLengthInput) {
+        e.preventDefault();
+        openInlineLengthInput('draw', e.key);
+      }
+
+      if (isNumberKey && !isDrawingMode && selectedWall && !showLengthInput) {
+        e.preventDefault();
+        openInlineLengthInput('selected', e.key);
+      }
+
+      if (
+        e.key === 'Enter' &&
+        showLengthInput &&
+        lengthInputMode === 'draw' &&
+        lengthInputValue &&
+        drawingStartPoint &&
+        drawingPreviewPoint
+      ) {
         e.preventDefault();
         const length = parseFloat(lengthInputValue);
         if (!isNaN(length) && length > 0) {
-          // Calculate direction from start to preview point
           const dx = drawingPreviewPoint.x - drawingStartPoint.x;
           const dy = drawingPreviewPoint.y - drawingStartPoint.y;
           const angle = Math.atan2(dy, dx);
-          
-          // Create endpoint at exact length
           const endPoint = {
             x: drawingStartPoint.x + length * Math.cos(angle),
             y: drawingStartPoint.y + length * Math.sin(angle)
           };
-          
-          // Create wall with global default texture
-          const defaultTexture = layout.defaultWallTexture || 
-            (layout.walls.length > 0 ? layout.walls[layout.walls.length - 1].texture : undefined) || 
+
+          const defaultTexture = layout.defaultWallTexture ||
+            (layout.walls.length > 0 ? layout.walls[layout.walls.length - 1].texture : undefined) ||
             'painted_white';
           const wallId = upsertWall({
             start: drawingStartPoint,
@@ -1172,35 +1211,64 @@ const FloorplanCanvas: React.FC = () => {
             color: '#64748b',
             texture: defaultTexture as any
           });
-          
-          // Continue from endpoint
+
           setDrawingStartPoint(endPoint);
           setDrawingPreviewPoint(null);
           setSnappedPoint(null);
           setShowLengthInput(false);
+          setLengthInputMode(null);
           setLengthInputValue('');
           selectWall(wallId);
         }
       }
+
+      if (e.key === 'Enter' && showLengthInput && lengthInputMode === 'selected' && lengthInputValue && selectedWall) {
+        e.preventDefault();
+        const length = parseFloat(lengthInputValue);
+        if (!isNaN(length) && length > 0) {
+          applySelectedWallLength(length);
+          setShowLengthInput(false);
+          setLengthInputMode(null);
+          setLengthInputValue('');
+        }
+      }
+
+      if (e.key === 'Escape' && showLengthInput) {
+        e.preventDefault();
+        setShowLengthInput(false);
+        setLengthInputMode(null);
+        setLengthInputValue('');
+      }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
-      if (e.key === 'Shift') {
-        setIsShiftPressed(false);
-      }
-      if (e.key === 'Control' || e.key === 'Meta') {
-        setIsCtrlPressed(false);
-      }
+      if (e.key === 'Shift') setIsShiftPressed(false);
+      if (e.key === 'Control' || e.key === 'Meta') setIsCtrlPressed(false);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
-    
+
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [isDrawingMode, setDrawingMode]);
+  }, [
+    isDrawingMode,
+    drawingStartPoint,
+    drawingPreviewPoint,
+    showLengthInput,
+    lengthInputValue,
+    lengthInputMode,
+    selectedWall,
+    setDrawingMode,
+    layout.defaultWallTexture,
+    layout.walls,
+    defaultWallThickness,
+    upsertWall,
+    selectWall,
+    applySelectedWallLength
+  ]);
 
   // Reset drawing state when entering/exiting drawing mode
   useEffect(() => {
@@ -1210,6 +1278,7 @@ const FloorplanCanvas: React.FC = () => {
       setDrawingPreviewPoint(null);
       setSnappedPoint(null);
       setShowLengthInput(false);
+      setLengthInputMode(null);
       setLengthInputValue('');
       // Clear drag states
       dragState.current = null;
@@ -1254,9 +1323,12 @@ const FloorplanCanvas: React.FC = () => {
         />
 
         {/* Compact Length Input Popup */}
-        {showLengthInput && isDrawingMode && drawingStartPoint && (
+        {showLengthInput && (
           <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 animate-in fade-in zoom-in-95 duration-200">
             <div className="bg-gradient-to-br from-primary to-secondary rounded-2xl shadow-2xl p-4 min-w-[220px]">
+              <p className="text-white/90 text-[11px] font-semibold mb-2 text-center">
+                {lengthInputMode === 'selected' ? 'تعديل طول الجدار المحدد (م)' : 'طول الجدار الجديد (م)'}
+              </p>
               <div className="flex items-center gap-3">
                 <Input
                   type="number"
@@ -1270,14 +1342,56 @@ const FloorplanCanvas: React.FC = () => {
                   onKeyDown={(e) => {
                     if (e.key === 'Escape') {
                       setShowLengthInput(false);
+                      setLengthInputMode(null);
                       setLengthInputValue('');
+                    }
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      const length = parseFloat(lengthInputValue);
+                      if (lengthInputMode === 'selected' && !isNaN(length) && length > 0 && selectedWall) {
+                        applySelectedWallLength(length);
+                        setShowLengthInput(false);
+                        setLengthInputMode(null);
+                        setLengthInputValue('');
+                      } else if (lengthInputMode !== 'selected' && !isNaN(length) && length > 0 && drawingStartPoint && drawingPreviewPoint) {
+                        const dx = drawingPreviewPoint.x - drawingStartPoint.x;
+                        const dy = drawingPreviewPoint.y - drawingStartPoint.y;
+                        const angle = Math.atan2(dy, dx);
+                        const endPoint = {
+                          x: drawingStartPoint.x + length * Math.cos(angle),
+                          y: drawingStartPoint.y + length * Math.sin(angle)
+                        };
+                        const defaultTexture = layout.defaultWallTexture ||
+                          (layout.walls.length > 0 ? layout.walls[layout.walls.length - 1].texture : undefined) ||
+                          'painted_white';
+                        const wallId = upsertWall({
+                          start: drawingStartPoint,
+                          end: endPoint,
+                          height: 3,
+                          thickness: defaultWallThickness,
+                          color: '#64748b',
+                          texture: defaultTexture as any
+                        });
+                        setDrawingStartPoint(endPoint);
+                        setDrawingPreviewPoint(null);
+                        setSnappedPoint(null);
+                        setShowLengthInput(false);
+                        setLengthInputMode(null);
+                        setLengthInputValue('');
+                        selectWall(wallId);
+                      }
                     }
                   }}
                 />
                 <Button
                   onClick={() => {
                     const length = parseFloat(lengthInputValue);
-                    if (!isNaN(length) && length > 0 && drawingPreviewPoint) {
+                    if (lengthInputMode === 'selected' && !isNaN(length) && length > 0 && selectedWall) {
+                      applySelectedWallLength(length);
+                      setShowLengthInput(false);
+                      setLengthInputMode(null);
+                      setLengthInputValue('');
+                    } else if (lengthInputMode !== 'selected' && !isNaN(length) && length > 0 && drawingStartPoint && drawingPreviewPoint) {
                       const dx = drawingPreviewPoint.x - drawingStartPoint.x;
                       const dy = drawingPreviewPoint.y - drawingStartPoint.y;
                       const angle = Math.atan2(dy, dx);
@@ -1301,6 +1415,7 @@ const FloorplanCanvas: React.FC = () => {
                       setDrawingPreviewPoint(null);
                       setSnappedPoint(null);
                       setShowLengthInput(false);
+                      setLengthInputMode(null);
                       setLengthInputValue('');
                       selectWall(wallId);
                     }

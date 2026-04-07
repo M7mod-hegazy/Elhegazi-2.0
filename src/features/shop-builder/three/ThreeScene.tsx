@@ -227,7 +227,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     
 
 
-    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'low-power' });
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true, powerPreference: 'low-power', preserveDrawingBuffer: true });
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = false;
 
@@ -689,7 +689,11 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
 
   const snapshot = useCallback(() => {
     const renderer = rendererRef.current;
-    if (!renderer) return null;
+    const scene = sceneRef.current;
+    const camera = cameraRef.current;
+    if (!renderer || !scene || !camera) return null;
+    // Force render to ensure the buffer has the latest frame
+    renderer.render(scene, camera);
     return renderer.domElement.toDataURL('image/png', 0.92);
   }, []);
 

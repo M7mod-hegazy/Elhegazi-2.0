@@ -14,7 +14,7 @@ import { generateAutoHungProductsList } from '../three/proceduralProducts';
 
 // Wall texture options - mapped from WALL_TEXTURES
 const WALL_TEXTURE_OPTIONS = [
-  { key: '', label: 'افتراضي', preview: null },
+  { key: '', label: 'Ø§ÙØªØ±Ø§Ø¶ÙŠ', preview: null },
   ...Object.entries(WALL_TEXTURES).map(([key, config]) => ({
     key,
     label: key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
@@ -44,9 +44,9 @@ interface BuilderToolbarProps {
 }
 
 const modeLabels: Record<TransformMode, { label: string; icon: React.ReactNode }> = {
-  translate: { label: 'تحريك', icon: <Scan className="h-4 w-4" /> },
-  rotate: { label: 'تدوير', icon: <Rotate3D className="h-4 w-4" /> },
-  scale: { label: 'تحجيم', icon: <Ruler className="h-4 w-4" /> },
+  translate: { label: 'ØªØ­Ø±ÙŠÙƒ', icon: <Scan className="h-4 w-4" /> },
+  rotate: { label: 'ØªØ¯ÙˆÙŠØ±', icon: <Rotate3D className="h-4 w-4" /> },
+  scale: { label: 'ØªØ­Ø¬ÙŠÙ…', icon: <Ruler className="h-4 w-4" /> },
 };
 
 interface Product3D {
@@ -165,7 +165,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
   const formatProductDims = useCallback(
     (product: Product3D) =>
-      `${formatMeters(product.dimensions.width)} x ${formatMeters(product.dimensions.height)} x ${formatMeters(product.dimensions.depth)} m`,
+      `${formatMeters(product.dimensions.width)}Ã—${formatMeters(product.dimensions.height)}Ã—${formatMeters(product.dimensions.depth)}Ù…`,
     []
   );
 
@@ -190,7 +190,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
         setProducts3D(response.items as unknown as Product3D[]);
       } else {
-        console.error('❌ Failed to fetch products:', response);
+        console.error('âŒ Failed to fetch products:', response);
       }
     } catch (error) {
       console.error('Error fetching 3D products:', error);
@@ -347,7 +347,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       color: layout.defaultWallColor || '#ffffff',
     });
     selectWall(id);
-    toast({ title: 'تم إضافة جدار جديد', description: 'يمكنك سحب أطرافه لتغيير الأبعاد.' });
+    toast({ title: 'ØªÙ… Ø¥Ø¶Ø§ÙØ© Ø¬Ø¯Ø§Ø± Ø¬Ø¯ÙŠØ¯', description: 'ÙŠÙ…ÙƒÙ†Ùƒ Ø³Ø­Ø¨ Ø£Ø·Ø±Ø§ÙÙ‡ Ù„ØªØºÙŠÙŠØ± Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯.' });
   }, [layout.walls.length, layout.defaultWallColor, selectWall, toast, upsertWall]);
   const handleWallColorChange = useCallback(
     (value: string) => {
@@ -361,7 +361,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   const handleExportLayout = useCallback(() => {
     const layoutData = exportLayout();
     downloadLayout(layoutData);
-    toast({ title: 'تم حفظ المخطط', description: 'تم تنزيل ملف JSON يحتوي على تفاصيل التخطيط.' });
+    toast({ title: 'ØªÙ… Ø­ÙØ¸ Ø§Ù„Ù…Ø®Ø·Ø·', description: 'ØªÙ… ØªÙ†Ø²ÙŠÙ„ Ù…Ù„Ù JSON ÙŠØ­ØªÙˆÙŠ Ø¹Ù„Ù‰ ØªÙØ§ØµÙŠÙ„ Ø§Ù„ØªØ®Ø·ÙŠØ·.' });
   }, [exportLayout, toast]);
 
   const handleImportClick = useCallback(() => {
@@ -376,10 +376,10 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       try {
         const layoutData = await readLayoutFile(file);
         importLayout(layoutData);
-        toast({ title: 'تم استيراد المخطط', description: 'تم تحميل الجدران والمنتجات من الملف.' });
+        toast({ title: 'ØªÙ… Ø§Ø³ØªÙŠØ±Ø§Ø¯ Ø§Ù„Ù…Ø®Ø·Ø·', description: 'ØªÙ… ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¬Ø¯Ø±Ø§Ù† ÙˆØ§Ù„Ù…Ù†ØªØ¬Ø§Øª Ù…Ù† Ø§Ù„Ù…Ù„Ù.' });
       } catch (error) {
         console.error(error);
-        toast({ title: 'فشل الاستيراد', description: 'تأكد من أن الملف يحتوي على صيغة JSON صحيحة.', variant: 'destructive' });
+        toast({ title: 'ÙØ´Ù„ Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯', description: 'ØªØ£ÙƒØ¯ Ù…Ù† Ø£Ù† Ø§Ù„Ù…Ù„Ù ÙŠØ­ØªÙˆÙŠ Ø¹Ù„Ù‰ ØµÙŠØºØ© JSON ØµØ­ÙŠØ­Ø©.', variant: 'destructive' });
       }
     },
     [importLayout, toast]
@@ -388,7 +388,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   // Settings menu handlers
   const handleExportDesign = useCallback(() => {
     exportToFile();
-    toast({ title: 'تم التصدير', description: 'تم تنزيل ملف التصميم بنجاح' });
+    toast({ title: 'ØªÙ… Ø§Ù„ØªØµØ¯ÙŠØ±', description: 'ØªÙ… ØªÙ†Ø²ÙŠÙ„ Ù…Ù„Ù Ø§Ù„ØªØµÙ…ÙŠÙ… Ø¨Ù†Ø¬Ø§Ø­' });
     setSettingsOpen(false);
   }, [exportToFile, toast]);
 
@@ -418,19 +418,19 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       if (!file) return;
       try {
         await importFromFile(file);
-        toast({ title: 'تم الاستيراد', description: 'تم تحميل التصميم بنجاح' });
+        toast({ title: 'ØªÙ… Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯', description: 'ØªÙ… ØªØ­Ù…ÙŠÙ„ Ø§Ù„ØªØµÙ…ÙŠÙ… Ø¨Ù†Ø¬Ø§Ø­' });
       } catch (error) {
         console.error(error);
-        toast({ title: 'فشل الاستيراد', description: 'تأكد من أن الملف صحيح', variant: 'destructive' });
+        toast({ title: 'ÙØ´Ù„ Ø§Ù„Ø§Ø³ØªÙŠØ±Ø§Ø¯', description: 'ØªØ£ÙƒØ¯ Ù…Ù† Ø£Ù† Ø§Ù„Ù…Ù„Ù ØµØ­ÙŠØ­', variant: 'destructive' });
       }
     },
     [importFromFile, toast]
   );
 
   const handleResetDesign = useCallback(() => {
-    if (confirm('هل أنت متأكد من إعادة التعيين؟ سيتم حذف جميع التصميمات.')) {
+    if (confirm('Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ¹ÙŠÙŠÙ†ØŸ Ø³ÙŠØªÙ… Ø­Ø°Ù Ø¬Ù…ÙŠØ¹ Ø§Ù„ØªØµÙ…ÙŠÙ…Ø§Øª.')) {
       reset();
-      toast({ title: 'تم إعادة التعيين', description: 'تم حذف التصميم والعودة للوضع الافتراضي' });
+      toast({ title: 'ØªÙ… Ø¥Ø¹Ø§Ø¯Ø© Ø§Ù„ØªØ¹ÙŠÙŠÙ†', description: 'ØªÙ… Ø­Ø°Ù Ø§Ù„ØªØµÙ…ÙŠÙ… ÙˆØ§Ù„Ø¹ÙˆØ¯Ø© Ù„Ù„ÙˆØ¶Ø¹ Ø§Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ' });
       setSettingsOpen(false);
     }
   }, [reset, toast]);
@@ -502,8 +502,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     try {
       if (!product.modelUrl || product.modelUrl.trim() === '') {
         toast({
-          title: 'خطأ',
-          description: 'هذا المنتج لا يحتوي على نموذج ثلاثي الأبعاد',
+          title: 'Ø®Ø·Ø£',
+          description: 'Ù‡Ø°Ø§ Ø§Ù„Ù…Ù†ØªØ¬ Ù„Ø§ ÙŠØ­ØªÙˆÙŠ Ø¹Ù„Ù‰ Ù†Ù…ÙˆØ°Ø¬ Ø«Ù„Ø§Ø«ÙŠ Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯',
           variant: 'destructive'
         });
         return;
@@ -513,8 +513,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       const hasValidFormat = /\.(glb|gltf|obj|fbx)$/i.test(modelPath);
       if (!hasValidFormat) {
         toast({
-          title: 'خطأ',
-          description: 'صيغة النموذج غير مدعومة. استخدم GLB أو GLTF أو OBJ أو FBX',
+          title: 'Ø®Ø·Ø£',
+          description: 'ØµÙŠØºØ© Ø§Ù„Ù†Ù…ÙˆØ°Ø¬ ØºÙŠØ± Ù…Ø¯Ø¹ÙˆÙ…Ø©. Ø§Ø³ØªØ®Ø¯Ù… GLB Ø£Ùˆ GLTF Ø£Ùˆ OBJ Ø£Ùˆ FBX',
           variant: 'destructive'
         });
         return;
@@ -544,10 +544,10 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
       selectProduct(id);
       setAddProductOpen(false);
-      toast({ title: 'تمت الإضافة', description: `${product.name} جاهز الآن داخل المشهد` });
+      toast({ title: 'ØªÙ…Øª Ø§Ù„Ø¥Ø¶Ø§ÙØ©', description: `${product.name} Ø¬Ø§Ù‡Ø² Ø§Ù„Ø¢Ù† Ø¯Ø§Ø®Ù„ Ø§Ù„Ù…Ø´Ù‡Ø¯` });
     } catch (error) {
       console.error('Error adding product:', error);
-      toast({ title: 'خطأ', description: 'فشل إضافة المنتج', variant: 'destructive' });
+      toast({ title: 'Ø®Ø·Ø£', description: 'ÙØ´Ù„ Ø¥Ø¶Ø§ÙØ© Ø§Ù„Ù…Ù†ØªØ¬', variant: 'destructive' });
     } finally {
       setIsAdding(false);
       setAddingProductId(null);
@@ -619,16 +619,16 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     const removedCount = layout.products.length - remaining.length;
     setProducts(remaining);
     toast({
-      title: 'تم تنظيف المنتجات التلقائية',
-      description: removedCount > 0 ? `تم حذف ${removedCount} منتج مولد تلقائيًا` : 'لا يوجد منتجات تلقائية للحذف',
+      title: 'ØªÙ… ØªÙ†Ø¸ÙŠÙ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠØ©',
+      description: removedCount > 0 ? `ØªÙ… Ø­Ø°Ù ${removedCount} Ù…Ù†ØªØ¬ Ù…ÙˆÙ„Ø¯ ØªÙ„Ù‚Ø§Ø¦ÙŠÙ‹Ø§` : 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª ØªÙ„Ù‚Ø§Ø¦ÙŠØ© Ù„Ù„Ø­Ø°Ù',
     });
   }, [layout.products, setProducts, toast]);
 
   const toggleAutoHungProductsVisibility = useCallback(() => {
     if (!hasAutoHungProducts) {
       toast({
-        title: 'لا توجد منتجات معلقة',
-        description: 'قم بتوليد المنتجات المعلقة أولاً ثم جرّب الإظهار/الإخفاء.',
+        title: 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª Ù…Ø¹Ù„Ù‚Ø©',
+        description: 'Ù‚Ù… Ø¨ØªÙˆÙ„ÙŠØ¯ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„Ù…Ø¹Ù„Ù‚Ø© Ø£ÙˆÙ„Ø§Ù‹ Ø«Ù… Ø¬Ø±Ù‘Ø¨ Ø§Ù„Ø¥Ø¸Ù‡Ø§Ø±/Ø§Ù„Ø¥Ø®ÙØ§Ø¡.',
       });
       return;
     }
@@ -654,10 +654,10 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     }
 
     toast({
-      title: nextHidden ? 'تم إخفاء المنتجات المعلقة' : 'تم إظهار المنتجات المعلقة',
+      title: nextHidden ? 'ØªÙ… Ø¥Ø®ÙØ§Ø¡ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„Ù…Ø¹Ù„Ù‚Ø©' : 'ØªÙ… Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„Ù…Ø¹Ù„Ù‚Ø©',
       description: nextHidden
-        ? `تم إخفاء ${autoHungProductsCount} منتج معلّق مؤقتًا.`
-        : `تمت إعادة إظهار ${autoHungProductsCount} منتج معلّق.`,
+        ? `ØªÙ… Ø¥Ø®ÙØ§Ø¡ ${autoHungProductsCount} Ù…Ù†ØªØ¬ Ù…Ø¹Ù„Ù‘Ù‚ Ù…Ø¤Ù‚ØªÙ‹Ø§.`
+        : `ØªÙ…Øª Ø¥Ø¹Ø§Ø¯Ø© Ø¥Ø¸Ù‡Ø§Ø± ${autoHungProductsCount} Ù…Ù†ØªØ¬ Ù…Ø¹Ù„Ù‘Ù‚.`,
     });
   }, [autoHungProductsCount, hasAutoHungProducts, isAutoHungHidden, layout.products, selectProduct, selectedProductId, setProducts, toast]);
 
@@ -675,20 +675,20 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       );
 
       if (!generated.length) {
-        toast({ title: 'لا توجد ملحقات صالحة', description: 'أضف ملحقات أولاً حتى يتم تعليق المنتجات تلقائيًا.' });
+        toast({ title: 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù„Ø­Ù‚Ø§Øª ØµØ§Ù„Ø­Ø©', description: 'Ø£Ø¶Ù Ù…Ù„Ø­Ù‚Ø§Øª Ø£ÙˆÙ„Ø§Ù‹ Ø­ØªÙ‰ ÙŠØªÙ… ØªØ¹Ù„ÙŠÙ‚ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª ØªÙ„Ù‚Ø§Ø¦ÙŠÙ‹Ø§.' });
         return;
       }
 
       setProducts([...manualProducts, ...generated]);
       selectProduct(generated[0].id);
       toast({
-        title: 'تم التعليق التلقائي بنجاح',
-        description: `تم إضافة ${generated.length} شكل ثلاثي الأبعاد مولد محليًا على الملحقات.`,
+        title: 'ØªÙ… Ø§Ù„ØªØ¹Ù„ÙŠÙ‚ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ Ø¨Ù†Ø¬Ø§Ø­',
+        description: `ØªÙ… Ø¥Ø¶Ø§ÙØ© ${generated.length} Ø´ÙƒÙ„ Ø«Ù„Ø§Ø«ÙŠ Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯ Ù…ÙˆÙ„Ø¯ Ù…Ø­Ù„ÙŠÙ‹Ø§ Ø¹Ù„Ù‰ Ø§Ù„Ù…Ù„Ø­Ù‚Ø§Øª.`,
       });
       setHangProductsOpen(false);
     } catch (error) {
       console.error('Auto hang generation failed:', error);
-      toast({ title: 'فشل توليد الأشكال', description: 'حدث خطأ أثناء التوزيع التلقائي.', variant: 'destructive' });
+      toast({ title: 'ÙØ´Ù„ ØªÙˆÙ„ÙŠØ¯ Ø§Ù„Ø£Ø´ÙƒØ§Ù„', description: 'Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø§Ù„ØªÙˆØ²ÙŠØ¹ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ.', variant: 'destructive' });
     } finally {
       setIsAutoHanging(false);
     }
@@ -696,7 +696,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
   const clearSelection = useCallback(() => {
     onClearSelection();
-    toast({ title: 'تم إلغاء التحديد', description: 'لم يتم اختيار أي جدار أو منتج.' });
+    toast({ title: 'ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø§Ù„ØªØ­Ø¯ÙŠØ¯', description: 'Ù„Ù… ÙŠØªÙ… Ø§Ø®ØªÙŠØ§Ø± Ø£ÙŠ Ø¬Ø¯Ø§Ø± Ø£Ùˆ Ù…Ù†ØªØ¬.' });
   }, [onClearSelection, toast]);
 
   return (
@@ -721,12 +721,12 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
             {isDrawingMode ? (
               <>
                 <X className="h-5 w-5 sm:h-4 sm:w-4" />
-                إنهاء وضع الرسم
+                Ø¥Ù†Ù‡Ø§Ø¡ ÙˆØ¶Ø¹ Ø§Ù„Ø±Ø³Ù…
               </>
             ) : (
               <>
                 <Edit2 className="h-5 w-5 sm:h-4 sm:w-4" />
-                وضع الرسم
+                ÙˆØ¶Ø¹ Ø§Ù„Ø±Ø³Ù…
               </>
             )}
           </Button>
@@ -736,7 +736,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
           {/* Direct Wall Length Input */}
           <div className="flex items-center justify-center gap-2 bg-white px-3 py-2 sm:py-1 border-t sm:border-t-0 border-zinc-200">
-            <span className="text-xs font-semibold text-zinc-600">الطول (م)</span>
+            <span className="text-xs font-semibold text-zinc-600">Ø§Ù„Ø·ÙˆÙ„ (Ù…)</span>
             <Input
               type="number"
               placeholder="0.5"
@@ -772,8 +772,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     </span>
                   </div>
                   <span className="text-right leading-tight">
-                    <span className="block text-sm font-black">كتالوج المنتجات 3D</span>
-                    <span className="block text-[11px] text-white/85">استعراض تفاعلي ثم إضافة فورية</span>
+                    <span className="block text-sm font-black">ÙƒØªØ§Ù„ÙˆØ¬ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª 3D</span>
+                    <span className="block text-[11px] text-white/85">Ø§Ø³ØªØ¹Ø±Ø§Ø¶ ØªÙØ§Ø¹Ù„ÙŠ Ø«Ù… Ø¥Ø¶Ø§ÙØ© ÙÙˆØ±ÙŠØ©</span>
                   </span>
                 </div>
                 <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-black ring-1 ring-white/30">
@@ -784,22 +784,22 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
           </DialogTrigger>
           <DialogContent className="max-w-[95vw] w-[1400px] max-h-[90vh] overflow-hidden flex flex-col p-0">
             <DialogHeader className="px-6 pt-6 pb-4 border-b">
-              <DialogTitle className="text-2xl font-bold">اختر منتج ثلاثي الأبعاد</DialogTitle>
+              <DialogTitle className="text-2xl font-bold">Ø§Ø®ØªØ± Ù…Ù†ØªØ¬ Ø«Ù„Ø§Ø«ÙŠ Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯</DialogTitle>
             </DialogHeader>
 
             <div className="px-4 py-2.5 border-b bg-white">
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                  <p className="text-[11px] text-zinc-500">1. اختر النموذج</p>
-                  <p className="text-xs font-bold text-zinc-800">استعرض البطاقات أو استخدم البحث</p>
+                  <p className="text-[11px] text-zinc-500">1. Ø§Ø®ØªØ± Ø§Ù„Ù†Ù…ÙˆØ°Ø¬</p>
+                  <p className="text-xs font-bold text-zinc-800">Ø§Ø³ØªØ¹Ø±Ø¶ Ø§Ù„Ø¨Ø·Ø§Ù‚Ø§Øª Ø£Ùˆ Ø§Ø³ØªØ®Ø¯Ù… Ø§Ù„Ø¨Ø­Ø«</p>
                 </div>
                 <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                  <p className="text-[11px] text-zinc-500">2. راجع التفاصيل</p>
-                  <p className="text-xs font-bold text-zinc-800">معاينة تفاعلية + الأبعاد الكاملة</p>
+                  <p className="text-[11px] text-zinc-500">2. Ø±Ø§Ø¬Ø¹ Ø§Ù„ØªÙØ§ØµÙŠÙ„</p>
+                  <p className="text-xs font-bold text-zinc-800">Ù…Ø¹Ø§ÙŠÙ†Ø© ØªÙØ§Ø¹Ù„ÙŠØ© + Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯ Ø§Ù„ÙƒØ§Ù…Ù„Ø©</p>
                 </div>
                 <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                  <p className="text-[11px] text-zinc-500">3. إضافة ذكية</p>
-                  <p className="text-xs font-bold text-zinc-800">تموضع تلقائي يمنع التداخل</p>
+                  <p className="text-[11px] text-zinc-500">3. Ø¥Ø¶Ø§ÙØ© Ø°ÙƒÙŠØ©</p>
+                  <p className="text-xs font-bold text-zinc-800">ØªÙ…ÙˆØ¶Ø¹ ØªÙ„Ù‚Ø§Ø¦ÙŠ ÙŠÙ…Ù†Ø¹ Ø§Ù„ØªØ¯Ø§Ø®Ù„</p>
                 </div>
               </div>
             </div>
@@ -810,7 +810,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 <div className="flex-1 relative" ref={searchInputRef}>
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 z-10" />
                   <Input
-                    placeholder="ابحث عن منتج..."
+                    placeholder="Ø§Ø¨Ø­Ø« Ø¹Ù† Ù…Ù†ØªØ¬..."
                     value={searchTerm}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && fetchProducts()}
@@ -829,7 +829,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                           <div className="p-2 border-b bg-gradient-to-r from-emerald-50 to-teal-50 sticky top-0 z-10">
                             <div className="flex items-center gap-1.5">
                               <TrendingUp className="h-3 w-3 text-emerald-600" />
-                              <p className="text-xs font-bold text-slate-800">الأكثر استخداماً - اقتراحات لك</p>
+                              <p className="text-xs font-bold text-slate-800">Ø§Ù„Ø£ÙƒØ«Ø± Ø§Ø³ØªØ®Ø¯Ø§Ù…Ø§Ù‹ - Ø§Ù‚ØªØ±Ø§Ø­Ø§Øª Ù„Ùƒ</p>
                             </div>
                           </div>
                           {recommendedProducts.map((product) => (
@@ -865,7 +865,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                                     </span>
                                   )}
                                   {product.isPremium && (
-                                    <Badge className="bg-amber-500 text-[10px] px-1 py-0">â­ مميز</Badge>
+                                    <Badge className="bg-amber-500 text-[10px] px-1 py-0">â­ Ù…Ù…ÙŠØ²</Badge>
                                   )}
                                 </div>
                               </div>
@@ -878,7 +878,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                       {searchTerm.length >= 2 && searchSuggestions.length > 0 && (
                         <>
                           <div className="p-2 border-b bg-slate-50 sticky top-0 z-10">
-                            <p className="text-xs font-bold text-slate-700">نتائج البحث ({searchSuggestions.length})</p>
+                            <p className="text-xs font-bold text-slate-700">Ù†ØªØ§Ø¦Ø¬ Ø§Ù„Ø¨Ø­Ø« ({searchSuggestions.length})</p>
                           </div>
                           {searchSuggestions.map((product) => (
                             <div
@@ -927,9 +927,9 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="recent">الأحدث</SelectItem>
-                    <SelectItem value="popular">الأكثر استخداماً</SelectItem>
-                    <SelectItem value="name">الاسم</SelectItem>
+                    <SelectItem value="recent">Ø§Ù„Ø£Ø­Ø¯Ø«</SelectItem>
+                    <SelectItem value="popular">Ø§Ù„Ø£ÙƒØ«Ø± Ø§Ø³ØªØ®Ø¯Ø§Ù…Ø§Ù‹</SelectItem>
+                    <SelectItem value="name">Ø§Ù„Ø§Ø³Ù…</SelectItem>
                   </SelectContent>
                 </Select>
                 <div className="flex border-2 rounded-lg overflow-hidden">
@@ -967,7 +967,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                         : "text-slate-700 hover:bg-slate-200"
                     )}
                   >
-                    الكل
+                    Ø§Ù„ÙƒÙ„
                   </button>
                   {categories.map(cat => (
                     <button
@@ -991,15 +991,15 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 {loadingProducts ? (
                   <div className="flex flex-col items-center justify-center h-96">
                     <div className="animate-spin rounded-full h-16 w-16 border-4 border-primary border-t-transparent"></div>
-                    <p className="mt-4 text-slate-600 font-medium">جاري التحميل...</p>
+                    <p className="mt-4 text-slate-600 font-medium">Ø¬Ø§Ø±ÙŠ Ø§Ù„ØªØ­Ù…ÙŠÙ„...</p>
                   </div>
                 ) : sortedAndPaginatedProducts.total === 0 ? (
                   <div className="flex flex-col items-center justify-center h-96 text-center">
                     <div className="w-24 h-24 bg-slate-200 rounded-full flex items-center justify-center mb-6">
                       <Package className="h-12 w-12 text-slate-400" />
                     </div>
-                    <h3 className="text-xl font-bold text-slate-700 mb-2">لا توجد نتائج</h3>
-                    <p className="text-slate-500">جرب تغيير الفئة أو البحث عن منتج آخر</p>
+                    <h3 className="text-xl font-bold text-slate-700 mb-2">Ù„Ø§ ØªÙˆØ¬Ø¯ Ù†ØªØ§Ø¦Ø¬</h3>
+                    <p className="text-slate-500">Ø¬Ø±Ø¨ ØªØºÙŠÙŠØ± Ø§Ù„ÙØ¦Ø© Ø£Ùˆ Ø§Ù„Ø¨Ø­Ø« Ø¹Ù† Ù…Ù†ØªØ¬ Ø¢Ø®Ø±</p>
                   </div>
                 ) : (
                   <>
@@ -1027,7 +1027,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                                   {product.isPremium && (
                                     <Badge className="border-0 bg-amber-500 text-[10px] text-white">
                                       <Star className="h-3 w-3 ml-1" />
-                                      مميز
+                                      Ù…Ù…ÙŠØ²
                                     </Badge>
                                   )}
                                   {product.usageCount > 0 && (
@@ -1046,7 +1046,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                                 <div className="flex items-start justify-between gap-2">
                                   <div className="min-w-0">
                                     <h4 className="line-clamp-1 text-sm font-black text-zinc-900 transition-colors group-hover:text-zinc-900">{product.name}</h4>
-                                    <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-500">{product.description || 'منتج جاهز للإضافة داخل المخطط'}</p>
+                                    <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-500">{product.description || 'Ù…Ù†ØªØ¬ Ø¬Ø§Ù‡Ø² Ù„Ù„Ø¥Ø¶Ø§ÙØ© Ø¯Ø§Ø®Ù„ Ø§Ù„Ù…Ø®Ø·Ø·'}</p>
                                   </div>
                                   <Badge variant="outline" className="h-6 shrink-0 rounded-full border-zinc-300 bg-zinc-50 px-2.5 text-[10px] text-zinc-700">
                                     {product.category}
@@ -1065,7 +1065,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                                     }}
                                   >
                                     <Eye className="h-4 w-4 ml-1" />
-                                    معاينة
+                                    Ù…Ø¹Ø§ÙŠÙ†Ø©
                                   </Button>
                                   <Button
                                     size="sm"
@@ -1079,7 +1079,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                                     {isAddingThis ? (
                                       <>
                                         <div className="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin ml-1" />
-                                        جاري الإضافة
+                                        Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¥Ø¶Ø§ÙØ©
                                       </>
                                     ) : (
                                       <>
@@ -1115,15 +1115,15 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                             <div className="flex-1 min-w-0 flex flex-col justify-between">
                               <div>
                                 <h4 className="text-lg font-black text-zinc-900 transition-colors group-hover:text-zinc-900">{product.name}</h4>
-                                <p className="mt-2 line-clamp-2 text-sm text-zinc-600">{product.description || 'منتج ثلاثي الأبعاد عالي الجودة'}</p>
+                                <p className="mt-2 line-clamp-2 text-sm text-zinc-600">{product.description || 'Ù…Ù†ØªØ¬ Ø«Ù„Ø§Ø«ÙŠ Ø§Ù„Ø£Ø¨Ø¹Ø§Ø¯ Ø¹Ø§Ù„ÙŠ Ø§Ù„Ø¬ÙˆØ¯Ø©'}</p>
                                 <div className="flex items-center gap-3 mt-3 flex-wrap">
                                   <Badge variant="secondary" className="text-sm border border-zinc-200 bg-zinc-100">{product.category}</Badge>
-                                  {product.isPremium && <Badge className="bg-amber-500 text-sm"><Star className="h-3 w-3 mr-1" />مميز</Badge>}
+                                  {product.isPremium && <Badge className="bg-amber-500 text-sm"><Star className="h-3 w-3 mr-1" />Ù…Ù…ÙŠØ²</Badge>}
                                   <span className="text-sm text-zinc-500">{formatProductDims(product)}</span>
                                   {product.usageCount > 0 && (
                                     <span className="text-sm text-zinc-500 flex items-center gap-1">
                                       <TrendingUp className="h-4 w-4" />
-                                      استخدم {product.usageCount} مرة
+                                      Ø§Ø³ØªØ®Ø¯Ù… {product.usageCount} Ù…Ø±Ø©
                                     </span>
                                   )}
                                 </div>
@@ -1132,13 +1132,13 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                             <div className="flex flex-col gap-3 justify-center">
                               <Button size="default" variant="outline" className="rounded-xl border-zinc-300 hover:border-zinc-500" onClick={() => { setPreviewProduct(product); setIsPreviewOpen(true); }}>
                                 <Eye className="h-4 w-4 ml-2" />
-                                معاينة
+                                Ù…Ø¹Ø§ÙŠÙ†Ø©
                               </Button>
                               <Button size="default" disabled={isAdding} className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold whitespace-nowrap px-4" onClick={() => handleAddProduct(product)}>
                                 {isAdding && addingProductId === product._id ? (
                                   <>
                                     <div className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin ml-2" />
-                                    جاري الإضافة...
+                                    Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¥Ø¶Ø§ÙØ©...
                                   </>
                                 ) : (
                                   <>
@@ -1165,7 +1165,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                           <ChevronRight className="h-4 w-4" />
                         </Button>
                         <span className="text-sm text-slate-600">
-                          صفحة {currentPage} من {sortedAndPaginatedProducts.totalPages}
+                          ØµÙØ­Ø© {currentPage} Ù…Ù† {sortedAndPaginatedProducts.totalPages}
                         </span>
                         <Button
                           size="sm"
@@ -1184,10 +1184,10 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
             <DialogFooter className="border-t pt-3 flex items-center justify-between">
               <span className="text-sm text-slate-600">
-                {sortedAndPaginatedProducts.total} نموذج متاح
+                {sortedAndPaginatedProducts.total} Ù†Ù…ÙˆØ°Ø¬ Ù…ØªØ§Ø­
               </span>
               <Button variant="outline" onClick={() => setAddProductOpen(false)}>
-                إغلاق
+                Ø¥ØºÙ„Ø§Ù‚
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1200,7 +1200,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
               <div className="px-6 pt-6 pb-3 border-b bg-gradient-to-r from-zinc-50 to-white">
                 <DialogTitle className="text-2xl font-black text-zinc-900">{previewProduct?.name}</DialogTitle>
                 <DialogDescription className="text-zinc-500 mt-1">
-                  معاينة تفاعلية كاملة قبل الإضافة مع تموضع ذكي داخل المشهد
+                  Ù…Ø¹Ø§ÙŠÙ†Ø© ØªÙØ§Ø¹Ù„ÙŠØ© ÙƒØ§Ù…Ù„Ø© Ù‚Ø¨Ù„ Ø§Ù„Ø¥Ø¶Ø§ÙØ© Ù…Ø¹ ØªÙ…ÙˆØ¶Ø¹ Ø°ÙƒÙŠ Ø¯Ø§Ø®Ù„ Ø§Ù„Ù…Ø´Ù‡Ø¯
                 </DialogDescription>
               </div>
             </DialogHeader>
@@ -1223,39 +1223,39 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
                   <div className="space-y-3">
                     <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                      <p className="text-xs text-zinc-500 mb-1">الفئة</p>
+                      <p className="text-xs text-zinc-500 mb-1">Ø§Ù„ÙØ¦Ø©</p>
                       <Badge variant="outline" className="mb-2">{previewProduct.category}</Badge>
                       <h4 className="text-lg font-black text-zinc-900">{previewProduct.name}</h4>
                       {previewProduct.nameEn && <p className="text-sm text-zinc-500">{previewProduct.nameEn}</p>}
                     </div>
 
                     <div className="rounded-2xl border border-zinc-200 bg-white p-4 space-y-3">
-                      <p className="text-xs text-zinc-500">معلومات النموذج</p>
+                      <p className="text-xs text-zinc-500">Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ù†Ù…ÙˆØ°Ø¬</p>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div className="rounded-xl bg-zinc-50 border border-zinc-200 py-2 px-1">
-                          <p className="text-[11px] text-zinc-500">العرض</p>
+                          <p className="text-[11px] text-zinc-500">Ø§Ù„Ø¹Ø±Ø¶</p>
                           <p className="text-sm font-black text-zinc-900">{formatMeters(previewProduct.dimensions.width)}م</p>
                         </div>
                         <div className="rounded-xl bg-zinc-50 border border-zinc-200 py-2 px-1">
-                          <p className="text-[11px] text-zinc-500">الارتفاع</p>
+                          <p className="text-[11px] text-zinc-500">Ø§Ù„Ø§Ø±ØªÙØ§Ø¹</p>
                           <p className="text-sm font-black text-zinc-900">{formatMeters(previewProduct.dimensions.height)}م</p>
                         </div>
                         <div className="rounded-xl bg-zinc-50 border border-zinc-200 py-2 px-1">
-                          <p className="text-[11px] text-zinc-500">العمق</p>
+                          <p className="text-[11px] text-zinc-500">Ø§Ù„Ø¹Ù…Ù‚</p>
                           <p className="text-sm font-black text-zinc-900">{formatMeters(previewProduct.dimensions.depth)}م</p>
                         </div>
                       </div>
 
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                          <p className="text-zinc-500">المادة</p>
-                          <p className="font-semibold text-zinc-800">{previewProduct.material || 'غير محدد'}</p>
+                          <p className="text-zinc-500">Ø§Ù„Ù…Ø§Ø¯Ø©</p>
+                          <p className="font-semibold text-zinc-800">{previewProduct.material || 'ØºÙŠØ± Ù…Ø­Ø¯Ø¯'}</p>
                         </div>
                         <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                          <p className="text-zinc-500">اللون</p>
+                          <p className="text-zinc-500">Ø§Ù„Ù„ÙˆÙ†</p>
                           <div className="flex items-center gap-2 mt-1">
                             <span className="h-4 w-4 rounded-md border border-zinc-300" style={{ backgroundColor: previewProduct.color || '#f4f4f5' }} />
-                            <p className="font-semibold text-zinc-800">{previewProduct.color || 'افتراضي'}</p>
+                            <p className="font-semibold text-zinc-800">{previewProduct.color || 'Ø§ÙØªØ±Ø§Ø¶ÙŠ'}</p>
                           </div>
                         </div>
                       </div>
@@ -1263,14 +1263,14 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
                     {previewProduct.description && (
                       <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                        <p className="text-xs text-zinc-500 mb-1">الوصف</p>
+                        <p className="text-xs text-zinc-500 mb-1">Ø§Ù„ÙˆØµÙ</p>
                         <p className="text-sm text-zinc-700 leading-relaxed">{previewProduct.description}</p>
                       </div>
                     )}
 
                     {previewProduct.tags && previewProduct.tags.length > 0 && (
                       <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                        <p className="text-xs text-zinc-500 mb-2">الوسوم</p>
+                        <p className="text-xs text-zinc-500 mb-2">Ø§Ù„ÙˆØ³ÙˆÙ…</p>
                         <div className="flex flex-wrap gap-1.5">
                           {previewProduct.tags.map((tag, index) => (
                             <Badge key={index} variant="secondary">{tag}</Badge>
@@ -1285,7 +1285,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
             <DialogFooter className="px-6 py-4 border-t bg-white flex items-center gap-2">
               <Button variant="outline" className="rounded-xl" onClick={() => setIsPreviewOpen(false)}>
-                إغلاق
+                Ø¥ØºÙ„Ø§Ù‚
               </Button>
               <Button
                 disabled={isAdding}
@@ -1300,12 +1300,12 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 {isAdding && addingProductId === previewProduct?._id ? (
                   <>
                     <div className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin ml-2" />
-                    جاري الإضافة...
+                    Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø¥Ø¶Ø§ÙØ©...
                   </>
                 ) : (
                   <>
                     <Plus className="h-4 w-4 ml-2" />
-                    إضافة إلى المشهد
+                    Ø¥Ø¶Ø§ÙØ© Ø¥Ù„Ù‰ Ø§Ù„Ù…Ø´Ù‡Ø¯
                   </>
                 )}
               </Button>
@@ -1329,26 +1329,26 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     </span>
                   </div>
                   <span className="text-right leading-tight">
-                    <span className="block text-sm font-black">تعليق المنتجات</span>
-                    <span className="block text-[11px] text-white/85">إدارة عامة لكل الجدران والأوجه</span>
+                    <span className="block text-sm font-black">ØªØ¹Ù„ÙŠÙ‚ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª</span>
+                    <span className="block text-[11px] text-white/85">Ø¥Ø¯Ø§Ø±Ø© Ø¹Ø§Ù…Ø© Ù„ÙƒÙ„ Ø§Ù„Ø¬Ø¯Ø±Ø§Ù† ÙˆØ§Ù„Ø£ÙˆØ¬Ù‡</span>
                   </span>
                 </div>
                 <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-black ring-1 ring-white/30">
-                  {isAutoHungHidden ? 'مخفي' : 'مرئي'}
+                  {isAutoHungHidden ? 'Ù…Ø®ÙÙŠ' : 'Ù…Ø±Ø¦ÙŠ'}
                 </span>
               </div>
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-2xl" dir="rtl">
             <DialogHeader>
-              <DialogTitle className="text-xl font-black text-zinc-900">إدارة تعليق المنتجات على الملحقات</DialogTitle>
+              <DialogTitle className="text-xl font-black text-zinc-900">Ø¥Ø¯Ø§Ø±Ø© ØªØ¹Ù„ÙŠÙ‚ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø¹Ù„Ù‰ Ø§Ù„Ù…Ù„Ø­Ù‚Ø§Øª</DialogTitle>
               <DialogDescription>
-                هذا مدخل عام لكل الجدران وكل الأوجه. سنربط هنا قريبًا التوزيع الذكي والسعة والتوافق.
+                Ù‡Ø°Ø§ Ù…Ø¯Ø®Ù„ Ø¹Ø§Ù… Ù„ÙƒÙ„ Ø§Ù„Ø¬Ø¯Ø±Ø§Ù† ÙˆÙƒÙ„ Ø§Ù„Ø£ÙˆØ¬Ù‡. Ø³Ù†Ø±Ø¨Ø· Ù‡Ù†Ø§ Ù‚Ø±ÙŠØ¨Ù‹Ø§ Ø§Ù„ØªÙˆØ²ÙŠØ¹ Ø§Ù„Ø°ÙƒÙŠ ÙˆØ§Ù„Ø³Ø¹Ø© ÙˆØ§Ù„ØªÙˆØ§ÙÙ‚.
               </DialogDescription>
             </DialogHeader>
             <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 space-y-1">
-              <p>الملحقات المتاحة حاليًا: <span className="font-black text-zinc-900">{hangableAccessoriesCount}</span></p>
-              <p>سيتم إنشاء منتجات متعددة عشوائيًا لكل ملحق لتجربة عرض واقعية.</p>
+              <p>Ø§Ù„Ù…Ù„Ø­Ù‚Ø§Øª Ø§Ù„Ù…ØªØ§Ø­Ø© Ø­Ø§Ù„ÙŠÙ‹Ø§: <span className="font-black text-zinc-900">{hangableAccessoriesCount}</span></p>
+              <p>Ø³ÙŠØªÙ… Ø¥Ù†Ø´Ø§Ø¡ Ù…Ù†ØªØ¬Ø§Øª Ù…ØªØ¹Ø¯Ø¯Ø© Ø¹Ø´ÙˆØ§Ø¦ÙŠÙ‹Ø§ Ù„ÙƒÙ„ Ù…Ù„Ø­Ù‚ Ù„ØªØ¬Ø±Ø¨Ø© Ø¹Ø±Ø¶ ÙˆØ§Ù‚Ø¹ÙŠØ©.</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-center">
               <Button
@@ -1363,22 +1363,22 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 )}
               >
                 {isAutoHungHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                <span>{isAutoHungHidden ? 'إظهار المنتجات المعلقة' : 'إخفاء المنتجات المعلقة'}</span>
+                <span>{isAutoHungHidden ? 'Ø¥Ø¸Ù‡Ø§Ø± Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„Ù…Ø¹Ù„Ù‚Ø©' : 'Ø¥Ø®ÙØ§Ø¡ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„Ù…Ø¹Ù„Ù‚Ø©'}</span>
               </Button>
               <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 whitespace-nowrap">
                 {hasAutoHungProducts
-                  ? `الحالة: ${isAutoHungHidden ? 'مخفية' : 'مرئية'} (${hiddenAutoHungProductsCount}/${autoHungProductsCount} مخفي)`
-                  : 'لا توجد منتجات معلّقة بعد'}
+                  ? `Ø§Ù„Ø­Ø§Ù„Ø©: ${isAutoHungHidden ? 'Ù…Ø®ÙÙŠØ©' : 'Ù…Ø±Ø¦ÙŠØ©'} (${hiddenAutoHungProductsCount}/${autoHungProductsCount} Ù…Ø®ÙÙŠ)`
+                  : 'Ù„Ø§ ØªÙˆØ¬Ø¯ Ù…Ù†ØªØ¬Ø§Øª Ù…Ø¹Ù„Ù‘Ù‚Ø© Ø¨Ø¹Ø¯'}
               </div>
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={clearAutoHungProducts}>تفريغ التوليد التلقائي</Button>
+              <Button variant="outline" onClick={clearAutoHungProducts}>ØªÙØ±ÙŠØº Ø§Ù„ØªÙˆÙ„ÙŠØ¯ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ</Button>
               <Button
                 onClick={generateAutoHungProducts}
                 disabled={isAutoHanging || hangableAccessoriesCount === 0}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white"
               >
-                {isAutoHanging ? 'جاري التوليد...' : 'توليد منتجات معلقة تلقائيًا'}
+                {isAutoHanging ? 'Ø¬Ø§Ø±ÙŠ Ø§Ù„ØªÙˆÙ„ÙŠØ¯...' : 'ØªÙˆÙ„ÙŠØ¯ Ù…Ù†ØªØ¬Ø§Øª Ù…Ø¹Ù„Ù‚Ø© ØªÙ„Ù‚Ø§Ø¦ÙŠÙ‹Ø§'}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1395,7 +1395,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
           className="h-10 w-10 p-0 rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50 shadow-sm disabled:opacity-40"
           onClick={onUndo}
           disabled={!canUndo}
-          title="تراجع"
+          title="ØªØ±Ø§Ø¬Ø¹"
         >
           <RotateCcw className="h-4 w-4" />
         </Button>
@@ -1404,7 +1404,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
           className="h-10 w-10 p-0 rounded-xl border border-zinc-200 bg-white text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50 shadow-sm disabled:opacity-40"
           onClick={onRedo}
           disabled={!canRedo}
-          title="إعادة"
+          title="Ø¥Ø¹Ø§Ø¯Ø©"
         >
           <RotateCcw className="h-4 w-4 scale-x-[-1]" />
         </Button>
@@ -1445,12 +1445,12 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
           {isCapturing ? (
             <>
               <div className="animate-spin h-4 w-4 border-2 border-transparent rounded-full" style={{ borderTopColor: primaryColor }}></div>
-              <span className="hidden sm:inline">جاري الالتقاط...</span>
+              <span className="hidden sm:inline">Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø§Ù„ØªÙ‚Ø§Ø·...</span>
             </>
           ) : (
             <>
               <Camera className="h-4 w-4" />
-              <span className="hidden sm:inline">حفظ صورة</span>
+              <span className="hidden sm:inline">Ø­ÙØ¸ ØµÙˆØ±Ø©</span>
             </>
           )}
         </Button>
@@ -1459,19 +1459,19 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
         <Dialog open={floorSettingsOpen} onOpenChange={setFloorSettingsOpen}>
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold">إعدادات الأرضية</DialogTitle>
+              <DialogTitle className="text-xl font-bold">Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø£Ø±Ø¶ÙŠØ©</DialogTitle>
               <DialogDescription>
-                تخصيص حجم ونسيج الأرضية
+                ØªØ®ØµÙŠØµ Ø­Ø¬Ù… ÙˆÙ†Ø³ÙŠØ¬ Ø§Ù„Ø£Ø±Ø¶ÙŠØ©
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-6 py-4 overflow-y-auto flex-1">
               {/* Floor Size Control */}
               <div>
-                <Label className="text-base font-semibold text-slate-900 mb-3 block">حجم الأرضية</Label>
+                <Label className="text-base font-semibold text-slate-900 mb-3 block">Ø­Ø¬Ù… Ø§Ù„Ø£Ø±Ø¶ÙŠØ©</Label>
                 <div className="space-y-3">
                   <div className="flex items-center gap-4">
-                    <span className="text-sm text-slate-600 w-24">الحجم (متر):</span>
+                    <span className="text-sm text-slate-600 w-24">Ø§Ù„Ø­Ø¬Ù… (Ù…ØªØ±):</span>
                     <input
                       type="range"
                       min="12"
@@ -1482,18 +1482,18 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                       className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                     <span className="text-lg font-bold text-primary w-16 text-center">
-                      {layout.floorSize || 24}م
+                      {layout.floorSize || 24}Ù…
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 pr-28">
-                    سيتم تطبيق الحجم على كل من العرض 2D والعرض 3D
+                    Ø³ÙŠØªÙ… ØªØ·Ø¨ÙŠÙ‚ Ø§Ù„Ø­Ø¬Ù… Ø¹Ù„Ù‰ ÙƒÙ„ Ù…Ù† Ø§Ù„Ø¹Ø±Ø¶ 2D ÙˆØ§Ù„Ø¹Ø±Ø¶ 3D
                   </p>
                 </div>
               </div>
 
               {/* Floor Texture Selector */}
               <div>
-                <Label className="text-base font-semibold text-slate-900 mb-3 block">نسيج الأرضية</Label>
+                <Label className="text-base font-semibold text-slate-900 mb-3 block">Ù†Ø³ÙŠØ¬ Ø§Ù„Ø£Ø±Ø¶ÙŠØ©</Label>
                 <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto p-2 border border-slate-200 rounded-lg">
                   {Object.entries(FLOOR_TEXTURES).map(([key, texture]) => (
                     <button
@@ -1517,16 +1517,16 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                         />
                       </div>
                       <span className="text-sm font-medium text-slate-700 text-right flex-1">
-                        {key === 'tiles_white' && 'بلاط أبيض'}
-                        {key === 'tiles_grey' && 'بلاط رمادي'}
-                        {key === 'tiles_black' && 'بلاط أسود'}
-                        {key === 'wood_light' && 'خشب فاتح'}
-                        {key === 'wood_dark' && 'خشب غامق'}
-                        {key === 'wood_parquet' && 'باركيه'}
-                        {key === 'marble_white' && 'رخام أبيض'}
-                        {key === 'marble_black' && 'رخام أسود'}
-                        {key === 'vinyl_grey' && 'فينيل'}
-                        {key === 'concrete' && 'خرسانة'}
+                        {key === 'tiles_white' && 'Ø¨Ù„Ø§Ø· Ø£Ø¨ÙŠØ¶'}
+                        {key === 'tiles_grey' && 'Ø¨Ù„Ø§Ø· Ø±Ù…Ø§Ø¯ÙŠ'}
+                        {key === 'tiles_black' && 'Ø¨Ù„Ø§Ø· Ø£Ø³ÙˆØ¯'}
+                        {key === 'wood_light' && 'Ø®Ø´Ø¨ ÙØ§ØªØ­'}
+                        {key === 'wood_dark' && 'Ø®Ø´Ø¨ ØºØ§Ù…Ù‚'}
+                        {key === 'wood_parquet' && 'Ø¨Ø§Ø±ÙƒÙŠÙ‡'}
+                        {key === 'marble_white' && 'Ø±Ø®Ø§Ù… Ø£Ø¨ÙŠØ¶'}
+                        {key === 'marble_black' && 'Ø±Ø®Ø§Ù… Ø£Ø³ÙˆØ¯'}
+                        {key === 'vinyl_grey' && 'ÙÙŠÙ†ÙŠÙ„'}
+                        {key === 'concrete' && 'Ø®Ø±Ø³Ø§Ù†Ø©'}
                       </span>
                     </button>
                   ))}
@@ -1536,7 +1536,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
             <DialogFooter>
               <Button onClick={() => setFloorSettingsOpen(false)} className="w-full">
-                تم
+                ØªÙ…
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1546,16 +1546,16 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
         <Dialog open={wallSettingsOpen} onOpenChange={setWallSettingsOpen}>
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold">إعدادات الجدران</DialogTitle>
+              <DialogTitle className="text-xl font-bold">Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø¬Ø¯Ø±Ø§Ù†</DialogTitle>
               <DialogDescription>
-                تخصيص نسيج ولون جميع الجدران
+                ØªØ®ØµÙŠØµ Ù†Ø³ÙŠØ¬ ÙˆÙ„ÙˆÙ† Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø¬Ø¯Ø±Ø§Ù†
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-6 py-4 overflow-y-auto flex-1">
               {/* Wall Texture Selector */}
               <div>
-                <Label className="text-base font-semibold text-slate-900 mb-3 block">نسيج الجدران</Label>
+                <Label className="text-base font-semibold text-slate-900 mb-3 block">Ù†Ø³ÙŠØ¬ Ø§Ù„Ø¬Ø¯Ø±Ø§Ù†</Label>
                 <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto p-2 border border-slate-200 rounded-lg">
                   {WALL_TEXTURE_OPTIONS.map((option) => (
                     <button
@@ -1580,7 +1580,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                           />
                         ) : (
                           <div className="w-full h-full bg-gray-100 flex items-center justify-center text-xs text-gray-500">
-                            افتراضي
+                            Ø§ÙØªØ±Ø§Ø¶ÙŠ
                           </div>
                         )}
                       </div>
@@ -1594,7 +1594,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
               {/* Global Wall Color Control */}
               <div>
-                <Label className="text-base font-semibold text-slate-900 mb-3 block">لون الجدران</Label>
+                <Label className="text-base font-semibold text-slate-900 mb-3 block">Ù„ÙˆÙ† Ø§Ù„Ø¬Ø¯Ø±Ø§Ù†</Label>
                 <div className="flex items-center gap-4 p-4 border border-slate-200 rounded-lg bg-slate-50">
                   <input
                     type="color"
@@ -1606,11 +1606,11 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                       });
                     }}
                     className="w-20 h-20 rounded-lg border-2 border-slate-300 cursor-pointer shadow-md"
-                    title="اختر لون الجدران"
+                    title="Ø§Ø®ØªØ± Ù„ÙˆÙ† Ø§Ù„Ø¬Ø¯Ø±Ø§Ù†"
                   />
                   <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-700 mb-1">لون جميع الجدران</p>
-                    <p className="text-xs text-slate-500">سيتم تطبيق اللون على جميع الجدران</p>
+                    <p className="text-sm font-medium text-slate-700 mb-1">Ù„ÙˆÙ† Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø¬Ø¯Ø±Ø§Ù†</p>
+                    <p className="text-xs text-slate-500">Ø³ÙŠØªÙ… ØªØ·Ø¨ÙŠÙ‚ Ø§Ù„Ù„ÙˆÙ† Ø¹Ù„Ù‰ Ø¬Ù…ÙŠØ¹ Ø§Ù„Ø¬Ø¯Ø±Ø§Ù†</p>
                     <p className="text-xs font-mono text-slate-600 mt-1">{layout.defaultWallColor || '#ffffff'}</p>
                   </div>
                 </div>
@@ -1619,7 +1619,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
             <DialogFooter>
               <Button onClick={() => setWallSettingsOpen(false)} className="w-full">
-                تم
+                ØªÙ…
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1634,26 +1634,26 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
             >
               <span className="flex items-center justify-center gap-2">
                 <Settings className="h-4 w-4" />
-                <span className="font-bold">الإعدادات</span>
+                <span className="font-bold">Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª</span>
               </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-[24rem] max-h-[72vh] overflow-y-auto p-2.5 rounded-2xl border border-zinc-200 bg-white/95 backdrop-blur-xl shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)]">
             <div className="px-2.5 pb-2 pt-1">
-              <p className="text-sm font-black text-zinc-900">مركز الإعدادات</p>
-              <p className="text-[11px] text-zinc-500">تحكم سريع في التخصيص والتصدير وإنهاء الجلسة</p>
+              <p className="text-sm font-black text-zinc-900">Ù…Ø±ÙƒØ² Ø§Ù„Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª</p>
+              <p className="text-[11px] text-zinc-500">ØªØ­ÙƒÙ… Ø³Ø±ÙŠØ¹ ÙÙŠ Ø§Ù„ØªØ®ØµÙŠØµ ÙˆØ§Ù„ØªØµØ¯ÙŠØ± ÙˆØ¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©</p>
             </div>
 
             {wallTextureOpen && (
               <div className="mb-2 flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-2">
-                <span className="text-xs text-zinc-600">اختر النسيج المطلوب</span>
+                <span className="text-xs text-zinc-600">Ø§Ø®ØªØ± Ø§Ù„Ù†Ø³ÙŠØ¬ Ø§Ù„Ù…Ø·Ù„ÙˆØ¨</span>
                 <button
                   onClick={() => {
                     setWallTextureOpen(false);
                   }}
                   className="text-xs text-zinc-600 hover:text-zinc-900 px-2 py-1 rounded-lg hover:bg-white transition-colors"
                 >
-                  إلغاء
+                  Ø¥Ù„ØºØ§Ø¡
                 </button>
               </div>
             )}
@@ -1671,8 +1671,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     <Palette className="h-4 w-4" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-sm text-zinc-900">إعدادات الأرضية</p>
-                    <p className="text-xs text-zinc-500">تخصيص الحجم والخامة</p>
+                    <p className="font-bold text-sm text-zinc-900">Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø£Ø±Ø¶ÙŠØ©</p>
+                    <p className="text-xs text-zinc-500">ØªØ®ØµÙŠØµ Ø§Ù„Ø­Ø¬Ù… ÙˆØ§Ù„Ø®Ø§Ù…Ø©</p>
                   </div>
                 </div>
               </DropdownMenuItem>
@@ -1689,8 +1689,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     <Palette className="h-4 w-4" />
                   </div>
                   <div className="flex-1">
-                    <p className="font-bold text-sm text-zinc-900">إعدادات الجدران</p>
-                    <p className="text-xs text-zinc-500">تخصيص اللون والنسيج</p>
+                    <p className="font-bold text-sm text-zinc-900">Ø¥Ø¹Ø¯Ø§Ø¯Ø§Øª Ø§Ù„Ø¬Ø¯Ø±Ø§Ù†</p>
+                    <p className="text-xs text-zinc-500">ØªØ®ØµÙŠØµ Ø§Ù„Ù„ÙˆÙ† ÙˆØ§Ù„Ù†Ø³ÙŠØ¬</p>
                   </div>
                 </div>
               </DropdownMenuItem>
@@ -1702,15 +1702,15 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 <div className="space-y-1.5">
                   <DropdownMenuItem onClick={handleExportDesign} className="group cursor-pointer rounded-xl px-3 py-2.5 border border-transparent hover:border-zinc-200 hover:bg-zinc-50 focus:bg-zinc-50 transition-all">
                     <Download className="h-4 w-4 ml-2 text-zinc-500 group-hover:text-zinc-800" />
-                    <span className="font-medium">تصدير التصميم</span>
+                    <span className="font-medium">ØªØµØ¯ÙŠØ± Ø§Ù„ØªØµÙ…ÙŠÙ…</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleImportDesign} className="group cursor-pointer rounded-xl px-3 py-2.5 border border-transparent hover:border-zinc-200 hover:bg-zinc-50 focus:bg-zinc-50 transition-all">
                     <FileUp className="h-4 w-4 ml-2 text-zinc-500 group-hover:text-zinc-800" />
-                    <span className="font-medium">استيراد تصميم</span>
+                    <span className="font-medium">Ø§Ø³ØªÙŠØ±Ø§Ø¯ ØªØµÙ…ÙŠÙ…</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleQuitSessionSnapshot} className="group cursor-pointer rounded-xl px-3 py-2.5 border border-transparent hover:border-zinc-200 hover:bg-zinc-50 focus:bg-zinc-50 transition-all">
                     <Camera className="h-4 w-4 ml-2 text-zinc-500 group-hover:text-zinc-800" />
-                    <span className="font-medium">التقاط صورة سريعة</span>
+                    <span className="font-medium">Ø§Ù„ØªÙ‚Ø§Ø· ØµÙˆØ±Ø© Ø³Ø±ÙŠØ¹Ø©</span>
                   </DropdownMenuItem>
                 </div>
 
@@ -1718,11 +1718,11 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 <div className="space-y-1.5">
                   <DropdownMenuItem onClick={handleResetDesign} className="cursor-pointer rounded-xl px-3 py-2.5 border border-transparent text-red-600 focus:text-red-600 hover:border-red-100 hover:bg-red-50 focus:bg-red-50 transition-all">
                     <RotateCcw className="h-4 w-4 ml-2" />
-                    <span className="font-medium">إعادة تعيين للافتراضي</span>
+                    <span className="font-medium">Ø¥Ø¹Ø§Ø¯Ø© ØªØ¹ÙŠÙŠÙ† Ù„Ù„Ø§ÙØªØ±Ø§Ø¶ÙŠ</span>
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleQuitSessionClick} className="cursor-pointer rounded-xl px-3 py-2.5 border border-transparent text-red-700 focus:text-red-700 hover:border-red-100 hover:bg-red-50 focus:bg-red-50 transition-all">
                     <LogOut className="h-4 w-4 ml-2" />
-                    <span className="font-bold">إنهاء الجلسة</span>
+                    <span className="font-bold">Ø¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©</span>
                   </DropdownMenuItem>
                 </div>
               </>
@@ -1733,23 +1733,23 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
         <Dialog open={quitDialogOpen} onOpenChange={setQuitDialogOpen}>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle className="text-xl font-black text-zinc-900">إنهاء الجلسة؟</DialogTitle>
+              <DialogTitle className="text-xl font-black text-zinc-900">Ø¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©ØŸ</DialogTitle>
               <DialogDescription className="text-zinc-600">
-                سيتم إنهاء الجلسة الحالية والعودة إلى صفحة المقدمة. التعديلات غير المحفوظة لن يتم حفظها.
+                Ø³ÙŠØªÙ… Ø¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø© Ø§Ù„Ø­Ø§Ù„ÙŠØ© ÙˆØ§Ù„Ø¹ÙˆØ¯Ø© Ø¥Ù„Ù‰ ØµÙØ­Ø© Ø§Ù„Ù…Ù‚Ø¯Ù…Ø©. Ø§Ù„ØªØ¹Ø¯ÙŠÙ„Ø§Øª ØºÙŠØ± Ø§Ù„Ù…Ø­ÙÙˆØ¸Ø© Ù„Ù† ÙŠØªÙ… Ø­ÙØ¸Ù‡Ø§.
               </DialogDescription>
             </DialogHeader>
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              تنبيه: قبل الخروج يمكنك أخذ لقطة شاشة للاحتفاظ بالتصميم الحالي.
+              ØªÙ†Ø¨ÙŠÙ‡: Ù‚Ø¨Ù„ Ø§Ù„Ø®Ø±ÙˆØ¬ ÙŠÙ…ÙƒÙ†Ùƒ Ø£Ø®Ø° Ù„Ù‚Ø·Ø© Ø´Ø§Ø´Ø© Ù„Ù„Ø§Ø­ØªÙØ§Ø¸ Ø¨Ø§Ù„ØªØµÙ…ÙŠÙ… Ø§Ù„Ø­Ø§Ù„ÙŠ.
             </div>
             <DialogFooter className="flex gap-2 sm:justify-end">
-              <Button variant="outline" onClick={() => setQuitDialogOpen(false)}>رجوع</Button>
+              <Button variant="outline" onClick={() => setQuitDialogOpen(false)}>Ø±Ø¬ÙˆØ¹</Button>
               <Button variant="outline" onClick={handleQuitSessionSnapshot} className="gap-2">
                 <Camera className="h-4 w-4" />
-                أخذ صورة
+                Ø£Ø®Ø° ØµÙˆØ±Ø©
               </Button>
               <Button onClick={handleConfirmQuitSession} className="gap-2 bg-red-600 hover:bg-red-700 text-white">
                 <LogOut className="h-4 w-4" />
-                إنهاء الجلسة
+                Ø¥Ù†Ù‡Ø§Ø¡ Ø§Ù„Ø¬Ù„Ø³Ø©
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1777,7 +1777,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
             <DialogHeader className="px-6 pt-6 pb-4 border-b" style={{ borderColor: primaryColor }}>
               <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                 <Eye className="h-5 w-5" style={{ color: primaryColor }} />
-                معاينة الصورة
+                Ù…Ø¹Ø§ÙŠÙ†Ø© Ø§Ù„ØµÙˆØ±Ø©
               </DialogTitle>
             </DialogHeader>
 
@@ -1802,7 +1802,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 }}
                 onClick={() => setPreviewOpen(false)}
               >
-                إغلاق
+                Ø¥ØºÙ„Ø§Ù‚
               </Button>
 
               <Button
@@ -1816,7 +1816,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 }}
               >
                 <Download className="h-4 w-4" />
-                تحميل
+                ØªØ­Ù…ÙŠÙ„
               </Button>
 
               <Button
@@ -1832,7 +1832,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     <html dir="rtl">
                       <head>
                         <meta charset="utf-8" />
-                        <title>طباعة التصميم</title>
+                        <title>Ø·Ø¨Ø§Ø¹Ø© Ø§Ù„ØªØµÙ…ÙŠÙ…</title>
                         <style>
                           @page { size: A4 portrait; margin: 10mm; }
                           html, body { margin: 0; padding: 0; background: #fff; }
@@ -1887,7 +1887,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 }}
               >
                 <Printer className="h-4 w-4" />
-                طباعة
+                Ø·Ø¨Ø§Ø¹Ø©
               </Button>
             </DialogFooter>
           </DialogContent>

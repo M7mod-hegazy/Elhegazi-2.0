@@ -1,12 +1,10 @@
-import React, { useState } from 'react';
-import { Box, Layers, Grid3x3, Eye, EyeOff, Trash2, ChevronDown, ChevronUp, ChevronRight, Focus, Copy } from 'lucide-react';
-import { useTheme } from '@/context/ThemeContext';
+﻿import React, { useState } from 'react';
+import { Box, Layers, Grid3x3, Trash2, ChevronDown, ChevronUp, ChevronRight } from 'lucide-react';
 import { useShopBuilder } from '../store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 
 export const SceneItemsList: React.FC = () => {
-  const { primaryColor, secondaryColor } = useTheme();
   const {
     layout,
     selectedProductId,
@@ -28,11 +26,11 @@ export const SceneItemsList: React.FC = () => {
   const [expandedWalls, setExpandedWalls] = useState<Set<string>>(new Set());
 
   const toggleSection = (section: 'products' | 'walls') => {
-    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+    setExpandedSections((prev) => ({ ...prev, [section]: !prev[section] }));
   };
 
   const toggleWall = (wallId: string) => {
-    setExpandedWalls(prev => {
+    setExpandedWalls((prev) => {
       const newSet = new Set(prev);
       if (newSet.has(wallId)) {
         newSet.delete(wallId);
@@ -43,7 +41,6 @@ export const SceneItemsList: React.FC = () => {
     });
   };
 
-  const totalColumns = layout.walls.reduce((sum, wall) => sum + (wall.columns?.length || 0), 0);
   const visibleProducts = layout.products.filter((product) => !(product.metadata as any)?.autoHangFill);
 
   return (
@@ -55,16 +52,14 @@ export const SceneItemsList: React.FC = () => {
         </h3>
       </div>
 
-      {/* Two Column Layout */}
-      <div className="flex flex-col divide-y divide-zinc-100 overflow-y-auto min-h-0 min-h-[300px]">
-        {/* Products Section - RIGHT COLUMN */}
-        <div className="order-1 flex flex-col flex-shrink-0 relative">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 p-3 overflow-hidden min-h-0">
+        <section className="rounded-xl border border-zinc-200/70 bg-white overflow-hidden flex flex-col min-h-[220px] max-h-[55vh]">
           <button
             onClick={() => toggleSection('products')}
-            className="w-full px-3 py-3 flex items-center justify-between transition-colors hover:bg-zinc-50 sticky top-0 bg-white/90 backdrop-blur-md z-10 border-b border-zinc-100/50"
+            className="w-full px-3 py-3 flex items-center justify-between transition-colors hover:bg-zinc-50 border-b border-zinc-100/70"
           >
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm text-zinc-600 bg-zinc-100 border border-zinc-200/50">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm text-zinc-600 bg-zinc-100 border border-zinc-200/60">
                 <Box className="h-4 w-4" />
               </div>
               <div className="text-right">
@@ -72,43 +67,36 @@ export const SceneItemsList: React.FC = () => {
                 <p className="text-[10px] text-slate-600">{visibleProducts.length} منتج</p>
               </div>
             </div>
-            {expandedSections.products ? (
-              <ChevronUp className="h-4 w-4 text-slate-400" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-slate-400" />
-            )}
+            {expandedSections.products ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
           </button>
 
           {expandedSections.products && (
-            <div className="px-2 pb-3 space-y-1.5 max-h-80 overflow-y-auto">
+            <div className="p-2 space-y-1.5 overflow-y-auto">
               {visibleProducts.length === 0 ? (
-                <div className="text-center py-6 text-slate-400">
+                <div className="text-center py-8 text-slate-400">
                   <Box className="h-10 w-10 mx-auto mb-2 opacity-30" />
                   <p className="text-xs">لا توجد منتجات</p>
                 </div>
               ) : (
                 visibleProducts.map((product) => {
-                  // Try to get thumbnail from metadata or use modelUrl
-                  const thumbnailUrl = (product.metadata?.thumbnailUrl as string) ||
-                    (product.metadata?.imageUrl as string) ||
-                    product.modelUrl;
-                  const isImageUrl = thumbnailUrl && (
-                    thumbnailUrl.endsWith('.jpg') ||
-                    thumbnailUrl.endsWith('.jpeg') ||
-                    thumbnailUrl.endsWith('.png') ||
-                    thumbnailUrl.endsWith('.webp')
-                  );
+                  const thumbnailUrl = (product.metadata?.thumbnailUrl as string) || (product.metadata?.imageUrl as string) || product.modelUrl;
+                  const isImageUrl =
+                    !!thumbnailUrl &&
+                    (thumbnailUrl.endsWith('.jpg') ||
+                      thumbnailUrl.endsWith('.jpeg') ||
+                      thumbnailUrl.endsWith('.png') ||
+                      thumbnailUrl.endsWith('.webp'));
 
                   return (
                     <div
                       key={product.id}
-                      className={`group flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${selectedProductId === product.id
-                        ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
-                        : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
-                        }`}
+                      className={`group flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${
+                        selectedProductId === product.id
+                          ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
+                          : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
+                      }`}
                       onClick={() => selectProduct(product.id)}
                     >
-                      {/* Product Image/Icon */}
                       <div className="w-10 h-10 rounded-lg bg-zinc-100 flex items-center justify-center overflow-hidden border border-zinc-200/60 flex-shrink-0">
                         {isImageUrl ? (
                           <img
@@ -116,23 +104,21 @@ export const SceneItemsList: React.FC = () => {
                             alt={product.name}
                             className="w-full h-full object-cover"
                             onError={(e) => {
-                              // Fallback to icon if image fails to load
                               e.currentTarget.style.display = 'none';
                               e.currentTarget.nextElementSibling?.classList.remove('hidden');
                             }}
                           />
                         ) : null}
-                        <Box className={`h-5 w-5 text-purple-600 ${isImageUrl ? 'hidden' : ''}`} />
+                        <Box className={`h-5 w-5 text-zinc-500 ${isImageUrl ? 'hidden' : ''}`} />
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <p className="font-semibold text-slate-900 truncate text-xs">{product.name}</p>
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <Badge variant="outline" className="text-[9px] h-4 px-1">
-                            📍 ({product.position.x.toFixed(1)}, {product.position.z.toFixed(1)})
-                          </Badge>
-                        </div>
+                        <Badge variant="outline" className="text-[9px] h-4 px-1 mt-0.5">
+                          ({product.position.x.toFixed(1)}, {product.position.z.toFixed(1)})
+                        </Badge>
                       </div>
+
                       <Button
                         size="sm"
                         variant="ghost"
@@ -150,16 +136,15 @@ export const SceneItemsList: React.FC = () => {
               )}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Walls Section - LEFT COLUMN */}
-        <div className="order-2 flex flex-col flex-shrink-0 relative">
+        <section className="rounded-xl border border-zinc-200/70 bg-white overflow-hidden flex flex-col min-h-[220px] max-h-[55vh]">
           <button
             onClick={() => toggleSection('walls')}
-            className="w-full px-3 py-3 flex items-center justify-between transition-colors hover:bg-zinc-50 border-t border-zinc-100/50 sticky top-0 bg-white/90 backdrop-blur-md z-10"
+            className="w-full px-3 py-3 flex items-center justify-between transition-colors hover:bg-zinc-50 border-b border-zinc-100/70"
           >
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm text-zinc-600 bg-zinc-100 border border-zinc-200/50">
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center shadow-sm text-zinc-600 bg-zinc-100 border border-zinc-200/60">
                 <Grid3x3 className="h-4 w-4" />
               </div>
               <div className="text-right">
@@ -167,40 +152,35 @@ export const SceneItemsList: React.FC = () => {
                 <p className="text-[10px] text-slate-600">{layout.walls.length} جدار</p>
               </div>
             </div>
-            {expandedSections.walls ? (
-              <ChevronUp className="h-4 w-4 text-slate-400" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-slate-400" />
-            )}
+            {expandedSections.walls ? <ChevronUp className="h-4 w-4 text-slate-400" /> : <ChevronDown className="h-4 w-4 text-slate-400" />}
           </button>
 
           {expandedSections.walls && (
-            <div className="px-2 pb-3 space-y-1.5 max-h-80 overflow-y-auto">
+            <div className="p-2 space-y-1.5 overflow-y-auto">
               {layout.walls.length === 0 ? (
                 <div className="text-center py-8 text-slate-400">
-                  <Grid3x3 className="h-12 w-12 mx-auto mb-2 opacity-30" />
-                  <p className="text-sm">لا توجد جدران</p>
+                  <Grid3x3 className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                  <p className="text-xs">لا توجد جدران</p>
                 </div>
               ) : (
                 layout.walls.map((wall, index) => {
                   const wallLength = Math.sqrt(
                     Math.pow(wall.end.x - wall.start.x, 2) +
-                    Math.pow(wall.end.y - wall.start.y, 2)
+                      Math.pow(wall.end.y - wall.start.y, 2)
                   );
                   const hasColumns = wall.columns && wall.columns.length > 0;
                   const isExpanded = expandedWalls.has(wall.id);
 
                   return (
                     <div key={wall.id} className="space-y-1">
-                      {/* Wall Item */}
                       <div
-                        className={`group flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${selectedWallId === wall.id
-                          ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
-                          : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
-                          }`}
+                        className={`group flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${
+                          selectedWallId === wall.id
+                            ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
+                            : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
+                        }`}
                         onClick={() => selectWall(wall.id)}
                       >
-                        {/* Expand/Collapse Button for Columns */}
                         {hasColumns && (
                           <button
                             onClick={(e) => {
@@ -209,11 +189,7 @@ export const SceneItemsList: React.FC = () => {
                             }}
                             className="w-5 h-5 flex items-center justify-center rounded hover:bg-zinc-200 transition-colors flex-shrink-0 text-zinc-600"
                           >
-                            {isExpanded ? (
-                              <ChevronDown className="h-3 w-3 text-blue-600" />
-                            ) : (
-                              <ChevronRight className="h-3 w-3 text-blue-600" />
-                            )}
+                            {isExpanded ? <ChevronDown className="h-3 w-3 text-zinc-700" /> : <ChevronRight className="h-3 w-3 text-zinc-700" />}
                           </button>
                         )}
 
@@ -228,13 +204,14 @@ export const SceneItemsList: React.FC = () => {
                           </div>
                           <div className="flex items-center gap-1 mt-0.5">
                             <Badge variant="outline" className="text-[9px] h-4 px-1">
-                              📏 {wallLength.toFixed(1)}م
+                              {wallLength.toFixed(1)}م
                             </Badge>
                             <Badge variant="outline" className="text-[9px] h-4 px-1">
-                              ⬛ {(wall.thickness * 100).toFixed(0)}سم
+                              {(wall.thickness * 100).toFixed(0)}سم
                             </Badge>
                           </div>
                         </div>
+
                         <Button
                           size="sm"
                           variant="ghost"
@@ -248,16 +225,16 @@ export const SceneItemsList: React.FC = () => {
                         </Button>
                       </div>
 
-                      {/* Nested Columns */}
                       {hasColumns && isExpanded && (
                         <div className="mr-6 space-y-1">
                           {wall.columns!.map((column, colIndex) => (
                             <div
                               key={column.id}
-                              className={`group flex items-center gap-1.5 p-1.5 rounded-lg border transition-all cursor-pointer ${selectedColumnId === column.id
-                                ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
-                                : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
-                                }`}
+                              className={`group flex items-center gap-1.5 p-1.5 rounded-lg border transition-all cursor-pointer ${
+                                selectedColumnId === column.id
+                                  ? 'border-zinc-400 bg-zinc-100 shadow-sm ring-1 ring-zinc-300'
+                                  : 'border-zinc-200/60 hover:border-zinc-300 hover:bg-zinc-50/50'
+                              }`}
                               onClick={() => selectColumn(column.id)}
                             >
                               <div className="w-6 h-6 rounded bg-zinc-100 flex items-center justify-center border border-zinc-200 flex-shrink-0">
@@ -267,10 +244,10 @@ export const SceneItemsList: React.FC = () => {
                                 <p className="font-semibold text-slate-900 text-[10px]">عمود {colIndex + 1}</p>
                                 <div className="flex items-center gap-1">
                                   <Badge variant="outline" className="text-[8px] h-3 px-0.5">
-                                    📍 {(column.position * 100).toFixed(0)}%
+                                    {(column.position * 100).toFixed(0)}%
                                   </Badge>
                                   <Badge variant="outline" className="text-[8px] h-3 px-0.5">
-                                    ↕️ {(column.height || 3).toFixed(1)}م
+                                    {(column.height || 3).toFixed(1)}م
                                   </Badge>
                                 </div>
                               </div>
@@ -295,8 +272,7 @@ export const SceneItemsList: React.FC = () => {
               )}
             </div>
           )}
-        </div>
-
+        </section>
       </div>
     </div>
   );
