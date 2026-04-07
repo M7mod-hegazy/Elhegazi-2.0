@@ -1,7 +1,25 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
-import { Upload, X, Image as ImageIcon, AlertCircle, Crown, ZoomIn, ChevronLeft, ChevronRight } from 'lucide-react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
+import {
+  Upload,
+  X,
+  Image as ImageIcon,
+  AlertCircle,
+  Crown,
+  ZoomIn,
+  ChevronLeft,
+  ChevronRight,
+  Link2,
+  Loader2,
+  RefreshCw,
+  CheckCircle2,
+  Globe,
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
+
+type InputMode = 'file' | 'link';
+type LinkImportMode = 'cloudinary' | 'external';
+type LinkCandidateStatus = 'checking' | 'preview_ok' | 'invalid' | 'uploading' | 'done' | 'failed';
 
 interface ImageUploadProps {
   onImagesChange: (images: string[]) => void;
@@ -25,6 +43,43 @@ interface FileEntry {
   status: 'queued' | 'compressing' | 'uploading' | 'done' | 'error';
   error?: string;
   sizeBytes?: number;
+}
+
+interface LinkCandidate {
+  id: string;
+  url: string;
+  host: string;
+  previewUrl: string;
+  status: LinkCandidateStatus;
+  error?: string;
+  resultUrl?: string;
+}
+
+function makeId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+async function runWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  worker: (item: T, index: number) => Promise<R>
+): Promise<R[]> {
+  if (!items.length) return [];
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+
+  const consume = async () => {
+    while (true) {
+      const current = cursor;
+      cursor += 1;
+      if (current >= items.length) break;
+      results[current] = await worker(items[current], current);
+    }
+  };
+
+  const workers = new Array(Math.min(limit, items.length)).fill(0).map(() => consume());
+  await Promise.all(workers);
+  return results;
 }
 
 // ── Lightbox ──────────────────────────────────────────────────────────────────
@@ -155,6 +210,13 @@ const ImageUpload = ({
   const [isDragging, setIsDragging] = useState(false);
   const [entries, setEntries] = useState<FileEntry[]>([]);
   const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
+  const [inputMode, setInputMode] = useState<InputMode>('file');
+  const [linkImportMode, setLinkImportMode] = useState<LinkImportMode>('cloudinary');
+  const [linkInput, setLinkInput] = useState('');
+  const [linkCandidates, setLinkCandidates] = useState<LinkCandidate[]>([]);
+  const [isCheckingLinks, setIsCheckingLinks] = useState(false);
+  const [isAddingLinks, setIsAddingLinks] = useState(false);
+  const linkCheckRunRef = useRef(0);
 
   // Initialise from initialImages
   const prevInitRef = useRef<string[]>([]);
@@ -177,11 +239,37 @@ const ImageUpload = ({
 
   const syncParent = useCallback(
     (updated: FileEntry[]) => {
-      const urls = updated.filter((e) => e.status === 'done' && e.remoteUrl).map((e) => e.remoteUrl!);
+      const urls = updated.filter((e) => e.status === 'done' && e.remoteUrl).map((e) => e.remoteUrl as string);
       onImagesChange(urls);
     },
     [onImagesChange]
   );
+
+  const getAuthHeaders = useCallback((): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    try {
+      const adminToken = localStorage.getItem('admin.auth.token');
+      const adminUid = localStorage.getItem('admin.auth.userId');
+      const adminEmail = localStorage.getItem('admin.auth.userEmail');
+      const uid = localStorage.getItem('auth.userId');
+      const email = localStorage.getItem('auth.userEmail');
+      const token = localStorage.getItem('auth.token');
+      const mode = localStorage.getItem('AUTH_MODE');
+      const adminSecret = localStorage.getItem('ADMIN_SECRET');
+
+      if (adminUid) headers['x-user-id'] = adminUid;
+      else if (uid) headers['x-user-id'] = uid;
+      if (adminEmail) headers['x-user-email'] = adminEmail;
+      else if (email) headers['x-user-email'] = email;
+      if (mode) headers['x-auth-mode'] = mode;
+      if (adminToken) headers.Authorization = `Bearer ${adminToken}`;
+      else if (token) headers.Authorization = `Bearer ${token}`;
+      if (adminSecret) headers['x-admin-secret'] = adminSecret;
+    } catch {
+      // ignore storage failures
+    }
+    return headers;
+  }, []);
 
   // Set as main image — moves entry to index 0
   const setAsMain = useCallback(
@@ -257,22 +345,14 @@ const ImageUpload = ({
         fd.append('file', new File([blob], fileName, { type: 'image/webp' }));
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/cloudinary/upload-file');
-        try {
-          const adminToken = localStorage.getItem('admin.auth.token');
-          const adminUid = localStorage.getItem('admin.auth.userId');
-          const adminEmail = localStorage.getItem('admin.auth.userEmail');
-          const uid = localStorage.getItem('auth.userId');
-          const email = localStorage.getItem('auth.userEmail');
-          const token = localStorage.getItem('auth.token');
-          const mode = localStorage.getItem('AUTH_MODE');
-          if (adminUid) xhr.setRequestHeader('x-user-id', adminUid);
-          else if (uid) xhr.setRequestHeader('x-user-id', uid);
-          if (adminEmail) xhr.setRequestHeader('x-user-email', adminEmail);
-          else if (email) xhr.setRequestHeader('x-user-email', email);
-          if (mode) xhr.setRequestHeader('x-auth-mode', mode);
-          if (adminToken) xhr.setRequestHeader('Authorization', `Bearer ${adminToken}`);
-          else if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
-        } catch { /* ignore */ }
+        const authHeaders = getAuthHeaders();
+        Object.entries(authHeaders).forEach(([key, value]) => {
+          try {
+            xhr.setRequestHeader(key, value);
+          } catch {
+            // ignore header failures
+          }
+        });
         xhr.withCredentials = true;
         xhr.upload.addEventListener('progress', (e) => {
           if (e.lengthComputable) onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)));
@@ -295,7 +375,57 @@ const ImageUpload = ({
         xhr.send(fd);
       });
     },
-    []
+    [getAuthHeaders]
+  );
+
+  const uploadUrlToCloudinary = useCallback(
+    async (url: string): Promise<string> => {
+      const response = await fetch('/api/cloudinary/upload-url', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ url, folder: 'products' }),
+      });
+
+      const body = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+        result?: { secure_url?: string };
+      };
+
+      if (!response.ok || !body.ok || !body.result?.secure_url) {
+        throw new Error(body.error || 'Failed to import link');
+      }
+      return body.result.secure_url;
+    },
+    [getAuthHeaders]
+  );
+
+  const validateCloudinaryUrl = useCallback(
+    async (url: string): Promise<void> => {
+      const response = await fetch('/api/cloudinary/upload-url', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...getAuthHeaders(),
+        },
+        body: JSON.stringify({ url, validateOnly: true }),
+      });
+
+      const body = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
+
+      if (!response.ok || !body.ok) {
+        throw new Error(body.error || 'Link failed Cloudinary validation');
+      }
+    },
+    [getAuthHeaders]
   );
 
   const handleFiles = useCallback(
@@ -355,58 +485,540 @@ const ImageUpload = ({
     [syncParent]
   );
 
+  const parseLinkInput = useCallback((raw: string): string[] => {
+    const chunks = raw
+      .split(/\r?\n|,/g)
+      .map((item) => item.trim())
+      .filter(Boolean);
+    const seen = new Set<string>();
+    const unique: string[] = [];
+    for (const chunk of chunks) {
+      if (!seen.has(chunk)) {
+        seen.add(chunk);
+        unique.push(chunk);
+      }
+    }
+    return unique.slice(0, 30);
+  }, []);
+
+  const loadPreviewImage = useCallback((url: string, timeoutMs = 7000): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const timeout = window.setTimeout(() => {
+        img.src = '';
+        reject(new Error('Timed out while loading image'));
+      }, timeoutMs);
+      img.onload = () => {
+        window.clearTimeout(timeout);
+        resolve();
+      };
+      img.onerror = () => {
+        window.clearTimeout(timeout);
+        reject(new Error('Image cannot be loaded'));
+      };
+      img.src = url;
+    });
+  }, []);
+
+  const checkSingleLink = useCallback(
+    async (url: string): Promise<{ ok: boolean; host: string; previewUrl: string; error?: string }> => {
+      let host = '';
+      try {
+        const parsed = new URL(url);
+        host = parsed.host;
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          return { ok: false, host, previewUrl: url, error: 'Only http/https links are supported' };
+        }
+      } catch {
+        return { ok: false, host: '', previewUrl: url, error: 'Invalid URL format' };
+      }
+
+      try {
+        await loadPreviewImage(url, 7000);
+        if (linkImportMode === 'cloudinary') {
+          await validateCloudinaryUrl(url);
+        }
+        return { ok: true, host, previewUrl: url };
+      } catch (err: unknown) {
+        return {
+          ok: false,
+          host,
+          previewUrl: url,
+          error: err instanceof Error ? err.message : 'Invalid image link',
+        };
+      }
+    },
+    [linkImportMode, loadPreviewImage, validateCloudinaryUrl]
+  );
+
+  const checkLinks = useCallback(
+    async (rawInput?: string): Promise<LinkCandidate[]> => {
+      const text = typeof rawInput === 'string' ? rawInput : linkInput;
+      const urls = parseLinkInput(text);
+      if (!urls.length) {
+        setLinkCandidates([]);
+        return [];
+      }
+
+      const doneUrls = new Set(entries.filter((e) => e.status === 'done' && e.remoteUrl).map((e) => e.remoteUrl as string));
+      const slots = multiple ? Math.max(0, maxImages - doneUrls.size) : 1;
+
+      let fillCount = 0;
+      const baseCandidates: LinkCandidate[] = urls.map((url) => {
+        let host = '';
+        try {
+          host = new URL(url).host;
+        } catch {
+          host = '';
+        }
+
+        if (doneUrls.has(url)) {
+          return { id: makeId('link'), url, host, previewUrl: url, status: 'invalid', error: 'Already added' };
+        }
+        if (fillCount >= slots) {
+          return {
+            id: makeId('link'),
+            url,
+            host,
+            previewUrl: url,
+            status: 'invalid',
+            error: `Image limit reached (${maxImages})`,
+          };
+        }
+        fillCount += 1;
+        return { id: makeId('link'), url, host, previewUrl: url, status: 'checking' };
+      });
+
+      setLinkCandidates(baseCandidates);
+      const toCheck = baseCandidates.filter((item) => item.status === 'checking');
+      if (!toCheck.length) return baseCandidates;
+
+      const runId = linkCheckRunRef.current + 1;
+      linkCheckRunRef.current = runId;
+      setIsCheckingLinks(true);
+
+      try {
+        const checked = await runWithConcurrency(toCheck, 3, async (candidate) => {
+          const result = await checkSingleLink(candidate.url);
+          return { id: candidate.id, ...result };
+        });
+
+        if (linkCheckRunRef.current !== runId) return [];
+        const checkedMap = new Map(checked.map((item) => [item.id, item]));
+        const resolved = baseCandidates.map((candidate) => {
+          const result = checkedMap.get(candidate.id);
+          if (!result) return candidate;
+          if (result.ok) {
+            return { ...candidate, host: result.host, previewUrl: result.previewUrl, status: 'preview_ok', error: undefined };
+          }
+          return {
+            ...candidate,
+            host: result.host,
+            previewUrl: result.previewUrl,
+            status: 'invalid',
+            error: result.error || 'Invalid image link',
+          };
+        });
+
+        setLinkCandidates(resolved);
+        return resolved;
+      } finally {
+        if (linkCheckRunRef.current === runId) setIsCheckingLinks(false);
+      }
+    },
+    [checkSingleLink, entries, linkInput, maxImages, multiple, parseLinkInput]
+  );
+
+  useEffect(() => {
+    if (inputMode !== 'link') return;
+    if (!linkInput.trim()) {
+      setLinkCandidates([]);
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      if (!isAddingLinks) void checkLinks(linkInput);
+    }, 500);
+
+    return () => window.clearTimeout(timer);
+  }, [checkLinks, inputMode, isAddingLinks, linkInput]);
+
+  const appendUrlsToEntries = useCallback(
+    (urls: string[]) => {
+      if (!urls.length) return;
+
+      setEntries((prev) => {
+        const existingUrls = new Set(prev.filter((e) => e.status === 'done' && e.remoteUrl).map((e) => e.remoteUrl as string));
+        const uniqueToAdd: string[] = [];
+        for (const url of urls) {
+          if (!existingUrls.has(url)) {
+            existingUrls.add(url);
+            uniqueToAdd.push(url);
+          }
+        }
+        if (!uniqueToAdd.length) return prev;
+
+        let next: FileEntry[] = prev;
+        if (!multiple) {
+          prev.forEach((entry) => {
+            if (!entry.remoteUrl && entry.previewUrl.startsWith('blob:')) URL.revokeObjectURL(entry.previewUrl);
+          });
+          const selected = uniqueToAdd[0];
+          next = [
+            {
+              id: makeId('link-added'),
+              name: selected.split('/').pop() || 'linked-image',
+              previewUrl: selected,
+              remoteUrl: selected,
+              progress: 100,
+              status: 'done',
+            },
+          ];
+        } else {
+          const doneCount = prev.filter((e) => e.status === 'done' && e.remoteUrl).length;
+          const slots = Math.max(0, maxImages - doneCount);
+          const limited = uniqueToAdd.slice(0, slots);
+          if (!limited.length) return prev;
+          const additions: FileEntry[] = limited.map((url) => ({
+            id: makeId('link-added'),
+            name: url.split('/').pop() || 'linked-image',
+            previewUrl: url,
+            remoteUrl: url,
+            progress: 100,
+            status: 'done',
+          }));
+          next = [...prev, ...additions];
+        }
+
+        syncParent(next);
+        return next;
+      });
+    },
+    [maxImages, multiple, syncParent]
+  );
+
+  const handleAddValidLinks = useCallback(async () => {
+    if (isAddingLinks || isCheckingLinks) return;
+
+    let working = linkCandidates;
+    const hasReady = working.some((item) => item.status === 'preview_ok' || item.status === 'done');
+    if (!hasReady) working = await checkLinks();
+
+    const candidates = working.filter((item) => item.status === 'preview_ok' || item.status === 'done');
+    if (!candidates.length) return;
+
+    setIsAddingLinks(true);
+    try {
+      if (linkImportMode === 'external') {
+        const externalUpdated = working.map((item) =>
+          item.status === 'preview_ok' ? { ...item, status: 'done' as const, resultUrl: item.url, error: undefined } : item
+        );
+        const added = externalUpdated
+          .filter((item) => item.status === 'done')
+          .map((item) => item.resultUrl || item.url)
+          .filter(Boolean);
+        setLinkCandidates(externalUpdated);
+        appendUrlsToEntries(added);
+        return;
+      }
+
+      const uploadables = working.filter((item) => item.status === 'preview_ok');
+      if (!uploadables.length) {
+        const doneUrls = working
+          .filter((item) => item.status === 'done')
+          .map((item) => item.resultUrl || item.url)
+          .filter(Boolean);
+        appendUrlsToEntries(doneUrls);
+        return;
+      }
+
+      const results = await runWithConcurrency(uploadables, 3, async (candidate) => {
+        setLinkCandidates((prev) =>
+          prev.map((item) => (item.id === candidate.id ? { ...item, status: 'uploading', error: undefined } : item))
+        );
+        try {
+          const secureUrl = await uploadUrlToCloudinary(candidate.url);
+          return { id: candidate.id, ok: true as const, resultUrl: secureUrl };
+        } catch (err: unknown) {
+          return {
+            id: candidate.id,
+            ok: false as const,
+            error: err instanceof Error ? err.message : 'Upload failed',
+          };
+        }
+      });
+
+      const resultMap = new Map(results.map((item) => [item.id, item]));
+      const updated = working.map((item) => {
+        const result = resultMap.get(item.id);
+        if (!result) return item;
+        if (result.ok) return { ...item, status: 'done' as const, resultUrl: result.resultUrl, error: undefined };
+        return { ...item, status: 'failed' as const, error: result.error || 'Upload failed' };
+      });
+
+      setLinkCandidates(updated);
+      const addedUrls = updated
+        .filter((item) => item.status === 'done')
+        .map((item) => item.resultUrl || item.url)
+        .filter(Boolean);
+      appendUrlsToEntries(addedUrls);
+    } finally {
+      setIsAddingLinks(false);
+    }
+  }, [appendUrlsToEntries, checkLinks, isAddingLinks, isCheckingLinks, linkCandidates, linkImportMode, uploadUrlToCloudinary]);
+
+  const retryLinkCandidate = useCallback(
+    async (id: string) => {
+      const target = linkCandidates.find((item) => item.id === id);
+      if (!target) return;
+      setLinkCandidates((prev) => prev.map((item) => (item.id === id ? { ...item, status: 'checking', error: undefined } : item)));
+      const checked = await checkSingleLink(target.url);
+      setLinkCandidates((prev) =>
+        prev.map((item) => {
+          if (item.id !== id) return item;
+          if (checked.ok) return { ...item, host: checked.host, previewUrl: checked.previewUrl, status: 'preview_ok', error: undefined };
+          return {
+            ...item,
+            host: checked.host,
+            previewUrl: checked.previewUrl,
+            status: 'invalid',
+            error: checked.error || 'Invalid image link',
+          };
+        })
+      );
+    },
+    [checkSingleLink, linkCandidates]
+  );
+
   const handleDrop = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault();
       setIsDragging(false);
-      if (e.dataTransfer.files) handleFiles(e.dataTransfer.files);
+      if (e.dataTransfer.files && inputMode === 'file') void handleFiles(e.dataTransfer.files);
     },
-    [handleFiles]
+    [handleFiles, inputMode]
   );
 
   const openFileDialog = () => fileInputRef.current?.click();
   const totalDone = entries.filter((e) => e.status === 'done').length;
   const hasUploading = entries.some((e) => e.status === 'uploading' || e.status === 'compressing' || e.status === 'queued');
   const isFull = totalDone >= maxImages;
+  const validReadyCount = linkCandidates.filter((item) => item.status === 'preview_ok' || item.status === 'done').length;
+  const statusInfo = useMemo<Record<LinkCandidateStatus, { label: string; className: string }>>(
+    () => ({
+      checking: { label: 'Checking', className: 'bg-slate-100 text-slate-700' },
+      preview_ok: { label: 'Preview OK', className: 'bg-emerald-100 text-emerald-700' },
+      invalid: { label: 'Invalid', className: 'bg-rose-100 text-rose-700' },
+      uploading: { label: 'Uploading', className: 'bg-amber-100 text-amber-700' },
+      done: { label: 'Done', className: 'bg-green-100 text-green-700' },
+      failed: { label: 'Failed', className: 'bg-red-100 text-red-700' },
+    }),
+    []
+  );
 
   return (
     <div className={`space-y-3 ${className}`}>
 
-      {/* Drop Zone */}
-      <div
-        onDrop={handleDrop}
-        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
-        onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
-        onClick={isFull ? undefined : openFileDialog}
-        className={[
-          'relative border-2 border-dashed rounded-xl p-5 text-center transition-all duration-300',
-          isDragging ? 'border-primary bg-primary/5' : 'border-slate-300 hover:border-primary hover:bg-slate-50',
-          isFull ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
-        ].join(' ')}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple={multiple}
-          accept={acceptedTypes.join(',')}
-          onChange={(e) => e.target.files && handleFiles(e.target.files)}
-          className="hidden"
-          disabled={isFull}
-        />
-        <div className="flex flex-col items-center gap-2">
-          <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center">
-            <Upload className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <p className="text-sm font-semibold text-slate-800">
-              {isFull ? `وصلت للحد الأقصى (${maxImages} صور)` : multiple ? 'اسحب الصور هنا أو انقر للتحديد' : 'اسحب الصورة هنا أو انقر للتحديد'}
-            </p>
-            <p className="text-xs text-slate-500 mt-0.5">
-              {multiple ? `حد أقصى ${maxImages} صور` : 'صورة واحدة'} • {maxSizeKB}KB لكل صورة • JPG, PNG, WebP
-            </p>
+      <div className="inline-flex rounded-lg border border-slate-200 bg-white p-1">
+        <button
+          type="button"
+          onClick={() => setInputMode('file')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+            inputMode === 'file' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Upload className="inline-block w-3.5 h-3.5 mr-1" />
+          File
+        </button>
+        <button
+          type="button"
+          onClick={() => setInputMode('link')}
+          className={`px-3 py-1.5 text-xs font-semibold rounded-md transition ${
+            inputMode === 'link' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Link2 className="inline-block w-3.5 h-3.5 mr-1" />
+          Import from Link
+        </button>
+      </div>
+
+      {inputMode === 'file' && (
+        <div
+          onDrop={handleDrop}
+          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+          onDragLeave={(e) => { e.preventDefault(); setIsDragging(false); }}
+          onClick={isFull ? undefined : openFileDialog}
+          className={[
+            'relative border-2 border-dashed rounded-xl p-5 text-center transition-all duration-300',
+            isDragging ? 'border-primary bg-primary/5' : 'border-slate-300 hover:border-primary hover:bg-slate-50',
+            isFull ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer',
+          ].join(' ')}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            multiple={multiple}
+            accept={acceptedTypes.join(',')}
+            onChange={(e) => e.target.files && handleFiles(e.target.files)}
+            className="hidden"
+            disabled={isFull}
+          />
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-11 h-11 bg-primary/10 rounded-full flex items-center justify-center">
+              <Upload className="w-6 h-6 text-primary" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-800">
+                {isFull
+                  ? `Reached maximum (${maxImages} images)`
+                  : multiple
+                  ? 'Drag images here or click to select'
+                  : 'Drag an image here or click to select'}
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {multiple ? `Up to ${maxImages} images` : 'Single image'} - {maxSizeKB}KB each - JPG, PNG, WebP
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {inputMode === 'link' && (
+        <div className="space-y-3 rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600">Import mode:</span>
+            <div className="inline-flex rounded-md border border-slate-200 bg-white p-1">
+              <button
+                type="button"
+                onClick={() => setLinkImportMode('cloudinary')}
+                className={`px-2.5 py-1 text-xs rounded ${
+                  linkImportMode === 'cloudinary' ? 'bg-slate-900 text-white' : 'text-slate-600'
+                }`}
+              >
+                Cloudinary Import
+              </button>
+              <button
+                type="button"
+                onClick={() => setLinkImportMode('external')}
+                className={`px-2.5 py-1 text-xs rounded ${
+                  linkImportMode === 'external' ? 'bg-slate-900 text-white' : 'text-slate-600'
+                }`}
+              >
+                External Link Only
+              </button>
+            </div>
+          </div>
+
+          <p className="text-[11px] text-slate-500">
+            {linkImportMode === 'cloudinary'
+              ? 'Images will be copied to Cloudinary and will consume Cloudinary storage.'
+              : 'Original links are saved directly and do not consume Cloudinary storage.'}
+          </p>
+
+          <textarea
+            value={linkInput}
+            onChange={(e) => setLinkInput(e.target.value)}
+            rows={4}
+            placeholder={multiple ? 'Paste one or many image links (one per line or comma-separated)' : 'Paste one image link'}
+            className="w-full rounded-md border border-slate-200 bg-white p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
+          />
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isCheckingLinks || isAddingLinks || hasUploading || !linkInput.trim()}
+              onClick={() => {
+                void checkLinks();
+              }}
+            >
+              {isCheckingLinks ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Globe className="w-4 h-4 mr-2" />}
+              Check links
+            </Button>
+
+            <Button
+              type="button"
+              disabled={isCheckingLinks || isAddingLinks || hasUploading || validReadyCount === 0}
+              onClick={() => {
+                void handleAddValidLinks();
+              }}
+            >
+              {isAddingLinks ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle2 className="w-4 h-4 mr-2" />}
+              Add valid only ({validReadyCount})
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              disabled={isCheckingLinks || isAddingLinks}
+              onClick={() => {
+                setLinkInput('');
+                setLinkCandidates([]);
+              }}
+            >
+              <X className="w-4 h-4 mr-2" />
+              Clear
+            </Button>
+          </div>
+
+          {linkCandidates.length > 0 && (
+            <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {linkCandidates.map((candidate) => {
+                const info = statusInfo[candidate.status];
+                return (
+                  <div key={candidate.id} className="flex items-start gap-3 rounded-lg border border-slate-200 bg-white p-2.5">
+                    <div className="w-14 h-14 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center shrink-0">
+                      {candidate.previewUrl ? (
+                        <img
+                          src={candidate.previewUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const img = e.currentTarget;
+                            img.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <ImageIcon className="w-4 h-4 text-slate-400" />
+                      )}
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-slate-800 truncate">{candidate.url}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{candidate.host || 'Unknown host'}</p>
+                      {candidate.error && <p className="text-[11px] text-rose-600 mt-1">{candidate.error}</p>}
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`px-2 py-1 rounded text-[10px] font-semibold ${info.className}`}>
+                        {candidate.status === 'checking' || candidate.status === 'uploading' ? (
+                          <Loader2 className="inline-block w-3 h-3 mr-1 animate-spin" />
+                        ) : null}
+                        {info.label}
+                      </span>
+
+                      {(candidate.status === 'invalid' || candidate.status === 'failed') && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-7 px-2 text-[11px]"
+                          onClick={() => {
+                            void retryLinkCandidate(candidate.id);
+                          }}
+                        >
+                          <RefreshCw className="w-3 h-3 mr-1" />
+                          Retry
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Image Cards Grid */}
       {entries.length > 0 && (
@@ -498,7 +1110,7 @@ const ImageUpload = ({
       )}
 
       {/* Add More */}
-      {entries.length > 0 && !isFull && multiple && !hasUploading && (
+      {inputMode === 'file' && entries.length > 0 && !isFull && multiple && !hasUploading && (
         <Button
           type="button"
           onClick={openFileDialog}
@@ -506,7 +1118,7 @@ const ImageUpload = ({
           className="w-full border-dashed border-2 border-slate-300 hover:border-primary h-9 text-sm"
         >
           <ImageIcon className="w-4 h-4 mr-2" />
-          إضافة المزيد ({totalDone}/{maxImages})
+          Add more ({totalDone}/{maxImages})
         </Button>
       )}
 

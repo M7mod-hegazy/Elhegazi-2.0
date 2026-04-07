@@ -1,11 +1,12 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/components/ui/use-toast';
 import { useTheme } from '@/context/ThemeContext';
 import { apiPostJson } from '@/lib/api';
+import { useDualAuth } from '@/hooks/useDualAuth';
 import { Sparkles, Store, Phone, Briefcase, ChevronRight, ArrowRight } from 'lucide-react';
 
 const SHOP_FIELDS = [
@@ -22,8 +23,10 @@ const SHOP_FIELDS = [
 
 export default function ShopSetup() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const { primaryColor, secondaryColor } = useTheme();
+  const { isAdminAuthenticated, isAdmin } = useDualAuth();
   
   const [step, setStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -34,6 +37,21 @@ export default function ShopSetup() {
     field: '',
     customField: '',
   });
+
+  useEffect(() => {
+    const persistedAdminSession = typeof window !== 'undefined' && (
+      !!localStorage.getItem('admin.auth.userId')
+      || localStorage.getItem('admin.auth.role') === 'admin'
+      || localStorage.getItem('auth.role') === 'admin'
+    );
+    if (isAdminAuthenticated || isAdmin || persistedAdminSession) {
+      navigate('/shop-builder/editor', { replace: true, state: { adminBypass: true, fromIntro: true } });
+      return;
+    }
+    if (!location.state?.fromIntro) {
+      navigate('/shop-builder/intro', { replace: true });
+    }
+  }, [isAdminAuthenticated, isAdmin, location.state, navigate]);
 
   const handleFieldChange = (value: string) => {
     setFormData(prev => ({
@@ -82,7 +100,7 @@ export default function ShopSetup() {
         toast({ title: 'نجح', description: 'تم حفظ بيانات المتجر بنجاح' });
         window.dispatchEvent(new Event('shop-setup-updated'));
         // Navigate with state to bypass redirect check
-        setTimeout(() => navigate('/shop-builder', { state: { fromSetup: true } }), 500);
+        setTimeout(() => navigate('/shop-builder/editor', { state: { fromSetup: true, fromIntro: true } }), 500);
       } else {
         toast({ title: 'خطأ', description: 'فشل حفظ البيانات', variant: 'destructive' });
       }

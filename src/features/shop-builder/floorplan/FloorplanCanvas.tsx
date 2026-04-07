@@ -727,7 +727,7 @@ const FloorplanCanvas: React.FC = () => {
             end: finalPos,
             height: 2.4, // Reduced from 3m to 2.4m for better proportions
             thickness: defaultWallThickness,
-            color: layout.defaultWallColor || '#ffffff',
+            color: layout.defaultWallColor || '#64748b',
             texture: defaultTexture as any
           });
           
@@ -1165,7 +1165,7 @@ const FloorplanCanvas: React.FC = () => {
             end: endPoint,
             height: 3,
             thickness: defaultWallThickness,
-            color: layout.defaultWallColor || '#ffffff',
+            color: '#64748b',
             texture: defaultTexture as any
           });
           
@@ -1290,7 +1290,7 @@ const FloorplanCanvas: React.FC = () => {
                         end: endPoint,
                         height: 3,
                         thickness: defaultWallThickness,
-                        color: layout.defaultWallColor || '#ffffff',
+                        color: '#64748b',
                         texture: defaultTexture as any
                       });
                       setDrawingStartPoint(endPoint);

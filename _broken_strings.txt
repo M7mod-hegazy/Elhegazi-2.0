@@ -1,0 +1,2652 @@
+﻿' 
+        }}
+      >
+        {/* Floating Toolbar positioned top center */}
+        <div className="flex justify-center z-30 pointer-events-auto sticky top-0 mb-1">
+          <BuilderToolbar
+            transformMode={transformMode}
+            onTransformModeChange={setTransformMode}
+            onResetCamera={handleResetCamera}
+            onSnapshot={handleSnapshot}
+            onFullscreen={handleFullscreen}
+            onClearSelection={handleClearSelection}
+          />
+        </div>
+
+        {/* Editor Split Views */}
+        <div className="flex-1 flex flex-col lg:flex-row gap-3 min-h-[60vh] lg:min-h-[calc(100vh-140px)] w-full max-w-[1920px] mx-auto">
+          <div ref={floorplan2DRef} className={cn(
+            "flex-1 rounded-2xl bg-white/90 backdrop-blur-lg shadow-sm border overflow-hidden relative flex flex-col group transition-all duration-500",
+            isDrawingMode ? "border-transparent ring-2 ring-primary/40 shadow-xl" : "border-zinc-200/60 hover:border-zinc-300"
+          )}
+            style={isDrawingMode ? { backgroundColor: `${primaryColor}03` } : {}}>
+            <div className="flex items-center justify-between mb-3 p-3 pb-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-zinc-800 tracking-tight font-bold">�.ُحرِ�'
+' && (
+                        <>
+                          <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>ا�"عرض (�.)</label>
+                            <input
+                              type="number" step="0.1" min="0.5"
+                              value={(slatWall.width || 1).toFixed(1)}
+                              onChange={(e) => updateSlatWall(wall.id, slatWall.id, { width: Number(e.target.value) })}
+                              className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
+                              style={{ border: `1px solid ${primaryColor}40` }}
+                            />
+                          </div>
+                          <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                          <div className="flex flex-col gap-1">
+                            <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>ا�"�.�^ضع %</label>
+                            <input
+                              type="range" min="0" max="1" step="0.01"
+                              value={slatWall.position || 0.5}
+                              onChange={(e) => updateSlatWall(wall.id, slatWall.id, { position: Number(e.target.value) })}
+                              className="w-20 h-9"
+                            />
+                          </div>
+                        </>
+                      )}
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>ا�"ارتفاع (�.)</label>
+                        <input
+                          type="number" step="0.1" min="0.5" max="4"
+                          value={(slatWall.height || 2).toFixed(1)}
+                          onChange={(e) => updateSlatWall(wall.id, slatWall.id, { height: Number(e.target.value) })}
+                          className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>ع�? ا�"أرض (�.)</label>
+                        <input
+                          type="number" step="0.1" min="0" max="2"
+                          value={(slatWall.bottomOffset || 0).toFixed(1)}
+                          onChange={(e) => updateSlatWall(wall.id, slatWall.id, { bottomOffset: Number(e.target.value) })}
+                          className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="flex flex-col gap-1">
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>ا�"�"�^�?</label>
+                        <input
+                          type="color"
+                          value={slatWall.color || '
+' && (
+                        <span className="px-1.5 py-0.5 rounded-full bg-emerald-50 text-[8px] font-black text-emerald-600 uppercase border border-emerald-100">
+                           جزئ�S
+                        </span>
+                     )}
+                  </div>
+                  <span className="text-[9px] font-bold text-zinc-400 mt-1 pr-2">خصائص ا�"جدار ا�"�.حدد</span>
+                </div>
+
+                <div className="flex flex-row items-center gap-4 shrink-0 flex-wrap flex-1 justify-end">
+                   <div className="flex flex-col text-left items-end">
+                      <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ا�"عرض</span>
+                      <span className="text-xs font-mono font-black text-zinc-800">{selectedSlatWidth.toFixed(2)}m</span>
+                   </div>
+                   <div className="w-px h-6 bg-zinc-200"></div>
+                   <div className="flex flex-col text-left items-end">
+                      <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ا�"ارتفاع</span>
+                      <span className="text-xs font-mono font-black text-zinc-800">{selectedSlat.height.toFixed(2)}m</span>
+                   </div>
+                   <div className="w-px h-6 bg-zinc-200"></div>
+                   
+                   {selectedSlat.systemType === '
+' && (
+                 <div className="flex gap-2">
+                   <div className="flex flex-col gap-1.5 flex-1">
+                      <label className="text-[10px] font-semibold text-zinc-500">عدد ا�"أرفف ا�"أف�,�Sة</label>
+                      <input type="number" step="1" min="1" value={selectedSlat.shelfCount || 5} onChange={e => handleUpdateSystem({shelfCount: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr"/>
+                   </div>
+                   <div className="flex flex-col gap-1.5 flex-1">
+                      <label className="text-[10px] font-semibold text-zinc-500">ع�.�, ا�"رف (�.)</label>
+                      <input type="number" step="0.01" min="0.2" value={Number((selectedSlat.shelfDepth || 0.4).toFixed(2))} onChange={e => handleUpdateSystem({shelfDepth: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr"/>
+                   </div>
+                 </div>
+               )}
+
+               {(genericSystemType === '
+' && (
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 pointer-events-none z-10">
+                  <div className="relative">
+                    <div className="w-2 h-2 bg-white rounded-full opacity-70 shadow-lg" />
+                    <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-6 h-6 border-2 border-white rounded-full opacity-30" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Unified Selection Toolbar - Below Both Views */}
+        {selectedProductId && !selectedWallId && !selectedColumnId && (() => {
+          const product = layout.products.find(p => p.id === selectedProductId);
+          if (!product) return null;
+          const similarCount = layout.products.filter(p => p.modelUrl === product.modelUrl).length;
+
+          return (
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-white/90 backdrop-blur-xl border border-zinc-200/60 rounded-2xl shadow-2xl overflow-hidden hover:shadow-primary/5 transition-all">
+              <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
+                {/* Product Name Badge */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid ${primaryColor}40`, color: primaryColor }}>
+                  <span className="text-sm font-bold">�Y"� {product.name}</span>
+                </div>
+
+                <div className="hidden sm:block h-8 w-px bg-purple-200" />
+
+                {/* Focus Camera Button */}
+                <button
+                  onClick={() => handleFocusOnProduct(product.id)}
+                  className="h-9 px-4 flex items-center gap-2 text-white rounded-xl shadow-lg transition-all hover:-translate-y-0.5 font-semibold text-xs"
+                  style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)`, boxShadow: `0 8px 16px -6px ${primaryColor}50` }}
+                  title="تر�f�Sز ا�"�fا�.�Sرا ع�"�? ا�"�.�?تج"
+                >
+                  <Focus className="h-4 w-4" />
+                  <span>تر�f�Sز</span>
+                </button>
+
+                {/* Place on Floor Button */}
+                <button
+                  onClick={() => {
+                    // Remove and re-add the product to trigger the smart positioning logic
+                    // This forces the Three.js scene to recalculate the floor position
+                    const tempProduct = { ...product };
+
+                    // First remove the product
+                    removeProduct(product.id);
+
+                    // Then add it back with Y=0.5 to trigger auto-calculation
+                    setTimeout(() => {
+                      upsertProduct({
+                        ...tempProduct,
+                        position: {
+                          x: tempProduct.position.x,
+                          y: 0.5,
+                          z: tempProduct.position.z
+                        }
+                      });
+
+                      toast({
+                        title: '
+' && (
+                <div className="absolute top-4 left-4 text-white p-4 rounded-lg text-sm shadow-lg z-10 backdrop-blur-sm" style={{ backgroundColor: `${primaryColor}dd` }}>
+                  <h3 className="font-bold mb-2 text-base">
+                    �o^️ �^ضع ا�"ط�Sرا�? ا�"حر
+                  </h3>
+                  <ul className="space-y-1.5">
+                    <li className="flex items-center gap-2">
+                      <span className="text-yellow-400">�?�</span>
+                      <kbd className="px-2 py-0.5 bg-white/20 rounded text-xs">W/S/A/D</kbd>
+                      <span>ا�"حر�fة</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-yellow-400">�?�</span>
+                      <kbd className="px-2 py-0.5 bg-white/20 rounded text-xs">Mouse</kbd>
+                      <span>ا�"�?ظر ح�^�"�f</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-yellow-400">�?�</span>
+                      <kbd className="px-2 py-0.5 bg-white/20 rounded text-xs">Space</kbd>
+                      <span>�"�"أع�"�?</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-yellow-400">�?�</span>
+                      <kbd className="px-2 py-0.5 bg-white/20 rounded text-xs">Shift</kbd>
+                      <span>�"�"أسف�"</span>
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="text-yellow-400">�?�</span>
+                      <kbd className="px-2 py-0.5 bg-white/20 rounded text-xs">ESC</kbd>
+                      <span>إ�"غاء ا�"�,ف�"</span>
+                    </li>
+                    <li className="flex items-center gap-2 mt-2 pt-2 border-t border-white/20">
+                      <span className="text-green-400">�Y'
+' && <img src="https://m.media-amazon.com/images/I/51H+WnKu2fL._AC_SX679_.jpg" alt="ش�^�f �.فرد" className="w-full h-full object-cover mix-blend-multiply" />}
+                      {selectedAccessory.type === '
+' && <img src="https://s.alicdn.com/@sc04/kf/H3e06bf17449d413f8eebd8b07b989664K/Wholesale-Retail-Store-Metal-Waterfall-Display-Hook-with-Bins-Chrome-Finish-Slatwall-Compatible-Displays-for-Shop-Showcase.jpg_300x300.jpg" alt="خطاف �.�"ابس" className="w-full h-full object-cover" />}
+                   </div>
+                   <div className="flex flex-col text-right">
+                     <span className="font-black text-sm text-zinc-900 border-r-2 border-primary pr-2">
+                        {selectedAccessory.type === '
+' && <img src="https://static.commerceplatform.services/images/zoom/swws1224mp.rw_zoom.jpg" alt="رف �.سطح" className="w-full h-full object-cover mix-blend-darken" />}
+                      {selectedAccessory.type === '
+' && baySpacingRatio > 0) {
+      // Shelf spans exactly 1 bay between two uprights
+      visualWidthPct = baySpacingRatio * 100;
+   } else {
+      visualWidthPct = (accessory.width / Math.max(0.01, slatWidth)) * 100;
+   }
+
+   // �"?�"? Visual X (flip for back side) �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+   const rawVisualX = activeSide === '
+' ? "خطاف �.فرد" : "خطاف �.�"ابس"}
+         className={`absolute flex border-2 shadow-sm cursor-move select-none ${
+            isActive  ? `border-primary bg-primary/20 z-20 scale-110` 
+            : isHovered ? `border-yellow-400 bg-yellow-300/30 z-20 scale-105 ring-2 ring-yellow-300/50 shadow-yellow-200/50 shadow-lg` 
+            : `${colorCls} ${bgCls} border-opacity-70 z-10`
+         } ${isShelf ? '
+' ? (
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col text-left items-end">
+                           <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ا�"أرفف</span>
+                           <span className="text-xs font-black text-zinc-800">{selectedSlat.shelfCount || 5} <span className="text-[9px] text-zinc-400 font-normal">طب�,ات</span></span>
+                        </div>
+                        <div className="w-px h-6 bg-zinc-200"></div>
+                        <div className="flex flex-col text-left items-end">
+                           <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ع�.�, ا�"رف</span>
+                           <span className="text-xs font-mono font-black text-zinc-800">{selectedSlat.shelfDepth ? selectedSlat.shelfDepth.toFixed(2) : '
+' ? (
+                   <>
+                     <div className="flex gap-2">
+                       <div className="flex flex-col gap-1.5 flex-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">ا�"عرض (�.)</label>
+                          <input type="number" step="0.01" value={Number((selectedSlat.width || 1).toFixed(2))} onChange={e => handleUpdateSystem({width: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr" />
+                       </div>
+                       <div className="flex flex-col gap-1.5 flex-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">ا�"ارتفاع (�.)</label>
+                          <input type="number" step="0.01" value={Number((selectedSlat.height || 1).toFixed(2))} onChange={e => handleUpdateSystem({height: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr" />
+                       </div>
+                     </div>
+                     <div className="flex gap-2">
+                       <div className="flex flex-col gap-1.5 flex-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">ا�"�.�^ضع ا�"أف�,�S (0-1)</label>
+                          <input type="number" step="0.01" min="0" max="1" value={Number((selectedSlat.position || 0.5).toFixed(2))} onChange={e => handleUpdateSystem({position: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr" />
+                       </div>
+                       <div className="flex flex-col gap-1.5 flex-1">
+                          <label className="text-[10px] font-semibold text-zinc-500">�.�? ا�"أرض (�.)</label>
+                          <input type="number" step="0.01" value={Number((selectedSlat.bottomOffset || 0).toFixed(2))} onChange={e => handleUpdateSystem({bottomOffset: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr" />
+                       </div>
+                     </div>
+                  </>
+               ) : (
+                  <>
+                     <div className="flex gap-2 mt-2">
+                        <div className="flex flex-col gap-1.5 flex-1">
+                           <label className="text-[10px] font-semibold text-zinc-500">ا�"ارتفاع (�.)</label>
+                           <input type="number" step="0.01" value={Number((selectedSlat.height || 1).toFixed(2))} onChange={e => updateSlatWall(targetId, selectedSlat.id, {height: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr" />
+                        </div>
+                        <div className="flex flex-col gap-1.5 flex-1">
+                           <label className="text-[10px] font-semibold text-zinc-500">�.�? ا�"أرض (�.)</label>
+                           <input type="number" step="0.01" value={Number((selectedSlat.bottomOffset || 0).toFixed(2))} onChange={e => updateSlatWall(targetId, selectedSlat.id, {bottomOffset: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr" />
+                        </div>
+                     </div>
+                  </>
+               )}
+
+               {(!selectedSlat.systemType || selectedSlat.systemType === '
+' ? 1 - (col.position || 0.5) : (col.position || 0.5);
+                const leftPct = visualPos * 100 - (widthPct / 2);
+                
+                return (
+                   <div 
+                      key={col.id}
+                      className="absolute bottom-0 bg-stone-300/80 border border-stone-400 z-20 flex flex-col items-center justify-center text-[10px] text-stone-600 font-bold pointer-events-none transition-all"
+                      style={{
+                         left: `${Math.max(0, leftPct)}%`,
+                         width: `${Math.min(100 - Math.max(0, leftPct), widthPct)}%`,
+                         height: `${Math.min(100, heightPct)}%`
+                      }}
+                   >
+                      <div className="bg-white/90 px-1.5 py-0.5 rounded text-[9px] shadow-sm border border-stone-200">ع�.�^د</div>
+                   </div>
+                );
+             })}
+             {/* Draw Slats */}
+             {allSystems.map(slat => {
+                const isSystemPrimo = !('
+' ? 1 - accessory.position.x : accessory.position.x;
+   const snappedVisualX = snapX(rawVisualX);
+   const leftPct = snappedVisualX * 100;
+   const bottomPct = snapY(accessory.position.y) * 100;
+
+   // �"?�"? Drag handler �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+   const handlePointerDown = (e: React.PointerEvent) => {
+      onActivate();
+      e.stopPropagation();
+      e.preventDefault();
+
+      const el = e.currentTarget as HTMLDivElement;
+      el.setPointerCapture(e.pointerId);
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startVisualX = activeSide === '
+' });
+                       }
+                       setActiveId(id);
+                       setIsAddingNewSystem(false);
+                     }}
+                     className="flex-1 py-2.5 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-bold transition-colors border border-blue-200 flex flex-col items-center justify-center gap-1"
+                     style={{ color: primaryColor }}
+                  >
+                     <Plus className="w-4 h-4"/>
+                     �fا�.�" ا�"جدار
+                  </button>
+                  <button
+                     onClick={() => {
+                       if (allSystems.some((s:any) => s.fillType === '
+' })}
+                          className="w-24 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        >
+                          <option value="full">�fا�.�" ا�"جدار</option>
+                          <option value="partial">�.ساحة جزئ�Sة</option>
+                        </select>
+                      </div>
+
+                      {slatWall.fillType === '
+' }}></span>
+                    �^ضع ا�"رس�.
+                  </span>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={toggle2DFullscreen}
+                className="h-7 w-7 p-0 transition-all"
+                style={{ color: primaryColor }}
+              >
+                {is2DFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </Button>
+            </div>
+            <div className="flex-1 min-h-0">
+              <FloorplanCanvas />
+            </div>
+
+            {/* Fullscreen Controls Overlay - Visible when fullscreen is active */}
+            {(is2DFullscreen || hasEnteredFullscreen) && (
+              <div className="absolute top-16 right-4 flex items-center gap-2 z-50 pointer-events-auto">
+                {/* Undo/Redo Buttons */}
+                <div className="flex items-center gap-1 bg-white rounded-lg border-2 p-1 shadow-lg" style={{ borderColor: primaryColor }}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleUndo}
+                    disabled={historyIndex <= 0}
+                    className="h-8 w-8 p-0 disabled:opacity-30 transition-all"
+                    style={{ color: primaryColor }}
+                    title="تراجع"
+                  >
+                    <RotateCcw className="h-4 w-4" />
+                  </Button>
+                  <div className="w-px h-6" style={{ backgroundColor: primaryColor }} />
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={handleRedo}
+                    disabled={historyIndex >= history.length - 1}
+                    className="h-8 w-8 p-0 disabled:opacity-30 transition-all"
+                    style={{ color: primaryColor }}
+                    title="إعادة"
+                  >
+                    <RotateCcw className="h-4 w-4 scale-x-[-1]" />
+                  </Button>
+                </div>
+
+                {/* Edit Mode Toggle */}
+                <Button
+                  onClick={() => {
+                    setDrawingMode(!isDrawingMode);
+                  }}
+                  className="flex items-center gap-2 font-semibold h-10 px-4 transition-all shadow-lg text-white"
+                  style={{
+                    background: isDrawingMode ? `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` : `linear-gradient(135deg, ${secondaryColor} 0%, ${primaryColor} 100%)`,
+                  }}
+                >
+                  <Edit2 className="h-4 w-4" />
+                  {isDrawingMode ? '
+' in slat);
+                return (
+                 <InteractiveSlatNode
+                    key={slat.id}
+                    slat={slat}
+                    wallLength={wallLength}
+                    wallHeight={wallHeight}
+                    isActive={activeId === slat.id}
+                    onActivate={() => { setActiveId(slat.id); setActiveAccessoryId(null); }}
+                    updateSlat={(updates) => {
+                       if (isSystemPrimo) updatePrimoStand(targetId, slat.id, updates);
+                       else updateSlatWall(targetId, slat.id, updates);
+                    }}
+                    containerRef={containerRef}
+                    activeAccessoryId={activeAccessoryId}
+                    setActiveAccessoryId={setActiveAccessoryId}
+                    hoveredAccessoryId={hoveredAccessoryId}
+                    updateAccessory={(accId, updates) => {
+                       if (isSystemPrimo) updatePrimoAccessory(targetId, slat.id, accId, updates);
+                       else updateAccessory(targetId, slat.id, accId, updates);
+                    }}
+                    activeSide={activeSide}
+                 />
+                );
+             })}
+          </div>
+          </div>
+       </div>
+       
+       {/* Smart Bottom List of Accessories for Selected Slat */}
+       {selectedSlat && selectedSlat.accessories && selectedSlat.accessories.length > 0 && (
+          <div className="w-full bg-white border border-zinc-200 rounded-xl p-3 shadow-sm animate-in fade-in slide-in-from-bottom-2 shrink-0">
+             <div className="flex flex-wrap gap-2 items-center">
+                <span className="text-[10px] font-bold text-zinc-500 ml-2">�.حت�^�Sات ا�"جدار:</span>
+                {selectedSlat.accessories.map((acc, index) => (
+                   <button 
+                      key={acc.id}
+                      onClick={() => setActiveAccessoryId(acc.id)}
+                      onMouseEnter={() => setHoveredAccessoryId(acc.id)}
+                      onMouseLeave={() => setHoveredAccessoryId(null)}
+                      className={`flex items-center gap-1.5 px-2 py-1 rounded-md border text-[10px] font-bold transition-all ${
+                         activeAccessoryId === acc.id 
+                            ? '
+'
+           : `100% ${100 / (slat.height / Math.max(0.01, slat.slatSpacing))}%`,
+      }}
+    >
+      {isActive && (
+        <div className="absolute top-0 right-0 p-1.5 px-2 bg-primary text-primary-foreground text-[10px] rounded-bl-xl font-bold shadow-md z-20 pointer-events-none">
+          ا�"ع�?صر ا�"�.حدد
+        </div>
+      )}
+
+      {/* Render Primo Uprights */}
+      {isPrimo && (() => {
+         const spacing = (slat as any).uprightSpacing || 0.8;
+         const count = Math.max(1, Math.ceil(width / spacing));
+         const step = 100 / count;
+         return Array.from({ length: count + 1 }).map((_, i) => (
+            <div 
+               key={i} 
+               className="absolute top-0 h-full w-[6px] bg-white/80 z-[1] pointer-events-none shadow-[0_0_4px_rgba(0,0,0,0.1)]" 
+               style={{ left: `${i * step}%`, transform: '
+"� �.�^ضع
+                  </label>
+                  <input
+                    type="
+" /> إضافة ع�.�^د جد�Sد
+                    </button>
+                  </div>
+                </div>
+
+                <div className="
+" />
+                      <span>أ�?ظ�.ة ا�"
+" />
+                    <button
+                      onClick={() => {
+                        const similarProducts = layout.products.filter(p => p.modelUrl === product.modelUrl);
+                        if (confirm(`تطب�S�, ا�"
+" />
+                    <span>تر�f�Sز</span>
+                    <ChevronUp className="
+" />
+                  {isDrawingMode ? '�^ضع ا�"
+" />
+                  <span>ا�"
+" />
+                  <span>تر�f�Sز</span>
+                </button>
+
+                {/* Place on Floor Button */}
+                <button
+                  onClick={() => {
+                    // Remove and re-add the product to trigger the smart positioning logic
+                    // This forces the Three.js scene to recalculate the floor position
+                    const tempProduct = { ...product };
+
+                    // First remove the product
+                    removeProduct(product.id);
+
+                    // Then add it back with Y=0.5 to trigger auto-calculation
+                    setTimeout(() => {
+                      upsertProduct({
+                        ...tempProduct,
+                        position: {
+                          x: tempProduct.position.x,
+                          y: 0.5,
+                          z: tempProduct.position.z
+                        }
+                      });
+
+                      toast({
+                        title: 'ت�. �^ضع ا�"
+" />
+                  <span>ع�"
+" />
+
+                {/* Delete Button */}
+                <button
+                  onClick={() => {
+                    if (confirm('�?�"
+" />}
+                      </div>
+                      <span>{acc.type === 'shelf' ? 'رف' : acc.type === 'hook_single' ? '�.فرد' : 'ش�"
+"' : 'س�"
+" �^ا�"
+" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Delete Button */}
+                <button
+                  onClick={() => {
+                    if (confirm('�?�"
+" style={{ backgroundColor: 'white' }}></span>
+                    �^ضع ا�"
+" style={{ color: primaryColor }}>�.د�Sر أ�?ظ�.ة ا�"
+" style={{ color: primaryColor }}>�Y"
+" style={{ color: primaryColor }}>�YZ� �"
+" style={{ color: primaryColor }}>ا�"
+" style={{ color: primaryColor }}>إعدادات ا�"
+" style={{ color: primaryColor }}>ع�? ا�"
+" ا�"
+"� ارتفاع (�.)
+                  </label>
+                  <input
+                    type="
+"� حج�.
+                  </label>
+                  <input
+                    type="
+" د�^را�?
+                  </label>
+                  <input
+                    type="
+" زا�^�Sة (°)
+                  </label>
+                  <input
+                    type="
+"� س�.�f (�.)
+                  </label>
+                  <input
+                    type="
+"� ط�^�"
+"� ع�.�, (�.)
+                  </label>
+                  <input
+                    type="
+" عاد�S
+                  </button>
+                  <button
+                    onClick={() => setCameraMode('freeMove')}
+                    className="
+"� عرض (�.)
+                  </label>
+                  <input
+                    type="
+"
+                      >
+                         <span>ع�.�^د {idx + 1}</span>
+                         <span className="
+"
+                      title={`تطب�S�, ع�"
+"
+                    title={product.texture ? '�"
+"
+                  >
+                    <span>�Y�>️ ع�.�^د</span>
+                    <ChevronUp className="
+"
+                  >
+                    �o^️ ط�Sرا�?
+                  </button>
+                </div>
+
+                <Button
+                  size="
+"
+                  style={{ color: primaryColor }}
+                  title={is3DFullscreen ? 'خر�^ج �.�? �.�"
+"
+                >
+                  <span>ا�"
+"�"
+"�,�S�.ة"
+"�,ائ�Sا�< ب�?اء�< ع�"
+"�,ف�"
+"�.�"
+"�.�?تج'
+                      });
+                    }, 50);
+                  }}
+                  className="
+"�.�^ضع ا�"
+"�.�^ضع ت�"
+"�.حدد
+        </div>
+      )}
+
+      {/* Render Primo Uprights */}
+      {isPrimo && (() => {
+         const spacing = (slat as any).uprightSpacing || 0.8;
+         const count = Math.max(1, Math.ceil(width / spacing));
+         const step = 100 / count;
+         return Array.from({ length: count + 1 }).map((_, i) => (
+            <div 
+               key={i} 
+               className="
+"�.حدد</span>
+                   </div>
+                </div>
+
+                <div className="
+"�.حدد</span>
+                </div>
+
+                <div className="
+"�.ع�"
+"�.عا�S�?ة ث�?ائ�Sة ا�"
+"/>
+                     �fا�.�"
+"/>
+                    جزء ف�,ط
+                 </button>
+              </div>
+            </div>
+           )}
+
+         {/* Selected Editor */}
+         {selectedSlat ? (
+            activeAccessoryId && selectedSlat.accessories?.find((a:any) => a.id === activeAccessoryId) ? (
+                 (() => {
+                    const acc = selectedSlat.accessories?.find((a:any) => a.id === activeAccessoryId)!;
+                    return (
+                        <div className="
+"/>
+                إضافة �?ظا�. عرض جد�Sد
+             </button>
+           ) : (
+             <div className="
+"�? ${similarProducts.length} �.�?تج �.شاب�?�Y`)) {
+                          similarProducts.forEach(p => {
+                            if (p.id !== product.id) {
+                              upsertProduct({
+                                id: p.id,
+                                color: product.color,
+                                texture: product.texture
+                              });
+                            }
+                          });
+                        }
+                      }}
+                      className="
+"�? �?ذا ا�"
+"? Colors �"
+"? Drag handler �"
+"�? ا�"
+"�? إعدادات ا�"
+"?
+   const handlePointerDown = (e: React.PointerEvent) => {
+      onActivate();
+      e.stopPropagation();
+      e.preventDefault();
+
+      const el = e.currentTarget as HTMLDivElement;
+      el.setPointerCapture(e.pointerId);
+
+      const startX = e.clientX;
+      const startY = e.clientY;
+      const startVisualX = activeSide === 'back' ? 1 - accessory.position.x : accessory.position.x;
+      const startPosY = accessory.position.y;
+      
+      const parent = el.parentElement;
+      if (!parent) return;
+      const rect = parent.getBoundingClientRect();
+
+      const handleMove = (moveEvent: PointerEvent) => {
+         const dx = moveEvent.clientX - startX;
+         const dy = startY - moveEvent.clientY;
+         
+         const rawNewVisualX = startVisualX + (dx / rect.width);
+         const rawNewY = startPosY + (dy / rect.height);
+
+         const newVisualX = Math.max(0, Math.min(1, snapX(rawNewVisualX)));
+         const newY       = Math.max(0, Math.min(1, snapY(rawNewY)));
+
+         const newX = activeSide === 'back' ? 1 - newVisualX : newVisualX;
+         updateAccessory({ position: { x: newX, y: newY } });
+      };
+
+      const handleUp = (upEvent: PointerEvent) => {
+         el.releasePointerCapture(upEvent.pointerId);
+         el.removeEventListener('pointermove', handleMove);
+         el.removeEventListener('pointerup', handleUp);
+      };
+
+      el.addEventListener('pointermove', handleMove);
+      el.addEventListener('pointerup', handleUp);
+   };
+
+   // �"
+"?
+   const rawVisualX = activeSide === 'back' ? 1 - accessory.position.x : accessory.position.x;
+   const snappedVisualX = snapX(rawVisualX);
+   const leftPct = snappedVisualX * 100;
+   const bottomPct = snapY(accessory.position.y) * 100;
+
+   // �"
+"?�"
+"�^�? �^ا�"
+'�"�^�? �fتأث�Sر ع�"�? ا�"�?س�Sج'
+"�^�? ا�"
+"�^�?</label>
+                        <input
+                          type="
+"�^ج�?"
+"�^ضع ا�"
+">
+                             ا�"
+">
+                            استخدا�. �?ذا ا�"
+">
+                            إغ�"
+">
+                           جزئ�S
+                        </span>
+                     )}
+                  </div>
+                  <span className="
+">
+                        {selectedAccessory.type === 'shelf' ? 'رف عرض' : selectedAccessory.type === 'hook_single' ? 'خطاف �.فرد' : selectedAccessory.type === 'hook_waterfall' ? 'خطاف ش�"
+">
+                        {selectedSlat.systemType === 'supermarket_shelves' ? '�?ظا�. أرفف' : selectedSlat.systemType === 'primo' ? 'أع�.دة بر�S�.�^' : 'جدار شرائح�S'}
+                     </span>
+                     {selectedSlat.fillType === 'partial' && (
+                        <span className="
+">
+                      ا�"
+">
+                    �o^️ �^ضع ا�"
+">
+                    �YZ� �"
+">
+                   {layout.field || 'تخط�Sط حر'}
+                 </span>
+              </div>
+              <span className="
+">
+                  <button
+                     onClick={() => {
+                       if (allSystems.some((s:any) => s.fillType === 'full')) return alert('�"
+">
+                {(layout as any).shopName || '�.ساحة ا�"
+">
+               ?????? ????? ???? ?????? ?? ?????? ??? 2D ?? ????? ???? ???? ????? ????????.
+            </div>
+         )}
+      </div>
+    </div>
+  )
+}
+
+
+// Helper to format Gregorian date and time
+const formatGregorianDateTime = () => {
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+  const dateStr = now.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: '2-digit' });
+  return { timeStr, dateStr };
+};
+
+// Wall texture options - mapped from WALL_TEXTURES
+const WALL_TEXTURE_OPTIONS = [
+  { key: '', label: 'افتراض�S', preview: null },
+  ...Object.entries(WALL_TEXTURES).map(([key, config]) => ({
+    key,
+    label: key.split('_').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' '),
+    preview: config.preview || config.map,
+  })),
+];
+
+// Product texture options - Using simple color-based textures (data URLs for guaranteed loading)
+const TEXTURE_OPTIONS = [
+  { value: '', label: 'افتراض�S', preview: null },
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id29vZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiM4QjczNTIiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjEwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjxyZWN0IHg9IjIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjMwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZCkiLz48L3N2Zz4=',
+    label: 'خشب ب�?�S',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id29vZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiM4QjczNTIiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjEwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjxyZWN0IHg9IjIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjMwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZCkiLz48L3N2Zz4='
+  },
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWFyYmxlIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMCw1MCBRMjUsMzAgNTAsNTAgVDEwMCw1MCIgc3Ryb2tlPSIjREREIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMCw3MCBRMzAsNjAgNjAsNzAgVDEwMCw3MCIgc3Ryb2tlPSIjRTBFMEUwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI21hcmJsZSkiLz48L3N2Zz4=',
+    label: 'رخا�. أب�Sض',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWFyYmxlIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMCw1MCBRMjUsMzAgNTAsNTAgVDEwMCw1MCIgc3Ryb2tlPSIjREREIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMCw3MCBRMzAsNjAgNjAsNzAgVDEwMCw3MCIgc3Ryb2tlPSIjRTBFMEUwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI21hcmJsZSkiLz48L3N2Zz4='
+  },
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYnJpY2siIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjQjI0QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iMjgiIGhlaWdodD0iMTQiIGZpbGw9IiNDOTVBNEIiIHN0cm9rZT0iIzhBMzMyOCIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iLTE0IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjYnJpY2spIi8+PC9zdmc+',
+    label: 'ط�^ب أح�.ر',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYnJpY2siIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjQjI0QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iMjgiIGhlaWdodD0iMTQiIGZpbGw9IiNDOTVBNEIiIHN0cm9rZT0iIzhBMzMyOCIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iLTE0IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjYnJpY2spIi8+PC9zdmc+'
+  },
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iY29uY3JldGUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjQTBBMEEwIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMiIgZmlsbD0iIzg4ODg4OCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0iIzk1OTU5NSIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIiIGZpbGw9IiM4ODg4ODgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjM1IiByPSIxIiBmaWxsPSIjOTU5NTk1Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNjb25jcmV0ZSkiLz48L3N2Zz4=',
+    label: 'خرسا�?ة',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iY29uY3JldGUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjQTBBMEEwIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMiIgZmlsbD0iIzg4ODg4OCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0iIzk1OTU5NSIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIiIGZpbGw9IiM4ODg4ODgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjM1IiByPSIxIiBmaWxsPSIjOTU5NTk1Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNjb25jcmV0ZSkiLz48L3N2Zz4='
+  },
+  {
+    value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWV0YWwiIHdpZHRoPSI0IiBoZWlnaHQ9IjUxMiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjQiIGhlaWdodD0iNTEyIiBmaWxsPSIjQzBDMEMwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjRDBEMEQwIi8+PHJlY3QgeD0iMyIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjQjBCMEIwIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNtZXRhbCkiLz48L3N2Zz4=',
+    label: '�.عد�?',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWV0YWwiIHdpZHRoPSI0IiBoZWlnaHQ9IjUxMiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjQiIGhlaWdodD0iNTEyIiBmaWxsPSIjQzBDMEMwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjRDBEMEQwIi8+PHJlY3QgeD0iMyIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjQjBCMEIwIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNtZXRhbCkiLz48L3N2Zz4='
+  },
+];
+
+const ShopBuilderContent = () => {
+  const [transformMode, setTransformMode] = useState<TransformMode>(DEFAULT_TRANSFORM_MODE);
+  const threeRef = useRef<ThreeSceneHandle | null>(null);
+
+  // Scrubby slider state
+  const scrubbyState = useRef<{
+    active: boolean;
+    startX: number;
+    startValue: number;
+    field: string;
+    step: number;
+    callback: (value: number) => void;
+  } | null>(null);
+
+  // Texture dropdown state
+  const [showProductTextureDropdown, setShowProductTextureDropdown] = useState(false);
+  const [showWallTextureDropdown, setShowWallTextureDropdown] = useState(false);
+
+  const { toast } = useToast();
+  const { user, adminUser } = useDualAuth();
+  const activeUser = adminUser || user;
+
+  const [sessionStartTime] = useState(Date.now());
+  const [sessionDuration, setSessionDuration] = useState('00:00:00');
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const diff = Date.now() - sessionStartTime;
+      const h = Math.floor(diff / 3600000).toString().padStart(2, '0');
+      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, '0');
+      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, '0');
+      setSessionDuration(`${h}:${m}:${s}`);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [sessionStartTime]);
+
+  const {
+    layout,
+    selectProduct,
+    selectWall,
+    selectedProductId,
+    selectedWallId,
+    selectedColumnId,
+    selectColumn,
+    upsertProduct,
+    cameraMode,
+    setCameraMode,
+    removeProduct,
+    upsertWall,
+    removeWall,
+    addColumnToWall,
+    removeColumn,
+    addSlatWallToWall,
+    updateSlatWall,
+    removeSlatWall,
+    selectedSlatWallId,
+    selectSlatWall,
+    isDrawingMode,
+    setDrawingMode
+  } = useShopBuilder();
+
+  // Undo/Redo history - Track complete layout snapshots
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+  const isUndoRedoingRef = useRef(false);
+  const lastSavedStateRef = useRef<string>('');
+
+  // Initialize history with first state
+  useEffect(() => {
+    if (history.length === 0) {
+      const initialState = JSON.parse(JSON.stringify(layout));
+      setHistory([initialState]);
+      setHistoryIndex(0);
+      lastSavedStateRef.current = JSON.stringify(initialState);
+    }
+  }, []);
+
+  // Save state to history when layout changes (but not during undo/redo)
+  useEffect(() => {
+    if (isUndoRedoingRef.current || history.length === 0) return;
+
+    const newStateStr = JSON.stringify(layout);
+
+    // Only save if state actually changed
+    if (newStateStr !== lastSavedStateRef.current) {
+      const newState = JSON.parse(newStateStr);
+      setHistory(prev => {
+        const newHistory = prev.slice(0, historyIndex + 1);
+        newHistory.push(newState);
+        return newHistory.slice(-100); // Keep last 100 states
+      });
+      setHistoryIndex(prev => prev + 1);
+      lastSavedStateRef.current = newStateStr;
+    }
+  }, [layout, historyIndex, history.length]);
+
+  const handleUndo = useCallback(() => {
+    if (historyIndex > 0) {
+      isUndoRedoingRef.current = true;
+      const prevState = history[historyIndex - 1];
+
+      // Clear current state
+      const currentWalls = [...layout.walls];
+      const currentProducts = [...layout.products];
+      currentWalls.forEach(w => removeWall(w.id));
+      currentProducts.forEach(p => removeProduct(p.id));
+
+      // Apply previous state
+      setTimeout(() => {
+        prevState.walls.forEach((w: any) => upsertWall(w));
+        prevState.products.forEach((p: any) => upsertProduct(p));
+        setHistoryIndex(historyIndex - 1);
+        lastSavedStateRef.current = JSON.stringify(prevState);
+        setTimeout(() => {
+          isUndoRedoingRef.current = false;
+        }, 50);
+      }, 50);
+    }
+  }, [historyIndex, history, layout, upsertWall, upsertProduct, removeWall, removeProduct]);
+
+  const handleRedo = useCallback(() => {
+    if (historyIndex < history.length - 1) {
+      isUndoRedoingRef.current = true;
+      const nextState = history[historyIndex + 1];
+
+      // Clear current state
+      const currentWalls = [...layout.walls];
+      const currentProducts = [...layout.products];
+      currentWalls.forEach(w => removeWall(w.id));
+      currentProducts.forEach(p => removeProduct(p.id));
+
+      // Apply next state
+      setTimeout(() => {
+        nextState.walls.forEach((w: any) => upsertWall(w));
+        nextState.products.forEach((p: any) => upsertProduct(p));
+        setHistoryIndex(historyIndex + 1);
+        lastSavedStateRef.current = JSON.stringify(nextState);
+        setTimeout(() => {
+          isUndoRedoingRef.current = false;
+        }, 50);
+      }, 50);
+    }
+  }, [historyIndex, history, layout, upsertWall, upsertProduct, removeWall, removeProduct]);
+
+  // Auto-enter fullscreen when wall mode is activated (only on initial entry)
+  const [hasEnteredFullscreen, setHasEnteredFullscreen] = useState(false);
+  const shouldExitFullscreenRef = useRef(false);
+
+  useEffect(() => {
+    const floorplanDiv = floorplan2DRef.current;
+    if (!floorplanDiv) return;
+
+    if (isDrawingMode && !hasEnteredFullscreen) {
+      // Enter fullscreen only on first entry
+      if (floorplanDiv.requestFullscreen) {
+        floorplanDiv.requestFullscreen().catch(err => {
+
+        });
+        setHasEnteredFullscreen(true);
+      }
+    } else if (!isDrawingMode && shouldExitFullscreenRef.current) {
+      // Only exit fullscreen if explicitly requested (not on toggle)
+      shouldExitFullscreenRef.current = false;
+      setHasEnteredFullscreen(false);
+      if (document.fullscreenElement === floorplanDiv) {
+        document.exitFullscreen().catch(err => {
+
+        });
+      }
+    }
+  }, [isDrawingMode, hasEnteredFullscreen]);
+
+  // Exit wall mode when fullscreen is exited via ESC
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      const floorplanDiv = floorplan2DRef.current;
+      if (!floorplanDiv) return;
+
+      // If fullscreen was exited (ESC pressed), exit drawing mode
+      if (document.fullscreenElement !== floorplanDiv && hasEnteredFullscreen) {
+        shouldExitFullscreenRef.current = true;
+        setDrawingMode(false);
+      }
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, [hasEnteredFullscreen, setDrawingMode]);
+  const [is2DFullscreen, setIs2DFullscreen] = useState(false);
+  const [is3DFullscreen, setIs3DFullscreen] = useState(false);
+  const floorplan2DRef = useRef<HTMLDivElement | null>(null);
+  const three3DRef = useRef<HTMLDivElement | null>(null);
+
+  const handleResetCamera = useCallback(() => {
+    threeRef.current?.resetCamera();
+  }, []);
+
+  // Scrubby slider handlers
+  const handleScrubbyStart = useCallback((e: React.MouseEvent, startValue: number, step: number, callback: (value: number) => void) => {
+    e.preventDefault();
+    scrubbyState.current = {
+      active: true,
+      startX: e.clientX,
+      startValue,
+      field: 'scrubby',
+      step,
+      callback
+    };
+    document.body.style.cursor = 'ew-resize';
+  }, []);
+
+  const handleScrubbyMove = useCallback((e: MouseEvent) => {
+    if (!scrubbyState.current?.active) return;
+    const deltaX = e.clientX - scrubbyState.current.startX;
+    const steps = Math.round(deltaX / 5); // 5px = 1 step
+    const newValue = scrubbyState.current.startValue + (steps * scrubbyState.current.step);
+    scrubbyState.current.callback(newValue);
+  }, []);
+
+  const handleScrubbyEnd = useCallback(() => {
+    if (scrubbyState.current) {
+      scrubbyState.current.active = false;
+      document.body.style.cursor = '';
+    }
+  }, []);
+
+  useEffect(() => {
+    document.addEventListener('mousemove', handleScrubbyMove);
+    document.addEventListener('mouseup', handleScrubbyEnd);
+    return () => {
+      document.removeEventListener('mousemove', handleScrubbyMove);
+      document.removeEventListener('mouseup', handleScrubbyEnd);
+    };
+  }, [handleScrubbyMove, handleScrubbyEnd]);
+
+  // Close dropdowns when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.texture-dropdown')) {
+        setShowProductTextureDropdown(false);
+        setShowWallTextureDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSnapshot = useCallback(async () => {
+    try {
+      // Dynamically import html2canvas
+      const html2canvas = (await import('html2canvas')).default;
+
+      // Get the 3D snapshot first
+      const threeSnapshot = threeRef.current?.snapshot();
+
+      // Get the main container
+      const container = (document.querySelector('[data-shop-builder-container]') || document.body) as HTMLElement;
+
+      // Get the 3D container element
+      const threeContainer = container.querySelector('[data-three-container]') as HTMLElement;
+
+      // Hide the 3D container temporarily
+      let originalDisplay = '';
+      if (threeContainer) {
+        originalDisplay = threeContainer.style.display;
+        threeContainer.style.display = 'none';
+      }
+
+      // Capture the page without the 3D view
+      const pageCanvas = await html2canvas(container, {
+        allowTaint: true,
+        useCORS: true,
+        scale: 1.2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        onclone: (clonedDocument) => {
+          const allElements = clonedDocument.querySelectorAll('*');
+          allElements.forEach((el: any) => {
+            el.style.visibility = 'visible';
+            el.style.opacity = '1';
+          });
+        },
+      });
+
+      // Restore the 3D container
+      if (threeContainer) {
+        threeContainer.style.display = originalDisplay;
+      }
+
+      // If we have a 3D snapshot, create a combined image
+      if (threeSnapshot) {
+        // Create a new canvas to combine both images
+        const combinedCanvas = document.createElement('canvas');
+        const ctx = combinedCanvas.getContext('2d');
+        if (!ctx) return pageCanvas.toDataURL('image/png');
+
+        // Set canvas size to match page canvas
+        combinedCanvas.width = pageCanvas.width;
+        combinedCanvas.height = pageCanvas.height;
+
+        // Draw the page canvas
+        ctx.drawImage(pageCanvas, 0, 0);
+
+        // Find where the 3D container is and draw the 3D snapshot there
+        const threeImg = new Image();
+        threeImg.onload = () => {
+          // Calculate position and size of 3D container in the screenshot
+          if (threeContainer) {
+            const rect = threeContainer.getBoundingClientRect();
+            const containerRect = container.getBoundingClientRect();
+            const scale = 1.2; // Same scale as html2canvas
+
+            const x = (rect.left - containerRect.left) * scale;
+            const y = (rect.top - containerRect.top) * scale;
+            const width = rect.width * scale;
+            const height = rect.height * scale;
+
+            ctx.drawImage(threeImg, x, y, width, height);
+          }
+        };
+        threeImg.src = threeSnapshot;
+
+        return combinedCanvas.toDataURL('image/png');
+      }
+
+      return pageCanvas.toDataURL('image/png');
+    } catch (error) {
+      // Fallback to 3D canvas snapshot
+      console.warn('html2canvas error:', error, 'using 3D snapshot fallback');
+      return threeRef.current?.snapshot();
+    }
+  }, []);
+
+  const handleSnapshotDownload = useCallback(() => {
+    const dataUrl = threeRef.current?.snapshot();
+    if (!dataUrl) return;
+    const link = document.createElement('a');
+    link.href = dataUrl;
+    link.download = `shop-layout-${Date.now()}.png`;
+    link.click();
+  }, []);
+
+  const handleFullscreen = useCallback(() => {
+    threeRef.current?.toggleFullscreen();
+  }, []);
+
+  const handleClearSelection = useCallback(() => {
+    selectProduct(null);
+    selectWall(null);
+  }, [selectProduct, selectWall]);
+
+  const toggle2DFullscreen = useCallback(() => {
+    if (!floorplan2DRef.current) return;
+    if (!is2DFullscreen) {
+      floorplan2DRef.current.requestFullscreen?.();
+      setIs2DFullscreen(true);
+    } else {
+      document.exitFullscreen?.();
+      setIs2DFullscreen(false);
+    }
+  }, [is2DFullscreen]);
+
+  const toggle3DFullscreen = useCallback(() => {
+    if (!three3DRef.current) return;
+    if (!is3DFullscreen) {
+      three3DRef.current.requestFullscreen?.();
+      setIs3DFullscreen(true);
+    } else {
+      document.exitFullscreen?.();
+      setIs3DFullscreen(false);
+    }
+  }, [is3DFullscreen]);
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      if (!document.fullscreenElement) {
+        setIs2DFullscreen(false);
+        setIs3DFullscreen(false);
+      }
+    };
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Function to focus camera on selected product
+  const handleFocusOnProduct = useCallback((productId: string) => {
+    const product = layout.products.find(p => p.id === productId);
+    if (!product || !threeRef.current) return;
+
+    threeRef.current.focusOnProduct(productId);
+  }, [layout.products]);
+
+  // Function to focus camera on selected wall
+  const handleFocusOnWall = useCallback((wallId: string, side: 'front' | 'back' = 'front') => {
+    const wall = layout.walls.find(w => w.id === wallId);
+    if (!wall || !threeRef.current) return;
+
+    threeRef.current.focusOnWall(wallId, side);
+  }, [layout.walls]);
+
+  const { primaryColor, secondaryColor } = useTheme();
+  const { timeStr, dateStr } = formatGregorianDateTime();
+  const [currentTime, setCurrentTime] = useState(timeStr);
+  const [currentDate, setCurrentDate] = useState(dateStr);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const { timeStr: newTime, dateStr: newDate } = formatGregorianDateTime();
+      setCurrentTime(newTime);
+      setCurrentDate(newDate);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="
+">
+             <button onClick={() => {setActiveSide('front'); setActiveId(null)}} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeSide === 'front' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>ا�"
+">
+          ا�"
+">�"
+">(تأث�Sر)</span>}
+                  </label>
+                  <input
+                    type="
+">�.�? ا�"
+">�.�^زعة</span></span>
+                        </div>
+                        {selectedSlat.slatSpacing !== undefined && (
+                          <>
+                             <div className="
+">�.حت�^�Sات ا�"
+">�.ُحرِ�'ر ا�"
+">�.ساحة جزئ�Sة</option>
+                        </select>
+                      </div>
+
+                      {slatWall.fillType === 'partial' && (
+                        <>
+                          <div className="
+">�.عا�S�?ة ث�"
+">�?�^ع ا�"
+">�?�</span>
+                      <kbd className="
+">{TEXTURE_OPTIONS.find(t => t.value === product.texture)?.label || '�?س�Sج'}</span>
+                      </>
+                    ) : (
+                      <span className="
+">�-�</span>
+                  </button>
+                  {showProductTextureDropdown && (
+                    <div className="
+">1. �?�^ع ا�"
+">ESC</kbd>
+                      <span>إ�"
+">�fا�.�"
+">Mouse</kbd>
+                      <span>ا�"
+">Shift</kbd>
+                      <span>�"
+">Space</kbd>
+                      <span>�"
+">W/S/A/D</kbd>
+                      <span>ا�"
+">�Y-�️ �?س�Sج</label>
+                  <button
+                    type="
+">�Y�� جدار</span>
+                      </div>
+
+                      <div className="
+">�Y�� جدار</span>
+                </div>
+
+                <div className="
+">�Y"
+">�Y'�</span>
+                      <span className="
+">�Y>' أ�?ظ�.ة ا�"
+">�Y�>️ ع�.�^د</span>
+                </div>
+
+                <div className="
+">ا�"
+">إ�"
+">ا�?�,ر �"
+">ا�?�,ر ع�"
+">إضافة �?ظا�. جد�Sد</h3>
+                
+                 {/* System Type Selector */}
+                 <div className="
+">إضافة ا�"
+">افتراض�S</span>
+                    )}
+                    <span className="
+">ب�S�? ا�"
+">تجا�?�"
+">تحد�Sد</span>
+                      </button>
+                    ))}
+                    {/* Add New Column */}
+                    <button 
+                      onClick={() => addColumnToWall(wall.id, 0.5)} 
+                      className="
+">تفاص�S�"
+">خصائص ا�"
+">طب�,ات</span></span>
+                        </div>
+                        <div className="
+">ع�.�, ا�"
+">ع�.�^د</div>
+                   </div>
+                );
+             })}
+             {/* Draw Slats */}
+             {allSystems.map(slat => {
+                const isSystemPrimo = !('slatSpacing' in slat);
+                return (
+                 <InteractiveSlatNode
+                    key={slat.id}
+                    slat={slat}
+                    wallLength={wallLength}
+                    wallHeight={wallHeight}
+                    isActive={activeId === slat.id}
+                    onActivate={() => { setActiveId(slat.id); setActiveAccessoryId(null); }}
+                    updateSlat={(updates) => {
+                       if (isSystemPrimo) updatePrimoStand(targetId, slat.id, updates);
+                       else updateSlatWall(targetId, slat.id, updates);
+                    }}
+                    containerRef={containerRef}
+                    activeAccessoryId={activeAccessoryId}
+                    setActiveAccessoryId={setActiveAccessoryId}
+                    hoveredAccessoryId={hoveredAccessoryId}
+                    updateAccessory={(accId, updates) => {
+                       if (isSystemPrimo) updatePrimoAccessory(targetId, slat.id, accId, updates);
+                       else updateAccessory(targetId, slat.id, accId, updates);
+                    }}
+                    activeSide={activeSide}
+                 />
+                );
+             })}
+          </div>
+          </div>
+       </div>
+       
+       {/* Smart Bottom List of Accessories for Selected Slat */}
+       {selectedSlat && selectedSlat.accessories && selectedSlat.accessories.length > 0 && (
+          <div className="
+">عدد ا�"
+"�f</span>
+                    </li>
+                    <li className="
+"�fا�.�"
+"�fائ�?�Y')) {
+                      removeProduct(product.id);
+                      selectProduct(null);
+                    }
+                  }}
+                  className="
+"�Sة', '�.ت�S�?'],
+    specs: { depth: '35-45 س�.', height: '1.2-2.4 �.' }
+  },
+  { 
+    value: 'primo', 
+    label: 'أع�.دة بر�S�.�^ �.عد�?�Sة (Primo Stands)', 
+    image: 'https://res.cloudinary.com/dvz0zvpof/image/upload/v1734346083/j9qozlpxdhyik5p33ozv.jpg', // generic placeholder
+    description: '�?ظا�. أع�.دة ع�.�^د�Sة �.زد�^جة ا�"
+'�"ا �S�.�f�? ا�"إضافة�O �S�^جد �?ظا�. �Sشغ�" �fا�.�" ا�"جدار ع�"�? �?ذا ا�"�^ج�?.'
+"أ�.ا�.�S
+                    </button>
+                    <button onClick={() => handleFocusOnWall(wall.id, 'back')} className="
+"أ�.ا�.�S</button>
+             <button onClick={() => {setActiveSide('back'); setActiveId(null)}} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeSide === 'back' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>ا�"
+"أ�.ر</button>
+                          </div>
+                       </div>
+                    )}
+
+                    <div className={`grid grid-cols-3 gap-2 transition-all duration-300 ${spaceError && !ignoreSpaceWarnings ? 'opacity-40 grayscale pointer-events-none' : 'opacity-100 grayscale-0 pointer-events-auto'}`}>
+                       <button onClick={() => {
+                          const usedRows = (selectedSlat.accessories || []).reduce((acc, curr) => acc + (curr.type === 'shelf' ? 1 : 0.25), 0);
+                          if (usedRows >= 8.5 && !ignoreSpaceWarnings) {
+                             setSpaceError("
+"أبعاد تفاع�"
+"أرض�Sة</span>
+                </button>
+
+                <div className="
+"أس� �"
+"اس�S�f�S ب�.سا�.�Sر visible �"
+"اسحب �"
+"أسف�"
+"إضافة �^تعد�S�"
+"إضافة�O �S�^جد �?ظا�. �Sشغ�"
+"أع�"
+"أع�.دة (�.)</label>
+                    <input type="
+"إغ�"
+"أف�,�S (0-1)</label>
+                          <input type="
+"أف�,�Sة</label>
+                      <input type="
+"ة ا�"
+"ت�^ز�Sع', 'تثب�Sت آ�.�?'],
+    specs: { spacing: '10-15 س�.', material: 'MDF أ�^ �.عد�?' }
+  },
+  { 
+    value: 'supermarket_shelves', 
+    label: 'أرفف س�^بر �.ار�fت (Gondola)', 
+    image: 'https://media.istockphoto.com/id/494180691/photo/triple-supermarket-shelf-on-white.jpg?s=612x612&w=0&k=20&c=vZTMd6XsxNr3y1947t2KTh3J-CGgbNep17hvXlh56y4=',
+    description: 'رف�^ف س�^بر �.ار�fت ث�?ائ�Sة ا�"
+"تبد�S�"
+"تر�f�Sز ا�"
+"تع�"
+"ج�"
+"جدار ا�"
+"جدار بش�f�"
+"جدار
+                  </button>
+                  <button
+                     onClick={() => {
+                       if (allSystems.some((s:any) => s.fillType === 'full')) return alert('�"
+"جدار�Y')) {
+                      removeWall(wall.id);
+                      selectWall(null);
+                    }
+                  }}
+                  className="
+"ح�,ات (Accessories)</label>
+                    
+                    {spaceError && !ignoreSpaceWarnings && (
+                       <div className="
+"ح�,ات</span>
+                           <span className="
+"خ�"
+"خ�Sارات ا�"
+"خطاف �.�"
+"خطاف �.فرد"
+"رس�.'}
+                </Button>
+              </div>
+            )}
+
+            {/* Selection Panel Copy - Visible when fullscreen is active and wall is selected */}
+            {(is2DFullscreen || hasEnteredFullscreen) && selectedWallId && !selectedColumnId && !selectedProductId && (() => {
+              const wall = layout.walls.find(w => w.id === selectedWallId);
+              if (!wall) return null;
+
+              return (
+                <div className="
+"رف �.سطح"
+"رف�^ف �^ا�"
+"س �"
+"ش�^�f �.فرد"
+"شاشة' : '�.�"
+"شرائح (�.)</label>
+                    <input type="
+"شرائح ع�"
+"ع�.�^د�Y')) {
+                      removeColumn(wall.id, column.id);
+                    }
+                  }}
+                  className="
+"عاد�S"
+"عرض ا�"
+"ف�S'}</span>
+                </button>
+
+                <div className="
+') && (
+                 /* Spacing */
+                 <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-zinc-600">ا�"�.سافة ب�S�? ا�"شرائح (�.)</label>
+                    <input type="number" step="0.01" min="0.05" value={Number((selectedSlat.slatSpacing || 0.15).toFixed(2))} onChange={e => handleUpdateSystem({slatSpacing: Number(e.target.value)})} className="w-full py-2 px-3 bg-zinc-50 border border-zinc-200 rounded-xl text-sm font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr"/>
+                 </div>
+               )}
+
+               {genericSystemType === '
+') && (
+                 <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-semibold text-zinc-600">ا�"�.سافة ب�S�? ا�"أع�.دة (�.)</label>
+                    <input type="number" step="0.01" min="0.3" value={Number((selectedSlat.uprightSpacing || (genericSystemType === '
+') && (
+                 <div className="pt-4 border-t border-zinc-100 flex flex-col gap-3">
+                    <label className="text-xs font-semibold text-zinc-600">إضافة ا�"�.�"ح�,ات (Accessories)</label>
+                    
+                    {spaceError && !ignoreSpaceWarnings && (
+                       <div className="bg-red-50 border border-red-200 rounded-lg p-3 flex flex-col gap-2.5 animate-in fade-in zoom-in-95 shadow-sm">
+                          <div className="flex items-start gap-2">
+                             <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1.5 shrink-0 animate-pulse" />
+                             <span className="text-xs font-bold text-red-700 leading-relaxed">{spaceError}</span>
+                          </div>
+                          <div className="flex gap-2 mt-1">
+                             <button onClick={() => {
+                                setSpaceError(null);
+                                setIgnoreSpaceWarnings(true);
+                                if (pendingAccessory) handleAddAccessory(pendingAccessory);
+                                setPendingAccessory(null);
+                             }} className="flex-1 bg-red-600 hover:bg-red-700 text-white shadow-sm py-2 rounded-md text-[10px] font-black transition-all">تجا�?�" ا�"ج�"سة با�"�fا�.�" �^إضافة</button>
+                             <button onClick={() => { setSpaceError(null); setPendingAccessory(null); }} className="flex-[0.5] bg-white hover:bg-zinc-50 border border-red-200 text-red-600 py-2 rounded-md text-[10px] font-bold transition-all">إ�"غاء ا�"أ�.ر</button>
+                          </div>
+                       </div>
+                    )}
+
+                    <div className={`grid grid-cols-3 gap-2 transition-all duration-300 ${spaceError && !ignoreSpaceWarnings ? '
+') {
+         // Shelf spans exactly 1 bay: snap center to bay center
+         // Bay centers: (i + 0.5) * baySpacingRatio for i = 0..baysCount-1
+         let bayIndex = Math.floor(rawVisualX / baySpacingRatio);
+         bayIndex = Math.max(0, Math.min(baysCount - 1, bayIndex));
+         return (bayIndex + 0.5) * baySpacingRatio;
+      } else {
+         // Hook / basket: snap center exactly onto the nearest upright
+         // Uprights at i * baySpacingRatio for i = 0..baysCount
+         let i = Math.round(rawVisualX / baySpacingRatio);
+         i = Math.max(0, Math.min(baysCount, i));
+         return i * baySpacingRatio;
+      }
+   };
+
+   const snapY = (rawY: number): number => {
+      if (isPrimo) {
+         // Primo: fine slot every 5 cm
+         const slotInterval = 0.05 / Math.max(0.01, slatHeight);
+         return Math.round(rawY / slotInterval) * slotInterval;
+      } else {
+         // Slat: snap to horizontal rail lines (slatSpacing intervals)
+         const railInterval = (slatSpacing || 0.15) / Math.max(0.01, slatHeight);
+         return Math.round(rawY / railInterval) * railInterval;
+      }
+   };
+
+   // �"?�"? Visual width for rendering �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+   let visualWidthPct: number;
+   if (isPrimo && accessory.type === '
+')) {
+                      removeProduct(product.id);
+                      selectProduct(null);
+                    }
+                  }}
+                  className="h-9 px-4 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>حذف</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => selectProduct(null)}
+                  className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  title="إغ�"ا�,"
+                >
+                  <X className="h-4 w-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Wall Selection Toolbar */}
+        {selectedWallId && !selectedColumnId && !selectedProductId && (() => {
+          const wall = layout.walls.find(w => w.id === selectedWallId);
+          if (!wall) return null;
+
+          return (
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-white/90 backdrop-blur-xl border border-zinc-200/60 rounded-2xl shadow-2xl overflow-visible hover:shadow-primary/5 transition-all">
+              <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
+                {/* Wall Name Badge */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid ${secondaryColor}40`, color: secondaryColor }}>
+                  <span className="text-sm font-bold">�Y�� جدار</span>
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Focus Wall */}
+                <div className="relative group/focus">
+                  <button
+                    onClick={() => handleFocusOnWall(wall.id, '
+')) {
+                      removeWall(wall.id);
+                      selectWall(null);
+                    }
+                  }}
+                  className="h-9 px-4 text-xs font-semibold bg-red-50 text-red-600 hover:bg-red-500 hover:text-white border border-red-200 rounded-lg flex items-center gap-2 transition-all shadow-sm"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>حذف</span>
+                </button>
+
+                {/* Close Button */}
+                <button
+                  onClick={() => selectWall(null)}
+                  className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  title="إغ�"ا�,"
+                >
+                  <X className="h-4 w-4 text-gray-600" />
+                </button>
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Column Selection Toolbar */}
+        {selectedColumnId && !selectedProductId && (() => {
+          const wall = layout.walls.find(w => w.columns?.some(c => c.id === selectedColumnId));
+          const column = wall?.columns?.find(c => c.id === selectedColumnId);
+          if (!wall || !column) return null;
+
+          return (
+            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-white/90 backdrop-blur-xl border border-zinc-200/60 rounded-2xl shadow-2xl overflow-x-auto hover:shadow-primary/5 transition-all scrollbar-hide">
+              <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
+                {/* Column Name Badge */}
+                <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid #d9770640`, color: "#d97706" }}>
+                  <span className="text-sm font-bold">�Y�>️ ع�.�^د</span>
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
+
+                {/* Back to Wall Button */}
+                <button
+                  onClick={() => {
+                     selectColumn(null);
+                     selectWall(wall.id);
+                  }}
+                  className="h-9 px-3 text-xs font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
+                >
+                  <span>ا�"ع�^دة �"�"جدار �Y"T</span>
+                </button>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
+
+                {/* Width Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: "#d97706" }}
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      column.width || 0.4,
+                      0.1,
+                      (width) => {
+                        const newWidth = Math.max(0.1, width);
+                        const updatedColumns = wall.columns?.map(c =>
+                          c.id === column.id ? { ...c, width: newWidth } : c
+                        );
+                        upsertWall({ id: wall.id, columns: updatedColumns });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"� عرض (�.)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={(column.width || 0.4).toFixed(1)}
+                    onChange={(e) => {
+                      const width = Number(e.target.value);
+                      const updatedColumns = wall.columns?.map(c =>
+                        c.id === column.id ? { ...c, width } : c
+                      );
+                      upsertWall({ id: wall.id, columns: updatedColumns });
+                    }}
+                    className="w-16 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: "#d97706" }}
+                  />
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
+
+                {/* Position Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: "#d97706" }}
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      column.position || 0.5,
+                      0.1,
+                      (position) => {
+                        const newPosition = Math.max(0, Math.min(1, position));
+                        const updatedColumns = wall.columns?.map(c =>
+                          c.id === column.id ? { ...c, position: newPosition } : c
+                        );
+                        upsertWall({ id: wall.id, columns: updatedColumns });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"� �.�^ضع
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="1"
+                    value={(column.position || 0.5).toFixed(2)}
+                    onChange={(e) => {
+                      const position = Math.max(0, Math.min(1, Number(e.target.value)));
+                      const updatedColumns = wall.columns?.map(c =>
+                        c.id === column.id ? { ...c, position } : c
+                      );
+                      upsertWall({ id: wall.id, columns: updatedColumns });
+                    }}
+                    className="w-14 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: "#d97706" }}
+                  />
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
+
+                {/* Depth Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: "#d97706" }}
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      column.depth || 0.4,
+                      0.05,
+                      (depth) => {
+                        const newDepth = Math.max(0.05, depth);
+                        const updatedColumns = wall.columns?.map(c =>
+                          c.id === column.id ? { ...c, depth: newDepth } : c
+                        );
+                        upsertWall({ id: wall.id, columns: updatedColumns });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"� ع�.�, (�.)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0.05"
+                    value={(column.depth || 0.4).toFixed(2)}
+                    onChange={(e) => {
+                      const depth = Number(e.target.value);
+                      const updatedColumns = wall.columns?.map(c =>
+                        c.id === column.id ? { ...c, depth } : c
+                      );
+                      upsertWall({ id: wall.id, columns: updatedColumns });
+                    }}
+                    className="w-14 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: "#d97706" }}
+                  />
+                </div>
+
+                <div className="h-8 w-px bg-amber-200" />
+
+                {/* Height Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold text-amber-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-amber-100"
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      column.height || 3,
+                      0.1,
+                      (height) => {
+                        const newHeight = Math.max(0.1, height);
+                        const updatedColumns = wall.columns?.map(c =>
+                          c.id === column.id ? { ...c, height: newHeight } : c
+                        );
+                        upsertWall({ id: wall.id, columns: updatedColumns });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"� ارتفاع (�.)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={(column.height || 3).toFixed(1)}
+                    onChange={(e) => {
+                      const height = Number(e.target.value);
+                      const updatedColumns = wall.columns?.map(c =>
+                        c.id === column.id ? { ...c, height } : c
+                      );
+                      upsertWall({ id: wall.id, columns: updatedColumns });
+                    }}
+                    className="w-14 h-9 text-center text-xs border border-amber-200 rounded-md focus:outline-none focus:ring-1 focus:ring-amber-400 bg-white"
+                  />
+                </div>
+
+                <div className="h-8 w-px bg-amber-200" />
+
+                <div className="h-8 w-px bg-amber-200" />
+
+                {/* Side Control */}
+                <button
+                  onClick={() => {
+                     const nextSide = ((column as any).side || '
+'); }} 
+                             className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                             title="�.ع�"�^�.ات"
+                          >
+                             ?
+                          </button>
+                       )}
+                    </div>
+                 </div>
+                
+                {/* Color */}
+               <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-zinc-600">ا�"�"�^�? ا�"أساس�S</label>
+                  <input type="color" value={selectedSlat.color || '
+');
+
+     const handleDeleteSystem = () => {
+        if (!selectedSlat) return;
+        if (isPrimo) removePrimoStand(targetId, selectedSlat.id);
+        else removeSlatWall(targetId, selectedSlat.id);
+     };
+
+     const handleUpdateSystem = (updates: any) => {
+        if (!selectedSlat) return;
+        if (isPrimo) updatePrimoStand(targetId, selectedSlat.id, updates);
+        else updateSlatWall(targetId, selectedSlat.id, updates);
+     };
+
+     const handleAddAccessory = (type: string) => {
+        if (!selectedSlat) return;
+        if (isPrimo) addAccessoryToPrimo(targetId, selectedSlat.id, type);
+        else addAccessoryToSlat(targetId, selectedSlat.id, type as any);
+     };
+
+     const handleUpdateAccessory = (accId: string, updates: any) => {
+        if (!selectedSlat) return;
+        if (isPrimo) updatePrimoAccessory(targetId, selectedSlat.id, accId, updates);
+        else updateAccessory(targetId, selectedSlat.id, accId, updates);
+     };
+
+     const handleDeleteAccessory = (accId: string) => {
+        if (!selectedSlat) return;
+        if (isPrimo) removePrimoAccessory(targetId, selectedSlat.id, accId);
+        else removeAccessory(targetId, selectedSlat.id, accId);
+     };
+    
+    return (
+       <div className="flex flex-col md:flex-row gap-6 mt-4 w-full" style={{ minHeight: 460 }}>
+         {/* System Info Dialog */}
+         {infoSystemOpen && selectedSystemInfo && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm" onClick={() => setInfoSystemOpen(null)}>
+               <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-[95vw] max-h-[80vh] overflow-y-auto animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                  <div className="relative h-48 bg-gradient-to-br from-zinc-100 to-zinc-200">
+                     <img src={selectedSystemInfo.image} alt={selectedSystemInfo.label} className="w-full h-full object-cover" />
+                     <button onClick={() => setInfoSystemOpen(null)} className="absolute top-3 left-3 w-8 h-8 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg transition-colors">
+                        <X className="w-4 h-4 text-zinc-700" />
+                     </button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                     <h2 className="text-xl font-black text-zinc-900">{selectedSystemInfo.label}</h2>
+                     <p className="text-sm text-zinc-600 leading-relaxed">{selectedSystemInfo.description}</p>
+                     
+                     <div className="space-y-2">
+                        <h3 className="text-sm font-bold text-zinc-800 border-b border-zinc-200 pb-1">ا�"�.�.�Sزات</h3>
+                        <ul className="grid grid-cols-1 gap-1.5">
+                           {selectedSystemInfo.features.map((f, i) => (
+                              <li key={i} className="text-xs text-zinc-700 flex items-center gap-2">
+                                 <div className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                                 {f}
+                              </li>
+                           ))}
+                        </ul>
+                     </div>
+                     
+                     <div className="space-y-2">
+                        <h3 className="text-sm font-bold text-zinc-800 border-b border-zinc-200 pb-1">ا�"�.�^اصفات</h3>
+                        <div className="grid grid-cols-2 gap-2">
+                           {Object.entries(selectedSystemInfo.specs).map(([key, val]) => (
+                              <div key={key} className="bg-zinc-50 rounded-lg p-2">
+                                 <span className="text-[10px] font-bold text-zinc-400 uppercase">{key}</span>
+                                 <p className="text-xs font-bold text-zinc-800">{val}</p>
+                              </div>
+                           ))}
+                        </div>
+                     </div>
+                     
+                      {selectedSlat ? (
+                         <button onClick={() => { updateSlatWall(targetId, selectedSlat.id, {systemType: infoSystemOpen as any}); setInfoSystemOpen(null); }} className="w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-bold rounded-xl transition-all shadow-lg hover:shadow-xl">
+                            استخدا�. �?ذا ا�"�?ظا�. �o"
+                         </button>
+                      ) : (
+                         <button onClick={() => setInfoSystemOpen(null)} className="w-full py-3 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold rounded-xl transition-all">
+                            إغ�"ا�,
+                         </button>
+                      )}
+                  </div>
+               </div>
+            </div>
+         )}
+       {/* Details Header & 2D Canvas Wrapper */}
+       <div className="flex-1 flex flex-col gap-4 min-w-[280px]">
+          
+          {/* TOP STRUCTURAL INFO PANELS / HEADER */}
+          {selectedAccessory ? (
+             <div className="w-full text-right bg-white shadow-sm rounded-xl border border-zinc-200 p-2.5 px-4 flex items-center justify-between gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+                <div className="flex flex-row items-center gap-3">
+                   {/* Preview Icon */}
+                   <div className="w-10 h-10 rounded-lg bg-zinc-50 border border-zinc-100 flex flex-col justify-center items-center shadow-inner overflow-hidden relative shrink-0">
+                      {selectedAccessory.type === '
+')} className="w-full px-3 py-2 text-xs font-bold text-center hover:bg-zinc-50 border-b border-zinc-100 transition-colors text-zinc-700">
+                      ا�"�^ج�? ا�"أ�.ا�.�S
+                    </button>
+                    <button onClick={() => handleFocusOnWall(wall.id, '
+')} className="w-full px-3 py-2 text-xs font-bold text-center hover:bg-zinc-50 transition-colors text-zinc-700">
+                      ا�"�^ج�? ا�"خ�"ف�S
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Height Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: secondaryColor }}
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      wall.height || 3,
+                      0.5,
+                      (height) => {
+                        const newHeight = Math.max(0.5, height);
+                        upsertWall({ id: wall.id, height: newHeight });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"� ارتفاع (�.)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={(wall.height || 3).toFixed(1)}
+                    onChange={(e) => {
+                      const height = Number(e.target.value);
+                      upsertWall({ id: wall.id, height });
+                    }}
+                    className="w-16 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: secondaryColor }}
+                  />
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Thickness Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: secondaryColor }}
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      wall.thickness || 0.2,
+                      0.05,
+                      (thickness) => {
+                        const newThickness = Math.max(0.05, thickness);
+                        upsertWall({ id: wall.id, thickness: newThickness });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"� س�.�f (�.)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.05"
+                    min="0.05"
+                    value={(wall.thickness || 0.2).toFixed(2)}
+                    onChange={(e) => {
+                      const thickness = Number(e.target.value);
+                      upsertWall({ id: wall.id, thickness });
+                    }}
+                    className="w-16 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: secondaryColor }}
+                  />
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Length Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: secondaryColor }}
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y),
+                      0.1,
+                      (newLength) => {
+                        const currentLength = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+                        if (currentLength > 0 && newLength > 0) {
+                          const ratio = newLength / currentLength;
+                          const dx = wall.end.x - wall.start.x;
+                          const dy = wall.end.y - wall.start.y;
+                          upsertWall({
+                            id: wall.id,
+                            end: {
+                              x: wall.start.x + dx * ratio,
+                              y: wall.start.y + dy * ratio
+                            }
+                          });
+                        }
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"� ط�^�" (�.)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y).toFixed(2)}
+                    onChange={(e) => {
+                      const newLength = Number(e.target.value);
+                      const currentLength = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+                      if (currentLength > 0 && newLength > 0) {
+                        const ratio = newLength / currentLength;
+                        const dx = wall.end.x - wall.start.x;
+                        const dy = wall.end.y - wall.start.y;
+                        upsertWall({
+                          id: wall.id,
+                          end: {
+                            x: wall.start.x + dx * ratio,
+                            y: wall.start.y + dy * ratio
+                          }
+                        });
+                      }
+                    }}
+                    className="w-16 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: secondaryColor }}
+                  />
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Angle Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold cursor-ew-resize select-none px-1 py-0.5 rounded transition-colors"
+                    style={{ color: secondaryColor }}
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      Math.round((Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x) * 180 / Math.PI)),
+                      1,
+                      (angleDeg) => {
+                        const angle = angleDeg * Math.PI / 180;
+                        const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+                        upsertWall({
+                          id: wall.id,
+                          end: {
+                            x: wall.start.x + length * Math.cos(angle),
+                            y: wall.start.y + length * Math.sin(angle)
+                          }
+                        });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"" زا�^�Sة (°)
+                  </label>
+                  <input
+                    type="number"
+                    step="1"
+                    value={Math.round((Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x) * 180 / Math.PI))}
+                    onChange={(e) => {
+                      const angle = Number(e.target.value) * Math.PI / 180;
+                      const length = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+                      upsertWall({
+                        id: wall.id,
+                        end: {
+                          x: wall.start.x + length * Math.cos(angle),
+                          y: wall.start.y + length * Math.sin(angle)
+                        }
+                      });
+                    }}
+                    className="w-14 h-9 text-center text-xs border border-zinc-200 rounded-xl focus:outline-none focus:ring-1 bg-white/80"
+                    style={{ outlineColor: secondaryColor }}
+                  />
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Slat Wall Manager Dialog */}
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <button
+                      className="h-9 px-4 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg hover:-translate-y-0.5"
+                      style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
+                    >
+                      <Plus className="h-4 w-4" />
+                      <span>أ�?ظ�.ة ا�"عرض</span>
+                    </button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-5xl w-[95vw] h-[85vh] flex flex-col overflow-hidden bg-white/95 backdrop-blur-xl border border-zinc-200/60 shadow-2xl" dir="rtl">
+                    <DialogHeader className="flex-none pb-4 border-b border-zinc-100">
+                      <DialogTitle className="text-xl" style={{ color: primaryColor }}>�.د�Sر أ�?ظ�.ة ا�"عرض (Display Systems)</DialogTitle>
+                      <DialogDescription>
+                        �,�. بت�^ز�Sع ا�"شرائح ع�"�? ا�"جدار بش�f�" حر. استخد�. ا�"�.عا�S�?ة ث�?ائ�Sة ا�"أبعاد (2D) �"إضافة �^تعد�S�" ا�"شرائح.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex-1 min-h-0 overflow-y-auto">
+                      <SlatWallManagerContent targetId={wall.id} type="wall" primaryColor={primaryColor} secondaryColor={secondaryColor} />
+                    </div>
+                  </DialogContent>
+                </Dialog>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Column Management Button via Hover Dropdown */}
+                <div className="relative group/column">
+                  <button
+                    className="h-9 px-4 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:-translate-y-0.5"
+                    style={{ backgroundColor: secondaryColor }}
+                    title="خ�Sارات ا�"أع�.دة"
+                  >
+                    <span>�Y�>️ ع�.�^د</span>
+                    <ChevronUp className="h-3 w-3 opacity-70" />
+                  </button>
+                  {/* Dropdown Menu */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-white border border-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover/column:opacity-100 group-hover/column:visible transition-all z-50 overflow-hidden flex flex-col">
+                    {/* List Existing Columns */}
+                    {wall.columns && wall.columns.length > 0 && wall.columns.map((col, idx) => (
+                      <button 
+                        key={col.id} 
+                        onClick={() => selectColumn(col.id)} 
+                        className="w-full px-3 py-2 text-xs font-bold text-center hover:bg-zinc-50 border-b border-zinc-100 transition-colors text-zinc-700 flex justify-between items-center"
+                      >
+                         <span>ع�.�^د {idx + 1}</span>
+                         <span className="text-[10px] text-zinc-400">تحد�Sد</span>
+                      </button>
+                    ))}
+                    {/* Add New Column */}
+                    <button 
+                      onClick={() => addColumnToWall(wall.id, 0.5)} 
+                      className="w-full px-3 py-2 text-xs font-bold text-center hover:bg-blue-50 transition-colors text-blue-600 bg-blue-50/50 flex justify-center items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> إضافة ع�.�^د جد�Sد
+                    </button>
+                  </div>
+                </div>
+
+                <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
+
+                {/* Delete Button */}
+                <button
+                  onClick={() => {
+                    if (confirm('
+')}
+                    className="h-9 px-4 flex items-center gap-2 text-white rounded-xl shadow-lg transition-all hover:-translate-y-0.5 font-semibold text-xs"
+                    style={{ background: `linear-gradient(135deg, ${secondaryColor} 0%, ${primaryColor} 100%)`, boxShadow: `0 8px 16px -6px ${secondaryColor}50` }}
+                    title="تر�f�Sز ا�"�fا�.�Sرا ع�"�? ا�"جدار"
+                  >
+                    <Focus className="h-4 w-4" />
+                    <span>تر�f�Sز</span>
+                    <ChevronUp className="h-3 w-3 opacity-70" />
+                  </button>
+                  {/* Dropdown on hover */}
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-32 bg-white border border-zinc-200 rounded-xl shadow-xl opacity-0 invisible group-hover/focus:opacity-100 group-hover/focus:visible transition-all z-50 overflow-hidden flex flex-col">
+                    <button onClick={() => handleFocusOnWall(wall.id, '
+', handleUp);
+   };
+
+   // �"?�"? Colors �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+   let colorCls = '
+', position: 0.5, width: Math.min(1, wallLength), height: Math.min(2, wallHeight) });
+                       }
+                      setActiveId(id);
+                      setIsAddingNewSystem(false);
+                    }}
+                    className="flex-1 py-2.5 bg-zinc-50 hover:bg-zinc-100 text-zinc-700 rounded-lg text-xs font-bold transition-colors border border-zinc-200 flex flex-col items-center justify-center gap-1"
+                 >
+                    <Plus className="w-4 h-4 text-zinc-500"/>
+                    جزء ف�,ط
+                 </button>
+              </div>
+            </div>
+           )}
+
+         {/* Selected Editor */}
+         {selectedSlat ? (
+            activeAccessoryId && selectedSlat.accessories?.find((a:any) => a.id === activeAccessoryId) ? (
+                 (() => {
+                    const acc = selectedSlat.accessories?.find((a:any) => a.id === activeAccessoryId)!;
+                    return (
+                        <div className="flex flex-col gap-4 p-4 border border-zinc-200 rounded-xl bg-white shadow-sm">
+                           <div className="flex justify-between items-center pb-2 border-b border-zinc-100">
+                             <h3 className="font-bold text-sm" style={{ color: primaryColor }}>إعدادات ا�"رف</h3>
+                             <button onClick={() => { handleDeleteAccessory(acc.id); setActiveAccessoryId(null); }} className="text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors"><Trash2 className="w-4 h-4"/></button>
+                           </div>
+                           
+                           {/* Color */}
+                           <div className="flex flex-col gap-1.5">
+                              <label className="text-xs font-semibold text-zinc-600">ا�"�"�^�? ا�"أساس�S</label>
+                              <input type="color" value={acc.color || '
+',
+                    }}
+                    title="�^ضع ا�"�fا�.�Sرا ا�"عاد�S"
+                  >
+                    �Y"" عاد�S
+                  </button>
+                  <button
+                    onClick={() => setCameraMode('
+',
+                    }}
+                    title="�^ضع ا�"ط�Sرا�? - حر�fة حرة"
+                  >
+                    �o^️ ط�Sرا�?
+                  </button>
+                </div>
+
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={toggle3DFullscreen}
+                  className="h-7 w-7 p-0 transition-all"
+                  style={{ color: primaryColor }}
+                  title={is3DFullscreen ? '
+'�.�"ء ا�"شاشة'
+'�.ت�S�?'
+'�.ر�^�?ة ف�S ا�"ت�^ز�Sع'
+'�.ساحة ا�"�.تجر'
+'�.عد�?'
+'�.فرد'
+';
+                     const updatedColumns = wall.columns?.map(c =>
+                       c.id === column.id ? { ...c, side: nextSide as any } : c
+                     );
+                     upsertWall({ id: wall.id, columns: updatedColumns as any });
+                  }}
+                  className="h-9 px-4 text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg flex items-center gap-2 transition-colors"
+                  title="تبد�S�" ا�"�^ج�?"
+                >
+                  <RotateCcw className="h-4 w-4 text-amber-600" />
+                  <span>ا�"�^ج�?: {((column as any).side || '
+';
+
+   // Primo upright layout
+   const baysCount = isPrimo ? Math.max(1, Math.ceil(slatWidth / (uprightSpacing || 0.8))) : 0;
+   const baySpacingRatio = isPrimo && baysCount > 0 ? 1 / baysCount : 0;
+
+   // �"?�"? SNAP helpers �"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?�"?
+   const snapX = (rawVisualX: number): number => {
+      if (!isPrimo || baySpacingRatio <= 0) return rawVisualX;
+      
+      if (accessory.type === '
+'�?�" تر�Sد حذف �?ذا ا�"ع�.�^د�Y'
+'�?س�Sج'
+'�?ظا�. أرفف'
+'�?ظا�. أع�.دة ع�.�^د�Sة �.زد�^جة ا�"فتحات �.عد�?�Sة (�fر�^�./فض�S) �"تع�"�S�, ا�"رف�^ف �^ا�"أذرع با�?س�Sاب�Sة.'
+'�^ضع ا�"رس�.'
+'} onChange={e => handleUpdateAccessory(acc.id, {color: e.target.value})} className="w-full h-8 rounded-md cursor-pointer border border-zinc-200"/>
+                           </div>
+
+                             {/* Dimensions */}
+                             <div className="flex gap-2">
+                               <div className="flex flex-col gap-1.5 flex-1">
+                                  <label className="text-[10px] font-semibold text-zinc-500">ا�"عرض (�.)</label>
+                                  <input type="number" step="0.01" value={Number((acc.width || 0).toFixed(2))} onChange={e => handleUpdateAccessory(acc.id, {width: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr" />
+                               </div>
+                               <div className="flex flex-col gap-1.5 flex-1">
+                                  <label className="text-[10px] font-semibold text-zinc-500">ا�"ع�.�, (�.)</label>
+                                  <input type="number" step="0.01" value={Number((acc.depth || 0).toFixed(2))} onChange={e => handleUpdateAccessory(acc.id, {depth: Number(e.target.value)})} className="w-full py-1.5 px-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-xs font-mono font-bold text-zinc-800 outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all text-left" dir="ltr" />
+                               </div>
+                             </div>
+
+                           <button onClick={() => setActiveAccessoryId(null)} className="mt-4 p-2 w-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 text-xs rounded-lg font-semibold transition-colors">
+                             ا�"ع�^دة إ�"�? إعدادات ا�"�?ظا�.
+                           </button>
+                        </div>
+                    )
+                 })()
+            ) : (
+            <div className="flex flex-col gap-4 p-4 border border-zinc-200 rounded-xl bg-white shadow-sm">
+               <div className="flex justify-between items-center pb-2 border-b border-zinc-100">
+                 <h3 className="font-bold text-sm" style={{ color: primaryColor }}>إعدادات ا�"�?ظا�.</h3>
+                 <button onClick={() => { handleDeleteSystem(); setActiveId(null); }} className="text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors"><Trash2 className="w-4 h-4"/></button>
+               </div>
+               
+                {/* System Type */}
+                <div className="flex flex-col gap-1.5">
+                   <label className="text-xs font-semibold text-zinc-600">�?�^ع ا�"�?ظا�.</label>
+                   <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                         <div className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded border border-zinc-200 overflow-hidden z-10 pointer-events-none">
+                            <img 
+                               src={DISPLAY_SYSTEMS.find(s => s.value === (selectedSlat?.systemType || '
+'}
+                          onChange={(e) => updateSlatWall(wall.id, slatWall.id, { color: e.target.value })}
+                          className="w-12 h-9 rounded-lg cursor-pointer shadow-sm"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <button
+                        onClick={() => {
+                          removeSlatWall(wall.id, slatWall.id);
+                        }}
+                        className="h-9 px-3 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                        style={{ background: `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)` }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>حذف</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          <div ref={three3DRef} className="flex-1 rounded-2xl bg-white/90 backdrop-blur-lg shadow-sm border border-zinc-200/60 flex flex-col relative overflow-hidden group hover:border-zinc-300 transition-colors duration-500" data-three-container>
+            <div className="flex items-center justify-between p-3 bg-white/80 backdrop-blur-sm border-b border-zinc-100 z-10">
+              <h2 className="text-zinc-800 tracking-tight font-bold">�.عا�S�?ة ث�"اث�Sة ا�"أبعاد تفاع�"�Sة</h2>
+              <div className="flex items-center gap-2">
+                {/* Camera Mode Toggle Buttons */}
+                <div className="flex gap-1 rounded-lg p-1" style={{ backgroundColor: `${primaryColor}10` }}>
+                  <button
+                    onClick={() => setCameraMode('
+'}
+                          onChange={(e) => upsertWall({ id: wall.id, color: e.target.value })}
+                          className="w-12 h-9 rounded-lg cursor-pointer shadow-sm"
+                          style={{ border: `1px solid ${primaryColor}40` }}
+                        />
+                      </div>
+
+                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+
+
+
+                      {/* Delete Button */}
+                      <button
+                        onClick={() => {
+                          removeWall(wall.id);
+                          selectWall(null);
+                        }}
+                        className="h-9 px-3 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
+                        style={{ background: `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)` }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        <span>حذف</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Slat Wall Settings Panel */}
+            {(is2DFullscreen || hasEnteredFullscreen) && selectedSlatWallId && (() => {
+              const wall = layout.walls.find(w => w.slatWalls?.some(s => s.id === selectedSlatWallId));
+              const slatWall = wall?.slatWalls?.find(s => s.id === selectedSlatWallId);
+              if (!wall || !slatWall) return null;
+
+              return (
+                <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-auto w-full max-w-4xl px-4">
+                  <div className="bg-white rounded-xl shadow-2xl overflow-visible" style={{ border: `2px solid ${primaryColor}` }}>
+                    <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-sm text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
+                        <span className="text-sm font-bold">�Y>'
+'}
+                  />
+                </div>
+
+                <div className="h-8 w-px bg-purple-200" />
+
+                {/* Rotation Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold text-purple-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-purple-100"
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      Math.round((product.rotation?.y || 0) * 180 / Math.PI),
+                      15,
+                      (degrees) => {
+                        const radians = degrees * Math.PI / 180;
+                        upsertProduct({ id: product.id, rotation: { ...product.rotation, y: radians } });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"" د�^را�?
+                  </label>
+                  <input
+                    type="number"
+                    step="15"
+                    value={Math.round((product.rotation?.y || 0) * 180 / Math.PI)}
+                    onChange={(e) => {
+                      const degrees = Number(e.target.value);
+                      const radians = degrees * Math.PI / 180;
+                      upsertProduct({ id: product.id, rotation: { ...product.rotation, y: radians } });
+                    }}
+                    className="w-16 h-9 text-center text-xs border border-purple-200 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-400 bg-white"
+                  />
+                </div>
+
+                <div className="h-8 w-px bg-purple-200" />
+
+                {/* Scale Control */}
+                <div className="flex flex-col gap-1">
+                  <label
+                    className="text-[10px] font-semibold text-purple-600 cursor-ew-resize select-none px-1 py-0.5 rounded hover:bg-purple-100"
+                    onMouseDown={(e) => handleScrubbyStart(
+                      e,
+                      product.scale?.x || 1,
+                      0.1,
+                      (scale) => {
+                        const newScale = Math.max(0.1, scale);
+                        upsertProduct({ id: product.id, scale: { x: newScale, y: newScale, z: newScale } });
+                      }
+                    )}
+                    title="اسحب �"تغ�S�Sر ا�"�,�S�.ة"
+                  >
+                    �Y"� حج�.
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0.1"
+                    value={(product.scale?.x || 1).toFixed(1)}
+                    onChange={(e) => {
+                      const scale = Number(e.target.value);
+                      upsertProduct({ id: product.id, scale: { x: scale, y: scale, z: scale } });
+                    }}
+                    className="w-16 h-9 text-center text-xs border border-purple-200 rounded-md focus:outline-none focus:ring-1 focus:ring-purple-400 bg-white"
+                  />
+                </div>
+
+                {/* Apply to Similar Button */}
+                {similarCount > 1 && (
+                  <>
+                    <div className="h-8 w-px bg-purple-200" />
+                    <button
+                      onClick={() => {
+                        const similarProducts = layout.products.filter(p => p.modelUrl === product.modelUrl);
+                        if (confirm(`تطب�S�, ا�"�"�^�? �^ا�"�?س�Sج ع�"�? ${similarProducts.length} �.�?تج �.شاب�?�Y`)) {
+                          similarProducts.forEach(p => {
+                            if (p.id !== product.id) {
+                              upsertProduct({
+                                id: p.id,
+                                color: product.color,
+                                texture: product.texture
+                              });
+                            }
+                          });
+                        }
+                      }}
+                      className="h-9 px-4 text-xs font-semibold bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-sm flex items-center gap-2"
+                      title={`تطب�S�, ع�"�? ${similarCount} �.�?تجات`}
+                    >
+                      <span>�s�</span>
+                      <span>تطب�S�, ({similarCount})</span>
+                    </button>
+                  </>
+                )}
+
+                <div className="h-8 w-px bg-purple-200" />
+
+                {/* Delete Button */}
+                <button
+                  onClick={() => {
+                    if (confirm('
+'}`}>ا�"�^ج�? ا�"أ�.ا�.�S</button>
+             <button onClick={() => {setActiveSide('
+'}`}>ا�"�^ج�? ا�"خ�"ف�S</button>
+          </div>
+
+           {!isAddingNewSystem ? (
+             <button
+                onClick={() => {
+                   setIsAddingNewSystem(true);
+                   setActiveId(null);
+                }}
+                className="w-full py-4 mt-2 bg-white hover:bg-zinc-50 border-2 border-dashed border-zinc-200 hover:border-blue-400 text-zinc-600 hover:text-blue-600 rounded-xl font-bold transition-all flex items-center justify-center gap-2 shadow-sm"
+             >
+                <Plus className="w-5 h-5"/>
+                إضافة �?ظا�. عرض جد�Sد
+             </button>
+           ) : (
+             <div className="flex flex-col gap-4 p-4 bg-white rounded-xl border-2 border-blue-100 shadow-md relative overflow-hidden">
+                <button 
+                  onClick={() => setIsAddingNewSystem(false)}
+                  className="absolute top-3 left-3 text-zinc-400 hover:text-red-500 transition-colors"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+                <h3 className="font-bold text-zinc-800 text-sm mb-1 pb-2 border-b border-zinc-100">إضافة �?ظا�. جد�Sد</h3>
+                
+                 {/* System Type Selector */}
+                 <div className="flex flex-col gap-1.5 flex-shrink-0">
+                     <label className="text-xs font-bold text-zinc-600">1. �?�^ع ا�"�?ظا�.</label>
+                     <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                           <div className="absolute left-2 top-1/2 -translate-y-1/2 w-6 h-6 rounded border border-zinc-200 overflow-hidden z-10 pointer-events-none">
+                              <img 
+                                 src={DISPLAY_SYSTEMS.find(s => s.value === insertSystemType)?.image} 
+                                 alt="" 
+                                 className="w-full h-full object-cover"
+                              />
+                           </div>
+                           <select 
+                              value={insertSystemType} 
+                              onChange={e => setInsertSystemType(e.target.value)} 
+                              className="w-full p-2 pl-10 border border-zinc-200 rounded-lg text-sm bg-zinc-50 outline-none focus:border-blue-500 font-semibold text-zinc-700 appearance-none cursor-pointer relative z-0"
+                           >
+                              {DISPLAY_SYSTEMS.map(sys => (
+                                 <option key={sys.value} value={sys.value}>{sys.label}</option>
+                              ))}
+                           </select>
+                        </div>
+                        <button 
+                           onClick={() => setInfoSystemOpen(insertSystemType)} 
+                           className="w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm font-bold flex items-center justify-center transition-colors shadow-sm cursor-pointer"
+                           title="�.ع�"�^�.ات"
+                        >
+                           ?
+                        </button>
+                     </div>
+                 </div>
+
+               {/* Side Toggle removed from here (moved to top of sidebar) */}
+      
+               {/* Add Actions */}
+               <div className="flex gap-2 flex-shrink-0 pt-2 border-t border-zinc-100">
+                  <button
+                     onClick={() => {
+                       if (allSystems.some((s:any) => s.fillType === '
+'}m</span>
+                        </div>
+                      </div>
+                   ) : (
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col text-left items-end">
+                           <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ا�"�.�"ح�,ات</span>
+                           <span className="text-xs font-black text-zinc-800">{selectedSlat.accessories?.length || 0} <span className="text-[9px] text-emerald-600 bg-emerald-50 px-1 py-0.5 rounded ml-1 font-bold">�.�^زعة</span></span>
+                        </div>
+                        {selectedSlat.slatSpacing !== undefined && (
+                          <>
+                             <div className="w-px h-6 bg-zinc-200"></div>
+                             <div className="flex flex-col text-left items-end">
+                                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ب�S�? ا�"�.جار�S</span>
+                                <span className="text-xs font-mono font-black text-zinc-800">{selectedSlat.slatSpacing.toFixed(2)}m</span>
+                             </div>
+                          </>
+                        )}
+                        {selectedSlat.uprightSpacing !== undefined && (
+                          <>
+                             <div className="w-px h-6 bg-zinc-200"></div>
+                             <div className="flex flex-col text-left items-end">
+                                <span className="text-[9px] font-bold text-zinc-400 uppercase tracking-wider mb-0.5">ب�S�? ا�"أع�.دة</span>
+                                <span className="text-xs font-mono font-black text-zinc-800">{selectedSlat.uprightSpacing.toFixed(2)}m</span>
+                             </div>
+                          </>
+                        )}
+                      </div>
+                   )}
+
+                </div>
+             </div>
+          ) : (
+             <div className="w-full text-center bg-zinc-50/50 border border-zinc-200 border-dashed rounded-xl p-3 flex flex-col items-center justify-center text-zinc-400 font-bold min-h-[72px] transition-all">
+                <span className="text-sm text-zinc-400/80">�"�. �Sت�. تحد�Sد ع�?صر</span>
+                <span className="text-[10px] mt-1 text-zinc-300">ا�?�,ر ع�"�? ا�"جدار ا�"�.�^ضح با�"أس� �" �"عرض ا�"ت� اص�S�" �^ا�"�.عا�S�"ة</span>
+             </div>
+          )}
+
+       {/* 2D Canvas */}
+       <div className="flex-1 relative bg-zinc-100 rounded-xl border border-zinc-200 overflow-hidden flex items-center justify-center p-6 min-h-[300px]" onPointerDown={(e) => { if (e.target === e.currentTarget || (containerRef.current && e.target === containerRef.current.parentElement)) setActiveId(null); }}>
+          <div className="w-full h-full flex items-center justify-center overflow-auto min-h-0 pointer-events-none p-4">
+             <div 
+                ref={containerRef}
+                className="bg-zinc-200 relative shadow-inner overflow-visible border-2 border-zinc-300 pointer-events-auto select-none shrink-0" 
+                style={{ 
+                   aspectRatio: `${wallLength} / ${wallHeight}`,
+                   maxWidth: wallLength > wallHeight ? '
+'1.2-2.4 �.'
+'10-15 س�.'
+'35-45 س�.'
+'60-80 س�.'
+'�fر�^�. / ستا�?�"س �"ا�.ع'
+'MDF أ�^ �.عد�?'
+'أ�.ا�.�S'
+'أرفف س�^بر �.ار�fت (Gondola)'
+'أع�.دة بر�S�.�^'
+'أع�.دة بر�S�.�^ �.عد�?�Sة (Primo Stands)'
+'افتراض�S'
+'ت�. حساب ا�"�.�^ضع ا�"صح�Sح ت�"�,ائ�Sا�< ب�?اء�< ع�"�? أبعاد ا�"�.�?تج'
+'تثب�Sت �.خف�S'
+'تثب�Sت آ�.�?'
+'تخط�Sط حر'
+'تص�.�S�. عصر�S �^ا�?س�Sاب�S'
+'تفر�Sغات �.زد�^جة'
+'جدار شرائح�S'
+'جدار شرائح�S (Slat Wall)'
+'جدار شرائح�S �f�"اس�S�f�S ب�.سا�.�Sر visible �"تثب�Sت Accessories.'
+'خ�"ف�S'
+'خرسا�?ة'
+'خشب ب�?�S'
+'خطاف �.فرد'
+'خطاف ش�"ا�"'
+'رخا�. أب�Sض'
+'رف�^ف س�^بر �.ار�fت ث�?ائ�Sة ا�"جا�?ب.'
+'س�"ة عرض'
+'س�?�^�"ة ا�"تر�f�Sب'
+'سعة عا�"�Sة'
+'ش�"ا�"'
+'ط�^ب أح�.ر'

@@ -4,11 +4,9 @@ import {
   type ShopBuilderProduct,
   type ShopBuilderWall,
   type ShopBuilderColumn,
-  type ShopBuilderSlatWall,
   type ShopBuilderCameraState,
 } from './types';
 import { apiGet } from '@/lib/api';
-import type { ShopBuilderSlatAccessory } from './types';
 
 const STORAGE_KEY = 'shop-builder-design';
 
@@ -19,7 +17,6 @@ interface ShopBuilderContextValue {
   selectedProductId: string | null;
   selectedWallId: string | null;
   selectedColumnId: string | null;
-  selectedSlatWallId: string | null;
   isDrawingMode: boolean;
   setDrawingMode: (enabled: boolean) => void;
   cameraMode: CameraMode;
@@ -36,24 +33,36 @@ interface ShopBuilderContextValue {
   removeWall: (id: string) => void;
   upsertProduct: (product: Partial<ShopBuilderProduct> & { id?: string }) => string;
   removeProduct: (id: string) => void;
-  addColumnToWall: (wallId: string, position?: number, side?: 'front' | 'back') => string;
+  addColumnToWall: (wallId: string, position?: number) => string;
   updateColumn: (wallId: string, columnId: string, updates: Partial<ShopBuilderColumn>) => void;
   removeColumn: (wallId: string, columnId: string) => void;
   selectProduct: (id: string | null) => void;
   selectWall: (id: string | null) => void;
   selectColumn: (id: string | null) => void;
-  selectSlatWall: (id: string | null) => void;
-  addSlatWallToWall: (wallId: string, side?: 'front' | 'back') => string;
-  updateSlatWall: (wallId: string, slatWallId: string, updates: Partial<ShopBuilderSlatWall>) => void;
-  removeSlatWall: (wallId: string, slatWallId: string) => void;
-  addAccessoryToSlat: (wallId: string, slatWallId: string, type?: 'shelf' | 'hook_single' | 'hook_waterfall' | 'basket') => string;
-  updateAccessory: (wallId: string, slatWallId: string, accessoryId: string, updates: Partial<ShopBuilderSlatAccessory>) => void;
-  removeAccessory: (wallId: string, slatWallId: string, accessoryId: string) => void;
   importLayout: (next: ShopBuilderLayout) => void;
   exportLayout: () => ShopBuilderLayout;
   exportToFile: () => void;
   importFromFile: (file: File) => Promise<void>;
   reset: () => void;
+  
+  // SlatWall and Accessory Management
+  selectedSlatWallId: string | null;
+  selectSlatWall: (id: string | null) => void;
+  addSlatWallToWall: (wallId: string, side: 'front'|'back') => string;
+  updateSlatWall: (wallId: string, slatId: string, updates: any) => void;
+  removeSlatWall: (wallId: string, slatId: string) => void;
+  addAccessoryToSlat: (wallId: string, slatId: string, type: string) => string;
+  updateAccessory: (wallId: string, slatId: string, accId: string, updates: any) => void;
+  removeAccessory: (wallId: string, slatId: string, accId: string) => void;
+
+  selectedPrimoStandId: string | null;
+  selectPrimoStand: (id: string | null) => void;
+  addPrimoStandToWall: (wallId: string, side: 'front'|'back') => string;
+  updatePrimoStand: (wallId: string, primoId: string, updates: any) => void;
+  removePrimoStand: (wallId: string, primoId: string) => void;
+  addAccessoryToPrimo: (wallId: string, primoId: string, type: string) => string;
+  updatePrimoAccessory: (wallId: string, primoId: string, accId: string, updates: any) => void;
+  removePrimoAccessory: (wallId: string, primoId: string, accId: string) => void;
 }
 
 const defaultLayout: ShopBuilderLayout = {
@@ -151,17 +160,20 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
         if (settings && settings.shopBuilderDefaults) {
           const { floorTexture, wallTexture, wallColor } = settings.shopBuilderDefaults;
           
-          // Always apply defaults from MongoDB to localStorage
-          // This ensures settings saved in admin panel take effect on the main site
+          // Apply defaults - ONLY set if not already in localStorage or if it's a fresh load
           setLayout((prev) => {
+            const needsFloor = !prev.floorTexture || prev.floorTexture === 'tiles_white';
+            const needsWallTex = !prev.defaultWallTexture || prev.defaultWallTexture === 'painted_white';
+            const needsWallCol = !prev.defaultWallColor || prev.defaultWallColor === '#ffffff';
+            
             const updated = {
               ...prev,
-              floorTexture: floorTexture || 'tiles_white',
-              defaultWallTexture: wallTexture || 'painted_white',
-              defaultWallColor: wallColor || '#ffffff',
+              floorTexture: needsFloor ? (floorTexture || 'tiles_white') : prev.floorTexture,
+              defaultWallTexture: needsWallTex ? (wallTexture || 'painted_white') : prev.defaultWallTexture,
+              defaultWallColor: needsWallCol ? (wallColor || '#ffffff') : prev.defaultWallColor,
             };
             
-            // Save to localStorage so defaults persist
+            // Always save to localStorage so defaults persist
             saveToStorage(updated);
             
             return updated;
@@ -182,7 +194,6 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
       setSelectedProductId(null);
       setSelectedWallId(null);
       setSelectedColumnId(null);
-      setSelectedSlatWallId(null);
     }
   }, []);
 
@@ -230,7 +241,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
         end: { x: 2, y: 0 },
         height: 2.4, // Reduced from 3m to 2.4m for better proportions
         thickness: 0.2,
-        color: prev.defaultWallColor || '#ffffff',
+        color: '#ffffff',
         ...existingWall,  // Merge existing wall data first
         ...wall,          // Then apply updates
       } as ShopBuilderWall;
@@ -313,7 +324,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
   }, []);
 
   // Column management functions
-  const addColumnToWall = useCallback((wallId: string, position: number = 0.5, side: 'front' | 'back' = 'front') => {
+  const addColumnToWall = useCallback((wallId: string, position: number = 0.5) => {
     const columnId = crypto.randomUUID();
     setLayout((prev) => {
       const walls = prev.walls.map((wall) => {
@@ -326,8 +337,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
             depth: 0.5, // Default depth (عمق) = 0.5m
             height: wall.height, // Match wall height
             shape: 'square',
-            side, // Use the provided side
-
+            side: 'left', // Default side (جانب) = يسار (left)
             color: wall.color, // Match wall color
           };
           return {
@@ -376,74 +386,286 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     setSelectedColumnId((current) => (current === columnId ? null : current));
   }, []);
 
-  // Slat Wall management
   const selectSlatWall = useCallback((id: string | null) => {
     setSelectedSlatWallId(id);
   }, []);
 
-  const addSlatWallToWall = useCallback((targetId: string, side: 'front' | 'back' = 'front') => {
-    const slatWallId = crypto.randomUUID();
-    setLayout((prev) => {
-      const walls = prev.walls.map((wall) => {
-        if (wall.id === targetId) {
-          const newSlatWall: ShopBuilderSlatWall = {
-             id: slatWallId,
-             wallId: targetId,
-             side,
-             fillType: 'full',
-             height: wall.height,
-             bottomOffset: 0,
-             color: '#f5f5f5', 
-             slatSpacing: 0.15, 
+  const addSlatWallToWall = useCallback((wallId: string, side: 'front'|'back' = 'front') => {
+    const slatId = crypto.randomUUID();
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId) {
+          const newSlat = {
+            id: slatId,
+            wallId,
+            side,
+            fillType: 'full',
+            // Full wall insert should occupy full wall height in 2D by default.
+            height: wall.height || 2,
+            bottomOffset: 0,
+            color: '#f5f5f5',
+            slatSpacing: 0.15,
+            accessories: []
           };
-          return { ...wall, slatWalls: [...(wall.slatWalls || []), newSlatWall] };
-        } else if (wall.columns?.some(c => c.id === targetId)) {
+          return {
+            ...wall,
+            slatWalls: [...(wall.slatWalls || []), newSlat as any]
+          };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+    setSelectedSlatWallId(slatId);
+    return slatId;
+  }, []);
+
+  const updateSlatWall = useCallback((wallId: string, slatId: string, updates: any) => {
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.slatWalls) {
+          return {
+            ...wall,
+            slatWalls: wall.slatWalls.map(s => s.id === slatId ? { ...s, ...updates } : s)
+          };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+  }, []);
+
+  const removeSlatWall = useCallback((wallId: string, slatId: string) => {
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.slatWalls) {
+          return {
+            ...wall,
+            slatWalls: wall.slatWalls.filter(s => s.id !== slatId)
+          };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+    setSelectedSlatWallId(current => current === slatId ? null : current);
+  }, []);
+
+  const addAccessoryToSlat = useCallback((wallId: string, slatId: string, type: string) => {
+    const accId = crypto.randomUUID();
+    let width = 0.6;
+    let depth = 0.3;
+    if (type === 'hook_single') { width = 0.05; depth = 0.2; }
+    if (type === 'hook_waterfall') { width = 0.05; depth = 0.3; }
+    if (type === 'basket') { width = 0.6; depth = 0.4; }
+
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.slatWalls) {
+          return {
+            ...wall,
+            slatWalls: wall.slatWalls.map(slat => {
+              if (slat.id === slatId) {
+                let finalWidth = width;
+                if (slat.systemType === 'primo' && type === 'shelf') {
+                   finalWidth = slat.uprightSpacing || 0.8;
+                }
+
+                const existing = slat.accessories || [];
+                const spacing = slat.slatSpacing || 0.15;
+                const slatH = slat.height || 2;
+                const railInterval = spacing / Math.max(0.01, slatH);
+                const slatW = slat.fillType === 'full'
+                  ? Math.hypot((wall.end.x - wall.start.x), (wall.end.y - wall.start.y))
+                  : (slat.width || 1);
+                const normalizedAccWidth = Math.max(0.01, finalWidth / Math.max(0.01, slatW));
+                const halfW = Math.min(0.49, normalizedAccWidth / 2);
+
+                let posX = 0.5;
+                let posY = 0.5;
+                const yCandidates: number[] = [];
+                for (let y = 0.95; y >= 0.1; y -= railInterval) {
+                  const snapped = Math.round(y / railInterval) * railInterval;
+                  if (snapped >= 0.05 && snapped <= 0.95) yCandidates.push(Number(snapped.toFixed(4)));
+                }
+
+                if (slat.systemType === 'primo') {
+                  const uprightSpacing = Math.max(0.2, slat.uprightSpacing || 0.8);
+                  const baysCount = Math.max(1, Math.round(slatW / uprightSpacing));
+                  const baySpacing = 1 / baysCount;
+                  const xAnchors = type === 'shelf'
+                    ? Array.from({ length: baysCount }, (_, i) => Number(((i + 0.5) * baySpacing).toFixed(4)))
+                    : Array.from({ length: baysCount + 1 }, (_, i) => Number((i * baySpacing).toFixed(4)));
+                  xAnchors.sort((a, b) => Math.abs(a - 0.5) - Math.abs(b - 0.5));
+
+                  let placed = false;
+                  for (const testY of yCandidates) {
+                    for (const testX of xAnchors) {
+                      const occupied = existing.some((a: any) => {
+                        const sameGroup = type === 'shelf' ? a.type === 'shelf' : a.type !== 'shelf';
+                        if (!sameGroup) return false;
+                        const aWNorm = Math.max(0.01, (a.width || 0.05) / Math.max(0.01, slatW));
+                        const xOverlap = Math.abs((a.position?.x ?? 0.5) - testX) < ((aWNorm + normalizedAccWidth) / 2) * 0.9;
+                        const yOverlap = Math.abs((a.position?.y ?? 0.5) - testY) < railInterval * 1.1;
+                        return xOverlap && yOverlap;
+                      });
+                      const blockedByShelfRow = type !== 'shelf' && existing.some((a: any) =>
+                        a.type === 'shelf' && Math.abs((a.position?.y ?? 0.5) - testY) < railInterval * 0.95
+                      );
+                      if (!occupied && !blockedByShelfRow) {
+                        posX = testX;
+                        posY = testY;
+                        placed = true;
+                        break;
+                      }
+                    }
+                    if (placed) break;
+                  }
+                } else {
+                  // Smart free-slot placement across both X and Y (not always center).
+                  const xStep = type === 'hook_single' || type === 'hook_waterfall'
+                    ? 0.08
+                    : Math.max(0.12, normalizedAccWidth * 1.1);
+                  const xCandidates: number[] = [];
+                  for (let x = halfW; x <= 1 - halfW + 1e-6; x += xStep) {
+                    xCandidates.push(Number(x.toFixed(4)));
+                  }
+                  xCandidates.sort((a, b) => Math.abs(a - 0.5) - Math.abs(b - 0.5));
+
+                  let placed = false;
+                  for (const testY of yCandidates) {
+                    for (const testX of xCandidates) {
+                      const occupied = existing.some((a: any) => {
+                        const aWNorm = Math.max(0.01, (a.width || 0.05) / Math.max(0.01, slatW));
+                        const xOverlap = Math.abs((a.position?.x ?? 0.5) - testX) < ((aWNorm + normalizedAccWidth) / 2) * 0.95;
+                        const yOverlap = Math.abs((a.position?.y ?? 0.5) - testY) < railInterval * 0.9;
+                        return xOverlap && yOverlap;
+                      });
+                      if (!occupied) {
+                        posX = testX;
+                        posY = testY;
+                        placed = true;
+                        break;
+                      }
+                    }
+                    if (placed) break;
+                  }
+                }
+
+                const newAcc = {
+                  id: accId,
+                  type,
+                  position: { x: posX, y: posY },
+                  width: finalWidth,
+                  depth,
+                  color: type === 'shelf' ? '#d97706' : '#94a3b8'
+                };
+                return {
+                  ...slat,
+                  accessories: [...existing, newAcc as any]
+                };
+              }
+              return slat;
+            })
+          };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+    return accId;
+  }, []);
+
+  const updateAccessory = useCallback((wallId: string, slatId: string, accId: string, updates: any) => {
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.slatWalls) {
+          return {
+            ...wall,
+            slatWalls: wall.slatWalls.map(slat => {
+              if (slat.id === slatId && slat.accessories) {
+                 return {
+                   ...slat,
+                   accessories: slat.accessories.map((a: any) => a.id === accId ? { ...a, ...updates } : a)
+                 };
+              }
+              return slat;
+            })
+          };
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+  }, []);
+
+  const removeAccessory = useCallback((wallId: string, slatId: string, accId: string) => {
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.slatWalls) {
            return {
-              ...wall,
-              columns: wall.columns.map(col => {
-                 if (col.id === targetId) {
-                    const newSlatWall: ShopBuilderSlatWall = {
-                       id: slatWallId,
-                       wallId: targetId,
-                       side,
-                       fillType: 'full',
-                       height: col.height,
-                       bottomOffset: 0,
-                       color: '#f5f5f5',
-                       slatSpacing: 0.15,
-                    };
-                    return { ...col, slatWalls: [...(col.slatWalls || []), newSlatWall] };
-                 }
-                 return col;
-              })
+             ...wall,
+             slatWalls: wall.slatWalls.map(slat => {
+               if (slat.id === slatId && slat.accessories) {
+                 return {
+                   ...slat,
+                   accessories: slat.accessories.filter((a: any) => a.id !== accId)
+                 };
+               }
+               return slat;
+             })
            };
         }
         return wall;
       });
       return { ...prev, walls, updatedAt: now() };
     });
-    setSelectedSlatWallId(slatWallId);
-    return slatWallId;
   }, []);
 
-  const updateSlatWall = useCallback((targetId: string, slatWallId: string, updates: Partial<ShopBuilderSlatWall>) => {
-    setLayout((prev) => {
-      const walls = prev.walls.map((wall) => {
-        if (wall.id === targetId && wall.slatWalls) {
+  const [selectedPrimoStandId, setSelectedPrimoStandId] = useState<string | null>(null);
+
+  const selectPrimoStand = useCallback((id: string | null) => {
+    setSelectedPrimoStandId(id);
+  }, []);
+
+  const addPrimoStandToWall = useCallback((wallId: string, side: 'front'|'back' = 'front') => {
+    const primoId = crypto.randomUUID();
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId) {
+          const newPrimo = {
+            id: primoId,
+            wallId,
+            side,
+            fillType: 'full',
+            height: 2,
+            bottomOffset: 0,
+            color: '#94a3b8',
+            uprightSpacing: 0.8,
+            systemType: 'primo',
+            accessories: []
+          };
           return {
             ...wall,
-            slatWalls: wall.slatWalls.map((slat) => slat.id === slatWallId ? { ...slat, ...updates } : slat),
+            primoStands: [...(wall.primoStands || []), newPrimo as any]
           };
-        } else if (wall.columns?.some(c => c.id === targetId)) {
-           return {
-              ...wall,
-              columns: wall.columns.map(col => {
-                 if (col.id === targetId && col.slatWalls) {
-                    return { ...col, slatWalls: col.slatWalls.map(slat => slat.id === slatWallId ? { ...slat, ...updates } : slat) };
-                 }
-                 return col;
-              })
-           }
+        }
+        return wall;
+      });
+      return { ...prev, walls, updatedAt: now() };
+    });
+    setSelectedPrimoStandId(primoId);
+    return primoId;
+  }, []);
+
+  const updatePrimoStand = useCallback((wallId: string, primoId: string, updates: any) => {
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.primoStands) {
+          return {
+            ...wall,
+            primoStands: wall.primoStands.map(s => s.id === primoId ? { ...s, ...updates } : s)
+          };
         }
         return wall;
       });
@@ -451,73 +673,149 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     });
   }, []);
 
-  const removeSlatWall = useCallback((targetId: string, slatWallId: string) => {
-    setLayout((prev) => {
-      const walls = prev.walls.map((wall) => {
-        if (wall.id === targetId && wall.slatWalls) {
-          return { ...wall, slatWalls: wall.slatWalls.filter((slat) => slat.id !== slatWallId) };
-        } else if (wall.columns?.some(c => c.id === targetId)) {
-           return {
-              ...wall,
-              columns: wall.columns.map(col => {
-                 if (col.id === targetId && col.slatWalls) {
-                    return { ...col, slatWalls: col.slatWalls.filter(slat => slat.id !== slatWallId) };
-                 }
-                 return col;
-              })
-           }
+  const removePrimoStand = useCallback((wallId: string, primoId: string) => {
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.primoStands) {
+          return {
+            ...wall,
+            primoStands: wall.primoStands.filter(s => s.id !== primoId)
+          };
         }
         return wall;
       });
       return { ...prev, walls, updatedAt: now() };
     });
-    setSelectedSlatWallId((current) => (current === slatWallId ? null : current));
+    setSelectedPrimoStandId(current => current === primoId ? null : current);
   }, []);
 
-  const addAccessoryToSlat = useCallback((targetId: string, slatWallId: string, type: 'shelf' | 'hook_single' | 'hook_waterfall' | 'basket' = 'shelf') => {
-    const accessoryId = crypto.randomUUID();
-    setLayout((prev) => {
-      const walls = prev.walls.map((wall) => {
-        
-        const mapSlat = (slat: ShopBuilderSlatWall) => {
-           if (slat.id === slatWallId) {
-              const defaultColor = type === 'shelf' ? '#d97706' : '#e5e7eb';
-              const defaultWidth = type === 'shelf' ? 0.8 : 0.05;
-              const defaultDepth = type === 'hook_waterfall' ? 0.4 : type === 'hook_single' ? 0.2 : 0.3;
-              return {
-                 ...slat,
-                 accessories: [...(slat.accessories || []), { id: accessoryId, type, position: { x: 0.5, y: 0.5 }, width: defaultWidth, depth: defaultDepth, color: defaultColor }]
+  const addAccessoryToPrimo = useCallback((wallId: string, primoId: string, type: string) => {
+    const accId = crypto.randomUUID();
+    let width = 0.6;
+    let depth = 0.3;
+    if (type === 'hook_single') { width = 0.05; depth = 0.2; }
+    if (type === 'hook_waterfall') { width = 0.05; depth = 0.3; }
+    if (type === 'basket') { width = 0.6; depth = 0.4; }
+
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.primoStands) {
+          return {
+            ...wall,
+            primoStands: wall.primoStands.map(primo => {
+              if (primo.id === primoId) {
+                const uprightSp = primo.uprightSpacing || 0.8;
+                const primoWidth = primo.fillType === 'full' 
+                  ? Math.hypot(
+                      (wall.end.x - wall.start.x),
+                      (wall.end.y - wall.start.y)
+                    )
+                  : (primo.width || 1);
+                const baysCount = Math.max(1, Math.ceil(primoWidth / uprightSp));
+                const baySpacing = 1 / baysCount;
+
+                let finalWidth = width;
+                if (type === 'shelf') {
+                   finalWidth = uprightSp;
+                }
+
+                const existing = primo.accessories || [];
+
+                // Find first non-occupied position
+                let posX = 0.5;
+                let posY = 0.5;
+
+                if (type === 'shelf') {
+                  // Shelves go in bay centers: 0.5*baySpacing, 1.5*baySpacing, etc.
+                  // Find first bay without a shelf at this Y level
+                  const ySlot = 0.05 / Math.max(0.01, primo.height || 2);
+                  const existingShelves = existing.filter((a: any) => a.type === 'shelf');
+                  
+                  let placed = false;
+                  for (let row = Math.floor(0.7 / ySlot); !placed; row--) {
+                    if (row < 2) row = Math.floor(0.9 / ySlot); // wrap around
+                    const testY = row * ySlot;
+                    if (testY < 0.05 || testY > 0.95) continue;
+                    
+                    for (let bay = 0; bay < baysCount; bay++) {
+                      const testX = (bay + 0.5) * baySpacing;
+                      const occupied = existingShelves.some((s: any) => 
+                        Math.abs(s.position.x - testX) < baySpacing * 0.5 && 
+                        Math.abs(s.position.y - testY) < ySlot * 2
+                      );
+                      if (!occupied) {
+                        posX = testX;
+                        posY = testY;
+                        placed = true;
+                        break;
+                      }
+                    }
+                    if (existingShelves.length > baysCount * 10) break; // safety
+                  }
+                } else {
+                  // Hooks snap to uprights: 0, baySpacing, 2*baySpacing, ..., 1
+                  const existingHooks = existing.filter((a: any) => a.type !== 'shelf');
+                  const ySlot = 0.05 / Math.max(0.01, primo.height || 2);
+                  
+                  let placed = false;
+                  for (let col = 0; col <= baysCount && !placed; col++) {
+                    const testX = col * baySpacing;
+                    for (let row = Math.floor(0.6 / ySlot); row > 1 && !placed; row--) {
+                      const testY = row * ySlot;
+                      if (testY < 0.05 || testY > 0.95) continue;
+                      const occupied = existingHooks.some((h: any) =>
+                        Math.abs(h.position.x - testX) < 0.01 &&
+                        Math.abs(h.position.y - testY) < ySlot * 2
+                      );
+                      if (!occupied) {
+                        posX = testX;
+                        posY = testY;
+                        placed = true;
+                      }
+                    }
+                  }
+                }
+
+                const newAcc = {
+                  id: accId,
+                  type,
+                  position: { x: posX, y: posY },
+                  width: finalWidth,
+                  depth,
+                  color: type === 'shelf' ? '#d97706' : '#94a3b8'
+                };
+                return {
+                  ...primo,
+                  accessories: [...existing, newAcc as any]
+                };
               }
-           }
-           return slat;
-        };
-
-        if (wall.id === targetId && wall.slatWalls) {
-          return { ...wall, slatWalls: wall.slatWalls.map(mapSlat) };
-        } else if (wall.columns?.some(c => c.id === targetId)) {
-           return { ...wall, columns: wall.columns.map(col => col.id === targetId && col.slatWalls ? { ...col, slatWalls: col.slatWalls.map(mapSlat) } : col) };
+              return primo;
+            })
+          };
         }
         return wall;
       });
       return { ...prev, walls, updatedAt: now() };
     });
-    return accessoryId;
+    return accId;
   }, []);
 
-  const updateAccessory = useCallback((targetId: string, slatWallId: string, accessoryId: string, updates: Partial<ShopBuilderSlatAccessory>) => {
-    setLayout((prev) => {
-      const walls = prev.walls.map((wall) => {
-         const mapSlat = (slat: ShopBuilderSlatWall) => {
-            if (slat.id === slatWallId && slat.accessories) {
-               return { ...slat, accessories: slat.accessories.map(acc => acc.id === accessoryId ? { ...acc, ...updates } : acc) };
-            }
-            return slat;
-         };
-
-        if (wall.id === targetId && wall.slatWalls) {
-          return { ...wall, slatWalls: wall.slatWalls.map(mapSlat) };
-        } else if (wall.columns?.some(c => c.id === targetId)) {
-          return { ...wall, columns: wall.columns.map(col => col.id === targetId && col.slatWalls ? { ...col, slatWalls: col.slatWalls.map(mapSlat) } : col) };
+  const updatePrimoAccessory = useCallback((wallId: string, primoId: string, accId: string, updates: any) => {
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.primoStands) {
+          return {
+            ...wall,
+            primoStands: wall.primoStands.map(primo => {
+              if (primo.id === primoId && primo.accessories) {
+                 return {
+                   ...primo,
+                   accessories: primo.accessories.map((a: any) => a.id === accId ? { ...a, ...updates } : a)
+                 };
+              }
+              return primo;
+            })
+          };
         }
         return wall;
       });
@@ -525,20 +823,22 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     });
   }, []);
 
-  const removeAccessory = useCallback((targetId: string, slatWallId: string, accessoryId: string) => {
-    setLayout((prev) => {
-      const walls = prev.walls.map((wall) => {
-         const mapSlat = (slat: ShopBuilderSlatWall) => {
-            if (slat.id === slatWallId && slat.accessories) {
-               return { ...slat, accessories: slat.accessories.filter(acc => acc.id !== accessoryId) };
-            }
-            return slat;
-         };
-
-        if (wall.id === targetId && wall.slatWalls) {
-          return { ...wall, slatWalls: wall.slatWalls.map(mapSlat) };
-        } else if (wall.columns?.some(c => c.id === targetId)) {
-          return { ...wall, columns: wall.columns.map(col => col.id === targetId && col.slatWalls ? { ...col, slatWalls: col.slatWalls.map(mapSlat) } : col) };
+  const removePrimoAccessory = useCallback((wallId: string, primoId: string, accId: string) => {
+    setLayout(prev => {
+      const walls = prev.walls.map(wall => {
+        if (wall.id === wallId && wall.primoStands) {
+           return {
+             ...wall,
+             primoStands: wall.primoStands.map(primo => {
+               if (primo.id === primoId && primo.accessories) {
+                 return {
+                   ...primo,
+                   accessories: primo.accessories.filter((a: any) => a.id !== accId)
+                 };
+               }
+               return primo;
+             })
+           };
         }
         return wall;
       });
@@ -606,7 +906,6 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     selectedProductId,
     selectedWallId,
     selectedColumnId,
-    selectedSlatWallId,
     isDrawingMode,
     setDrawingMode,
     cameraMode,
@@ -629,6 +928,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     selectProduct,
     selectWall,
     selectColumn,
+    selectedSlatWallId,
     selectSlatWall,
     addSlatWallToWall,
     updateSlatWall,
@@ -636,6 +936,16 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     addAccessoryToSlat,
     updateAccessory,
     removeAccessory,
+
+    selectedPrimoStandId,
+    selectPrimoStand,
+    addPrimoStandToWall,
+    updatePrimoStand,
+    removePrimoStand,
+    addAccessoryToPrimo,
+    updatePrimoAccessory,
+    removePrimoAccessory,
+
     importLayout,
     exportLayout,
     exportToFile,
@@ -657,6 +967,31 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     selectedWallId,
     selectedColumnId,
     selectedSlatWallId,
+    selectSlatWall,
+    addSlatWallToWall,
+    updateSlatWall,
+    removeSlatWall,
+    addAccessoryToSlat,
+    updateAccessory,
+    removeAccessory,
+
+    selectedPrimoStandId,
+    selectPrimoStand,
+    addPrimoStandToWall,
+    updatePrimoStand,
+    removePrimoStand,
+    addAccessoryToPrimo,
+    updatePrimoAccessory,
+    removePrimoAccessory,
+
+    selectedPrimoStandId,
+    selectPrimoStand,
+    addPrimoStandToWall,
+    updatePrimoStand,
+    removePrimoStand,
+    addAccessoryToPrimo,
+    updatePrimoAccessory,
+    removePrimoAccessory,
     isDrawingMode,
     setDrawingMode,
     cameraMode,
@@ -664,10 +999,6 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     selectProduct,
     selectWall,
     selectColumn,
-    selectSlatWall,
-    addSlatWallToWall,
-    updateSlatWall,
-    removeSlatWall,
     setCamera,
     setFloorTexture,
     setFloorSize,

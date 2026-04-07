@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Ruler, Rotate3D, Scan, Save, Upload, Wand2, Search, Package, Eye, SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, TrendingUp, Star, Clock, Settings, Download, FileUp, RotateCcw, X, Palette, Edit2, Printer, LogOut, Camera } from 'lucide-react';
+import { Plus, Ruler, Rotate3D, Scan, Save, Upload, Wand2, Search, Package, Eye, SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, TrendingUp, Star, Clock, Settings, Download, FileUp, RotateCcw, X, Palette, Edit2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,7 +27,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import Model3DPreview from './Model3DPreview';
-import { useNavigate } from 'react-router-dom';
 
 interface BuilderToolbarProps {
   transformMode: TransformMode;
@@ -71,7 +70,6 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   onFullscreen,
   onClearSelection,
 }) => {
-  const navigate = useNavigate();
   const { toast } = useToast();
   const { primaryColor, secondaryColor } = useTheme();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -108,7 +106,6 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [isCapturing, setIsCapturing] = useState(false);
@@ -129,8 +126,6 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [showFilters, setShowFilters] = useState(false);
-  const [addingProductId, setAddingProductId] = useState<string | null>(null);
-  const addProductLockRef = useRef(false);
   const itemsPerPage = 12;
 
   // Search suggestions and recommendations
@@ -372,20 +367,6 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     setSettingsOpen(false);
   }, []);
 
-  const handleQuitSessionClick = useCallback(() => {
-    setSettingsOpen(false);
-    setQuitDialogOpen(true);
-  }, []);
-
-  const handleConfirmQuitSession = useCallback(() => {
-    setQuitDialogOpen(false);
-    navigate('/shop-builder/intro', { replace: true });
-  }, [navigate]);
-
-  const handleQuitSessionSnapshot = useCallback(() => {
-    onSnapshot();
-  }, [onSnapshot]);
-
   const handleImportDesignFile = useCallback(
     async (event: React.ChangeEvent<HTMLInputElement>) => {
       const file = event.target.files?.[0];
@@ -410,125 +391,60 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     }
   }, [reset, toast]);
 
-  const getModelPath = useCallback((modelUrl: string) => {
-    try {
-      return new URL(modelUrl, window.location.origin).pathname.toLowerCase();
-    } catch {
-      return modelUrl.toLowerCase();
-    }
-  }, []);
-
-  const estimateFootprint = useCallback((candidate: Product3D | { scale?: { x: number; z: number } }) => {
-    if ('dimensions' in candidate && candidate.dimensions) {
-      return {
-        width: Math.max(0.9, candidate.dimensions.width || 1),
-        depth: Math.max(0.9, candidate.dimensions.depth || 1),
-      };
-    }
-    return {
-      width: Math.max(0.9, candidate.scale?.x || 1),
-      depth: Math.max(0.9, candidate.scale?.z || 1),
-    };
-  }, []);
-
-  const findSpawnPosition = useCallback((candidate: Product3D) => {
-    const nextSize = estimateFootprint(candidate);
-    const spacing = Math.max(nextSize.width, nextSize.depth) + 0.8;
-    const maxRing = 9;
-
-    const cells: Array<{ x: number; z: number }> = [{ x: 0, z: 0 }];
-    for (let r = 1; r <= maxRing; r++) {
-      for (let cx = -r; cx <= r; cx++) {
-        cells.push({ x: cx * spacing, z: r * spacing });
-        cells.push({ x: cx * spacing, z: -r * spacing });
-      }
-      for (let cz = -r + 1; cz <= r - 1; cz++) {
-        cells.push({ x: r * spacing, z: cz * spacing });
-        cells.push({ x: -r * spacing, z: cz * spacing });
-      }
-    }
-
-    for (const cell of cells) {
-      const hasCollision = layout.products.some((existing) => {
-        const currentSize = estimateFootprint(existing);
-        const minX = (nextSize.width + currentSize.width) * 0.5 + 0.35;
-        const minZ = (nextSize.depth + currentSize.depth) * 0.5 + 0.35;
-        return (
-          Math.abs((existing.position?.x || 0) - cell.x) < minX &&
-          Math.abs((existing.position?.z || 0) - cell.z) < minZ
-        );
-      });
-
-      if (!hasCollision) {
-        return { x: cell.x, y: 0.5, z: cell.z };
-      }
-    }
-
-    return { x: 0, y: 0.5, z: layout.products.length * 1.4 };
-  }, [estimateFootprint, layout.products]);
-
   const handleAddProduct = useCallback(async (product: Product3D) => {
-    if (addProductLockRef.current || isAdding) return;
-
-    addProductLockRef.current = true;
     setIsAdding(true);
-    setAddingProductId(product._id);
-
     try {
+      // Validate model URL
       if (!product.modelUrl || product.modelUrl.trim() === '') {
         toast({
           title: 'خطأ',
           description: 'هذا المنتج لا يحتوي على نموذج ثلاثي الأبعاد',
           variant: 'destructive'
         });
+        setIsAdding(false);
         return;
       }
 
-      const modelPath = getModelPath(product.modelUrl);
-      const hasValidFormat = /\.(glb|gltf|obj|fbx)$/i.test(modelPath);
+      // Validate model format
+      const url = product.modelUrl.toLowerCase();
+      const validFormats = ['.glb', '.gltf', '.obj', '.fbx'];
+      const hasValidFormat = validFormats.some(format => url.endsWith(format));
+
       if (!hasValidFormat) {
         toast({
           title: 'خطأ',
-          description: 'صيغة النموذج غير مدعومة. استخدم GLB أو GLTF أو OBJ أو FBX',
+          description: 'صيغة النموذج غير مدعومة. يجب أن يكون GLB أو GLTF أو OBJ أو FBX',
           variant: 'destructive'
         });
+        setIsAdding(false);
         return;
       }
 
-      // Fire-and-forget analytics call. Insertion should not fail if this endpoint is down.
-      apiPostJson(`/api/products-3d/${product._id}/use`, {}).catch((error) => {
-        console.warn('Usage counter failed:', error);
-      });
+      // Increment usage count
+      await apiPostJson(`/api/products-3d/${product._id}/use`, {});
 
-      const spawnPosition = findSpawnPosition(product);
       const id = upsertProduct({
         name: product.name,
         modelUrl: product.modelUrl,
-        position: spawnPosition,
+        // Don't override position - let store.tsx default (y: 0.5) handle it
         rotation: { x: 0, y: 0, z: 0 },
         scale: product.defaultScale,
         metadata: {
           thumbnailUrl: product.thumbnailUrl,
           category: product.category,
-          description: product.description,
-          dimensions: product.dimensions,
-          material: product.material,
-          color: product.color,
+          description: product.description
         }
       });
-
       selectProduct(id);
+      toast({ title: 'تم إضافة المنتج', description: `تم إضافة ${product.name} إلى المشهد` });
       setAddProductOpen(false);
-      toast({ title: 'تمت الإضافة', description: `${product.name} جاهز الآن داخل المشهد` });
     } catch (error) {
       console.error('Error adding product:', error);
       toast({ title: 'خطأ', description: 'فشل إضافة المنتج', variant: 'destructive' });
     } finally {
       setIsAdding(false);
-      setAddingProductId(null);
-      addProductLockRef.current = false;
     }
-  }, [findSpawnPosition, getModelPath, isAdding, selectProduct, toast, upsertProduct]);
+  }, [selectProduct, toast, upsertProduct]);
 
   const clearSelection = useCallback(() => {
     onClearSelection();
@@ -536,18 +452,15 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   }, [onClearSelection, toast]);
 
   return (
-    <div
-      className="w-full grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_auto] items-stretch 2xl:items-center gap-3 rounded-2xl border border-zinc-200 bg-gradient-to-br from-white via-zinc-50/70 to-white px-2.5 sm:px-3.5 py-3 shadow-sm"
-      style={{ boxShadow: `0 8px 28px -22px ${primaryColor}66` }}
-    >
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 rounded-2xl border bg-white/95 px-4 py-3 shadow-lg backdrop-blur-sm" style={{ borderColor: primaryColor }}>
       {/* Right Side - Main Actions */}
-      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-3 w-full">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full sm:w-auto">
         {/* Modern Wall System - Two buttons with divider */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-0 bg-white rounded-2xl overflow-hidden border border-zinc-200 shadow-sm">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-0 bg-white rounded-xl overflow-hidden shadow-sm" style={{ border: `2px solid ${primaryColor}` }}>
           {/* Wall Mode / Quit Button */}
           <Button
             onClick={() => setDrawingMode(!isDrawingMode)}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold text-base sm:text-sm rounded-none h-11 sm:h-11 px-5 transition-all duration-500 border-0"
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 font-bold text-base sm:text-sm rounded-none h-12 sm:h-11 px-5 transition-all duration-700 border-0"
             style={{
               background: isDrawingMode ? `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` : 'white',
               color: isDrawingMode ? 'white' : primaryColor,
@@ -568,23 +481,23 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
           </Button>
 
           {/* Divider */}
-          <div className="hidden sm:block w-px h-7 bg-zinc-200" />
+          <div className="hidden sm:block w-px h-8" style={{ backgroundColor: primaryColor }} />
 
           {/* Direct Wall Length Input */}
-          <div className="flex items-center justify-center gap-2 bg-white px-3 py-2 sm:py-1 border-t sm:border-t-0 border-zinc-200">
-            <span className="text-xs font-semibold text-zinc-600">الطول (م)</span>
+          <div className="flex items-center justify-center gap-2 bg-white px-3 py-2 sm:py-1 border-t sm:border-t-0" style={{ borderColor: primaryColor }}>
+            <span className="text-xs font-semibold" style={{ color: primaryColor }}>الطول (م)</span>
             <Input
               type="number"
               placeholder="0.5"
-              className="w-16 h-8 text-center text-sm border-zinc-300 text-zinc-900 placeholder-zinc-500 font-semibold"
+              className="w-16 h-8 text-center text-sm border-slate-300 text-slate-900 placeholder-slate-600 font-medium"
               min="0.5"
               step="0.5"
             />
             <Button
               onClick={handleAddWall}
               size="sm"
-              className="h-8 w-8 p-0 text-white transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, ${secondaryColor} 0%, ${primaryColor} 100%)` }}
+              className="h-8 w-8 p-0 text-white transition-all"
+              style={{ backgroundColor: secondaryColor }}
             >
               <Plus className="h-4 w-4" />
             </Button>
@@ -594,51 +507,15 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
         <Dialog open={addProductOpen} onOpenChange={setAddProductOpen}>
           <DialogTrigger asChild>
-            <Button className="group relative h-14 min-w-[250px] rounded-2xl overflow-hidden border-0 px-0 text-white shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5">
-              <div className="absolute inset-0 bg-[linear-gradient(120deg,#0f172a_0%,#1d4ed8_45%,#0ea5e9_100%)]" />
-              <div className="absolute -left-8 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full bg-white/20 blur-2xl transition-all duration-500 group-hover:left-2" />
-              <div className="relative z-10 flex w-full items-center justify-between px-4">
-                <div className="flex items-center gap-3">
-                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/15 p-1.5 ring-1 ring-white/30">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/20">
-                      <Package className="h-3.5 w-3.5" />
-                    </span>
-                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/20">
-                      <Plus className="h-3.5 w-3.5" />
-                    </span>
-                  </div>
-                  <span className="text-right leading-tight">
-                    <span className="block text-sm font-black">كتالوج المنتجات 3D</span>
-                    <span className="block text-[11px] text-white/85">استعراض تفاعلي ثم إضافة فورية</span>
-                  </span>
-                </div>
-                <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-black ring-1 ring-white/30">
-                  OPEN
-                </span>
-              </div>
+            <Button className="flex items-center gap-2 text-white font-medium rounded-xl h-10 px-4 transition-all" style={{ background: `linear-gradient(135deg, ${secondaryColor} 0%, ${primaryColor} 100%)` }}>
+              <Plus className="h-4 w-4" />
+              إضافة منتج ثلاثي الأبعاد
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-[95vw] w-[1400px] max-h-[90vh] overflow-hidden flex flex-col p-0">
             <DialogHeader className="px-6 pt-6 pb-4 border-b">
               <DialogTitle className="text-2xl font-bold">اختر منتج ثلاثي الأبعاد</DialogTitle>
             </DialogHeader>
-
-            <div className="px-4 py-2.5 border-b bg-white">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                  <p className="text-[11px] text-zinc-500">1. اختر النموذج</p>
-                  <p className="text-xs font-bold text-zinc-800">استعرض البطاقات أو استخدم البحث</p>
-                </div>
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                  <p className="text-[11px] text-zinc-500">2. راجع التفاصيل</p>
-                  <p className="text-xs font-bold text-zinc-800">معاينة تفاعلية + الأبعاد الكاملة</p>
-                </div>
-                <div className="rounded-xl border border-zinc-200 bg-zinc-50 px-3 py-2">
-                  <p className="text-[11px] text-zinc-500">3. إضافة ذكية</p>
-                  <p className="text-xs font-bold text-zinc-800">تموضع تلقائي يمنع التداخل</p>
-                </div>
-              </div>
-            </div>
 
             {/* Enhanced Search Bar with Live Suggestions */}
             <div className="px-4 py-2 border-b" style={{ background: `linear-gradient(135deg, ${primaryColor}08 0%, ${secondaryColor}08 100%)` }}>
@@ -799,7 +676,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     className={cn(
                       "w-full text-right px-3 py-2 rounded-lg text-sm font-medium transition-all",
                       selectedCategory === 'all'
-                        ? "bg-zinc-900 text-white shadow-md"
+                        ? "bg-primary text-white shadow-md"
                         : "text-slate-700 hover:bg-slate-200"
                     )}
                   >
@@ -812,7 +689,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                       className={cn(
                         "w-full text-right px-3 py-2 rounded-lg text-sm font-medium transition-all",
                         selectedCategory === cat
-                          ? "bg-zinc-900 text-white shadow-md"
+                          ? "bg-primary text-white shadow-md"
                           : "text-slate-700 hover:bg-slate-200"
                       )}
                     >
@@ -840,102 +717,98 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                 ) : (
                   <>
                     {viewMode === 'grid' ? (
-                      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
-                        {sortedAndPaginatedProducts.items.map((product) => {
-                          const isAddingThis = isAdding && addingProductId === product._id;
-                          return (
-                            <div
-                              key={product._id}
-                              className="group overflow-hidden rounded-3xl border border-zinc-200 bg-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl"
-                            >
-                              <div className="relative h-44 overflow-hidden bg-[radial-gradient(circle_at_20%_20%,#dbeafe_0%,#ecfeff_35%,#f8fafc_100%)]">
-                                <div className="absolute inset-3 rounded-2xl border border-white/80 bg-white/55 backdrop-blur-sm shadow-inner" />
-                                <div className="absolute inset-0 z-10 flex items-center justify-center p-4">
-                                  <Model3DPreview
-                                    modelUrl={product.modelUrl}
-                                    thumbnailUrl={product.thumbnailUrl}
-                                    className="h-full w-full max-h-[92%] max-w-[92%]"
-                                    autoRotate
-                                    showThumbnail={false}
+                      <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+                        {sortedAndPaginatedProducts.items.map((product) => (
+                          <div
+                            key={product._id}
+                            className="group bg-slate-50 rounded-lg border-2 border-slate-200 overflow-hidden hover:border-primary hover:bg-white hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
+                          >
+                            {/* 3D Preview - Always show 3D model */}
+                            <div className="relative aspect-[4/3] bg-gradient-to-br from-slate-50 via-slate-100 to-slate-200 flex items-center justify-center overflow-hidden">
+                              <Model3DPreview
+                                modelUrl={product.modelUrl}
+                                thumbnailUrl={product.thumbnailUrl}
+                                className="w-full h-full"
+                                autoRotate={true}
+                                showThumbnail={false}
+                              />
+
+                              {/* Thumbnail overlay - bottom left */}
+                              {product.thumbnailUrl && (
+                                <div className="absolute bottom-2 left-2 w-12 h-12 rounded-lg overflow-hidden border-2 border-white shadow-lg bg-white">
+                                  <img
+                                    src={product.thumbnailUrl}
+                                    alt={product.name}
+                                    className="w-full h-full object-cover"
                                   />
                                 </div>
-                                <div className="absolute right-2 top-2 z-20 flex items-center gap-1.5">
-                                  {product.isPremium && (
-                                    <Badge className="border-0 bg-amber-500 text-[10px] text-white">
-                                      <Star className="h-3 w-3 ml-1" />
-                                      مميز
-                                    </Badge>
-                                  )}
-                                  {product.usageCount > 0 && (
-                                    <Badge variant="secondary" className="border border-zinc-200 bg-white/95 text-[10px]">
-                                      <TrendingUp className="ml-1 h-3 w-3 text-emerald-600" />
-                                      {product.usageCount}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="absolute left-2 top-2 z-20 rounded-full border border-zinc-200 bg-white/95 px-2 py-1 text-[10px] font-bold text-zinc-700">
-                                  {product.dimensions.width}×{product.dimensions.height}×{product.dimensions.depth}م
-                                </div>
+                              )}
+
+                              {/* Badges Overlay */}
+                              <div className="absolute top-3 right-3 flex flex-col gap-2">
+                                {product.isPremium && (
+                                  <Badge className="bg-gradient-to-r from-amber-400 to-amber-600 text-white shadow-lg border-0">
+                                    <Star className="h-3 w-3 mr-1" />
+                                    مميز
+                                  </Badge>
+                                )}
+                                {product.usageCount > 5 && (
+                                  <Badge className="bg-gradient-to-r from-emerald-400 to-emerald-600 text-white shadow-lg border-0">
+                                    <TrendingUp className="h-3 w-3 mr-1" />
+                                    شائع
+                                  </Badge>
+                                )}
                               </div>
 
-                              <div className="space-y-3 bg-[linear-gradient(180deg,#ffffff_0%,#fafafa_100%)] p-3">
-                                <div className="flex items-start justify-between gap-2">
-                                  <div className="min-w-0">
-                                    <h4 className="line-clamp-1 text-sm font-black text-zinc-900 transition-colors group-hover:text-blue-700">{product.name}</h4>
-                                    <p className="mt-0.5 line-clamp-1 text-[11px] text-zinc-500">{product.description || 'منتج جاهز للإضافة داخل المخطط'}</p>
-                                  </div>
-                                  <Badge variant="outline" className="h-6 shrink-0 rounded-full border-zinc-300 bg-zinc-50 px-2.5 text-[10px] text-zinc-700">
-                                    {product.category}
-                                  </Badge>
-                                </div>
+                              {/* Removed hover overlay button */}
+                            </div>
 
-                                <div className="grid grid-cols-2 gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-9 rounded-xl border-zinc-300 bg-white hover:border-zinc-500 hover:bg-zinc-50"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setPreviewProduct(product);
-                                      setIsPreviewOpen(true);
-                                    }}
-                                  >
-                                    <Eye className="h-4 w-4 ml-1" />
-                                    معاينة
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    disabled={isAdding}
-                                    className="h-9 rounded-xl bg-[linear-gradient(120deg,#0f172a_0%,#2563eb_60%,#0ea5e9_100%)] text-white font-bold hover:brightness-110 disabled:opacity-70"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleAddProduct(product);
-                                    }}
-                                  >
-                                    {isAddingThis ? (
-                                      <>
-                                        <div className="h-3.5 w-3.5 rounded-full border-2 border-white/40 border-t-white animate-spin ml-1" />
-                                        جاري الإضافة
-                                      </>
-                                    ) : (
-                                      <>
-                                        <Plus className="ml-1 h-4 w-4" />
-                                        أضف للمشهد
-                                      </>
-                                    )}
-                                  </Button>
-                                </div>
+                            {/* Info Section - Compact */}
+                            <div className="p-2 space-y-1.5">
+                              <div>
+                                <h4 className="font-semibold text-xs text-slate-900 truncate group-hover:text-primary transition-colors leading-tight">{product.name}</h4>
+                              </div>
+
+                              <div className="flex items-center gap-1">
+                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{product.category}</Badge>
+                              </div>
+
+                              {/* Action Buttons */}
+                              <div className="flex gap-1 pt-0.5">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="flex-1 h-7 text-[10px] px-1 border hover:border-primary hover:text-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setPreviewProduct(product);
+                                    setIsPreviewOpen(true);
+                                  }}
+                                >
+                                  <Eye className="h-3 w-3" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  className="flex-1 h-7 text-[10px] px-1 bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAddProduct(product);
+                                  }}
+                                >
+                                  <Plus className="h-3 w-3 ml-0.5" />
+                                  إضافة
+                                </Button>
                               </div>
                             </div>
-                          );
-                        })}
+                          </div>
+                        ))}
                       </div>
                     ) : (
                       /* List View - Enhanced */
                       <div className="space-y-4">
                         {sortedAndPaginatedProducts.items.map((product) => (
-                          <div key={product._id} className="group flex gap-5 rounded-2xl border border-zinc-200 bg-white p-4 transition-all hover:border-zinc-300 hover:shadow-xl">
-                            <div className="h-32 w-32 flex-shrink-0 overflow-hidden rounded-2xl border border-zinc-200 bg-[radial-gradient(circle_at_20%_20%,#dbeafe_0%,#ecfeff_40%,#f8fafc_100%)] p-2">
+                          <div key={product._id} className="flex gap-6 p-5 bg-white rounded-2xl border-2 border-slate-200 hover:border-primary hover:shadow-xl transition-all group">
+                            <div className="w-32 h-32 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center flex-shrink-0 overflow-hidden shadow-md">
                               {product.thumbnailUrl ? (
                                 <img src={product.thumbnailUrl} alt={product.name} className="w-full h-full object-cover" />
                               ) : (
@@ -950,14 +823,14 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                             </div>
                             <div className="flex-1 min-w-0 flex flex-col justify-between">
                               <div>
-                                <h4 className="text-lg font-black text-zinc-900 transition-colors group-hover:text-blue-700">{product.name}</h4>
-                                <p className="mt-2 line-clamp-2 text-sm text-zinc-600">{product.description || 'منتج ثلاثي الأبعاد عالي الجودة'}</p>
+                                <h4 className="font-bold text-lg text-slate-900 group-hover:text-primary transition-colors">{product.name}</h4>
+                                <p className="text-sm text-slate-600 line-clamp-2 mt-2">{product.description || 'منتج ثلاثي الأبعاد عالي الجودة'}</p>
                                 <div className="flex items-center gap-3 mt-3 flex-wrap">
-                                  <Badge variant="secondary" className="text-sm border border-zinc-200 bg-zinc-100">{product.category}</Badge>
+                                  <Badge variant="secondary" className="text-sm">{product.category}</Badge>
                                   {product.isPremium && <Badge className="bg-amber-500 text-sm"><Star className="h-3 w-3 mr-1" />مميز</Badge>}
-                                  <span className="text-sm text-zinc-500">{product.dimensions.width}×{product.dimensions.height}×{product.dimensions.depth}م</span>
+                                  <span className="text-sm text-slate-500">{product.dimensions.width}×{product.dimensions.height}×{product.dimensions.depth}م</span>
                                   {product.usageCount > 0 && (
-                                    <span className="text-sm text-zinc-500 flex items-center gap-1">
+                                    <span className="text-sm text-slate-500 flex items-center gap-1">
                                       <TrendingUp className="h-4 w-4" />
                                       استخدم {product.usageCount} مرة
                                     </span>
@@ -966,22 +839,13 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                               </div>
                             </div>
                             <div className="flex flex-col gap-3 justify-center">
-                              <Button size="default" variant="outline" className="rounded-xl border-zinc-300 hover:border-zinc-500" onClick={() => { setPreviewProduct(product); setIsPreviewOpen(true); }}>
+                              <Button size="default" variant="outline" className="border-2 hover:border-primary" onClick={() => { setPreviewProduct(product); setIsPreviewOpen(true); }}>
                                 <Eye className="h-4 w-4 ml-2" />
                                 معاينة
                               </Button>
-                              <Button size="default" disabled={isAdding} className="rounded-xl bg-[linear-gradient(120deg,#0f172a_0%,#2563eb_60%,#0ea5e9_100%)] hover:brightness-110" onClick={() => handleAddProduct(product)}>
-                                {isAdding && addingProductId === product._id ? (
-                                  <>
-                                    <div className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin ml-2" />
-                                    جاري الإضافة...
-                                  </>
-                                ) : (
-                                  <>
-                                    <Plus className="h-4 w-4 ml-2" />
-                                    إضافة للمشهد
-                                  </>
-                                )}
+                              <Button size="default" className="bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary" onClick={() => handleAddProduct(product)}>
+                                <Plus className="h-4 w-4 ml-2" />
+                                إضافة للمتجر
                               </Button>
                             </div>
                           </div>
@@ -1031,119 +895,108 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
         {/* Preview Modal */}
         <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-          <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col p-0">
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <div className="px-6 pt-6 pb-3 border-b bg-gradient-to-r from-zinc-50 to-white">
-                <DialogTitle className="text-2xl font-black text-zinc-900">{previewProduct?.name}</DialogTitle>
-                <DialogDescription className="text-zinc-500 mt-1">
-                  معاينة تفاعلية كاملة قبل الإضافة مع تموضع ذكي داخل المشهد
-                </DialogDescription>
-              </div>
+              <DialogTitle>{previewProduct?.name}</DialogTitle>
+              <DialogDescription>
+                معاينة تفاصيل النموذج ثلاثي الأبعاد
+              </DialogDescription>
             </DialogHeader>
 
             {previewProduct && (
-              <div className="overflow-y-auto flex-1 px-6 py-5">
-                <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)] gap-4">
-                  <div className="rounded-2xl border border-zinc-200 bg-gradient-to-br from-slate-100 via-zinc-100 to-slate-200 p-4 min-h-[360px] relative overflow-hidden">
-                    <div className="absolute inset-4 rounded-2xl border border-white/70 bg-white/35 backdrop-blur-[1px]" />
-                    <div className="relative z-10 h-full flex items-center justify-center">
-                      <Model3DPreview
-                        modelUrl={previewProduct.modelUrl}
-                        thumbnailUrl={previewProduct.thumbnailUrl}
-                        className="w-full h-full max-w-[92%] max-h-[92%]"
-                        autoRotate
-                        showThumbnail
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                      <p className="text-xs text-zinc-500 mb-1">الفئة</p>
-                      <Badge variant="outline" className="mb-2">{previewProduct.category}</Badge>
-                      <h4 className="text-lg font-black text-zinc-900">{previewProduct.name}</h4>
-                      {previewProduct.nameEn && <p className="text-sm text-zinc-500">{previewProduct.nameEn}</p>}
-                    </div>
-
-                    <div className="rounded-2xl border border-zinc-200 bg-white p-4 space-y-3">
-                      <p className="text-xs text-zinc-500">معلومات النموذج</p>
-                      <div className="grid grid-cols-3 gap-2 text-center">
-                        <div className="rounded-xl bg-zinc-50 border border-zinc-200 py-2 px-1">
-                          <p className="text-[11px] text-zinc-500">العرض</p>
-                          <p className="text-sm font-black text-zinc-900">{previewProduct.dimensions.width}م</p>
-                        </div>
-                        <div className="rounded-xl bg-zinc-50 border border-zinc-200 py-2 px-1">
-                          <p className="text-[11px] text-zinc-500">الارتفاع</p>
-                          <p className="text-sm font-black text-zinc-900">{previewProduct.dimensions.height}م</p>
-                        </div>
-                        <div className="rounded-xl bg-zinc-50 border border-zinc-200 py-2 px-1">
-                          <p className="text-[11px] text-zinc-500">العمق</p>
-                          <p className="text-sm font-black text-zinc-900">{previewProduct.dimensions.depth}م</p>
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2 text-xs">
-                        <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                          <p className="text-zinc-500">المادة</p>
-                          <p className="font-semibold text-zinc-800">{previewProduct.material || 'غير محدد'}</p>
-                        </div>
-                        <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2">
-                          <p className="text-zinc-500">اللون</p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="h-4 w-4 rounded-md border border-zinc-300" style={{ backgroundColor: previewProduct.color || '#f4f4f5' }} />
-                            <p className="font-semibold text-zinc-800">{previewProduct.color || 'افتراضي'}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {previewProduct.description && (
-                      <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                        <p className="text-xs text-zinc-500 mb-1">الوصف</p>
-                        <p className="text-sm text-zinc-700 leading-relaxed">{previewProduct.description}</p>
-                      </div>
-                    )}
-
-                    {previewProduct.tags && previewProduct.tags.length > 0 && (
-                      <div className="rounded-2xl border border-zinc-200 bg-white p-4">
-                        <p className="text-xs text-zinc-500 mb-2">الوسوم</p>
-                        <div className="flex flex-wrap gap-1.5">
-                          {previewProduct.tags.map((tag, index) => (
-                            <Badge key={index} variant="secondary">{tag}</Badge>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+              <div className="space-y-4 overflow-y-auto flex-1">
+                {/* 3D Preview with Thumbnail - Scrollable */}
+                <div className="aspect-video bg-gradient-to-br from-slate-100 to-slate-200 rounded-lg flex items-center justify-center overflow-hidden relative">
+                  <div className="absolute inset-0 flex items-center justify-center p-4">
+                    <Model3DPreview
+                      modelUrl={previewProduct.modelUrl}
+                      thumbnailUrl={previewProduct.thumbnailUrl}
+                      className="w-full h-full max-w-full max-h-full object-contain"
+                      autoRotate={true}
+                      showThumbnail={true}
+                    />
                   </div>
                 </div>
+
+                {/* Details Grid */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-slate-600">الاسم</Label>
+                    <p className="font-semibold">{previewProduct.name}</p>
+                  </div>
+                  {previewProduct.nameEn && (
+                    <div>
+                      <Label className="text-slate-600">Name (EN)</Label>
+                      <p className="font-semibold">{previewProduct.nameEn}</p>
+                    </div>
+                  )}
+                  <div>
+                    <Label className="text-slate-600">الفئة</Label>
+                    <Badge variant="outline">{previewProduct.category}</Badge>
+                  </div>
+                  <div>
+                    <Label className="text-slate-600">الأبعاد</Label>
+                    <p className="font-mono text-sm">
+                      {previewProduct.dimensions.width}×{previewProduct.dimensions.height}×{previewProduct.dimensions.depth}م
+                    </p>
+                  </div>
+                  {previewProduct.material && (
+                    <div>
+                      <Label className="text-slate-600">المادة</Label>
+                      <p>{previewProduct.material}</p>
+                    </div>
+                  )}
+                  {previewProduct.color && (
+                    <div>
+                      <Label className="text-slate-600">اللون</Label>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-6 h-6 rounded border border-slate-300"
+                          style={{ backgroundColor: previewProduct.color }}
+                        />
+                        <span className="text-sm font-mono">{previewProduct.color}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Description */}
+                {previewProduct.description && (
+                  <div>
+                    <Label className="text-slate-600">الوصف</Label>
+                    <p className="text-sm text-slate-700 mt-1">{previewProduct.description}</p>
+                  </div>
+                )}
+
+                {/* Tags */}
+                {previewProduct.tags && previewProduct.tags.length > 0 && (
+                  <div>
+                    <Label className="text-slate-600">الوسوم</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {previewProduct.tags.map((tag, index) => (
+                        <Badge key={index} variant="secondary">{tag}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
-            <DialogFooter className="px-6 py-4 border-t bg-white flex items-center gap-2">
-              <Button variant="outline" className="rounded-xl" onClick={() => setIsPreviewOpen(false)}>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsPreviewOpen(false)}>
                 إغلاق
               </Button>
               <Button
-                disabled={isAdding}
                 onClick={() => {
                   if (previewProduct) {
                     handleAddProduct(previewProduct);
                     setIsPreviewOpen(false);
                   }
                 }}
-                className="rounded-xl bg-gradient-to-r from-primary to-blue-600 hover:from-blue-600 hover:to-primary text-white font-bold"
+                className="bg-primary"
               >
-                {isAdding && addingProductId === previewProduct?._id ? (
-                  <>
-                    <div className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white animate-spin ml-2" />
-                    جاري الإضافة...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="h-4 w-4 ml-2" />
-                    إضافة إلى المشهد
-                  </>
-                )}
+                <Plus className="h-4 w-4 ml-2" />
+                إضافة إلى المشهد
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1375,132 +1228,82 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
         {/* Settings Dropdown Menu */}
         <DropdownMenu open={settingsOpen} onOpenChange={setSettingsOpen}>
           <DropdownMenuTrigger asChild>
-            <Button
-              variant="outline"
-              className="flex-1 sm:flex-none h-11 px-4 rounded-2xl border border-zinc-200 bg-white text-zinc-700 hover:text-zinc-900 hover:bg-zinc-50 hover:border-zinc-300 transition-all duration-200 shadow-sm hover:shadow-md"
-            >
-              <span className="flex items-center justify-center gap-2">
-                <Settings className="h-4 w-4" />
-                <span className="font-bold">الإعدادات</span>
-              </span>
+            <Button variant="outline" className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 rounded-xl h-10 px-3">
+              <Settings className="h-4 w-4" />
+              <span className="hidden sm:inline">الإعدادات</span>
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-[24rem] max-h-[72vh] overflow-y-auto p-2.5 rounded-2xl border border-zinc-200 bg-white/95 backdrop-blur-xl shadow-[0_24px_80px_-32px_rgba(0,0,0,0.45)]">
-            <div className="px-2.5 pb-2 pt-1">
-              <p className="text-sm font-black text-zinc-900">مركز الإعدادات</p>
-              <p className="text-[11px] text-zinc-500">تحكم سريع في التخصيص والتصدير وإنهاء الجلسة</p>
-            </div>
-
+          <DropdownMenuContent align="end" className="w-96 max-h-[600px] overflow-y-auto p-3">
+            {/* Wall Texture Selector Header */}
             {wallTextureOpen && (
-              <div className="mb-2 flex items-center justify-between rounded-xl border border-zinc-200 bg-zinc-50 px-2.5 py-2">
-                <span className="text-xs text-zinc-600">اختر النسيج المطلوب</span>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs text-slate-500">اختر النسيج المطلوب</span>
                 <button
                   onClick={() => {
                     setWallTextureOpen(false);
                   }}
-                  className="text-xs text-zinc-600 hover:text-zinc-900 px-2 py-1 rounded-lg hover:bg-white transition-colors"
+                  className="text-xs text-slate-500 hover:text-slate-700 px-2 py-1 rounded hover:bg-slate-100"
                 >
-                  إلغاء
+                  ✕ إلغاء
                 </button>
               </div>
             )}
 
-            <div className="space-y-1.5">
-              <DropdownMenuItem
-                onClick={() => {
-                  setFloorSettingsOpen(true);
-                  setSettingsOpen(false);
-                }}
-                className="group cursor-pointer p-3 rounded-xl border border-transparent hover:border-zinc-200 hover:bg-zinc-50/90 focus:bg-zinc-50 transition-all duration-200"
-              >
-                <div className="flex items-center gap-3 w-full">
-                  <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center group-hover:scale-105 transition-transform">
-                    <Palette className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-sm text-zinc-900">إعدادات الأرضية</p>
-                    <p className="text-xs text-zinc-500">تخصيص الحجم والخامة</p>
-                  </div>
+            {/* Floor Settings Button */}
+            <DropdownMenuItem
+              onClick={() => {
+                setFloorSettingsOpen(true);
+                setSettingsOpen(false);
+              }}
+              className="cursor-pointer p-3 hover:bg-slate-100 rounded-lg mb-2"
+            >
+              <div className="flex items-center gap-3 w-full">
+                <Palette className="h-5 w-5 text-primary" />
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">إعدادات الأرضية</p>
+                  <p className="text-xs text-slate-500">تخصيص حجم ونسيج الأرضية</p>
                 </div>
-              </DropdownMenuItem>
+              </div>
+            </DropdownMenuItem>
 
-              <DropdownMenuItem
-                onClick={() => {
-                  setWallSettingsOpen(true);
-                  setSettingsOpen(false);
-                }}
-                className="group cursor-pointer p-3 rounded-xl border border-transparent hover:border-zinc-200 hover:bg-zinc-50/90 focus:bg-zinc-50 transition-all duration-200"
-              >
-                <div className="flex items-center gap-3 w-full">
-                  <div className="h-9 w-9 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center group-hover:scale-105 transition-transform">
-                    <Palette className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-bold text-sm text-zinc-900">إعدادات الجدران</p>
-                    <p className="text-xs text-zinc-500">تخصيص اللون والنسيج</p>
-                  </div>
+            {/* Wall Settings Button */}
+            <DropdownMenuItem
+              onClick={() => {
+                setWallSettingsOpen(true);
+                setSettingsOpen(false);
+              }}
+              className="cursor-pointer p-3 hover:bg-slate-100 rounded-lg mb-3"
+            >
+              <div className="flex items-center gap-3 w-full">
+                <Palette className="h-5 w-5 text-emerald-600" />
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">إعدادات الجدران</p>
+                  <p className="text-xs text-slate-500">تخصيص نسيج ولون جميع الجدران</p>
                 </div>
-              </DropdownMenuItem>
-            </div>
+              </div>
+            </DropdownMenuItem>
 
             {!floorTextureOpen && !wallTextureOpen && (
               <>
-                <DropdownMenuSeparator className="my-2" />
-                <div className="space-y-1.5">
-                  <DropdownMenuItem onClick={handleExportDesign} className="group cursor-pointer rounded-xl px-3 py-2.5 border border-transparent hover:border-zinc-200 hover:bg-zinc-50 focus:bg-zinc-50 transition-all">
-                    <Download className="h-4 w-4 ml-2 text-zinc-500 group-hover:text-zinc-800" />
-                    <span className="font-medium">تصدير التصميم</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleImportDesign} className="group cursor-pointer rounded-xl px-3 py-2.5 border border-transparent hover:border-zinc-200 hover:bg-zinc-50 focus:bg-zinc-50 transition-all">
-                    <FileUp className="h-4 w-4 ml-2 text-zinc-500 group-hover:text-zinc-800" />
-                    <span className="font-medium">استيراد تصميم</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleQuitSessionSnapshot} className="group cursor-pointer rounded-xl px-3 py-2.5 border border-transparent hover:border-zinc-200 hover:bg-zinc-50 focus:bg-zinc-50 transition-all">
-                    <Camera className="h-4 w-4 ml-2 text-zinc-500 group-hover:text-zinc-800" />
-                    <span className="font-medium">التقاط صورة سريعة</span>
-                  </DropdownMenuItem>
-                </div>
+                <DropdownMenuSeparator />
 
-                <DropdownMenuSeparator className="my-2" />
-                <div className="space-y-1.5">
-                  <DropdownMenuItem onClick={handleResetDesign} className="cursor-pointer rounded-xl px-3 py-2.5 border border-transparent text-red-600 focus:text-red-600 hover:border-red-100 hover:bg-red-50 focus:bg-red-50 transition-all">
-                    <RotateCcw className="h-4 w-4 ml-2" />
-                    <span className="font-medium">إعادة تعيين للافتراضي</span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={handleQuitSessionClick} className="cursor-pointer rounded-xl px-3 py-2.5 border border-transparent text-red-700 focus:text-red-700 hover:border-red-100 hover:bg-red-50 focus:bg-red-50 transition-all">
-                    <LogOut className="h-4 w-4 ml-2" />
-                    <span className="font-bold">إنهاء الجلسة</span>
-                  </DropdownMenuItem>
-                </div>
+                <DropdownMenuItem onClick={handleExportDesign} className="cursor-pointer">
+                  <Download className="h-4 w-4 ml-2" />
+                  <span>تصدير التصميم</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={handleImportDesign} className="cursor-pointer">
+                  <FileUp className="h-4 w-4 ml-2" />
+                  <span>استيراد تصميم</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleResetDesign} className="cursor-pointer text-red-600 focus:text-red-600">
+                  <RotateCcw className="h-4 w-4 ml-2" />
+                  <span>إعادة تعيين للافتراضي</span>
+                </DropdownMenuItem>
               </>
             )}
           </DropdownMenuContent>
         </DropdownMenu>
-
-        <Dialog open={quitDialogOpen} onOpenChange={setQuitDialogOpen}>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-black text-zinc-900">إنهاء الجلسة؟</DialogTitle>
-              <DialogDescription className="text-zinc-600">
-                سيتم إنهاء الجلسة الحالية والعودة إلى صفحة المقدمة. التعديلات غير المحفوظة لن يتم حفظها.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              تنبيه: قبل الخروج يمكنك أخذ لقطة شاشة للاحتفاظ بالتصميم الحالي.
-            </div>
-            <DialogFooter className="flex gap-2 sm:justify-end">
-              <Button variant="outline" onClick={() => setQuitDialogOpen(false)}>رجوع</Button>
-              <Button variant="outline" onClick={handleQuitSessionSnapshot} className="gap-2">
-                <Camera className="h-4 w-4" />
-                أخذ صورة
-              </Button>
-              <Button onClick={handleConfirmQuitSession} className="gap-2 bg-red-600 hover:bg-red-700 text-white">
-                <LogOut className="h-4 w-4" />
-                إنهاء الجلسة
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
 
         {/* Hidden file inputs */}
         <input

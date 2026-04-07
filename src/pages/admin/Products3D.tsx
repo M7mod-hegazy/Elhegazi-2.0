@@ -81,9 +81,6 @@ const Products3D = () => {
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const [uploadPhase, setUploadPhase] = useState<'idle' | 'sending' | 'processing' | 'done' | 'error'>('idle');
-  const [uploadFileName, setUploadFileName] = useState('');
   
   // Form state
   const [formData, setFormData] = useState({
@@ -260,9 +257,6 @@ const Products3D = () => {
   const handleFileUpload = async (file: File) => {
     setIsUploading(true);
     setUploadProgress(0);
-    setUploadError(null);
-    setUploadPhase('sending');
-    setUploadFileName(file.name);
 
     // Auto-detect format from file extension
     const fileName = file.name.toLowerCase();
@@ -270,24 +264,20 @@ const Products3D = () => {
     if (fileName.endsWith('.gltf')) detectedFormat = 'gltf';
     else if (fileName.endsWith('.obj')) detectedFormat = 'obj';
     else if (fileName.endsWith('.fbx')) detectedFormat = 'fbx';
-    else if (fileName.endsWith('.glp')) detectedFormat = 'glb';
-
-    const fileSizeMB = (file.size / (1024 * 1024)).toFixed(1);
 
     try {
+      // Create FormData for file upload
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
       uploadFormData.append('type', '3d-model');
 
+      // Use XMLHttpRequest for progress tracking
       const xhr = new XMLHttpRequest();
 
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
           const percentComplete = (e.loaded / e.total) * 100;
           setUploadProgress(percentComplete);
-          if (percentComplete >= 100) {
-            setUploadPhase('processing');
-          }
         }
       });
 
@@ -295,64 +285,43 @@ const Products3D = () => {
         if (xhr.status === 200) {
           try {
             const response = JSON.parse(xhr.responseText);
-            if (response.ok === false) {
-              setUploadError(response.error || 'فشل الرفع على السيرفر');
-              setUploadPhase('error');
-              setIsUploading(false);
-              return;
-            }
+            // Update form with uploaded file URL, size, and auto-detected format
             setFormData(prev => ({ 
               ...prev, 
               modelUrl: response.url || response.fileUrl || '',
               fileSize: file.size,
               format: detectedFormat
             }));
-            setUploadPhase('done');
             toast({ 
-              title: '✅ تم الرفع بنجاح', 
-              description: `${file.name} (${fileSizeMB} MB - ${detectedFormat.toUpperCase()})` 
+              title: 'نجح', 
+              description: `تم رفع الملف بنجاح (${detectedFormat.toUpperCase()})` 
             });
           } catch (error) {
-            setUploadError('فشل معالجة استجابة السيرفر');
-            setUploadPhase('error');
+            console.error('Error parsing response:', error);
+            toast({ title: 'خطأ', description: 'فشل معالجة الاستجابة', variant: 'destructive' });
           }
         } else {
-          let errMsg = `خطأ ${xhr.status}: `;
-          try {
-            const errBody = JSON.parse(xhr.responseText);
-            errMsg += errBody.error || xhr.statusText;
-          } catch { errMsg += xhr.statusText; }
-          setUploadError(errMsg);
-          setUploadPhase('error');
+          toast({ title: 'خطأ', description: `فشل الرفع: ${xhr.statusText}`, variant: 'destructive' });
         }
         setIsUploading(false);
         setUploadProgress(0);
       });
 
       xhr.addEventListener('error', () => {
-        setUploadError('فشل الاتصال بالسيرفر — تأكد من تشغيله');
-        setUploadPhase('error');
+        toast({ title: 'خطأ', description: 'فشل رفع الملف', variant: 'destructive' });
         setIsUploading(false);
         setUploadProgress(0);
       });
 
-      xhr.addEventListener('timeout', () => {
-        setUploadError('انتهت مهلة الرفع — الملف كبير جداً أو الاتصال بطيء');
-        setUploadPhase('error');
-        setIsUploading(false);
-        setUploadProgress(0);
-      });
-
-      xhr.timeout = 10 * 60 * 1000; // 10 min timeout for large files
+      // Send request to upload endpoint
       xhr.open('POST', '/api/upload-3d-model');
       xhr.send(uploadFormData);
 
-    } catch (error: any) {
+    } catch (error) {
       console.error('Upload error:', error);
-      setUploadError(error?.message || 'خطأ غير متوقع أثناء الرفع');
-      setUploadPhase('error');
       setIsUploading(false);
       setUploadProgress(0);
+      toast({ title: 'خطأ', description: 'فشل رفع الملف', variant: 'destructive' });
     }
   };
 
@@ -1077,7 +1046,6 @@ const Products3D = () => {
                 <Label>رابط النموذج أو رفع ملف *</Label>
                 <div
                   onDragOver={(e) => {
-                    if (isUploading) return;
                     e.preventDefault();
                     e.currentTarget.classList.add('border-primary', 'bg-primary/5');
                   }}
@@ -1086,122 +1054,26 @@ const Products3D = () => {
                     e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
                   }}
                   onDrop={(e) => {
-                    if (isUploading) return;
                     e.preventDefault();
                     e.currentTarget.classList.remove('border-primary', 'bg-primary/5');
                     const file = e.dataTransfer.files?.[0];
                     if (file) handleFileUpload(file);
                   }}
-                  className={`border-2 border-dashed rounded-xl p-6 text-center transition-all duration-300 ${
-                    isUploading 
-                      ? 'border-blue-400 bg-blue-50/50 cursor-wait' 
-                      : uploadPhase === 'error'
-                        ? 'border-red-300 bg-red-50/30 cursor-pointer hover:border-red-400'
-                        : formData.modelUrl
-                          ? 'border-green-300 bg-green-50/30 cursor-pointer hover:border-green-400'
-                          : 'border-slate-300 cursor-pointer hover:border-primary/50 hover:bg-primary/5'
-                  }`}
-                  onClick={() => !isUploading && document.getElementById('model-file-input')?.click()}
+                  className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center transition-colors cursor-pointer hover:border-primary/50"
+                  onClick={() => document.getElementById('model-file-input')?.click()}
                 >
-                  {/* === UPLOADING STATE === */}
-                  {isUploading ? (
-                    <div className="space-y-3 py-2">
-                      <div className="relative mx-auto w-14 h-14">
-                        <div className="absolute inset-0 rounded-full border-4 border-blue-100" />
-                        <div className="absolute inset-0 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
-                        <Package className="absolute inset-0 m-auto h-6 w-6 text-blue-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-slate-800 truncate max-w-[280px] mx-auto" dir="ltr">{uploadFileName}</p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {(parseFloat(uploadFileName ? ((document.getElementById('model-file-input') as HTMLInputElement)?.files?.[0]?.size || 0).toString() : '0') / (1024*1024)).toFixed(1)} MB
-                        </p>
-                      </div>
-                      {/* Progress bar */}
-                      <div className="w-full max-w-xs mx-auto">
-                        <div className="w-full bg-slate-200 rounded-full h-2.5 overflow-hidden">
-                          <div 
-                            className={`h-2.5 rounded-full transition-all duration-500 ease-out ${
-                              uploadPhase === 'processing' ? 'bg-amber-500 animate-pulse' : 'bg-blue-500'
-                            }`}
-                            style={{ width: `${Math.max(uploadProgress, 5)}%` }}
-                          />
-                        </div>
-                        <div className="flex items-center justify-between mt-1.5">
-                          <p className="text-xs font-medium text-slate-600">
-                            {uploadPhase === 'sending' && `جاري الرفع... ${uploadProgress.toFixed(0)}%`}
-                            {uploadPhase === 'processing' && '⏳ جاري المعالجة على السيرفر...'}
-                          </p>
-                          <p className="text-xs text-slate-400">{uploadProgress.toFixed(0)}%</p>
-                        </div>
-                      </div>
-                    </div>
-                  ) : uploadPhase === 'error' ? (
-                    /* === ERROR STATE === */
-                    <div className="space-y-3 py-2">
-                      <div className="mx-auto w-14 h-14 rounded-full bg-red-100 flex items-center justify-center">
-                        <X className="h-7 w-7 text-red-500" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-red-700">فشل رفع الملف</p>
-                        <p className="text-xs text-red-500 mt-1 max-w-[300px] mx-auto break-words" dir="ltr">{uploadError}</p>
-                        {uploadFileName && (
-                          <p className="text-xs text-slate-400 mt-1" dir="ltr">{uploadFileName}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 justify-center">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          className="text-red-600 border-red-200 hover:bg-red-50"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setUploadPhase('idle');
-                            setUploadError(null);
-                          }}
-                        >
-                          إلغاء
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          className="bg-blue-600 hover:bg-blue-700 text-white"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const input = document.getElementById('model-file-input') as HTMLInputElement;
-                            const lastFile = input?.files?.[0];
-                            if (lastFile) {
-                              handleFileUpload(lastFile);
-                            } else {
-                              input?.click();
-                            }
-                          }}
-                        >
-                          إعادة المحاولة
-                        </Button>
-                      </div>
-                    </div>
-                  ) : formData.modelUrl ? (
-                    /* === SUCCESS STATE === */
-                    <div className="space-y-2 py-1">
-                      <div className="mx-auto w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
-                        <Package className="h-6 w-6 text-green-600" />
-                      </div>
-                      <p className="text-sm font-semibold text-green-700">✅ تم رفع الملف بنجاح</p>
-                      <p className="text-xs text-slate-500 break-all max-w-[300px] mx-auto" dir="ltr">{formData.modelUrl}</p>
-                      {formData.fileSize > 0 && (
-                        <p className="text-xs text-slate-400">{(formData.fileSize / (1024*1024)).toFixed(1)} MB — {formData.format.toUpperCase()}</p>
-                      )}
+                  {formData.modelUrl ? (
+                    <div className="space-y-2">
+                      <Package className="h-8 w-8 text-green-600 mx-auto" />
+                      <p className="text-sm font-medium text-slate-700">تم رفع الملف</p>
+                      <p className="text-xs text-slate-500 break-all">{formData.modelUrl}</p>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
-                        className="border-red-200 text-red-600 hover:bg-red-50"
                         onClick={(e) => {
                           e.stopPropagation();
-                          setFormData({ ...formData, modelUrl: '', fileSize: 0 });
-                          setUploadPhase('idle');
+                          setFormData({ ...formData, modelUrl: '' });
                         }}
                       >
                         <X className="h-3 w-3 ml-1" />
@@ -1209,20 +1081,19 @@ const Products3D = () => {
                       </Button>
                     </div>
                   ) : (
-                    /* === IDLE STATE === */
-                    <div className="space-y-2 py-2">
+                    <div className="space-y-2">
                       <Package className="h-12 w-12 text-slate-400 mx-auto" />
                       <div>
                         <p className="text-sm font-medium text-slate-700">اسحب وأفلت الملف هنا</p>
                         <p className="text-xs text-slate-500">أو انقر للتحديد</p>
                       </div>
-                      <p className="text-xs text-slate-400">GLB, GLTF, GLP, OBJ, FBX — حتى 100 MB</p>
+                      <p className="text-xs text-slate-400">GLB, GLTF, OBJ, FBX</p>
                     </div>
                   )}
                   <input
                     id="model-file-input"
                     type="file"
-                    accept=".glb,.gltf,.obj,.fbx,.glp"
+                    accept=".glb,.gltf,.obj,.fbx"
                     onChange={(e) => {
                       const file = e.target.files?.[0];
                       if (file) handleFileUpload(file);
@@ -1230,12 +1101,22 @@ const Products3D = () => {
                     className="hidden"
                   />
                 </div>
+                {isUploading && (
+                  <div className="mt-2">
+                    <div className="w-full bg-slate-200 rounded-full h-2">
+                      <div 
+                        className="bg-primary h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${uploadProgress}%` }}
+                      />
+                    </div>
+                    <p className="text-sm text-center text-slate-600 mt-1">{uploadProgress.toFixed(0)}%</p>
+                  </div>
+                )}
                 <Input 
                   className="mt-2" 
                   value={formData.modelUrl} 
                   onChange={(e) => setFormData({ ...formData, modelUrl: e.target.value })} 
                   placeholder="أو الصق رابط مباشر"
-                  disabled={isUploading}
                 />
               </div>
 

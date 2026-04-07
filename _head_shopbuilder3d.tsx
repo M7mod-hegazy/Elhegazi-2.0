@@ -22,12 +22,8 @@ function InteractiveAccessoryNode({
    slatWidth,
    slatHeight,
    slatSpacing,
-   systemType,
-   uprightSpacing,
    isActive,
-   isHovered,
    onActivate,
-   onHoverChange,
    updateAccessory,
    activeSide
 }: {
@@ -35,12 +31,8 @@ function InteractiveAccessoryNode({
    slatWidth: number;
    slatHeight: number;
    slatSpacing: number;
-   systemType?: 'slat' | 'supermarket_shelves' | 'primo';
-   uprightSpacing?: number;
    isActive: boolean;
-   isHovered: boolean;
    onActivate: () => void;
-   onHoverChange: (hovered: boolean) => void;
    updateAccessory: (updates: Partial<ShopBuilderSlatAccessory>) => void;
    activeSide: 'front' | 'back';
 }) {
@@ -76,20 +68,6 @@ function InteractiveAccessoryNode({
          const intervalY = slatSpacing / slatHeight;
          newY = Math.round(newY / intervalY) * intervalY;
 
-         if (systemType === 'primo') {
-            const spacingMeters = Math.max(0.2, uprightSpacing || 0.8);
-            const baysCount = Math.max(1, Math.round(slatWidth / spacingMeters));
-            const baySpacing = 1 / baysCount;
-            const xAnchors = accessory.type === 'shelf'
-              ? Array.from({ length: baysCount }, (_, i) => (i + 0.5) * baySpacing)
-              : Array.from({ length: baysCount + 1 }, (_, i) => i * baySpacing);
-
-            const nearest = xAnchors.reduce((best, candidate) =>
-              Math.abs(candidate - newVisualX) < Math.abs(best - newVisualX) ? candidate : best, xAnchors[0] || 0.5
-            );
-            newVisualX = nearest;
-         }
-
          newVisualX = Math.max(0, Math.min(1, newVisualX));
          newY = Math.max(0, Math.min(1, newY));
 
@@ -122,16 +100,14 @@ function InteractiveAccessoryNode({
    return (
       <div
          onPointerDown={handlePointerDown}
-         onMouseEnter={() => onHoverChange(true)}
-         onMouseLeave={() => onHoverChange(false)}
          title={accessory.type === 'shelf' ? "رف" : accessory.type === 'hook_single' ? "خطاف مفرد" : "خطاف ملابس"}
+         className={`absolute flex border-2 shadow-sm transition-colors cursor-move ${isActive ? `border-primary bg-primary/20 z-20` : `${colorCls} ${bgCls} border-opacity-70 z-10`} ${accessory.type === 'shelf' ? 'rounded-sm' : 'rounded-full'}`}
          style={{
             left: `${leftPct}%`,
             bottom: `${bottomPct}%`,
             width: accessory.type === 'shelf' ? `${widthPct}%` : '12px',
             height: '12px',
-            transform: 'translateX(-50%) translateY(50%)',
-            boxShadow: isHovered && !isActive ? '0 0 0 2px rgba(255,255,255,0.95), 0 0 0 4px rgba(59,130,246,0.35)' : undefined
+            transform: 'translateX(-50%) translateY(50%)'
          }}
       >
          {accessory.type === 'hook_single' && <div className="absolute inset-0 m-auto w-1.5 h-1.5 rounded-full bg-white opacity-60" />}
@@ -155,12 +131,8 @@ function InteractiveSlatNode({
   containerRef,
   activeAccessoryId,
   setActiveAccessoryId,
-  hoveredAccessoryId,
-  setHoveredAccessoryId,
   updateAccessory,
-  activeSide,
-  isHovered,
-  onHoverChange
+  activeSide
 }: {
   slat: ShopBuilderSlatWall;
   wallLength: number;
@@ -171,12 +143,8 @@ function InteractiveSlatNode({
   containerRef: React.RefObject<HTMLDivElement>;
   activeAccessoryId: string | null;
   setActiveAccessoryId: (id: string | null) => void;
-  hoveredAccessoryId: string | null;
-  setHoveredAccessoryId: (id: string | null) => void;
   updateAccessory: (accId: string, updates: Partial<ShopBuilderSlatAccessory>) => void;
   activeSide: 'front' | 'back';
-  isHovered: boolean;
-  onHoverChange: (hovered: boolean) => void;
 }) {
   const width = slat.fillType === 'full' ? wallLength : (slat.width || 1);
   const widthPct = (width / wallLength) * 100;
@@ -184,10 +152,6 @@ function InteractiveSlatNode({
   const bottomPct = (slat.bottomOffset / wallHeight) * 100;
   const visualPos = activeSide === 'back' ? 1 - slat.position! : slat.position!;
   const leftPct = slat.fillType === 'full' ? 0 : (visualPos - (width/wallLength/2)) * 100;
-  const isPrimo = slat.systemType === 'primo';
-  const primoUprightSpacing = Math.max(0.2, slat.uprightSpacing || 0.8);
-  const primoBaysCount = Math.max(1, Math.round(width / primoUprightSpacing));
-  const primoBaySpacingPct = 100 / primoBaysCount;
 
   const handlePointerDown = (e: React.PointerEvent) => {
     onActivate();
@@ -323,8 +287,6 @@ function InteractiveSlatNode({
   return (
     <div
       onPointerDown={handlePointerDown}
-      onMouseEnter={() => onHoverChange(true)}
-      onMouseLeave={() => onHoverChange(false)}
       className={`absolute transition-colors cursor-move shadow-md ${
         isActive ? 'ring-2 ring-primary z-10' : 'ring-1 ring-black/20 hover:ring-2 hover:ring-black/30'
       }`}
@@ -333,22 +295,14 @@ function InteractiveSlatNode({
         bottom: `${bottomPct}%`,
         width: `${widthPct}%`,
         height: `${heightPct}%`,
-        backgroundColor: slat.systemType === 'supermarket_shelves' ? '#fff' : isPrimo ? '#eef2f7' : (slat.color || '#f5f5f5'),
-        backgroundImage: slat.systemType === 'supermarket_shelves'
+        backgroundColor: slat.systemType === 'supermarket_shelves' ? '#fff' : (slat.color || '#f5f5f5'),
+        backgroundImage: slat.systemType === 'supermarket_shelves' 
            ? `repeating-linear-gradient(90deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 4px, transparent 4px, transparent ${Math.max(1, ((slat.uprightSpacing || 1.0) / width) * 100)}%), 
               repeating-linear-gradient(0deg, transparent, transparent calc(${100 / (slat.shelfCount || 5)}% - 4px), ${slat.color || '#e11d48'} calc(${100 / (slat.shelfCount || 5)}% - 4px), ${slat.color || '#e11d48'} ${100 / (slat.shelfCount || 5)}%)`
-           : isPrimo
-           ? `linear-gradient(180deg, rgba(255,255,255,0.65), rgba(226,232,240,0.65)),
-              repeating-linear-gradient(90deg, rgba(30,41,59,0.35) 0px, rgba(30,41,59,0.35) 4px, transparent 4px, transparent ${primoBaySpacingPct}%)`
            : `repeating-linear-gradient(0deg, transparent, transparent calc(100% - 2px), rgba(0,0,0,0.2) calc(100% - 2px), rgba(0,0,0,0.2) 100%)`,
-        backgroundSize: slat.systemType === 'supermarket_shelves'
+        backgroundSize: slat.systemType === 'supermarket_shelves' 
            ? `100% 100%, 100% 100%` 
-           : isPrimo
-           ? `100% 100%, 100% 100%`
            : `100% ${100 / (slat.height / Math.max(0.01, slat.slatSpacing))}%`,
-        boxShadow: isHovered && !isActive
-          ? '0 0 0 2px rgba(255,255,255,0.95), 0 0 0 5px rgba(37,99,235,0.35)'
-          : undefined,
       }}
     >
       {isActive && (
@@ -385,28 +339,12 @@ function InteractiveSlatNode({
              slatWidth={width}
              slatHeight={slat.height}
              slatSpacing={slat.slatSpacing || 0.15}
-             systemType={slat.systemType}
-             uprightSpacing={slat.uprightSpacing}
              isActive={activeAccessoryId === acc.id}
-             isHovered={hoveredAccessoryId === acc.id}
              onActivate={() => setActiveAccessoryId(acc.id)}
-             onHoverChange={(hovered) => setHoveredAccessoryId(hovered ? acc.id : null)}
              updateAccessory={(updates) => updateAccessory(acc.id, updates)}
              activeSide={activeSide}
           />
       ))}
-
-      {isPrimo && (
-        <div className="absolute inset-0 pointer-events-none">
-          {Array.from({ length: primoBaysCount + 1 }).map((_, idx) => (
-            <div
-              key={`primo-upright-${idx}`}
-              className="absolute top-0 bottom-0 border-r border-slate-500/45"
-              style={{ left: `${(idx / primoBaysCount) * 100}%` }}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 }
@@ -787,22 +725,27 @@ const TEXTURE_OPTIONS = [
   {
     value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id29vZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiM4QjczNTIiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjEwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjxyZWN0IHg9IjIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjMwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZCkiLz48L3N2Zz4=',
     label: 'خشب بني',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0id29vZCIgd2lkdGg9IjQwIiBoZWlnaHQ9IjQwIiBwYXR0ZXJuVW5pdHM9InVzZXJTcGFjZU9uVXNlIj48cmVjdCB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIGZpbGw9IiM4QjczNTIiLz48cmVjdCB4PSIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjEwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjxyZWN0IHg9IjIwIiB5PSIwIiB3aWR0aD0iMiIgaGVpZ2h0PSI0MCIgZmlsbD0iIzZBNTQzRCIvPjxyZWN0IHg9IjMwIiB5PSIwIiB3aWR0aD0iMSIgaGVpZ2h0PSI0MCIgZmlsbD0iIzc1NUI0NCIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZCkiLz48L3N2Zz4='
   },
   {
     value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWFyYmxlIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMCw1MCBRMjUsMzAgNTAsNTAgVDEwMCw1MCIgc3Ryb2tlPSIjREREIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMCw3MCBRMzAsNjAgNjAsNzAgVDEwMCw3MCIgc3Ryb2tlPSIjRTBFMEUwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI21hcmJsZSkiLz48L3N2Zz4=',
     label: 'رخام أبيض',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWFyYmxlIiB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIGZpbGw9IiNGNUY1RjUiLz48cGF0aCBkPSJNMCw1MCBRMjUsMzAgNTAsNTAgVDEwMCw1MCIgc3Ryb2tlPSIjREREIiBzdHJva2Utd2lkdGg9IjIiIGZpbGw9Im5vbmUiLz48cGF0aCBkPSJNMCw3MCBRMzAsNjAgNjAsNzAgVDEwMCw3MCIgc3Ryb2tlPSIjRTBFMEUwIiBzdHJva2Utd2lkdGg9IjEiIGZpbGw9Im5vbmUiLz48L3BhdHRlcm4+PC9kZWZzPjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiBmaWxsPSJ1cmwoI21hcmJsZSkiLz48L3N2Zz4='
   },
   {
     value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYnJpY2siIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjQjI0QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iMjgiIGhlaWdodD0iMTQiIGZpbGw9IiNDOTVBNEIiIHN0cm9rZT0iIzhBMzMyOCIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iLTE0IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjYnJpY2spIi8+PC9zdmc+',
     label: 'طوب أحمر',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iYnJpY2siIHdpZHRoPSI2MCIgaGVpZ2h0PSIzMCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjYwIiBoZWlnaHQ9IjMwIiBmaWxsPSIjQjI0QTNEIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjMyIiB5PSIwIiB3aWR0aD0iMjgiIGhlaWdodD0iMTQiIGZpbGw9IiNDOTVBNEIiIHN0cm9rZT0iIzhBMzMyOCIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iLTE0IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHg9IjE4IiB5PSIxNiIgd2lkdGg9IjI4IiBoZWlnaHQ9IjE0IiBmaWxsPSIjQzk1QTRCIiBzdHJva2U9IiM4QTMzMjgiIHN0cm9rZS13aWR0aD0iMSIvPjwvcGF0dGVybj48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjYnJpY2spIi8+PC9zdmc+'
   },
   {
     value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iY29uY3JldGUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjQTBBMEEwIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMiIgZmlsbD0iIzg4ODg4OCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0iIzk1OTU5NSIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIiIGZpbGw9IiM4ODg4ODgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjM1IiByPSIxIiBmaWxsPSIjOTU5NTk1Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNjb25jcmV0ZSkiLz48L3N2Zz4=',
     label: 'خرسانة',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0iY29uY3JldGUiIHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjQTBBMEEwIi8+PGNpcmNsZSBjeD0iMTAiIGN5PSIxMCIgcj0iMiIgZmlsbD0iIzg4ODg4OCIvPjxjaXJjbGUgY3g9IjMwIiBjeT0iMjAiIHI9IjEuNSIgZmlsbD0iIzk1OTU5NSIvPjxjaXJjbGUgY3g9IjQwIiBjeT0iNDAiIHI9IjIiIGZpbGw9IiM4ODg4ODgiLz48Y2lyY2xlIGN4PSIyMCIgY3k9IjM1IiByPSIxIiBmaWxsPSIjOTU5NTk1Ii8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNjb25jcmV0ZSkiLz48L3N2Zz4='
   },
   {
     value: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWV0YWwiIHdpZHRoPSI0IiBoZWlnaHQ9IjUxMiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjQiIGhlaWdodD0iNTEyIiBmaWxsPSIjQzBDMEMwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjRDBEMEQwIi8+PHJlY3QgeD0iMyIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjQjBCMEIwIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNtZXRhbCkiLz48L3N2Zz4=',
     label: 'معدن',
+    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48cGF0dGVybiBpZD0ibWV0YWwiIHdpZHRoPSI0IiBoZWlnaHQ9IjUxMiIgcGF0dGVyblVuaXRzPSJ1c2VyU3BhY2VPblVzZSI+PHJlY3Qgd2lkdGg9IjQiIGhlaWdodD0iNTEyIiBmaWxsPSIjQzBDMEMwIi8+PHJlY3QgeD0iMCIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjRDBEMEQwIi8+PHJlY3QgeD0iMyIgeT0iMCIgd2lkdGg9IjEiIGhlaWdodD0iNTEyIiBmaWxsPSIjQjBCMEIwIi8+PC9wYXR0ZXJuPjwvZGVmcz48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0idXJsKCNtZXRhbCkiLz48L3N2Zz4='
   },
 ];
 
@@ -825,7 +768,6 @@ const ShopBuilderContent = () => {
   const [showWallTextureDropdown, setShowWallTextureDropdown] = useState(false);
 
   const { toast } = useToast();
-  const { user, adminUser, isAuthenticated, isAdminAuthenticated, isAdmin } = useDualAuth();
 
   const {
     layout,
@@ -1196,91 +1138,30 @@ const ShopBuilderContent = () => {
   const { timeStr, dateStr } = formatGregorianDateTime();
   const [currentTime, setCurrentTime] = useState(timeStr);
   const [currentDate, setCurrentDate] = useState(dateStr);
-  const sessionStartedAtRef = useRef(Date.now());
-  const [sessionSeconds, setSessionSeconds] = useState(0);
-  const activeUser = adminUser || user;
-  const displayName = [activeUser?.firstName, activeUser?.lastName].filter(Boolean).join(' ') || 'User';
-  const displayEmail = activeUser?.email || 'guest@session.local';
-  const sessionType = isAdminAuthenticated || (isAuthenticated && isAdmin) ? 'Admin Session' : isAuthenticated ? 'User Session' : 'Guest Session';
-  const sessionTimer = `${String(Math.floor(sessionSeconds / 3600)).padStart(2, '0')}:${String(Math.floor((sessionSeconds % 3600) / 60)).padStart(2, '0')}:${String(sessionSeconds % 60).padStart(2, '0')}`;
 
   useEffect(() => {
     const timer = setInterval(() => {
       const { timeStr: newTime, dateStr: newDate } = formatGregorianDateTime();
       setCurrentTime(newTime);
       setCurrentDate(newDate);
-      setSessionSeconds(Math.floor((Date.now() - sessionStartedAtRef.current) / 1000));
     }, 1000);
     return () => clearInterval(timer);
   }, []);
 
   return (
     <div className="min-h-screen w-full flex flex-col overflow-y-auto text-zinc-800 bg-zinc-50 font-sans selection:bg-slate-200 pb-12" dir="rtl" data-shop-builder-container>
-      {/* Top Session Header */}
-      <header className="flex-shrink-0 border-b border-zinc-200/80 bg-white/90 px-3 sm:px-5 py-3 sticky top-0 z-40 backdrop-blur-xl">
-        <div className="w-full max-w-[1920px] mx-auto rounded-3xl border border-zinc-200 bg-gradient-to-br from-white via-zinc-50 to-zinc-100 shadow-sm overflow-hidden">
-          <div
-            className="h-1.5 w-full"
-            style={{ background: `linear-gradient(90deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
-          />
-          <div className="p-3 sm:p-4 lg:p-5 grid grid-cols-1 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] gap-3 lg:gap-4">
-            <div className="rounded-2xl border border-zinc-200/80 bg-white px-4 py-3 sm:px-5 sm:py-4 shadow-sm">
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                <div className="min-w-0 space-y-2">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-md" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
-                      <Store className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <h1 className="text-base sm:text-xl font-black text-zinc-900 truncate">{layout.shopName || 'مساحة العمل'}</h1>
-                      <p className="text-xs sm:text-sm text-zinc-500 truncate">{layout.field || 'بدون فئة'}</p>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-2 min-w-0">
-                      <p className="text-[11px] text-zinc-500 mb-0.5">المستخدم</p>
-                      <p className="text-sm font-bold text-zinc-800 truncate">{displayName}</p>
-                    </div>
-                    <div className="rounded-xl border border-zinc-200 bg-zinc-50/80 px-3 py-2 min-w-0">
-                      <p className="text-[11px] text-zinc-500 mb-0.5">البريد الإلكتروني</p>
-                      <p className="text-sm font-bold text-zinc-800 truncate">{displayEmail}</p>
-                    </div>
-                  </div>
-                </div>
-                <div className="shrink-0 self-start rounded-full border border-zinc-300 bg-white px-3 py-1.5 text-[11px] font-black text-zinc-700">
-                  {sessionType}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-2 gap-2.5">
-              <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-                <div className="flex items-center gap-2 mb-1.5 text-zinc-500">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span className="text-[11px] font-medium">الوقت</span>
-                </div>
-                <p className="text-sm font-black text-zinc-900">{currentTime}</p>
-              </div>
-              <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-                <div className="flex items-center gap-2 mb-1.5 text-zinc-500">
-                  <MapPin className="h-3.5 w-3.5" />
-                  <span className="text-[11px] font-medium">التاريخ</span>
-                </div>
-                <p className="text-sm font-black text-zinc-900">{currentDate}</p>
-              </div>
-              <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-                <div className="text-[11px] text-zinc-500 mb-1.5">مؤقت الجلسة</div>
-                <p className="text-sm font-black text-zinc-900 tracking-wider">{sessionTimer}</p>
-              </div>
-              <div className="rounded-2xl border border-zinc-200 bg-white p-3 shadow-sm">
-                <div className="text-[11px] text-zinc-500 mb-1.5">حالة النظام</div>
-                <div className="inline-flex items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 text-emerald-700 px-2.5 py-1 text-[11px] font-black">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  يعمل
-                </div>
-              </div>
-            </div>
+      {/* Avant-Garde Minimal Top Nav */}
+      <header className="flex-shrink-0 h-14 bg-white/70 backdrop-blur-xl border-b border-zinc-200/50 px-6 flex items-center justify-between z-40 transition-all sticky top-0 mix-blend-luminosity">
+        <div className="flex items-center gap-6">
+          <div className="flex items-baseline gap-2 group cursor-default">
+             <div className="w-2 h-2 rounded-full" style={{ backgroundColor: primaryColor }} />
+             <span className="font-bold text-lg tracking-tight text-zinc-900 group-hover:text-black transition-colors">{layout.shopName || 'مساحة العمل'}</span>
+             <span className="text-xs font-medium text-zinc-400">/ {layout.field || 'بدون فئة'}</span>
           </div>
+        </div>
+        <div className="flex items-center gap-4 text-xs font-mono font-semibold text-zinc-400">
+           <span className="px-2 py-1 bg-zinc-100/50 rounded-md tracking-wider border border-zinc-200/50 shadow-sm">{currentDate}</span>
+           <span className="px-2 py-1 bg-zinc-100/50 rounded-md tracking-wider border border-zinc-200/50 shadow-sm">{currentTime}</span>
         </div>
       </header>
 
@@ -1292,26 +1173,18 @@ const ShopBuilderContent = () => {
           backgroundSize: '24px 24px' 
         }}
       >
-        {/* Full-width Control Strip */}
-        <div className="w-full max-w-[1920px] mx-auto z-30 mb-1">
-          <div className="rounded-3xl border border-zinc-200 bg-white/95 shadow-sm overflow-hidden">
-            <div className="px-3 sm:px-5 py-2.5 border-b border-zinc-200/80 bg-gradient-to-r from-zinc-50 to-white">
-              <div className="flex items-center justify-between gap-3">
-                <h2 className="text-sm sm:text-base font-black text-zinc-800">لوحة التحكم السريعة</h2>
-                <p className="text-[11px] sm:text-xs text-zinc-500">تحكم بالإعدادات والإضافة والتصوير من شريط واحد</p>
-              </div>
-            </div>
-            <div className="px-2 sm:px-3 lg:px-4 py-2.5">
-              <BuilderToolbar
-                transformMode={transformMode}
-                onTransformModeChange={setTransformMode}
-                onResetCamera={handleResetCamera}
-                onSnapshot={handleSnapshot}
-                onFullscreen={handleFullscreen}
-                onClearSelection={handleClearSelection}
-              />
-            </div>
-          </div>
+        {/* Floating Toolbar positioned top center */}
+        <div className="flex justify-center z-30 pointer-events-none sticky top-0 mb-1">
+           <div className="pointer-events-auto transform shadow-sm hover:shadow-md transition-shadow rounded-2xl bg-white/90 backdrop-blur-lg border border-zinc-100">
+             <BuilderToolbar
+               transformMode={transformMode}
+               onTransformModeChange={setTransformMode}
+               onResetCamera={handleResetCamera}
+               onSnapshot={handleSnapshot}
+               onFullscreen={handleFullscreen}
+               onClearSelection={handleClearSelection}
+             />
+           </div>
         </div>
 
         {/* Editor Split Views */}
@@ -1323,7 +1196,7 @@ const ShopBuilderContent = () => {
             style={isDrawingMode ? { backgroundColor: `${primaryColor}03` } : {}}>
             <div className="flex items-center justify-between mb-3 p-3 pb-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-zinc-800 tracking-tight font-bold">محرر المخطط ثنائي الأبعاد</h2>
+                <h2 className="text-zinc-800 tracking-tight font-bold">مُحرِّر المخطط ثنائي الأبعاد</h2>
                 {isDrawingMode && (
                   <span className="inline-flex items-center gap-1 px-2 py-1 text-xs font-bold rounded-full animate-pulse text-white" style={{ backgroundColor: primaryColor, textShadow: '0 1px 3px rgba(0,0,0,0.5)' }}>
                     <span className="w-2 h-2 rounded-full animate-pulse" style={{ backgroundColor: 'white' }}></span>
@@ -1402,14 +1275,14 @@ const ShopBuilderContent = () => {
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
                       {/* Wall Name Badge */}
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-sm text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
-                        <span className="text-sm font-bold">جدار</span>
+                        <span className="text-sm font-bold">🧱 جدار</span>
                       </div>
 
                       <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
 
                       {/* Height Control */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>ارتفاع (م)</label>
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>📏 ارتفاع (م)</label>
                         <input
                           type="number"
                           step="0.5"
@@ -1428,7 +1301,7 @@ const ShopBuilderContent = () => {
 
                       {/* Thickness Control */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>سمك (م)</label>
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>📐 سمك (م)</label>
                         <input
                           type="number"
                           step="0.05"
@@ -1447,7 +1320,7 @@ const ShopBuilderContent = () => {
 
                       {/* Color Picker */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>اللون</label>
+                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>🎨 لون</label>
                         <input
                           type="color"
                           value={wall.color || '#64748b'}
@@ -1490,7 +1363,7 @@ const ShopBuilderContent = () => {
                   <div className="bg-white rounded-xl shadow-2xl overflow-visible" style={{ border: `2px solid ${primaryColor}` }}>
                     <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
                       <div className="flex items-center gap-2 px-3 py-2 rounded-lg shadow-sm text-white" style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}>
-                        <span className="text-sm font-bold">أنظمة العرض</span>
+                        <span className="text-sm font-bold">🛒 أنظمة العرض</span>
                       </div>
 
                       <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
@@ -1604,28 +1477,19 @@ const ShopBuilderContent = () => {
                     }}
                     title="وضع الكاميرا العادي"
                   >
-                    عادي
+                    🔄 عادي
                   </button>
                   <button
-                    onClick={() => {
-                      setCameraMode('freeMove');
-                      if (!document.fullscreenElement && !is3DFullscreen) {
-                        three3DRef.current?.requestFullscreen?.()
-                          .then(() => setIs3DFullscreen(true))
-                          .catch((error) => {
-                            console.warn('Failed to auto-enter 3D fullscreen in طيران mode:', error);
-                          });
-                      }
-                    }}
+                    onClick={() => setCameraMode('freeMove')}
                     className="px-3 py-1 rounded text-xs font-semibold transition-all"
                     style={{
                       backgroundColor: cameraMode === 'freeMove' ? secondaryColor : 'transparent',
                       color: cameraMode === 'freeMove' ? 'white' : secondaryColor,
                       boxShadow: cameraMode === 'freeMove' ? `0 2px 8px ${secondaryColor}40` : 'none',
                     }}
-                    title="وضع الطيران - حرية حرة"
+                    title="وضع الطيران - حركة حرة"
                   >
-                    طيران
+                    ✈️ طيران
                   </button>
                 </div>
 
@@ -1635,7 +1499,7 @@ const ShopBuilderContent = () => {
                   onClick={toggle3DFullscreen}
                   className="h-7 w-7 p-0 transition-all"
                   style={{ color: primaryColor }}
-                  title={is3DFullscreen ? 'الخروج من ملء الشاشة' : 'ملء الشاشة'}
+                  title={is3DFullscreen ? 'خروج من ملء الشاشة' : 'ملء الشاشة'}
                 >
                   {is3DFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </Button>
@@ -1649,7 +1513,7 @@ const ShopBuilderContent = () => {
               {cameraMode === 'freeMove' && (
                 <div className="absolute top-4 left-4 text-white p-4 rounded-lg text-sm shadow-lg z-10 backdrop-blur-sm" style={{ backgroundColor: `${primaryColor}dd` }}>
                   <h3 className="font-bold mb-2 text-base">
-                    وضع الطيران الحر
+                    ✈️ وضع الطيران الحر
                   </h3>
                   <ul className="space-y-1.5">
                     <li className="flex items-center gap-2">
@@ -1660,7 +1524,7 @@ const ShopBuilderContent = () => {
                     <li className="flex items-center gap-2">
                       <span className="text-yellow-400">•</span>
                       <kbd className="px-2 py-0.5 bg-white/20 rounded text-xs">Mouse</kbd>
-                      <span>النظر الحر</span>
+                      <span>النظر حولك</span>
                     </li>
                     <li className="flex items-center gap-2">
                       <span className="text-yellow-400">•</span>
@@ -1678,7 +1542,7 @@ const ShopBuilderContent = () => {
                       <span>إلغاء القفل</span>
                     </li>
                     <li className="flex items-center gap-2 mt-2 pt-2 border-t border-white/20">
-                      <span className="text-green-400">✓</span>
+                      <span className="text-green-400">💡</span>
                       <span className="text-xs opacity-90">انقر للبدء</span>
                     </li>
                   </ul>
@@ -1709,7 +1573,7 @@ const ShopBuilderContent = () => {
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3 px-4 py-3 w-full sm:w-auto" dir="rtl">
                 {/* Product Name Badge */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid ${primaryColor}40`, color: primaryColor }}>
-                  <span className="text-sm font-bold">منتج {product.name}</span>
+                  <span className="text-sm font-bold">📦 {product.name}</span>
                 </div>
 
                 <div className="hidden sm:block h-8 w-px bg-purple-200" />
@@ -1763,7 +1627,7 @@ const ShopBuilderContent = () => {
 
                 {/* Texture Selector */}
                 <div className="flex flex-col gap-1 relative texture-dropdown">
-                  <label className="text-[10px] font-semibold text-purple-600">نسيج</label>
+                  <label className="text-[10px] font-semibold text-purple-600">🖼️ نسيج</label>
                   <button
                     type="button"
                     onClick={() => setShowProductTextureDropdown(!showProductTextureDropdown)}
@@ -1777,7 +1641,7 @@ const ShopBuilderContent = () => {
                     ) : (
                       <span className="flex-1 text-left">افتراضي</span>
                     )}
-                    <span className="text-purple-400">▾</span>
+                    <span className="text-purple-400">▼</span>
                   </button>
                   {showProductTextureDropdown && (
                     <div className="absolute top-full left-0 mt-1 w-32 bg-white border-2 border-purple-300 rounded-md shadow-lg z-50 overflow-hidden">
@@ -1810,14 +1674,14 @@ const ShopBuilderContent = () => {
                 {/* Color Picker */}
                 <div className="flex flex-col gap-1">
                   <label className="text-[10px] font-semibold text-purple-600">
-                    لون {product.texture && <span className="text-[8px] opacity-70">(تأثير)</span>}
+                    🎨 لون {product.texture && <span className="text-[8px] opacity-70">(تأثير)</span>}
                   </label>
                   <input
                     type="color"
                     value={product.color || '#ffffff'}
                     onChange={(e) => upsertProduct({ id: product.id, color: e.target.value })}
                     className="w-12 h-9 rounded-lg border border-purple-200 cursor-pointer shadow-sm"
-                    title={product.texture ? 'لون بتأثير النسيج' : product.color || '#ffffff'}
+                    title={product.texture ? 'لون كتأثير على النسيج' : product.color || '#ffffff'}
                   />
                 </div>
 
@@ -1838,7 +1702,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    دوران
+                    🔄 دوران
                   </label>
                   <input
                     type="number"
@@ -1870,7 +1734,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    حجم
+                    📏 حجم
                   </label>
                   <input
                     type="number"
@@ -1892,7 +1756,7 @@ const ShopBuilderContent = () => {
                     <button
                       onClick={() => {
                         const similarProducts = layout.products.filter(p => p.modelUrl === product.modelUrl);
-                        if (confirm(`تطبيق اللون والنسيج على ${similarProducts.length} منتجات متشابهة؟`)) {
+                        if (confirm(`تطبيق اللون والنسيج على ${similarProducts.length} منتج مشابه؟`)) {
                           similarProducts.forEach(p => {
                             if (p.id !== product.id) {
                               upsertProduct({
@@ -1907,7 +1771,7 @@ const ShopBuilderContent = () => {
                       className="h-9 px-4 text-xs font-semibold bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-lg hover:from-purple-600 hover:to-purple-700 transition-all shadow-sm flex items-center gap-2"
                       title={`تطبيق على ${similarCount} منتجات`}
                     >
-                      <span>↺</span>
+                      <span>⚡</span>
                       <span>تطبيق ({similarCount})</span>
                     </button>
                   </>
@@ -1918,7 +1782,7 @@ const ShopBuilderContent = () => {
                 {/* Delete Button */}
                 <button
                   onClick={() => {
-                    if (confirm('هل تريد حذف هذا المنتج؟')) {
+                    if (confirm('هل تريد حذف هذا الكائن؟')) {
                       removeProduct(product.id);
                       selectProduct(null);
                     }
@@ -1952,7 +1816,7 @@ const ShopBuilderContent = () => {
               <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
                 {/* Wall Name Badge */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid ${secondaryColor}40`, color: secondaryColor }}>
-                  <span className="text-sm font-bold">جدار</span>
+                  <span className="text-sm font-bold">🧱 جدار</span>
                 </div>
 
                 <div className="h-8 w-px" style={{ backgroundColor: `${secondaryColor}30` }} />
@@ -1998,7 +1862,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    ارتفاع (م)
+                    📏 ارتفاع (م)
                   </label>
                   <input
                     type="number"
@@ -2032,7 +1896,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    سمك (م)
+                    📐 سمك (م)
                   </label>
                   <input
                     type="number"
@@ -2077,7 +1941,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    طول (م)
+                    📏 طول (م)
                   </label>
                   <input
                     type="number"
@@ -2130,7 +1994,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    زاوية (°)
+                    🔄 زاوية (°)
                   </label>
                   <input
                     type="number"
@@ -2187,7 +2051,7 @@ const ShopBuilderContent = () => {
                     style={{ backgroundColor: secondaryColor }}
                     title="خيارات الأعمدة"
                   >
-                    <span>أعمدة</span>
+                    <span>🏛️ عمود</span>
                     <ChevronUp className="h-3 w-3 opacity-70" />
                   </button>
                   {/* Dropdown Menu */}
@@ -2253,7 +2117,7 @@ const ShopBuilderContent = () => {
               <div className="flex items-center justify-center gap-3 px-4 py-3 min-w-max" dir="rtl">
                 {/* Column Name Badge */}
                 <div className="flex items-center gap-2 px-3 py-2 bg-white/50 backdrop-blur-md rounded-xl" style={{ border: `1px solid #d9770640`, color: "#d97706" }}>
-                  <span className="text-sm font-bold">عمود</span>
+                  <span className="text-sm font-bold">🏛️ عمود</span>
                 </div>
 
                 <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
@@ -2266,7 +2130,7 @@ const ShopBuilderContent = () => {
                   }}
                   className="h-9 px-3 text-xs font-bold bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg flex items-center gap-1.5 transition-colors shadow-sm"
                 >
-                  <span>العودة للجدار</span>
+                  <span>العودة للجدار 🔙</span>
                 </button>
 
                 <div className="h-8 w-px" style={{ backgroundColor: `#d9770630` }} />
@@ -2290,7 +2154,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    عرض (م)
+                    📏 عرض (م)
                   </label>
                   <input
                     type="number"
@@ -2330,7 +2194,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    موضع
+                    📍 موضع
                   </label>
                   <input
                     type="number"
@@ -2371,7 +2235,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    عمق (م)
+                    📐 عمق (م)
                   </label>
                   <input
                     type="number"
@@ -2410,7 +2274,7 @@ const ShopBuilderContent = () => {
                     )}
                     title="اسحب لتغيير القيمة"
                   >
-                    ارتفاع (م)
+                    📏 ارتفاع (م)
                   </label>
                   <input
                     type="number"
@@ -2454,6 +2318,7 @@ const ShopBuilderContent = () => {
                 <button
                   onClick={() => {
                     if (confirm('هل تريد حذف هذا العمود؟')) {
+                      removeColumn(wall.id, column.id);
                     }
                   }}
                   className="h-9 px-4 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
@@ -2492,22 +2357,9 @@ const ShopBuilderProtected = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { shopData, loading } = useShopSetup();
-  const { isAuthenticated, isAdminAuthenticated, isAdmin } = useDualAuth();
-  const persistedAdminSession = typeof window !== 'undefined' && (
-    !!localStorage.getItem('admin.auth.userId')
-    || localStorage.getItem('admin.auth.role') === 'admin'
-    || localStorage.getItem('auth.role') === 'admin'
-  );
-  const hasAdminBypass =
-    !!location.state?.adminBypass
-    || !!location.state?.fromIntro
-    || isAdminAuthenticated
-    || (isAuthenticated && isAdmin)
-    || persistedAdminSession;
+  const { isAuthenticated } = useDualAuth();
 
   useEffect(() => {
-    if (loading || hasAdminBypass) return;
-
     // If guest user and NOT coming from setup completion, redirect to setup
     if (!loading && !isAuthenticated && !location.state?.fromSetup) {
       navigate('/shop-setup', { replace: true });
@@ -2519,7 +2371,7 @@ const ShopBuilderProtected = () => {
     if (!loading && !shopData && !location.state?.fromSetup) {
       navigate('/shop-setup', { replace: true });
     }
-  }, [shopData, loading, navigate, isAuthenticated, location.state, hasAdminBypass]);
+  }, [shopData, loading, navigate, isAuthenticated, location]);
 
   if (loading) {
     return (
@@ -2530,7 +2382,7 @@ const ShopBuilderProtected = () => {
   }
 
   // Allow rendering if we have data OR if we're a guest coming from setup (using temporary state)
-  if (!shopData && !location.state?.fromSetup && !hasAdminBypass) {
+  if (!shopData && !location.state?.fromSetup) {
     return null;
   }
 
@@ -2542,4 +2394,3 @@ const ShopBuilderProtected = () => {
 };
 
 export default ShopBuilderProtected;
-

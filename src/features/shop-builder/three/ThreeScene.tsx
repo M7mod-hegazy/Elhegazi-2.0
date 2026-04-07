@@ -190,6 +190,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
   const wallMeshRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const columnMeshRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const slatWallMeshRef = useRef<Map<string, THREE.Object3D>>(new Map());
+  const primoStandMeshRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const cachedModelsRef = useRef<Map<string, THREE.Group>>(new Map());
   const mixersRef = useRef<THREE.AnimationMixer[]>([]);
   const texturesCache = useRef<Map<string, THREE.Texture>>(new Map());
@@ -246,6 +247,17 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true;
     orbit.dampingFactor = 0.08;
+    orbit.enableZoom = true;
+    orbit.zoomSpeed = 0.75;
+    orbit.minDistance = 1.5;
+    orbit.maxDistance = 120;
+    orbit.enablePan = true;
+    orbit.panSpeed = 0.9;
+    orbit.screenSpacePanning = true;
+    // Improves zoom precision toward pointer when supported by current three version
+    if ('zoomToCursor' in orbit) {
+      (orbit as OrbitControls & { zoomToCursor: boolean }).zoomToCursor = true;
+    }
     orbit.maxPolarAngle = Math.PI / 2.1;
     orbit.target.copy(CAMERA_TARGET);
 
@@ -1010,6 +1022,37 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         });
       }
 
+      // Render Primo stands for this wall
+      if (wall.primoStands && wall.primoStands.length > 0) {
+        wall.primoStands.forEach((primo) => {
+          const primoKey = `primo-${wall.id}-${primo.id}`;
+          const existing = primoStandMeshRef.current.get(primoKey);
+          if (existing) {
+            scene.remove(existing);
+            existing.traverse((child) => {
+               if (child instanceof THREE.Mesh) {
+                  child.geometry?.dispose();
+                  if (child.material?.map) child.material.map.dispose();
+                  child.material?.dispose();
+               }
+            });
+            primoStandMeshRef.current.delete(primoKey);
+          }
+          // Cast primo to ShopBuilderSlatWall shape since createSlatWallMesh is generic
+          const slatLike = {
+            ...primo,
+            systemType: 'primo' as const,
+            fillType: primo.fillType,
+            slatSpacing: undefined,
+            shelfCount: undefined,
+            shelfDepth: undefined,
+          };
+          const primoMesh = createSlatWallMesh(wall, slatLike as any);
+          primoStandMeshRef.current.set(primoKey, primoMesh);
+          scene.add(primoMesh);
+        });
+      }
+
       // Render columns for this wall
       if (wall.columns && wall.columns.length > 0) {
         wall.columns.forEach((column) => {
@@ -1073,6 +1116,29 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
            }
         });
         slatWallMeshRef.current.delete(key);
+      }
+    });
+
+    // Remove primo stands that no longer exist
+    const currentPrimoKeys = new Set<string>();
+    layout.walls.forEach((wall) => {
+      if (wall.primoStands) {
+        wall.primoStands.forEach((p) => {
+          currentPrimoKeys.add(`primo-${wall.id}-${p.id}`);
+        });
+      }
+    });
+    primoStandMeshRef.current.forEach((mesh, key) => {
+      if (!currentPrimoKeys.has(key)) {
+        scene.remove(mesh);
+        mesh.traverse((child) => {
+           if (child instanceof THREE.Mesh) {
+              child.geometry?.dispose();
+              if (child.material?.map) child.material.map.dispose();
+              child.material?.dispose();
+           }
+        });
+        primoStandMeshRef.current.delete(key);
       }
     });
   }, [layout.walls]);
@@ -1791,6 +1857,130 @@ function createSlatTexture(color: string, spacing: number): THREE.Texture {
   return texture.clone();
 }
 
+function syncPrimoAccessories(mesh: THREE.Object3D, slat: ShopBuilderSlatWall, wallLength: number, wallThickness: number, wallColumns?: ShopBuilderColumn[]) {
+  // First, find and remove all existing accessories
+  const toRemove = mesh.children.filter(c => c.name.startsWith('accessory_'));
+  toRemove.forEach(c => {
+    mesh.remove(c);
+    if (c instanceof THREE.Mesh) {
+       c.geometry.dispose();
+       if (Array.isArray(c.material)) c.material.forEach((m:any) => m.dispose());
+       else (c.material as any).dispose();
+    }
+  });
+
+  if (!slat.accessories?.length) return;
+
+  const slatWidth = slat.fillType === 'full' ? wallLength : (slat.width || 1);
+  const slatHeight = slat.height || 2;
+
+  // Primo Stand Layout calculations
+  const uprightSpacing = slat.uprightSpacing || 0.8;
+  const baysCount = Math.max(1, Math.ceil(slatWidth / uprightSpacing));
+  const bayWidth = slatWidth / baysCount;
+
+  slat.accessories.forEach(acc => {
+     const accGroup = new THREE.Group();
+     accGroup.name = `accessory_${acc.id}`;
+     
+     const localX = (acc.position.x - 0.5) * slatWidth;
+
+     let visualWidth = acc.width;
+     if (acc.type === 'shelf') {
+        const widthInBays = Math.max(1, Math.round(acc.width / bayWidth));
+        visualWidth = widthInBays * bayWidth;
+     }
+
+     if (acc.type === 'shelf') {
+        const geom = new THREE.BoxGeometry(visualWidth - 0.01, 0.02, acc.depth);
+        const mat = new THREE.MeshStandardMaterial({ color: acc.color || '#cccccc' });
+        const accMesh = new THREE.Mesh(geom, mat);
+        
+        // Add shelf brackets right under the shelf
+        const bracketGeom = new THREE.BoxGeometry(0.01, 0.1, acc.depth * 0.8);
+        const bracketMat = new THREE.MeshStandardMaterial({ color: 0xffffff });
+        const leftBracket = new THREE.Mesh(bracketGeom, bracketMat);
+        leftBracket.position.set(-visualWidth/2 + 0.005, -0.05, 0); 
+        const rightBracket = new THREE.Mesh(bracketGeom, bracketMat);
+        rightBracket.position.set(visualWidth/2 - 0.005, -0.05, 0);
+
+        accGroup.add(accMesh);
+        accGroup.add(leftBracket);
+        accGroup.add(rightBracket);
+     } else if (acc.type === 'hook_single') {
+        const geom = new THREE.CylinderGeometry(0.005, 0.005, acc.depth, 8);
+        geom.rotateX(Math.PI / 2); // Make cylinder protrude along Z local axis
+        const mat = new THREE.MeshStandardMaterial({ color: acc.color || '#cccccc', metalness: 0.7, roughness: 0.2 });
+        const hookMesh = new THREE.Mesh(geom, mat);
+        
+        // small base plate against the wall
+        const baseGeom = new THREE.BoxGeometry(0.04, 0.04, 0.01);
+        const baseMesh = new THREE.Mesh(baseGeom, mat);
+        baseMesh.position.set(0, 0, -acc.depth / 2);
+        
+        accGroup.add(hookMesh);
+        accGroup.add(baseMesh);
+     } else if (acc.type === 'hook_waterfall') {
+        const geom = new THREE.CylinderGeometry(0.012, 0.012, acc.depth, 16);
+        geom.rotateX(Math.PI / 2); 
+        const mat = new THREE.MeshStandardMaterial({ color: acc.color || '#aaaaaa', metalness: 0.6, roughness: 0.3 });
+        const tube = new THREE.Mesh(geom, mat);
+        tube.rotation.x = Math.PI / 16; // slightly angles downward
+        
+        // add dividing balls for clothes hangers
+        const sphereGeom = new THREE.SphereGeometry(0.018, 12, 12);
+        const ballCount = Math.floor(acc.depth / 0.08); // ball every 8cm
+        for(let i=1; i<=ballCount; i++) {
+           const zPos = - (acc.depth / 2) + (i * 0.08);
+           const ball = new THREE.Mesh(sphereGeom, mat);
+           ball.position.set(0, 0, zPos);
+           tube.add(ball);
+        }
+        
+        const baseGeom = new THREE.BoxGeometry(0.05, 0.08, 0.01);
+        const baseMesh = new THREE.Mesh(baseGeom, mat);
+        baseMesh.position.set(0, 0, -acc.depth / 2);
+        
+        accGroup.add(tube);
+        accGroup.add(baseMesh);
+     } else {
+        // Fallback for hook/basket
+        const geom = new THREE.BoxGeometry(visualWidth, 0.1, acc.depth);
+        const mat = new THREE.MeshStandardMaterial({ color: acc.color });
+        const accMesh = new THREE.Mesh(geom, mat);
+        accGroup.add(accMesh);
+     }
+
+     const localY = (acc.position.y - 0.5) * slatHeight;
+     
+     // Determine if it is over a column to protrude it
+     let protrusion = 0;
+     const absoluteX = (slat.fillType === 'full' ? 0.5 : (slat.position || 0.5)) * wallLength - (slatWidth / 2) + acc.position.x * slatWidth;
+     
+     if (wallColumns) {
+        wallColumns.forEach(col => {
+           const colStart = (col.position || 0.5) * wallLength - ((col.width || 0.4) / 2);
+           const colEnd = colStart + (col.width || 0.4);
+           if (absoluteX >= colStart && absoluteX <= colEnd) {
+               const wThickness = wallThickness || 0.1;
+               const slatAnchorOffset = wThickness / 2 + 0.01;
+               const totalDepth = col.depth || 0.4;
+               
+               if ((col as any).side === slat.side) {
+                   protrusion = Math.max(0, totalDepth - slatAnchorOffset) + 0.005;
+               }
+           }
+        });
+     }
+
+     const localZ = acc.depth / 2 + 0.01 + protrusion;
+
+     accGroup.position.set(localX, localY, localZ);
+     
+     mesh.add(accGroup);
+  });
+}
+
 function syncSlatWallAccessories(mesh: THREE.Object3D, slat: ShopBuilderSlatWall, wallLength: number, wallThickness: number, wallColumns?: ShopBuilderColumn[]) {
   // First, find and remove all existing accessories
   const toRemove = mesh.children.filter(c => c.name.startsWith('accessory_'));
@@ -1902,6 +2092,59 @@ function syncSlatWallAccessories(mesh: THREE.Object3D, slat: ShopBuilderSlatWall
      
      mesh.add(accGroup);
   });
+}
+
+function createPrimoStandMesh(group: THREE.Group, slat: ShopBuilderSlatWall, segments: any[], wallLength: number, slatPosCenter: number) {
+   const uprightSpacing = slat.uprightSpacing || 0.8; // default 80cm
+   const sysHeight = slat.height || 2.4;
+   
+   // Metallic chrome look for the standards
+   const uprightMaterial = new THREE.MeshStandardMaterial({ 
+      color: slat.color || '#dddddd', 
+      metalness: 0.8, 
+      roughness: 0.2 
+   });
+   
+   const sideFlip = slat.side === 'back' ? -1 : 1;
+
+   segments.forEach(seg => {
+      const segWidth = seg.end - seg.start;
+      if (segWidth < 0.05) return; // Too small
+      
+      const baysCount = Math.max(1, Math.ceil(segWidth / uprightSpacing));
+      const bayWidth = segWidth / baysCount;
+      
+      const segCenter = (seg.start + seg.end) / 2;
+      const segLocalX = (segCenter - (slatPosCenter * wallLength)) * sideFlip;
+
+      const segGroup = new THREE.Group();
+      segGroup.position.set(segLocalX, 0, seg.protrusion);
+      group.add(segGroup);
+      
+      const uprightWidth = 0.03; // thin 3cm visible strip
+      const uprightDepth = 0.015; // 1.5 cm thick
+      const uprightGeom = new THREE.BoxGeometry(uprightWidth, sysHeight, uprightDepth);
+      
+      for(let i = 0; i <= baysCount; i++) {
+         const upX = -segWidth/2 + i * bayWidth;
+         const upright = new THREE.Mesh(uprightGeom, uprightMaterial);
+         
+         upright.position.set(upX, 0, uprightDepth / 2 + 0.001);
+         
+         // Add tiny slot details using dark narrow boxes running down the sides
+         const slotGeom = new THREE.BoxGeometry(0.003, sysHeight, 0.002);
+         const slotMat = new THREE.MeshBasicMaterial({ color: '#111111' }); // dark
+         const slot1 = new THREE.Mesh(slotGeom, slotMat);
+         slot1.position.set(-0.006, 0, uprightDepth / 2 + 0.001);
+         const slot2 = new THREE.Mesh(slotGeom, slotMat);
+         slot2.position.set(0.006, 0, uprightDepth / 2 + 0.001);
+         
+         upright.add(slot1);
+         upright.add(slot2);
+
+         segGroup.add(upright);
+      }
+   });
 }
 
 function createSupermarketShelvesMesh(group: THREE.Group, slat: ShopBuilderSlatWall, segments: any[], wallLength: number, slatPosCenter: number) {
@@ -2055,6 +2298,9 @@ function createSlatWallMesh(wall: ShopBuilderWall, slat: ShopBuilderSlatWall): T
 
   if (slat.systemType === 'supermarket_shelves') {
      createSupermarketShelvesMesh(group, slat, segments, wallLength, slatPosCenter);
+  } else if (slat.systemType === 'primo') {
+     createPrimoStandMesh(group, slat, segments, wallLength, slatPosCenter);
+     syncPrimoAccessories(group, slat, wallLength, wall.thickness || 0.1, wall.columns);
   } else {
      const sideFlip = slat.side === 'back' ? -1 : 1;
      segments.forEach(seg => {

@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
 
 dotenv.config();
 
@@ -25,6 +26,38 @@ async function connectMongoDB() {
 }
 
 const app = new Hono().basePath('/api');
+
+function getClientIp(c) {
+  return (
+    c.req.header('x-forwarded-for')?.split(',')[0]?.trim()
+    || c.req.header('x-real-ip')
+    || 'unknown-ip'
+  );
+}
+
+function getActorKey(c) {
+  const userId = c.req.header('x-user-id');
+  if (userId) return `user:${userId}`;
+  const ua = c.req.header('user-agent') || 'unknown-ua';
+  const ip = getClientIp(c);
+  const anonHash = crypto.createHash('sha1').update(`${ip}|${ua}`).digest('hex').slice(0, 24);
+  return `anon:${anonHash}`;
+}
+
+async function isAdminRequest(c) {
+  const adminSecret = c.req.header('x-admin-secret') || '';
+  if (process.env.ADMIN_SECRET && adminSecret === process.env.ADMIN_SECRET) return true;
+
+  const userId = c.req.header('x-user-id');
+  if (!userId) return false;
+  try {
+    const { default: User } = await import('../server/models/User.js');
+    const user = await User.findById(userId).select('role').lean().maxTimeMS(8000);
+    return !!(user && (user.role === 'admin' || user.role === 'SuperAdmin' || user.role === 'super_admin'));
+  } catch {
+    return false;
+  }
+}
 
 // Middleware: Connect to MongoDB for all requests
 app.use('*', async (c, next) => {
@@ -433,7 +466,10 @@ app.put('/home-config', async (c) => {
 app.get('/shop-setup', async (c) => {
   try {
     const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
-    const setup = await ShopSetup.findOne({}).lean().maxTimeMS(8000);
+    const userId = c.req.header('x-user-id') || null;
+    const actorKey = getActorKey(c);
+    const query = userId ? { userId } : { actorKey };
+    const setup = await ShopSetup.findOne(query).lean().maxTimeMS(8000);
     return c.json({ ok: true, item: setup });
   } catch (err) {
     console.error('[API] Error:', err.message);
@@ -445,8 +481,227 @@ app.post('/shop-setup', async (c) => {
   try {
     const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
     const body = await c.req.json();
-    const updated = await ShopSetup.findOneAndUpdate({}, body, { new: true, upsert: true }).maxTimeMS(8000);
+    const userId = c.req.header('x-user-id') || null;
+    const actorKey = getActorKey(c);
+    const payload = { ...body, userId, actorKey };
+
+    if (!String(payload.ownerName || '').trim() || !String(payload.shopName || '').trim() || !String(payload.phone || '').trim() || !String(payload.field || '').trim()) {
+      return c.json({ ok: false, error: 'Missing required shop setup fields' }, 400);
+    }
+
+    const query = userId ? { userId } : { actorKey };
+    const updated = await ShopSetup.findOneAndUpdate(query, payload, { new: true, upsert: true }).maxTimeMS(8000);
     return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/shop-setup/all', async (c) => {
+  try {
+    const admin = await isAdminRequest(c);
+    if (!admin) return c.json({ ok: false, error: 'Admin authentication required' }, 403);
+    const { default: ShopSetup } = await import('../server/models/ShopSetup.js');
+    const items = await ShopSetup.find({}).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== BUILDER ACCESS =====
+app.get('/builder/pricing-config', async (c) => {
+  try {
+    const { default: BuilderPricingConfig } = await import('../server/models/BuilderPricingConfig.js');
+    let cfg = await BuilderPricingConfig.findOne({}).lean().maxTimeMS(8000);
+    if (!cfg) {
+      cfg = await BuilderPricingConfig.create({
+        isFreeNow: true,
+        currentPriceEgp: 0,
+        nextPriceEgp: 100,
+        sessionMinutes: 90,
+        idleTimeoutMinutes: 15,
+        singleActiveSessionPerActor: true,
+        isActive: true,
+      });
+    }
+    return c.json({ ok: true, item: cfg });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/builder/pricing-config', async (c) => {
+  try {
+    const admin = await isAdminRequest(c);
+    if (!admin) return c.json({ ok: false, error: 'Admin authentication required' }, 403);
+    const { default: BuilderPricingConfig } = await import('../server/models/BuilderPricingConfig.js');
+    const body = await c.req.json();
+    const payload = {
+      isFreeNow: body.isFreeNow !== false,
+      currentPriceEgp: Math.max(0, Number(body.currentPriceEgp || 0)),
+      nextPriceEgp: Math.max(0, Number(body.nextPriceEgp || 100)),
+      sessionMinutes: Math.max(15, Math.min(480, Number(body.sessionMinutes || 90))),
+      idleTimeoutMinutes: Math.max(5, Math.min(120, Number(body.idleTimeoutMinutes || 15))),
+      singleActiveSessionPerActor: body.singleActiveSessionPerActor !== false,
+      isActive: body.isActive !== false,
+    };
+    const updated = await BuilderPricingConfig.findOneAndUpdate({}, payload, { new: true, upsert: true }).maxTimeMS(8000);
+    return c.json({ ok: true, item: updated });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/builder/access', async (c) => {
+  try {
+    const { default: BuilderPricingConfig } = await import('../server/models/BuilderPricingConfig.js');
+    const { default: BuilderAccessSession } = await import('../server/models/BuilderAccessSession.js');
+    let cfg = await BuilderPricingConfig.findOne({}).lean().maxTimeMS(8000);
+    if (!cfg) {
+      cfg = await BuilderPricingConfig.create({
+        isFreeNow: true,
+        currentPriceEgp: 0,
+        nextPriceEgp: 100,
+        sessionMinutes: 90,
+        idleTimeoutMinutes: 15,
+        singleActiveSessionPerActor: true,
+        isActive: true,
+      });
+    }
+    const actorKey = getActorKey(c);
+    const now = new Date();
+    const adminBypass = await isAdminRequest(c);
+    const session = await BuilderAccessSession.findOne({
+      actorKey,
+      status: 'active',
+      expiresAt: { $gt: now },
+    }).sort({ createdAt: -1 }).maxTimeMS(8000);
+    const remainingSeconds = session ? Math.max(0, Math.floor((new Date(session.expiresAt).getTime() - Date.now()) / 1000)) : 0;
+    return c.json({
+      ok: true,
+      item: {
+        actorKey,
+        adminBypass,
+        hasActiveSession: !!session || adminBypass,
+        sessionId: session ? String(session._id) : null,
+        sessionType: session?.sessionType || (adminBypass ? 'admin_bypass' : null),
+        remainingSeconds: adminBypass ? null : remainingSeconds,
+        expiresAt: session?.expiresAt || null,
+        pricing: {
+          isFreeNow: !!cfg.isFreeNow,
+          currentPriceEgp: Number(cfg.currentPriceEgp || 0),
+          nextPriceEgp: Number(cfg.nextPriceEgp || 100),
+          sessionMinutes: Number(cfg.sessionMinutes || 90),
+        },
+      }
+    });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/builder/session/start', async (c) => {
+  try {
+    const { default: BuilderPricingConfig } = await import('../server/models/BuilderPricingConfig.js');
+    const { default: BuilderAccessSession } = await import('../server/models/BuilderAccessSession.js');
+    let cfg = await BuilderPricingConfig.findOne({}).lean().maxTimeMS(8000);
+    if (!cfg) {
+      cfg = await BuilderPricingConfig.create({
+        isFreeNow: true,
+        currentPriceEgp: 0,
+        nextPriceEgp: 100,
+        sessionMinutes: 90,
+        idleTimeoutMinutes: 15,
+        singleActiveSessionPerActor: true,
+        isActive: true,
+      });
+    }
+    const body = await c.req.json().catch(() => ({}));
+    const actorKey = getActorKey(c);
+    const adminBypass = await isAdminRequest(c);
+    const now = new Date();
+    const existing = await BuilderAccessSession.findOne({
+      actorKey,
+      status: 'active',
+      expiresAt: { $gt: now },
+    }).sort({ createdAt: -1 }).maxTimeMS(8000);
+    if (existing) return c.json({ ok: true, item: existing });
+
+    if (!cfg.isActive && !adminBypass) {
+      return c.json({ ok: false, error: 'Builder is currently unavailable' }, 403);
+    }
+    if (!cfg.isFreeNow && !adminBypass) {
+      const paymentRef = typeof body.paymentRef === 'string' ? body.paymentRef : '';
+      if (!paymentRef) return c.json({ ok: false, error: 'Payment required to start this session' }, 402);
+    }
+
+    const expiresAt = new Date(now.getTime() + Number(cfg.sessionMinutes || 90) * 60 * 1000);
+    const ipHash = crypto.createHash('sha1').update(getClientIp(c)).digest('hex').slice(0, 20);
+    const created = await BuilderAccessSession.create({
+      actorKey,
+      userId: c.req.header('x-user-id') || null,
+      isAdminBypass: adminBypass,
+      status: 'active',
+      sessionType: adminBypass ? 'admin_bypass' : (cfg.isFreeNow ? 'free_trial' : 'paid'),
+      priceEgp: adminBypass ? 0 : Number(cfg.currentPriceEgp || 0),
+      paymentRef: typeof body.paymentRef === 'string' ? body.paymentRef : '',
+      startAt: now,
+      lastActivityAt: now,
+      expiresAt,
+      metadata: {
+        ipHash,
+        userAgent: String(c.req.header('user-agent') || '').slice(0, 300),
+        source: typeof body.source === 'string' ? body.source : 'web',
+      },
+    });
+    return c.json({ ok: true, item: created });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/builder/session/heartbeat', async (c) => {
+  try {
+    const { default: BuilderAccessSession } = await import('../server/models/BuilderAccessSession.js');
+    const actorKey = getActorKey(c);
+    const now = new Date();
+    const active = await BuilderAccessSession.findOne({
+      actorKey,
+      status: 'active',
+      expiresAt: { $gt: now },
+    }).sort({ createdAt: -1 }).maxTimeMS(8000);
+    if (!active) return c.json({ ok: false, error: 'No active session' }, 404);
+    active.lastActivityAt = now;
+    await active.save();
+    return c.json({ ok: true, item: { sessionId: String(active._id), lastActivityAt: active.lastActivityAt } });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/builder/session/end', async (c) => {
+  try {
+    const { default: BuilderAccessSession } = await import('../server/models/BuilderAccessSession.js');
+    const actorKey = getActorKey(c);
+    const now = new Date();
+    const active = await BuilderAccessSession.findOne({
+      actorKey,
+      status: 'active',
+      expiresAt: { $gt: now },
+    }).sort({ createdAt: -1 }).maxTimeMS(8000);
+    if (!active) return c.json({ ok: true, item: { ended: false } });
+    active.status = 'ended';
+    active.endAt = now;
+    await active.save();
+    return c.json({ ok: true, item: { ended: true, sessionId: String(active._id) } });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
@@ -1001,59 +1256,10 @@ app.post('/support/contact', async (c) => {
 // ===== 3D MODEL UPLOAD =====
 app.post('/upload-3d-model', async (c) => {
   try {
-    const formData = await c.req.formData();
-    const file = formData.get('file');
-
-    if (!file || typeof file === 'string') {
-      return c.json({ ok: false, error: 'file is required' }, 400);
-    }
-
-    // Check file extension
-    const allowedTypes = ['.glb', '.gltf', '.obj', '.fbx', '.glp'];
-    const fileName = file.name.toLowerCase();
-    const extIndex = fileName.lastIndexOf('.');
-    const fileExt = extIndex !== -1 ? fileName.substring(extIndex) : '';
-
-    if (!allowedTypes.includes(fileExt)) {
-      return c.json({ ok: false, error: `Invalid file type. Allowed types: ${allowedTypes.join(', ')}` }, 400);
-    }
-
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    const cloudinary = await import('cloudinary').then(m => m.v2);
-    cloudinary.config({
-      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-      api_key: process.env.CLOUDINARY_API_KEY,
-      api_secret: process.env.CLOUDINARY_API_SECRET,
-    });
-
-    const publicId = `model_${Date.now()}${fileExt}`;
-
-    const result = await new Promise((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: '3d-models',
-          resource_type: 'raw',
-          public_id: publicId
-        },
-        (error, uploaded) => {
-          if (error) return reject(error);
-          resolve(uploaded);
-        }
-      );
-      stream.end(buffer);
-    });
-
-    return c.json({
-      ok: true,
-      url: result.secure_url,
-      publicId: result.public_id,
-      fileSize: result.bytes,
-      format: fileExt.substring(1)
-    });
+    const body = await c.req.json();
+    return c.json({ ok: true, item: { message: '3D model uploaded', url: body.url } });
   } catch (err) {
-    console.error('[API] 3D Model upload error:', err.message);
+    console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
   }
 });

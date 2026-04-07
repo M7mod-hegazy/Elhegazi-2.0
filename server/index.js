@@ -28,6 +28,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
+import net from 'node:net';
 import { requirePermission, applyReadConditions, validateWriteAgainstConditions, getUserPermissions, clearUserPermissionCache } from './rbac/permissions.js';
 
 const ORDER_STATUS_TRANSITIONS = {
@@ -76,6 +77,8 @@ import Transaction from './models/Transaction.js';
 import Branch from './models/Branch.js';
 import HistoryRead from './models/HistoryRead.js';
 import Rating from './models/Rating.js';
+import BuilderPricingConfig from './models/BuilderPricingConfig.js';
+import BuilderAccessSession from './models/BuilderAccessSession.js';
 
 // Services
 import orderAutomationService from './services/orderAutomationService.js';
@@ -149,6 +152,66 @@ app.get('/api/debug/whoami', async (req, res) => {
     return res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+function getClientIp(req) {
+  return (
+    req.headers['x-forwarded-for']?.split(',')[0]?.trim()
+    || req.socket?.remoteAddress
+    || req.ip
+    || 'unknown-ip'
+  );
+}
+
+function getActorKey(req) {
+  const userId = req.user?._id || null;
+  if (userId) return `user:${userId}`;
+  const ua = String(req.headers['user-agent'] || 'unknown-ua');
+  const ip = getClientIp(req);
+  const anonHash = crypto.createHash('sha1').update(`${ip}|${ua}`).digest('hex').slice(0, 24);
+  return `anon:${anonHash}`;
+}
+
+async function getBuilderPricingConfig() {
+  let cfg = await BuilderPricingConfig.findOne().lean();
+  if (!cfg) {
+    cfg = (await BuilderPricingConfig.create({
+      isFreeNow: true,
+      currentPriceEgp: 0,
+      nextPriceEgp: 100,
+      sessionMinutes: 90,
+      idleTimeoutMinutes: 15,
+      singleActiveSessionPerActor: true,
+      isActive: true,
+    })).toObject();
+  }
+  return cfg;
+}
+
+async function isAdminRequest(req) {
+  try {
+    const hdr = req.header('x-admin-secret') || '';
+    const hasValidSecret = !!process.env.ADMIN_SECRET && hdr === process.env.ADMIN_SECRET;
+    if (hasValidSecret) return true;
+
+    if (!req.user?._id) return false;
+    const user = await User.findById(req.user._id).select('role').lean();
+    return !!(user && (user.role === 'admin' || user.role === 'SuperAdmin' || user.role === 'super_admin'));
+  } catch {
+    return false;
+  }
+}
+
+async function getActiveBuilderSession(actorKey) {
+  const now = new Date();
+  const active = await BuilderAccessSession.findOne({
+    actorKey,
+    status: 'active',
+    expiresAt: { $gt: now },
+  }).sort({ createdAt: -1 });
+
+  if (!active) return null;
+  return active;
+}
 
 app.post('/api/orders/bulk/status', requirePermission('orders', 'update', { attach: true }), async (req, res) => {
   try {
@@ -493,7 +556,7 @@ app.post('/api/rbac/bootstrap-roles', async (req, res) => {
   }
 });
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } }); // 100MB for 3D models
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 // unread support: lastSeenAt per admin
 app.get('/api/history/unread-count', async (req, res) => {
@@ -1037,7 +1100,10 @@ app.put('/api/home-config', async (req, res) => {
 // Shop Setup - Get current shop setup
 app.get('/api/shop-setup', async (req, res) => {
   try {
-    const shop = await ShopSetup.findOne().lean();
+    const userId = req.user?._id ? String(req.user._id) : null;
+    const actorKey = getActorKey(req);
+    const query = userId ? { userId } : { actorKey };
+    const shop = await ShopSetup.findOne(query).lean();
     return res.json({ ok: true, item: shop || null });
   } catch (err) {
     return res.status(400).json({ ok: false, error: err.message });
@@ -1048,7 +1114,11 @@ app.get('/api/shop-setup', async (req, res) => {
 app.post('/api/shop-setup', async (req, res) => {
   try {
     const body = req.body || {};
+    const userId = req.user?._id ? String(req.user._id) : null;
+    const actorKey = getActorKey(req);
     const payload = {
+      userId,
+      actorKey,
       ownerName: body.ownerName || '',
       shopName: body.shopName || '',
       phone: body.phone || '',
@@ -1057,7 +1127,12 @@ app.post('/api/shop-setup', async (req, res) => {
       customField: body.customField || '',
     };
 
-    const shop = await ShopSetup.findOneAndUpdate({}, payload, { new: true, upsert: true, setDefaultsOnInsert: true });
+    if (!payload.ownerName.trim() || !payload.shopName.trim() || !payload.phone.trim() || !payload.field.trim()) {
+      return res.status(400).json({ ok: false, error: 'Missing required shop setup fields' });
+    }
+
+    const query = userId ? { userId } : { actorKey };
+    const shop = await ShopSetup.findOneAndUpdate(query, payload, { new: true, upsert: true, setDefaultsOnInsert: true });
     return res.json({ ok: true, item: shop });
   } catch (err) {
     return res.status(400).json({ ok: false, error: err.message });
@@ -1067,10 +1142,174 @@ app.post('/api/shop-setup', async (req, res) => {
 // Shop Setup - Get all shops (for admin)
 app.get('/api/shop-setup/all', async (req, res) => {
   try {
+    const adminBypass = await isAdminRequest(req);
+    if (!adminBypass) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
     const shops = await ShopSetup.find().sort({ createdAt: -1 }).lean();
     return res.json({ ok: true, items: shops });
   } catch (err) {
     return res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+// --- Builder Access & Session Lock ---
+app.get('/api/builder/pricing-config', async (_req, res) => {
+  try {
+    const cfg = await getBuilderPricingConfig();
+    return res.json({
+      ok: true,
+      item: {
+        isFreeNow: !!cfg.isFreeNow,
+        currentPriceEgp: Number(cfg.currentPriceEgp || 0),
+        nextPriceEgp: Number(cfg.nextPriceEgp || 100),
+        sessionMinutes: Number(cfg.sessionMinutes || 90),
+        idleTimeoutMinutes: Number(cfg.idleTimeoutMinutes || 15),
+        singleActiveSessionPerActor: !!cfg.singleActiveSessionPerActor,
+        isActive: !!cfg.isActive,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message || 'Failed to load pricing config' });
+  }
+});
+
+app.put('/api/builder/pricing-config', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+
+    const body = req.body || {};
+    const payload = {
+      isFreeNow: !!body.isFreeNow,
+      currentPriceEgp: Math.max(0, Number(body.currentPriceEgp || 0)),
+      nextPriceEgp: Math.max(0, Number(body.nextPriceEgp || 100)),
+      sessionMinutes: Math.max(15, Math.min(480, Number(body.sessionMinutes || 90))),
+      idleTimeoutMinutes: Math.max(5, Math.min(120, Number(body.idleTimeoutMinutes || 15))),
+      singleActiveSessionPerActor: body.singleActiveSessionPerActor !== false,
+      isActive: body.isActive !== false,
+    };
+
+    const updated = await BuilderPricingConfig.findOneAndUpdate({}, payload, {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    }).lean();
+
+    return res.json({ ok: true, item: updated });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to update pricing config' });
+  }
+});
+
+app.get('/api/builder/access', async (req, res) => {
+  try {
+    const cfg = await getBuilderPricingConfig();
+    const adminBypass = await isAdminRequest(req);
+    const actorKey = getActorKey(req);
+    const session = await getActiveBuilderSession(actorKey);
+    const now = Date.now();
+    const expiresAtMs = session?.expiresAt ? new Date(session.expiresAt).getTime() : 0;
+    const remainingSeconds = expiresAtMs > now ? Math.floor((expiresAtMs - now) / 1000) : 0;
+
+    return res.json({
+      ok: true,
+      item: {
+        actorKey,
+        adminBypass,
+        hasActiveSession: !!session || adminBypass,
+        sessionId: session?._id ? String(session._id) : null,
+        sessionType: session?.sessionType || (adminBypass ? 'admin_bypass' : null),
+        remainingSeconds: adminBypass ? null : remainingSeconds,
+        expiresAt: session?.expiresAt || null,
+        pricing: {
+          isFreeNow: !!cfg.isFreeNow,
+          currentPriceEgp: Number(cfg.currentPriceEgp || 0),
+          nextPriceEgp: Number(cfg.nextPriceEgp || 100),
+          sessionMinutes: Number(cfg.sessionMinutes || 90),
+        },
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message || 'Failed to load access state' });
+  }
+});
+
+app.post('/api/builder/session/start', async (req, res) => {
+  try {
+    const cfg = await getBuilderPricingConfig();
+    const actorKey = getActorKey(req);
+    const adminBypass = await isAdminRequest(req);
+    const active = await getActiveBuilderSession(actorKey);
+    if (active) {
+      return res.json({ ok: true, item: active });
+    }
+
+    if (!cfg.isActive && !adminBypass) {
+      return res.status(403).json({ ok: false, error: 'Builder is currently unavailable' });
+    }
+
+    const body = req.body || {};
+    if (!cfg.isFreeNow && !adminBypass) {
+      if (!body.paymentRef || typeof body.paymentRef !== 'string') {
+        return res.status(402).json({ ok: false, error: 'Payment required to start this session' });
+      }
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + Number(cfg.sessionMinutes || 90) * 60 * 1000);
+    const ip = getClientIp(req);
+    const ipHash = crypto.createHash('sha1').update(ip).digest('hex').slice(0, 20);
+    const userAgent = String(req.headers['user-agent'] || '');
+    const session = await BuilderAccessSession.create({
+      actorKey,
+      userId: req.user?._id ? String(req.user._id) : null,
+      isAdminBypass: adminBypass,
+      status: 'active',
+      sessionType: adminBypass ? 'admin_bypass' : (cfg.isFreeNow ? 'free_trial' : 'paid'),
+      priceEgp: adminBypass ? 0 : Number(cfg.currentPriceEgp || 0),
+      paymentRef: typeof body.paymentRef === 'string' ? body.paymentRef : '',
+      startAt: now,
+      lastActivityAt: now,
+      expiresAt,
+      metadata: {
+        ipHash,
+        userAgent: userAgent.slice(0, 300),
+        source: typeof body.source === 'string' ? body.source : 'web',
+      },
+    });
+
+    return res.json({ ok: true, item: session });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to start builder session' });
+  }
+});
+
+app.post('/api/builder/session/heartbeat', async (req, res) => {
+  try {
+    const actorKey = getActorKey(req);
+    const active = await getActiveBuilderSession(actorKey);
+    if (!active) {
+      return res.status(404).json({ ok: false, error: 'No active session' });
+    }
+    active.lastActivityAt = new Date();
+    await active.save();
+    return res.json({ ok: true, item: { sessionId: String(active._id), lastActivityAt: active.lastActivityAt } });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to update session heartbeat' });
+  }
+});
+
+app.post('/api/builder/session/end', async (req, res) => {
+  try {
+    const actorKey = getActorKey(req);
+    const active = await getActiveBuilderSession(actorKey);
+    if (!active) return res.json({ ok: true, item: { ended: false } });
+
+    active.status = 'ended';
+    active.endAt = new Date();
+    await active.save();
+    return res.json({ ok: true, item: { ended: true, sessionId: String(active._id) } });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to end builder session' });
   }
 });
 
@@ -1103,23 +1342,154 @@ async function ensureAdminUser() {
 
 ensureAdminUser();
 
-// Demo: Upload image by URL to Cloudinary
+function isPrivateIpv4(ip) {
+  const parts = String(ip).split('.').map((p) => Number(p));
+  if (parts.length !== 4 || parts.some((n) => !Number.isFinite(n) || n < 0 || n > 255)) return false;
+  if (parts[0] === 10) return true;
+  if (parts[0] === 127) return true;
+  if (parts[0] === 0) return true;
+  if (parts[0] === 169 && parts[1] === 254) return true;
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+  if (parts[0] === 192 && parts[1] === 168) return true;
+  return false;
+}
+
+function isPrivateIpv6(ip) {
+  const normalized = String(ip).toLowerCase();
+  if (normalized === '::1') return true;
+  if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+  if (normalized.startsWith('fe80:')) return true;
+  if (normalized.startsWith('::ffff:')) {
+    const mapped = normalized.replace('::ffff:', '');
+    if (net.isIP(mapped) === 4) return isPrivateIpv4(mapped);
+  }
+  return false;
+}
+
+function isBlockedHostname(hostname) {
+  const host = String(hostname || '').toLowerCase();
+  return host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || host.endsWith('.internal');
+}
+
+function assertSafeRemoteImageUrl(inputUrl) {
+  if (typeof inputUrl !== 'string' || !inputUrl.trim()) {
+    throw new Error('url is required');
+  }
+  if (inputUrl.length > 2048) {
+    throw new Error('URL is too long');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(inputUrl.trim());
+  } catch {
+    throw new Error('Invalid URL');
+  }
+
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error('Only http/https URLs are allowed');
+  }
+  if (parsed.username || parsed.password) {
+    throw new Error('Credentials in URL are not allowed');
+  }
+  if (isBlockedHostname(parsed.hostname)) {
+    throw new Error('Blocked host');
+  }
+
+  const hostType = net.isIP(parsed.hostname);
+  if (hostType === 4 && isPrivateIpv4(parsed.hostname)) {
+    throw new Error('Private network IPs are not allowed');
+  }
+  if (hostType === 6 && isPrivateIpv6(parsed.hostname)) {
+    throw new Error('Private network IPs are not allowed');
+  }
+
+  return parsed.toString();
+}
+
+async function probeRemoteImageUrl(url, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      method: 'GET',
+      redirect: 'follow',
+      signal: controller.signal,
+      headers: {
+        Range: 'bytes=0-4096',
+      },
+    });
+    if (!response.ok) {
+      throw new Error(`Source returned ${response.status}`);
+    }
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.startsWith('image/')) {
+      throw new Error('URL does not point to an image');
+    }
+    return {
+      contentType,
+      contentLength: Number(response.headers.get('content-length') || 0),
+    };
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      throw new Error('Timed out while checking image URL');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// Upload image by URL to Cloudinary (hardened)
 app.post('/api/cloudinary/upload-url', async (req, res) => {
   try {
-    const { url, public_id } = req.body || {};
-    if (!url) return res.status(400).json({ ok: false, error: 'url is required' });
-    const result = await cloudinary.uploader.upload(url, { public_id });
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) {
+      return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    }
+
+    const { url, public_id, folder, validateOnly } = req.body || {};
+    const safeUrl = assertSafeRemoteImageUrl(url);
+    await probeRemoteImageUrl(safeUrl, 8000);
+
+    if (validateOnly) {
+      return res.json({ ok: true, item: { url: safeUrl, valid: true } });
+    }
+
+    const uploadOptions = {
+      folder: typeof folder === 'string' && folder.trim() ? folder.trim() : 'products',
+      resource_type: 'image',
+    };
+
+    if (typeof public_id === 'string' && public_id.trim()) {
+      const cleaned = public_id.trim();
+      if (!/^[a-zA-Z0-9/_-]+$/.test(cleaned)) {
+        return res.status(400).json({ ok: false, error: 'Invalid public_id format' });
+      }
+      uploadOptions.public_id = cleaned;
+    }
+
+    const result = await cloudinary.uploader.upload(safeUrl, uploadOptions);
     return res.json({ ok: true, result });
   } catch (err) {
     console.error('Cloudinary upload error:', err);
-    return res.status(500).json({ ok: false, error: err.message });
+    const message = err?.message || 'Upload failed';
+    const isClientError = /required|invalid|only|blocked|timed out|does not point|source returned|private network/i.test(message);
+    return res.status(isClientError ? 400 : 500).json({ ok: false, error: message });
   }
 });
 
 // Upload image file (multipart/form-data) to Cloudinary
 app.post('/api/cloudinary/upload-file', upload.single('file'), async (req, res) => {
   try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) {
+      return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    }
     if (!req.file) return res.status(400).json({ ok: false, error: 'file is required' });
+    if (!String(req.file.mimetype || '').startsWith('image/')) {
+      return res.status(400).json({ ok: false, error: 'Only image files are allowed' });
+    }
     const result = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream({
         folder: 'products',
@@ -1149,7 +1519,7 @@ app.post('/api/upload-3d-model', upload.single('file'), async (req, res) => {
     }
 
     // Check file type
-    const allowedTypes = ['.glb', '.gltf', '.obj', '.fbx', '.glp'];
+    const allowedTypes = ['.glb', '.gltf', '.obj', '.fbx'];
     const fileExt = path.extname(req.file.originalname).toLowerCase();
     
     if (!allowedTypes.includes(fileExt)) {
@@ -1160,49 +1530,32 @@ app.post('/api/upload-3d-model', upload.single('file'), async (req, res) => {
     }
 
     // Upload to Cloudinary with raw resource type for 3D files
-    const publicId = `model_${Date.now()}${fileExt}`;
-    const fileSizeMB = req.file.buffer.length / (1024 * 1024);
+    // Include file extension in public_id to preserve it in the URL
+    const fileNameWithoutExt = path.basename(req.file.originalname, fileExt);
+    const publicId = `model_${Date.now()}${fileExt}`; // Include extension
     
-    console.log(`📦 Uploading 3D model: ${req.file.originalname} (${fileSizeMB.toFixed(1)} MB)`);
-
     const result = await new Promise((resolve, reject) => {
-      const uploadOptions = {
+      const stream = cloudinary.uploader.upload_stream({
         folder: '3d-models',
-        resource_type: 'raw',
+        resource_type: 'raw', // Important for non-image files
         public_id: publicId,
-        chunk_size: 6 * 1024 * 1024, // 6MB chunks for large files
-      };
-
-      // Use upload_large_stream for chunked uploads (supports files > 10MB)
-      const stream = cloudinary.uploader.upload_large_stream
-        ? cloudinary.uploader.upload_large_stream(uploadOptions, (error, uploaded) => {
-            if (error) return reject(error);
-            resolve(uploaded);
-          })
-        : cloudinary.uploader.upload_stream(uploadOptions, (error, uploaded) => {
-            if (error) return reject(error);
-            resolve(uploaded);
-          });
-
-      // Write buffer in chunks to avoid memory pressure
-      const CHUNK = 4 * 1024 * 1024; // 4MB write chunks
-      let offset = 0;
-      while (offset < req.file.buffer.length) {
-        const end = Math.min(offset + CHUNK, req.file.buffer.length);
-        stream.write(req.file.buffer.slice(offset, end));
-        offset = end;
-      }
-      stream.end();
+        format: fileExt.substring(1), // Remove the dot from extension
+      }, (error, uploaded) => {
+        if (error) return reject(error);
+        resolve(uploaded);
+      });
+      stream.end(req.file.buffer);
     });
 
     console.log('✅ 3D Model uploaded:', result.secure_url);
+    console.log('📦 File extension:', fileExt);
     
     return res.json({ 
       ok: true, 
       url: result.secure_url,
       publicId: result.public_id,
       fileSize: result.bytes,
-      format: fileExt.substring(1)
+      format: fileExt.substring(1) // Return extension without dot
     });
   } catch (err) {
     console.error('❌ 3D Model upload error:', err);

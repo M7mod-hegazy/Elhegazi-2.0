@@ -28,6 +28,7 @@ const Model3DPreview: React.FC<Model3DPreviewProps> = ({
 
   useEffect(() => {
     if (!containerRef.current) return;
+    const mount = containerRef.current;
 
     // Setup scene
     const scene = new THREE.Scene();
@@ -42,12 +43,24 @@ const Model3DPreview: React.FC<Model3DPreviewProps> = ({
 
     // Setup renderer
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setSize(300, 300);
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.shadowMap.enabled = true;
     rendererRef.current = renderer;
+    renderer.domElement.style.width = '100%';
+    renderer.domElement.style.height = '100%';
+    mount.appendChild(renderer.domElement);
 
-    containerRef.current.appendChild(renderer.domElement);
+    const updateRendererSize = () => {
+      const width = Math.max(120, mount.clientWidth || 300);
+      const height = Math.max(120, mount.clientHeight || width);
+      camera.aspect = width / height;
+      camera.updateProjectionMatrix();
+      renderer.setSize(width, height, false);
+    };
+
+    updateRendererSize();
+    const resizeObserver = new ResizeObserver(updateRendererSize);
+    resizeObserver.observe(mount);
 
     // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 1.2);
@@ -63,7 +76,15 @@ const Model3DPreview: React.FC<Model3DPreviewProps> = ({
     scene.add(fillLight);
 
     // Load model
-    const fileExtension = modelUrl.split('.').pop()?.toLowerCase();
+    const getFileExtension = () => {
+      try {
+        const pathname = new URL(modelUrl, window.location.origin).pathname;
+        return pathname.split('.').pop()?.toLowerCase();
+      } catch {
+        return modelUrl.split('?')[0].split('.').pop()?.toLowerCase();
+      }
+    };
+    const fileExtension = getFileExtension();
     
     const onLoad = (object: THREE.Group) => {
       // Calculate bounding box BEFORE any transformations
@@ -138,8 +159,9 @@ const Model3DPreview: React.FC<Model3DPreviewProps> = ({
       if (frameRef.current) {
         cancelAnimationFrame(frameRef.current);
       }
-      if (containerRef.current && renderer.domElement) {
-        containerRef.current.removeChild(renderer.domElement);
+      resizeObserver.disconnect();
+      if (mount && renderer.domElement && mount.contains(renderer.domElement)) {
+        mount.removeChild(renderer.domElement);
       }
       renderer.dispose();
       scene.traverse((object) => {

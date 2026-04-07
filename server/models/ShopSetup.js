@@ -3,6 +3,8 @@ import mongoose from 'mongoose';
 const ShopSetupSchema = new mongoose.Schema(
   {
     // User Information
+    userId: { type: String, default: null, index: true },
+    actorKey: { type: String, default: null, index: true },
     ownerName: { type: String, required: true },
     shopName: { type: String, required: true },
     phone: { type: String, required: true },
