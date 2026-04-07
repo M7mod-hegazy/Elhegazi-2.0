@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { apiGet } from '@/lib/api';
+import { buildProductPath } from '@/lib/product-link';
 import whatsappIcon from '@/assets/whatsapp.png';
 import messengerIcon from '@/assets/messenger.png';
 
@@ -61,7 +62,7 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
   }, [isAuthenticated, user, isOpen]);
 
   // Build product details link
-  const productDetailsLink = `${window.location.origin}/product/${productId}`;
+  const productDetailsLink = `${window.location.origin}${buildProductPath(productId)}`;
   
   // Build full message with product code if available
   const fullMessage = `${message}\n\n👤 الاسم: ${userName}\n📱 الهاتف: ${userPhone}\n📍 العنوان: ${userAddress}\n\n📦 المنتج: ${productName}${productCode ? `\nالكود: ${productCode}` : ''}\n🔗 الرابط: ${productDetailsLink}`;

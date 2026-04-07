@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -6,11 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { AlertTriangle, Plus, Sliders, Trash2, Images, Search, X, LayoutDashboard, Hash, Edit2, Zap, Target, ExternalLink, FileText, Save, Type, Lightbulb, Award, Palette, Info } from 'lucide-react';
 import type { HomeConfig, Slide } from '@/types/home-config';
 import { SelectionModal } from '@/components/admin/home-config/SelectionModal';
 import { apiGet, apiPutJson } from '@/lib/api';
+import { buildCategoryPath } from '@/lib/category-link';
 import BackgroundPattern from '@/components/home/BackgroundPattern';
 
 interface HeroSlidesModalProps {
@@ -57,19 +59,11 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
   // Also refresh when the modal is opened (in case storage changed elsewhere)
   useEffect(() => {
     if (!open) return;
-    if (typeof window === 'undefined') return;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const arr: unknown = JSON.parse(raw);
-      if (Array.isArray(arr)) {
-        const nums = arr.map((x) => Number(x)).filter((n) => Number.isFinite(n));
-        setCollapsed(new Set(nums));
-      }
-    } catch {
-      // ignore
-    }
-  }, [open]);
+    // Always start collapsed for a cleaner 2-cards view.
+    const allCollapsed = new Set((cfg.slides || []).map((_, i) => i));
+    setCollapsed(allCollapsed);
+    persistCollapsed(allCollapsed);
+  }, [open, cfg.slides]);
 
   // Defer animations until after first paint to avoid initial content flash
   const [hydrated, setHydrated] = useState(false);
@@ -235,15 +229,24 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
   }, [openSuggestFor]);
 
   // Categories quick-pick for buttonLink
-  const [categories, setCategories] = useState<Array<{ id: string; label: string }>>([]);
+  const [categories, setCategories] = useState<Array<{ id: string; label: string; link: string }>>([]);
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        type Category = { slug: string; name?: string };
+        type Category = { _id?: string; slug?: string; name?: string; nameAr?: string };
         const res = await apiGet<Category>('/api/categories?page=1&limit=300');
         if (res.ok && mounted) {
-          const arr: Array<{ id: string; label: string }> = (res.items || []).map((c: Category) => ({ id: c.slug, label: c.name || c.slug }));
+          const arr: Array<{ id: string; label: string; link: string }> = (res.items || []).map((c: Category) => ({
+            id: c._id || c.slug || c.name || '',
+            label: c.nameAr || c.name || c.slug || c._id || '',
+            link: buildCategoryPath({
+              slug: c.slug,
+              nameAr: c.nameAr,
+              name: c.name,
+              id: c._id,
+            }),
+          }));
           setCategories(arr);
         }
       } catch {
@@ -255,6 +258,19 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
 
   // Save a single slide by persisting the whole slides array and then collapsing this slide
   const [savingSlideIdx, setSavingSlideIdx] = useState<number | null>(null);
+  const [addingSlide, setAddingSlide] = useState(false);
+  const [pendingAddSave, setPendingAddSave] = useState(false);
+  const prevSlidesLenRef = useRef(cfg.slides.length);
+  const [editorOpenIdx, setEditorOpenIdx] = useState<number | null>(null);
+  useEffect(() => {
+    if (!open) setEditorOpenIdx(null);
+  }, [open]);
+  useEffect(() => {
+    if (editorOpenIdx === null) return;
+    if (editorOpenIdx < 0 || editorOpenIdx >= (cfg.slides?.length || 0)) {
+      setEditorOpenIdx(null);
+    }
+  }, [editorOpenIdx, cfg.slides?.length]);
   const saveSlide = useCallback(async (idx: number) => {
     try {
       setSavingSlideIdx(idx);
@@ -280,11 +296,51 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
     }
   }, [cfg, setCfg]);
 
+  const handleAddSlide = useCallback(() => {
+    setPendingAddSave(true);
+    addSlide();
+  }, [addSlide]);
+
+  useEffect(() => {
+    if (!pendingAddSave) {
+      prevSlidesLenRef.current = cfg.slides.length;
+      return;
+    }
+    if (cfg.slides.length <= prevSlidesLenRef.current) return;
+
+    let cancelled = false;
+    (async () => {
+      try {
+        setAddingSlide(true);
+        const body = { slides: cfg.slides, heroEnabled: cfg.heroEnabled } as Partial<HomeConfig>;
+        const headers = typeof window !== 'undefined'
+          ? { 'x-admin-secret': localStorage.getItem('ADMIN_SECRET') || '' }
+          : undefined;
+        const res = await apiPutJson<HomeConfig, Partial<HomeConfig>>('/api/home-config', body, headers);
+        if (res.ok && !cancelled) setCfg(res.item as HomeConfig);
+      } catch {
+        // silent
+      } finally {
+        if (!cancelled) {
+          setAddingSlide(false);
+          setPendingAddSave(false);
+          prevSlidesLenRef.current = cfg.slides.length;
+        }
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [pendingAddSave, cfg, setCfg]);
+
   const pickerSelected = useMemo(() => {
     if (pickerOpenIdx === null) return [] as string[];
     const s = cfg.slides[pickerOpenIdx];
     return (s?.productIds || []) as string[];
   }, [cfg.slides, pickerOpenIdx]);
+  const editorSlide = useMemo(() => {
+    if (editorOpenIdx === null) return null;
+    return cfg.slides[editorOpenIdx] || null;
+  }, [cfg.slides, editorOpenIdx]);
 
   const setPickerSelected = useCallback((ids: string[]) => {
     if (pickerOpenIdx === null) return;
@@ -430,208 +486,47 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-10">
-          {/* Enhanced Action Controls Section */}
-          <div className="bg-gradient-to-r from-slate-50/80 via-blue-50/50 to-indigo-50/30 p-8 rounded-3xl border border-slate-200/60 shadow-lg backdrop-blur-sm">
-            <div className="flex items-center justify-between">
-              {/* Preview Mode Selector */}
-              <div className="flex items-center gap-6">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-white rounded-xl shadow-sm border border-slate-200/50">
-                    <LayoutDashboard className="w-5 h-5 text-slate-600" />
-                  </div>
-                  <span className="text-base font-semibold text-slate-700">عرض المعاينة:</span>
-                </div>
-                <div className="flex items-center rounded-2xl border border-slate-300/70 overflow-hidden shadow-lg bg-white backdrop-blur-sm">
-                  <button
-                    type="button"
-                    className={`px-6 py-3 text-sm font-semibold transition-all duration-300 flex items-center gap-3 ${previewMode === 'desktop'
-                        ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-lg'
-                        : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-                      }`}
-                    onClick={() => setPreviewMode('desktop')}
-                  >
-                    <LayoutDashboard className="w-4 h-4" />
-                    <span>سطح المكتب</span>
-                    {previewMode === 'desktop' && <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />}
-                  </button>
-                  <button
-                    type="button"
-                    className={`px-6 py-3 text-sm font-semibold transition-all duration-300 flex items-center gap-3 ${previewMode === 'mobile'
-                        ? 'bg-gradient-to-r from-primary to-secondary text-white shadow-lg'
-                        : 'bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-800'
-                      }`}
-                    onClick={() => setPreviewMode('mobile')}
-                  >
-                    <Hash className="w-4 h-4" />
-                    <span>الجوال</span>
-                    {previewMode === 'mobile' && <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-4">
-                {/* Add New Slide */}
-                <Button
-                  onClick={addSlide}
-                  className="gap-3 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 hover:from-green-700 hover:via-emerald-700 hover:to-teal-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 px-8 py-4 rounded-2xl font-semibold text-base transform hover:scale-105 active:scale-95"
-                >
-                  <div className="relative">
-                    <Plus className="w-5 h-5" />
-                    <div className="absolute inset-0 bg-white/30 rounded-full animate-ping" />
-                  </div>
-                  إضافة شريحة جديدة
-                </Button>
-              </div>
-            </div>
-
-            {/* Preview Info */}
-            <div className="flex items-center justify-between mt-6 pt-6 border-t border-slate-200/50">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 px-4 py-2 bg-white/60 rounded-xl border border-slate-200/50">
-                  <div className={`w-2 h-2 rounded-full ${previewMode === 'desktop' ? 'bg-primary' : 'bg-purple-500'
-                    } animate-pulse`} />
-                  <span className="text-sm text-slate-600 font-medium">
-                    معاينة {previewMode === 'desktop' ? 'سطح المكتب' : 'الجوال'}
-                  </span>
-                </div>
-                {cfg.slides.length > 0 && (
-                  <div className="text-sm text-slate-500">
-                    يمكنك مشاهدة التغييرات فورياً في المعاينة أدناه
-                  </div>
-                )}
-              </div>
-
-              {cfg.slides.length > 0 && (
-                <div className="flex items-center gap-2 text-sm text-slate-500">
-                  <span>عدد الشرائح المفعلة:</span>
-                  <Badge className="bg-green-100 text-green-700 font-semibold">
-                    {cfg.slides.filter(s => s.enabled).length} / {cfg.slides.length}
-                  </Badge>
-                </div>
-              )}
-            </div>
+                    {/* Enhanced Action Controls Section */}
+          <div className="bg-gradient-to-r from-slate-50/80 via-blue-50/50 to-indigo-50/30 p-6 rounded-3xl border border-slate-200/60 shadow-lg backdrop-blur-sm">
+            <Button
+              onClick={handleAddSlide}
+              disabled={addingSlide}
+              className="gap-3 bg-gradient-to-r from-green-600 via-emerald-600 to-teal-600 hover:from-green-700 hover:via-emerald-700 hover:to-teal-700 text-white shadow-xl transition-all duration-300 px-8 py-4 rounded-2xl font-semibold text-base"
+            >
+              <Plus className="w-5 h-5" />
+              {addingSlide ? 'جارٍ الحفظ...' : 'إضافة شريحة جديدة'}
+            </Button>
           </div>
 
-          {/* Enhanced Empty State */}
+                    {/* Enhanced Empty State */}
           {cfg.slides.length === 0 && (
-            <div className="relative">
-              {/* Background Pattern */}
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-50/50 via-orange-50/30 to-red-50/20 rounded-3xl" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,rgba(251,146,60,0.1),transparent_70%)]" />
-              <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_80%,rgba(249,115,22,0.08),transparent_60%)]" />
-
-              {/* Content */}
-              <div className="relative border-2 border-dashed border-amber-300/70 rounded-3xl p-16 text-center bg-gradient-to-br from-amber-50/80 via-orange-50/50 to-red-50/30 backdrop-blur-sm">
-                <div className="flex flex-col items-center gap-8 max-w-2xl mx-auto">
-                  {/* Icon */}
-                  <div className="relative">
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-400/30 to-orange-500/30 rounded-full blur-2xl animate-pulse" />
-                    <div className="absolute inset-0 bg-gradient-to-br from-amber-300/20 to-orange-400/20 rounded-full blur-xl" />
-                    <div className="relative p-8 bg-gradient-to-br from-amber-400 to-orange-500 rounded-full shadow-2xl ring-4 ring-amber-100/50">
-                      <Images className="w-16 h-16 text-white" />
-                    </div>
-                    {/* Floating particles */}
-                    <div className="absolute -top-2 -right-2 w-4 h-4 bg-amber-300 rounded-full animate-bounce" style={{ animationDelay: '0s' }} />
-                    <div className="absolute -bottom-1 -left-1 w-3 h-3 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: '0.5s' }} />
-                    <div className="absolute top-1/2 -right-4 w-2 h-2 bg-red-300 rounded-full animate-bounce" style={{ animationDelay: '1s' }} />
-                  </div>
-
-                  {/* Content */}
-                  <div className="space-y-6">
-                    <div className="space-y-3">
-                      <h4 className="text-3xl font-bold text-amber-900 leading-tight">
-                        لا توجد شرائح محفوظة بعد
-                      </h4>
-                      <p className="text-lg text-amber-800 leading-relaxed font-medium">
-                        ابدأ بإنشاء شريحتك الأولى لعرض محتوى جذاب وتفاعلي في الصفحة الرئيسية
-                      </p>
-                    </div>
-
-                    {/* Features List */}
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-8">
-                      <div className="flex items-center gap-3 p-4 bg-white/60 rounded-2xl border border-amber-200/50 backdrop-blur-sm">
-                        <div className="p-2 bg-primary/10 rounded-xl">
-                          <Edit2 className="w-5 h-5 text-primary" />
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-slate-800">تخصيص سهل</div>
-                          <div className="text-sm text-slate-600">محرر متقدم</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-4 bg-white/60 rounded-2xl border border-amber-200/50 backdrop-blur-sm">
-                        <div className="p-2 bg-green-100 rounded-xl">
-                          <Target className="w-5 h-5 text-green-600" />
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-slate-800">معاينة فورية</div>
-                          <div className="text-sm text-slate-600">شاهد النتيجة</div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3 p-4 bg-white/60 rounded-2xl border border-amber-200/50 backdrop-blur-sm">
-                        <div className="p-2 bg-purple-100 rounded-xl">
-                          <Zap className="w-5 h-5 text-purple-600" />
-                        </div>
-                        <div className="text-right">
-                          <div className="font-semibold text-slate-800">تفاعل حي</div>
-                          <div className="text-sm text-slate-600">تأثيرات متقدمة</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* CTA Buttons */}
-                    <div className="flex items-center justify-center gap-4 mt-10">
-                      <Button
-                        onClick={addSlide}
-                        className="gap-3 bg-gradient-to-r from-amber-600 via-orange-600 to-red-600 hover:from-amber-700 hover:via-orange-700 hover:to-red-700 text-white shadow-2xl hover:shadow-3xl transition-all duration-300 px-10 py-4 rounded-2xl font-bold text-lg transform hover:scale-105 active:scale-95"
-                      >
-                        <div className="relative">
-                          <Plus className="w-6 h-6" />
-                          <div className="absolute inset-0 bg-white/40 rounded-full animate-ping" />
-                        </div>
-                        إضافة أول شريحة
-                      </Button>
-                      <Button
-                        variant="outline"
-                        className="gap-2 border-2 border-amber-300 text-amber-700 hover:bg-amber-50 hover:border-amber-400 px-6 py-4 rounded-2xl font-semibold text-base backdrop-blur-sm bg-white/50"
-                        onClick={() => {
-                          // Could trigger a demo/tutorial mode
-                        }}
-                      >
-                        <Target className="w-5 h-5" />
-                        مشاهدة مثال
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              </div>
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-10 text-center text-slate-600">
+              {'\u0644\u0627 \u062A\u0648\u062C\u062F \u0634\u0631\u0627\u0626\u062D \u062D\u0627\u0644\u064A\u064B\u0627\u060C \u0627\u0636\u063A\u0637 \u0639\u0644\u0649 \u0625\u0636\u0627\u0641\u0629 \u0634\u0631\u064A\u062D\u0629 \u062C\u062F\u064A\u062F\u0629'}
             </div>
           )}
 
           {/* Enhanced Individual Slides */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {cfg.slides.map((s, idx) => {
             const isCollapsed = collapsed.has(idx);
             const isEnabled = s.enabled;
             const isSaving = savingSlideIdx === idx;
+            const selectedCategoryLink = categories.some((c) => c.link === s.buttonLink) ? s.buttonLink : '__custom__';
 
             return (
               <Card
                 key={idx}
                 className={`transition-all duration-500 ease-out ${isCollapsed
-                    ? 'bg-gradient-to-r from-slate-50/80 to-primary/5 border-slate-200/60 shadow-md'
+                    ? 'bg-white border-slate-200 shadow-sm hover:shadow-md'
                     : 'bg-gradient-to-br from-white via-primary/5 to-secondary/5 border-primary/20 shadow-xl'
-                  } ${isEnabled ? 'ring-2 ring-green-200/50' : 'ring-2 ring-gray-200/30'} overflow-hidden`}
+                  } ${isEnabled ? 'ring-1 ring-green-200/70' : 'ring-1 ring-gray-200/70'} min-h-[220px] overflow-hidden rounded-2xl ${!isCollapsed ? 'md:col-span-2' : ''}`}
               >
                 {/* Enhanced Slide Header */}
-                <div className={`transition-all duration-300 ${isCollapsed ? 'p-6' : 'p-6 border-b border-slate-200/50 bg-gradient-to-r from-slate-50/50 to-primary/5'
+                <div className={`transition-all duration-300 ${isCollapsed ? 'p-5' : 'p-6 border-b border-slate-200/50 bg-gradient-to-r from-slate-50/50 to-primary/5'
                   }`}>
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-start justify-between gap-3">
                     {/* Slide Info Section */}
-                    <button
-                      type="button"
-                      onClick={() => toggleCollapse(idx)}
-                      className="flex items-center gap-4 text-left group transition-all duration-300 flex-1"
-                    >
+                    <div className="flex items-center gap-4 text-left group transition-all duration-300 flex-1">
                       {/* Slide Number Badge */}
                       <div className={`relative transition-all duration-300 ${isCollapsed ? 'w-12 h-12' : 'w-14 h-14'
                         }`}>
@@ -653,7 +548,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                       {/* Slide Preview and Info */}
                       <div className="flex items-center gap-4 flex-1 min-w-0">
                         {/* Enhanced Preview Thumbnail */}
-                        <div className={`relative overflow-hidden rounded-xl border-2 transition-all duration-300 ${isCollapsed ? 'w-24 h-16' : 'w-32 h-20'
+                        <div className={`relative overflow-hidden rounded-xl border-2 transition-all duration-300 ${isCollapsed ? 'w-20 h-20' : 'w-32 h-20'
                           } ${isEnabled ? 'border-primary/20 shadow-md' : 'border-gray-200 shadow-sm'}`}>
                           {/* Background */}
                           {s.bgColor && s.bgColor.trim() ? (
@@ -698,7 +593,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                         {/* Slide Details */}
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-3 mb-2">
-                            <h4 className={`font-bold text-slate-900 truncate group-hover:text-primary transition-all duration-300 ${isCollapsed ? 'text-lg' : 'text-xl'
+                            <h4 className={`font-bold text-slate-900 truncate group-hover:text-primary transition-all duration-300 ${isCollapsed ? 'text-base' : 'text-xl'
                               }`}>
                               {s.title?.trim() || `شريحة #${idx + 1}`}
                             </h4>
@@ -742,10 +637,11 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                           )}
                         </div>
                       </div>
-                    </button>
+                    </div>
+
 
                     {/* Action Controls */}
-                    <div className="flex items-center gap-3 ml-4">
+                    <div className="flex items-center gap-2 shrink-0">
                       {/* Status Toggle */}
                       <div className={`transition-all duration-300 flex items-center gap-2 ${isCollapsed ? 'transform scale-90' : 'transform scale-100'
                         }`}>
@@ -753,30 +649,26 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                           checked={s.enabled}
                           onCheckedChange={(val) => updateSlide(idx, { enabled: val })}
                           variant={s.enabled ? 'success' : 'default'}
-                          size={isCollapsed ? 'sm' : 'default'}
+                          size="sm"
                           className="transition-all duration-200"
                         />
-                        {!isCollapsed && (
-                          <span className={`text-xs font-medium transition-colors duration-200 ${s.enabled ? 'text-green-700' : 'text-slate-500'
-                            }`}>
-                            {s.enabled ? 'مفعل' : 'معطل'}
-                          </span>
-                        )}
+                        <span className={s.enabled ? 'text-xs font-medium transition-colors duration-200 text-green-700' : 'text-xs font-medium transition-colors duration-200 text-slate-500'}>
+                          {s.enabled ? '\u0645\u0641\u0639\u0644' : '\u0645\u0639\u0637\u0644'}
+                        </span>
                       </div>
 
                       {/* Edit/Collapse Button */}
                       <Button
                         size="sm"
-                        variant={isCollapsed ? "default" : "outline"}
+                        variant={isCollapsed ? 'default' : 'outline'}
                         onClick={() => toggleCollapse(idx)}
                         className={`transition-all duration-300 gap-2 ${isCollapsed
-                            ? 'bg-primary hover:bg-primary text-white shadow-md hover:shadow-lg'
+                            ? 'bg-primary hover:bg-primary text-white shadow-sm'
                             : 'border-slate-300 hover:border-primary/30 hover:bg-primary/5'
                           }`}
                       >
-                        <Edit2 className={`w-4 h-4 transition-transform duration-300 ${!isCollapsed ? 'rotate-45' : 'rotate-0'
-                          }`} />
-                        {isCollapsed ? 'تعديل' : 'طي'}
+                        <Edit2 className={`w-4 h-4 transition-transform duration-300 ${!isCollapsed ? 'rotate-45' : 'rotate-0'}`} />
+                        {isCollapsed ? '\u062A\u0639\u062F\u064A\u0644' : '\u0625\u063A\u0644\u0627\u0642'}
                       </Button>
 
                       {/* Delete Button */}
@@ -790,24 +682,11 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                       </Button>
                     </div>
                   </div>
-
-                  {/* Quick Preview Strip (when collapsed) */}
-                  {isCollapsed && (
-                    <div className="mt-4 pt-4 border-t border-slate-200/50">
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-slate-500 font-medium">معاينة سريعة:</span>
-                        <div className={`flex-1 h-2 rounded-full overflow-hidden ${s.bgColor ? '' : 'bg-gradient-to-r'
-                          } ${s.bgColor ? '' : (s.bgGradient || 'from-indigo-600 via-purple-600 to-pink-600')}`}
-                          style={s.bgColor ? { backgroundColor: s.bgColor } : undefined} />
-                        <Badge className="bg-slate-100 text-slate-600 text-xs px-2 py-1">
-                          {previewMode === 'desktop' ? '💻' : '📱'}
-                        </Badge>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
-                {/* Live Preview Strip (when expanded) */}
+                  {/* Keep collapsed cards minimal/square without extra preview strips */}
+
+                  {/* Live Preview Strip (when expanded) */}
                 {!isCollapsed && (
                   <div className="px-6 pb-4">
                     <div className="rounded-xl overflow-hidden border-2 border-slate-200/50 shadow-inner">
@@ -1033,7 +912,26 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                               placeholder="/products أو https://example.com"
                               className="flex-1 px-4 py-3 text-base border-2 border-slate-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 rounded-xl transition-all duration-300 bg-white/80 backdrop-blur-sm"
                             />
-                            <div className="relative">
+                            <Select
+                              value={selectedCategoryLink}
+                              onValueChange={(value) => {
+                                if (value === '__custom__') return;
+                                updateSlide(idx, { buttonLink: value });
+                              }}
+                            >
+                              <SelectTrigger className="w-[220px] border-2 border-green-200 text-green-700 rounded-xl bg-white/90">
+                                <SelectValue placeholder="اختيار سريع من الفئات" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="__custom__">رابط مخصص</SelectItem>
+                                {categories.map((c) => (
+                                  <SelectItem key={c.id} value={c.link}>
+                                    {c.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <div className="relative hidden">
                               <Button
                                 type="button"
                                 variant="outline"
@@ -1058,7 +956,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                                         key={c.id}
                                         type="button"
                                         className="w-full text-right px-4 py-3 rounded-xl hover:bg-green-50 hover:text-green-800 transition-all duration-200 border border-transparent hover:border-green-200 font-medium"
-                                        onClick={() => { updateSlide(idx, { buttonLink: `/category/${c.id}` }); setOpenSuggestFor(null); }}
+                                        onClick={() => { updateSlide(idx, { buttonLink: c.link }); setOpenSuggestFor(null); }}
                                       >
                                         {c.label}
                                       </button>
@@ -1353,7 +1251,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                         <div>
                           <Button
                             type="button"
-                            onClick={() => saveSlide(idx)}
+                            onClick={async () => { await saveSlide(idx); setCollapsed((prev) => { const next = new Set(Array.from(prev).concat([idx])); persistCollapsed(next); return next; }); }}
                             disabled={savingSlideIdx === idx}
                             className="gap-2 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 px-8 py-4 rounded-xl font-semibold text-base"
                           >
@@ -1380,7 +1278,88 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
               </Card>
             );
           })}
+          </div>
         </div>
+
+        <Dialog open={false} onOpenChange={() => {}}>
+          <DialogContent className="max-w-5xl w-[92vw] max-h-[88vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editorOpenIdx !== null ? `تعديل الشريحة #${editorOpenIdx + 1}` : 'تعديل الشريحة'}
+              </DialogTitle>
+              <DialogDescription>
+                عدّل بيانات الشريحة بسرعة ثم احفظ التغييرات أو اخرج.
+              </DialogDescription>
+            </DialogHeader>
+            {editorOpenIdx !== null && editorSlide && (
+              <div className="p-6 space-y-8 bg-gradient-to-br from-slate-50/50 via-white to-primary/5 rounded-2xl border border-slate-200/60">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold text-slate-700">{"\u0627\u0644\u0639\u0646\u0648\u0627\u0646 \u0627\u0644\u0631\u0626\u064A\u0633\u064A"}</Label>
+                    <Input value={editorSlide.title} onChange={(e) => updateSlide(editorOpenIdx, { title: e.target.value })} className="border-2 border-slate-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 rounded-xl" />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold text-slate-700">{"\u0646\u0635 \u0627\u0644\u0632\u0631"}</Label>
+                    <Input value={editorSlide.buttonText} onChange={(e) => updateSlide(editorOpenIdx, { buttonText: e.target.value })} className="border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 rounded-xl" />
+                  </div>
+                  <div className="space-y-3 lg:col-span-2">
+                    <Label className="text-base font-semibold text-slate-700">{"\u0627\u0644\u0648\u0635\u0641"}</Label>
+                    <Textarea value={editorSlide.subtitle} onChange={(e) => updateSlide(editorOpenIdx, { subtitle: e.target.value })} rows={4} className="border-2 border-slate-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100 rounded-xl resize-none" />
+                  </div>
+                  <div className="space-y-3 lg:col-span-2">
+                    <Label className="text-base font-semibold text-slate-700">{"\u0631\u0627\u0628\u0637 \u0627\u0644\u0632\u0631"}</Label>
+                    <div className="grid grid-cols-1 md:grid-cols-[1fr_240px] gap-3">
+                      <Input value={editorSlide.buttonLink} onChange={(e) => updateSlide(editorOpenIdx, { buttonLink: e.target.value })} className="border-2 border-slate-200 focus:border-green-500 focus:ring-4 focus:ring-green-100 rounded-xl" />
+                      <Select value={categories.some((c) => c.link === editorSlide.buttonLink) ? editorSlide.buttonLink : '__custom__'} onValueChange={(value) => { if (value === '__custom__') return; updateSlide(editorOpenIdx, { buttonLink: value }); }}>
+                        <SelectTrigger className="border-2 border-green-200 rounded-xl"><SelectValue placeholder={"\u0627\u062E\u062A\u064A\u0627\u0631 \u0633\u0631\u064A\u0639 \u0645\u0646 \u0627\u0644\u0641\u0626\u0627\u062A"} /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="__custom__">{"\u0631\u0627\u0628\u0637 \u0645\u062E\u0635\u0635"}</SelectItem>
+                          {categories.map((c) => (<SelectItem key={c.id} value={c.link}>{c.label}</SelectItem>))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold text-slate-700">{"\u0627\u0644\u0634\u0639\u0627\u0631"}</Label>
+                    <Input value={editorSlide.badge || ''} onChange={(e) => updateSlide(editorOpenIdx, { badge: e.target.value })} className="border-2 border-slate-200 focus:border-amber-500 focus:ring-4 focus:ring-amber-100 rounded-xl" />
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-base font-semibold text-slate-700">{"\u0635\u0648\u0631\u0629 \u0627\u0644\u062E\u0644\u0641\u064A\u0629"}</Label>
+                    <Input value={editorSlide.image || ''} onChange={(e) => updateSlide(editorOpenIdx, { image: e.target.value })} className="border-2 border-slate-200 focus:border-pink-500 focus:ring-4 focus:ring-pink-100 rounded-xl" />
+                  </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-4 space-y-3">
+                  <Label className="text-sm font-semibold text-slate-700">{"\u0646\u0645\u0637 \u0627\u0644\u062E\u0644\u0641\u064A\u0629"}</Label>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {patternOptions.map((opt) => (
+                      <button key={opt.key} type="button" aria-pressed={editorSlide.pattern === opt.key} className={`border rounded-lg overflow-hidden text-xs transition-all ${editorSlide.pattern === opt.key ? 'ring-2 ring-pink-500 border-pink-500 bg-pink-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`} onClick={() => updateSlide(editorOpenIdx, { pattern: opt.key as Slide['pattern'] })}>
+                        {opt.preview}
+                        <div className="px-2 py-1 text-center">{opt.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">{"\u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A \u0627\u0644\u0645\u0631\u062A\u0628\u0637\u0629:"} <span className="font-bold">{(editorSlide.productIds || []).length}</span></div>
+                  <Button type="button" variant="outline" onClick={() => { setPickerOpenIdx(editorOpenIdx); setPickerVisibleCount(10); }} className="border-teal-200 text-teal-700 hover:bg-teal-50">{"\u0627\u062E\u062A\u064A\u0627\u0631 \u0627\u0644\u0645\u0646\u062A\u062C\u0627\u062A"}</Button>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-slate-700">{"\u062A\u0641\u0639\u064A\u0644 \u0627\u0644\u0634\u0631\u064A\u062D\u0629"}</span>
+                    <Switch checked={editorSlide.enabled} onCheckedChange={(val) => updateSlide(editorOpenIdx, { enabled: val })} variant={editorSlide.enabled ? 'success' : 'default'} />
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-2">
+                  <Button variant="outline" onClick={() => setEditorOpenIdx(null)}>{"\u062E\u0631\u0648\u062C"}</Button>
+                  <Button onClick={async () => { await saveSlide(editorOpenIdx); setEditorOpenIdx(null); }} disabled={savingSlideIdx === editorOpenIdx}>
+                    {savingSlideIdx === editorOpenIdx ? "\u062C\u0627\u0631\u064D \u0627\u0644\u062D\u0641\u0638..." : "\u062D\u0641\u0638 \u0648\u0625\u063A\u0644\u0627\u0642"}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* shared Selection Modal for per-slide products */}
         <SelectionModal

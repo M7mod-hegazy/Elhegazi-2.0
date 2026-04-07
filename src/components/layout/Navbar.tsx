@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { apiGet, type ApiResponse } from '@/lib/api';
+import { buildCategoryPath } from '@/lib/category-link';
 import type { Category } from '@/types';
 
 type ApiCategory = {
@@ -53,6 +54,13 @@ const Navbar = () => {
   const { hidePrices } = usePricingSettings();
 
   const isActivePath = (path: string) => location.pathname === path;
+  const getCategoryPath = (category: Pick<Category, 'slug' | 'nameAr' | 'name' | 'id'>) =>
+    buildCategoryPath({
+      slug: category.slug,
+      nameAr: category.nameAr,
+      name: category.name,
+      id: category.id,
+    });
 
   // Build a friendly display name from auth user
   const displayName = (() => {
@@ -220,7 +228,7 @@ const Navbar = () => {
                                     className="px-2"
                                   >
                                     <DropdownMenuItem asChild>
-                                      <Link to={`/category/${category.slug}`} className="w-full flex items-center justify-between">
+                                      <Link to={getCategoryPath(category)} className="w-full flex items-center justify-between">
                                         <span>{category.nameAr}</span>
                                         {typeof category.productCount === 'number' && (
                                           <span className="text-xs text-muted-foreground">{category.productCount}</span>
@@ -500,7 +508,7 @@ const Navbar = () => {
                       .map((category) => (
                         <Link
                           key={category.id}
-                          to={`/category/${category.slug}`}
+                          to={getCategoryPath(category)}
                           onClick={() => setIsMobileMenuOpen(false)}
                           className="block py-2 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out text-sm"
                         >

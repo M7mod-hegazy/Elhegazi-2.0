@@ -3,6 +3,7 @@ import * as XLSX from 'xlsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { buildProductPath } from '@/lib/product-link';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -2826,7 +2827,7 @@ const AdminProducts = () => {
                                       <Button
                                         size="sm"
                                         variant="outline"
-                                        onClick={() => window.open(`/product/${product.id}`, '_blank')}
+                                        onClick={() => window.open(buildProductPath(product.id), '_blank')}
                                         className="h-8 w-8 p-0"
                                       >
                                         <Eye className="w-3 h-3" />
@@ -3867,3 +3868,4 @@ const AdminProducts = () => {
 };
 
 export default AdminProducts;
+

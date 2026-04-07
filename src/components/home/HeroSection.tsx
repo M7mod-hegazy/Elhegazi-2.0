@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { apiGet } from '@/lib/api';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { buildProductPath } from '@/lib/product-link';
 import type { Product } from '@/types';
 
 const HeroSection = () => {
@@ -242,7 +243,7 @@ const HeroSection = () => {
                       className="btn-primary bg-primary-foreground text-primary"
                       asChild
                     >
-                      <Link to={`/product/${currentSlideData.product.id}`}>
+                      <Link to={buildProductPath(currentSlideData.product.id)}>
                         عرض
                       </Link>
                     </Button>
@@ -282,7 +283,7 @@ const HeroSection = () => {
                       </div>
                     )}
                     <Button size="sm" asChild>
-                      <Link to={`/product/${currentSlideData.product.id}`}>
+                      <Link to={buildProductPath(currentSlideData.product.id)}>
                         عرض التفاصيل
                       </Link>
                     </Button>
@@ -338,3 +339,4 @@ const HeroSection = () => {
 };
 
 export default HeroSection;
+

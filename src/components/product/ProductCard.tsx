@@ -14,6 +14,8 @@ import AuthModal from '@/components/ui/auth-modal';
 import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal';
 import { useToast } from '@/hooks/use-toast';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { buildCategoryPath } from '@/lib/category-link';
+import { buildProductPath } from '@/lib/product-link';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination } from 'swiper/modules';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -46,6 +48,16 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
   const { toast } = useToast();
   const { hidePrices, contactMessage, loading: pricingLoading } = usePricingSettings();
   const { favorites, toggleFavorite: toggleFavoriteHook } = useFavorites();
+
+  const categoryPath = (() => {
+    return buildCategoryPath({
+      slug: product.categorySlug,
+      nameAr: product.categoryAr,
+      name: product.category,
+      id: product.categoryId || product.category,
+    });
+  })();
+  const productPath = buildProductPath(product.id);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -173,7 +185,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
             >
               {/* Main Image */}
               <SwiperSlide>
-                <Link to={`/product/${product.id}`} state={{ product }} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
+                <Link to={productPath} state={{ product }} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
                   <img
                     src={optimizeImage(product.image, { w: 320 })}
                     alt={product.nameAr}
@@ -190,7 +202,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
               {/* Additional Images */}
               {product.images && product.images.length > 0 && product.images.slice(0, 4).map((img, idx) => (
                 <SwiperSlide key={idx}>
-                  <Link to={`/product/${product.id}`} state={{ product }} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
+                  <Link to={productPath} state={{ product }} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
                     <img
                       src={optimizeImage(img, { w: 320 })}
                       alt={`${product.nameAr} - ${idx + 1}`}
@@ -210,7 +222,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
             <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-20">
               {/* Category Badge - Top Right */}
               <Link
-                to={`/category/${product.category}`}
+                to={categoryPath}
                 className="text-xs font-semibold text-white bg-primary/90 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-lg hover:bg-primary transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -307,7 +319,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
 
           {/* Content */}
           <div className="p-3 space-y-2 flex flex-col h-full">
-            <Link to={`/product/${product.id}`} className="block">
+            <Link to={productPath} className="block">
               <h3 className="font-bold text-sm text-slate-900 line-clamp-2 group-hover:text-primary transition-colors min-h-[2.5rem]">
                 {product.nameAr}
               </h3>
@@ -360,7 +372,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                     <Button
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.location.href = `/product/${product.id}`;
+                        window.location.href = productPath;
                       }}
                       className="h-10 w-10 rounded-lg bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0 relative flex-shrink-0"
                     >

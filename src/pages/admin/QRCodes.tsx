@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import AdminLayout from '@/components/admin/AdminLayout';
 import SmartProductSelector from '@/components/admin/SmartProductSelector';
 import { apiGet } from '@/lib/api';
+import { buildProductPath } from '@/lib/product-link';
 
 import { Product, Category } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -95,7 +96,7 @@ const QRCodesPDFDocument = ({ products, settings }: { products: Product[]; setti
   // Generate QR codes as base64 for PDF
   const generateQRForPDF = async (product: Product) => {
     try {
-      const qrData = `${window.location.origin}/product/${product.id}`;
+      const qrData = `${window.location.origin}${buildProductPath(product.id)}`;
       return await QRCode.toDataURL(qrData, {
         width: 200,
         margin: 1,
@@ -311,7 +312,7 @@ const AdminQRCodes = () => {
 
   // Generate QR code with logo overlay using canvas
   const generateQRCodeWithLogo = useCallback(async (product: Product, customSize?: number): Promise<string> => {
-    const productURL = `${window.location.origin}/product/${product.id}`;
+    const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
     const size = customSize || settings.size;
     const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}`;
 
@@ -414,7 +415,7 @@ const AdminQRCodes = () => {
     });
 
     // Return fallback URL while generating
-    const productURL = `${window.location.origin}/product/${product.id}`;
+    const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
     const size = customSize || settings.size;
     const params = new URLSearchParams({
       size: `${size}x${size}`,
@@ -795,7 +796,7 @@ const AdminQRCodes = () => {
         price: product.price,
         category: product.category,
         qrUrl: generateQRCodeURL(product),
-        productUrl: `${window.location.origin}/product/${product.id}`,
+        productUrl: `${window.location.origin}${buildProductPath(product.id)}`,
         qrSettings: {
           size: settings.size,
           backgroundColor: settings.backgroundColor,
@@ -841,7 +842,7 @@ const AdminQRCodes = () => {
                   ${settings.showProductCode ? `<div class="code">${product.sku}</div>` : ''}
                   ${settings.showProductName ? `<div class="name">${product.nameAr}</div>` : ''}
                   ${settings.showPrice ? `<div class="price">${product.price.toLocaleString()} ج.م</div>` : ''}
-                  <div class="url">${window.location.origin}/product/${product.id}</div>
+                  <div class="url">${window.location.origin}${buildProductPath(product.id)}</div>
                 </div>
               `).join('')}
             </div>
@@ -953,7 +954,7 @@ const AdminQRCodes = () => {
   // Handle preview link for individual product
   const handlePreviewLink = (product: Product) => {
     const qrUrl = generateQRCodeURL(product);
-    const productUrl = `${window.location.origin}/product/${product.id}`;
+    const productUrl = `${window.location.origin}${buildProductPath(product.id)}`;
 
     // Open in new window
     const previewWindow = window.open('', '_blank', 'width=600,height=400');
@@ -2049,3 +2050,4 @@ const AdminQRCodes = () => {
 };
 
 export default AdminQRCodes;
+

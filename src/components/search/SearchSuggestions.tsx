@@ -6,6 +6,7 @@ import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { Input } from '@/components/ui/input';
 import { Product } from '@/types';
 import { cn } from '@/lib/utils';
+import { buildProductPath } from '@/lib/product-link';
 
 interface SearchSuggestionsProps {
   placeholder?: string;
@@ -195,7 +196,7 @@ const SearchSuggestions = ({
                   {suggestions.map((product) => (
                     <Link
                       key={product.id}
-                      to={`/product/${product.id}`}
+                  to={buildProductPath(product.id)}
                       onClick={() => setIsOpen(false)}
                       className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50 transition-colors duration-150"
                     >

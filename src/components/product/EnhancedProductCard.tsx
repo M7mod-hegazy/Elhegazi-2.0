@@ -15,6 +15,8 @@ import AuthModal from '@/components/ui/auth-modal';
 import Rating from '@/components/product/Rating';
 import { useToast } from '@/hooks/use-toast';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { buildCategoryPath } from '@/lib/category-link';
+import { buildProductPath } from '@/lib/product-link';
 import { useFavorites } from '@/hooks/useFavorites';
 import {
   Tooltip,
@@ -43,6 +45,16 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
   const { hidePrices, contactMessage } = usePricingSettings();
   const { toast } = useToast();
   const { favorites, toggleFavorite: toggleFavoriteHook } = useFavorites();
+
+  const categoryPath = (() => {
+    return buildCategoryPath({
+      slug: product.categorySlug,
+      nameAr: product.categoryAr,
+      name: product.category,
+      id: product.categoryId || product.category,
+    });
+  })();
+  const productPath = buildProductPath(product.id);
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -161,7 +173,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                 <LoadingSpinner />
               </div>
             )}
-            <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
+            <Link to={productPath} onClick={(e) => e.stopPropagation()} aria-label="عرض المنتج" className="block w-full h-full">
               <img
                 src={optimizeImage(product.image, { w: 320 })}
                 alt={product.nameAr}
@@ -183,7 +195,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
             <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-20">
               {/* Category Badge - Top Right */}
               <Link
-                to={`/category/${product.category}`}
+                to={categoryPath}
                 className="text-xs font-semibold text-white bg-primary/90 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-lg hover:bg-primary transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
@@ -282,7 +294,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
           <div className="p-3 space-y-2 flex flex-col h-full transition-all duration-500 group-hover:bg-gradient-to-br group-hover:from-slate-50 group-hover:to-white relative z-10 bg-white">
             {/* Product Title with Modern Separation Line */}
             <div className="mb-4">
-              <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()}>
+              <Link to={productPath} onClick={(e) => e.stopPropagation()}>
                 <h3 className="font-bold text-slate-900 text-base sm:text-lg line-clamp-2 group-hover:text-primary transition-colors duration-500 leading-tight tracking-tight mb-3">
                   {product.nameAr}
                 </h3>
@@ -317,7 +329,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                     <Button
                       onClick={(e) => {
                         e.stopPropagation();
-                        window.location.href = `/product/${product.id}`;
+                        window.location.href = productPath;
                       }}
                       className="h-10 w-10 rounded-lg bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0 relative flex-shrink-0"
                     >
@@ -431,3 +443,4 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
 };
 
 export default EnhancedProductCard;
+

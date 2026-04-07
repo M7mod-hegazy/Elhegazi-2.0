@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/tooltip';
 import SocialLinks from '@/components/layout/SocialLinks';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { buildCategoryPath, getCategorySegment, normalizeCategorySegment } from '@/lib/category-link';
+import { buildProductPath } from '@/lib/product-link';
 import ScrollAnimation from '@/components/ui/scroll-animation';
 import { apiGet, type ApiResponse } from '@/lib/api';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -55,6 +57,8 @@ type ApiProduct = {
   name: string;
   nameAr?: string;
   sku?: string;
+  categoryId?: string;
+  category?: string;
   categorySlug?: string;
   price: number;
   description?: string;
@@ -237,7 +241,7 @@ const CategoryPage = () => {
       try {
         const [catRes, prodRes] = await Promise.all([
           apiGet<ApiCategory>('/api/categories'),
-          apiGet<ApiProduct>(`/api/products${slug ? `?category=${encodeURIComponent(slug)}` : ''}`),
+          apiGet<ApiProduct>('/api/products?limit=500'),
         ]);
         const catItems = (catRes as Extract<ApiResponse<ApiCategory>, { ok: true }>).items ?? [];
         const categories: Category[] = catItems.map((c) => ({
@@ -254,9 +258,17 @@ const CategoryPage = () => {
         }));
 
         const prodItems = (prodRes as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
+        const catBySlug = new Map(categories.map((c) => [c.slug, c] as const));
+        const catById = new Map(categories.map((c) => [String(c.id), c] as const));
         const products: Product[] = prodItems.map((p) => {
-          const slugVal = p.categorySlug ?? '';
-          const cat = categories.find((c) => c.slug === slugVal);
+          const directSlug = p.categorySlug?.trim() || '';
+          const byIdSlug = p.categoryId ? catById.get(String(p.categoryId))?.slug : '';
+          const byCategoryFieldSlug =
+            (p.category && catById.get(String(p.category))?.slug) ||
+            (p.category && catBySlug.get(String(p.category))?.slug) ||
+            '';
+          const slugVal = directSlug || byIdSlug || byCategoryFieldSlug || '';
+          const cat = catBySlug.get(slugVal);
           return {
             id: p._id,
             name: p.name,
@@ -269,6 +281,8 @@ const CategoryPage = () => {
             images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
             category: slugVal,
             categoryAr: cat?.nameAr ?? slugVal,
+            categoryId: p.categoryId,
+            categorySlug: slugVal,
             stock: p.stock,
             isHidden: p.active === false,
             featured: !!p.featured,
@@ -314,16 +328,63 @@ const CategoryPage = () => {
     };
   }, [slug]);
 
-  // Find the category by slug
-  const category = liveCategories.find(cat => cat.slug === slug || cat.id === slug);
+  // Find category by slug/id and by normalized names for legacy/simple links
+  const category = useMemo(() => {
+    const key = normalizeCategorySegment(slug || '');
+    return liveCategories.find((cat) => {
+      const bySlug = normalizeCategorySegment(cat.slug) === key;
+      const byId = String(cat.id) === String(slug || '');
+      const byNameAr = normalizeCategorySegment(cat.nameAr) === key;
+      const byName = normalizeCategorySegment(cat.name) === key;
+      return bySlug || byId || byNameAr || byName;
+    });
+  }, [liveCategories, slug]);
 
-  // Get category products. Prefer match by id; fallback to name/nameAr
+  // Canonical redirect: if URL uses long id, redirect to short slug URL
+  useEffect(() => {
+    if (!slug || !category) return;
+    const preferred = getCategorySegment({
+      slug: category.slug,
+      nameAr: category.nameAr,
+      name: category.name,
+      id: category.id,
+    });
+    if (preferred && slug !== preferred) {
+      navigate(`/category/${preferred}`, { replace: true });
+    }
+  }, [slug, category, navigate]);
+
+  const getProductCategoryPath = (product: Product): string =>
+    buildCategoryPath({
+      slug: product.categorySlug,
+      nameAr: product.categoryAr,
+      name: product.category,
+      id: product.categoryId || product.category,
+    });
+
+  // Get category products. Match by slug/id/name keys to support legacy data.
   const categoryProducts = useMemo(() => {
     if (!category) return [] as Product[];
-    return liveProducts.filter(product => 
-      (product.category === category.slug || product.category === category.id) && 
-      product.isHidden !== true
+    const categoryKeys = new Set(
+      [
+        normalizeCategorySegment(category.slug),
+        normalizeCategorySegment(category.nameAr),
+        normalizeCategorySegment(category.name),
+        String(category.id || '').trim(),
+      ].filter(Boolean)
     );
+
+    return liveProducts.filter((product) => {
+      const productKeys = [
+        normalizeCategorySegment(product.categorySlug),
+        normalizeCategorySegment(product.categoryAr),
+        normalizeCategorySegment(product.category),
+        String(product.categoryId || '').trim(),
+      ].filter(Boolean);
+
+      const matches = productKeys.some((key) => categoryKeys.has(key));
+      return matches && product.isHidden !== true;
+    });
   }, [liveProducts, category]);
 
   // Base filtered products (exclude price for dynamic bounds)
@@ -873,7 +934,7 @@ const CategoryPage = () => {
                   <div
                     key={product.id}
                     className="group relative rounded-2xl overflow-hidden bg-white border-2 border-slate-200 hover:border-primary shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-1 cursor-pointer"
-                    onClick={() => navigate(`/product/${product.id}`)}
+                    onClick={() => navigate(buildProductPath(product.id))}
                     onMouseEnter={() => setHoveredProduct(product.id)}
                     onMouseLeave={() => setHoveredProduct(null)}
                   >
@@ -886,7 +947,7 @@ const CategoryPage = () => {
                       {/* Left: Product Image */}
                       <div className="relative flex-shrink-0">
                         <div className="w-44 h-44 rounded-xl overflow-hidden bg-slate-50">
-                          <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()}>
+                          <Link to={buildProductPath(product.id)} onClick={(e) => e.stopPropagation()}>
                             <img
                               src={optimizeImage(product.image || `/api/categories/${product.category}/image`, { w: 180 })}
                               alt={product.nameAr}
@@ -936,13 +997,13 @@ const CategoryPage = () => {
                         <div className="space-y-3">
                           {/* Header: Name + Category Badge */}
                           <div className="flex items-start justify-between gap-3">
-                            <Link to={`/product/${product.id}`} className="flex-1">
+                            <Link to={buildProductPath(product.id)} className="flex-1">
                               <h3 className="font-bold text-lg text-slate-900 line-clamp-2 group-hover:text-primary transition-colors">
                                 {product.nameAr}
                               </h3>
                             </Link>
                             <Link 
-                              to={`/category/${product.category}`}
+                              to={getProductCategoryPath(product)}
                               className="flex-shrink-0 text-xs font-semibold text-white bg-primary/90 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-lg hover:bg-primary transition-colors"
                               onClick={(e) => e.stopPropagation()}
                             >
@@ -1019,7 +1080,7 @@ const CategoryPage = () => {
                                   <Button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      navigate(`/product/${product.id}`);
+                                      navigate(buildProductPath(product.id));
                                     }}
                                     className="h-10 w-24 rounded-xl bg-primary hover:bg-primary/90 text-white transition-all duration-300 flex items-center justify-center gap-2"
                                   >
@@ -1101,7 +1162,7 @@ const CategoryPage = () => {
                 <div
                   key={product.id}
                   className="group relative h-full rounded-2xl overflow-hidden bg-gradient-to-br from-white to-slate-50/50 border border-slate-100 shadow-sm hover:shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] hover:ring-2 hover:ring-primary/20 hover:ring-offset-2 transition-all duration-500 hover:-translate-y-4 cursor-pointer"
-                  onClick={() => navigate(`/product/${product.id}`)}
+                  onClick={() => navigate(buildProductPath(product.id))}
                   onMouseEnter={() => setHoveredProduct(product.id)}
                   onMouseLeave={() => setHoveredProduct(null)}
                 >
@@ -1133,7 +1194,7 @@ const CategoryPage = () => {
                           {/* All Images (main image is already in product.images array) */}
                           {product.images.slice(0, 5).map((img, idx) => (
                             <SwiperSlide key={`${product.id}-${idx}`}>
-                              <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()} className="block w-full h-full">
+                              <Link to={buildProductPath(product.id)} onClick={(e) => e.stopPropagation()} className="block w-full h-full">
                                 <img
                                   src={optimizeImage(img, { w: 320 })}
                                   alt={`${product.nameAr} - ${idx + 1}`}
@@ -1161,7 +1222,7 @@ const CategoryPage = () => {
                       </>
                     ) : (
                       /* Single Image - No Swiper */
-                      <Link to={`/product/${product.id}`} onClick={(e) => e.stopPropagation()} className="block w-full h-full">
+                      <Link to={buildProductPath(product.id)} onClick={(e) => e.stopPropagation()} className="block w-full h-full">
                         <img
                           src={optimizeImage(product.image || `/api/categories/${product.category}/image`, { w: 320 })}
                           alt={product.nameAr}
@@ -1173,7 +1234,7 @@ const CategoryPage = () => {
 
                     {/* Category Badge - Top Right */}
                     <Link 
-                      to={`/category/${product.category}`}
+                      to={getProductCategoryPath(product)}
                       className="absolute top-3 right-3 text-xs md:text-sm font-bold text-white bg-gradient-to-r from-primary to-secondary backdrop-blur-md px-4 py-2 rounded-lg shadow-xl hover:shadow-2xl transition-all z-10"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -1216,7 +1277,7 @@ const CategoryPage = () => {
 
                   {/* Product Info */}
                   <div className="p-4 md:p-5 space-y-3">
-                    <Link to={`/product/${product.id}`} className="block">
+                    <Link to={buildProductPath(product.id)} className="block">
                       <h3 className="font-bold text-sm md:text-base lg:text-lg text-slate-900 line-clamp-2 group-hover:text-primary transition-colors leading-tight overflow-hidden">
                         {product.nameAr}
                       </h3>
@@ -1261,7 +1322,7 @@ const CategoryPage = () => {
                             <Button
                               onClick={(e) => {
                                 e.stopPropagation();
-                                navigate(`/product/${product.id}`);
+                                navigate(buildProductPath(product.id));
                               }}
                               className="h-10 w-10 rounded-lg bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0 relative flex-shrink-0"
                             >
@@ -1407,3 +1468,4 @@ const CategoryPage = () => {
 };
 
 export default CategoryPage;
+

@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Ruler, Rotate3D, Scan, Save, Upload, Wand2, Search, Package, Eye, EyeOff, SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, TrendingUp, Star, Clock, Settings, Download, FileUp, RotateCcw, X, Palette, Edit2, Printer, LogOut, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,6 +10,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useShopBuilder, useShopBuilderLayout } from '../store';
 import type { TransformMode } from '../three/ThreeScene';
 import { WALL_TEXTURES, FLOOR_TEXTURES } from '../three/ThreeScene';
+import { generateAutoHungProductsList } from '../three/proceduralProducts';
 
 // Wall texture options - mapped from WALL_TEXTURES
 const WALL_TEXTURE_OPTIONS = [
@@ -580,8 +581,9 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     const cos = Math.cos(rotY);
     const sin = Math.sin(rotY);
 
-    const xRot = localX * cos - localZ * sin;
-    const zRot = localX * sin + localZ * cos;
+    // Standard THREE.js Y-axis rotation: local → world
+    const xRot = localX * cos + localZ * sin;
+    const zRot = -localX * sin + localZ * cos;
 
     return {
       x: groupPos.x + xRot,
@@ -642,163 +644,14 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     if (isAutoHanging) return;
     setIsAutoHanging(true);
     try {
-      const proceduralCatalogByAccessory: Record<string, Array<{
-        key: string;
-        name: string;
-        type: 'box' | 'can' | 'bottle' | 'pouch' | 'hanger_pack';
-        color: string;
-        dimensions: { width: number; height: number; depth: number };
-      }>> = {
-        shelf: [
-          { key: 'box-small', name: 'عبوة صندوق', type: 'box', color: '#dbeafe', dimensions: { width: 0.22, height: 0.28, depth: 0.14 } },
-          { key: 'pouch-snack', name: 'عبوة مرنة', type: 'pouch', color: '#fde68a', dimensions: { width: 0.18, height: 0.24, depth: 0.08 } },
-          { key: 'bottle-stand', name: 'زجاجة', type: 'bottle', color: '#c7d2fe', dimensions: { width: 0.10, height: 0.32, depth: 0.10 } },
-          { key: 'can-wide', name: 'علبة أسطوانية', type: 'can', color: '#bfdbfe', dimensions: { width: 0.09, height: 0.16, depth: 0.09 } },
-        ],
-        hook_single: [
-          { key: 'hang-pack', name: 'منتج معلق', type: 'hanger_pack', color: '#fecaca', dimensions: { width: 0.11, height: 0.18, depth: 0.04 } },
-          { key: 'hang-pouch', name: 'كيس معلق', type: 'pouch', color: '#fde68a', dimensions: { width: 0.10, height: 0.16, depth: 0.04 } },
-          { key: 'hang-box', name: 'علبة خفيفة', type: 'box', color: '#ddd6fe', dimensions: { width: 0.10, height: 0.14, depth: 0.05 } },
-        ],
-        hook_waterfall: [
-          { key: 'wf-pack', name: 'باكيت معلق', type: 'hanger_pack', color: '#fecdd3', dimensions: { width: 0.10, height: 0.17, depth: 0.04 } },
-          { key: 'wf-pouch', name: 'كيس انسيابي', type: 'pouch', color: '#fef3c7', dimensions: { width: 0.09, height: 0.15, depth: 0.04 } },
-          { key: 'wf-mini-box', name: 'علبة عرض', type: 'box', color: '#bae6fd', dimensions: { width: 0.10, height: 0.13, depth: 0.05 } },
-        ],
-        basket: [
-          { key: 'basket-box', name: 'منتج داخل سلة', type: 'box', color: '#bbf7d0', dimensions: { width: 0.16, height: 0.18, depth: 0.10 } },
-          { key: 'basket-can', name: 'علبة سلة', type: 'can', color: '#bfdbfe', dimensions: { width: 0.08, height: 0.14, depth: 0.08 } },
-          { key: 'basket-pouch', name: 'عبوة سلة', type: 'pouch', color: '#fde68a', dimensions: { width: 0.13, height: 0.16, depth: 0.07 } },
-        ],
-      };
-
       const manualProducts = layout.products.filter((p) => !(p.metadata as any)?.autoHangFill);
-      const generated: any[] = [];
-      const rnd = (min: number, max: number) => min + Math.random() * (max - min);
-
-      layout.walls.forEach((wall) => {
-        const systems: any[] = [
-          ...(wall.slatWalls || []),
-          ...(((wall.primoStands as any[] | undefined) || []).map((p) => ({ ...p, systemType: 'primo' }))),
-        ];
-
-        systems.forEach((slat) => {
-          const accessories = (slat.accessories || []) as any[];
-          const slatHeight = slat.height || 2;
-          const wallLength = Math.max(0.001, Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y));
-          const slatWidth = slat.fillType === 'full' ? wallLength : (slat.width || 1);
-          const slatPosCenter = slat.fillType === 'full' ? 0.5 : (slat.position || 0.5);
-
-          accessories.forEach((acc) => {
-            let count = 1;
-            if (acc.type === 'shelf') {
-              const maxByWidth = Math.max(1, Math.floor((acc.width || 0.5) / 0.22));
-              count = Math.max(2, Math.min(6, maxByWidth + Math.floor(rnd(0, 2))));
-            } else if (acc.type === 'hook_single') {
-              count = Math.floor(rnd(1, 3));
-            } else if (acc.type === 'hook_waterfall') {
-              const maxByDepth = Math.max(2, Math.floor((acc.depth || 0.4) / 0.08));
-              count = Math.max(3, Math.min(9, maxByDepth));
-            } else {
-              count = Math.floor(rnd(2, 5));
-            }
-
-            for (let i = 0; i < count; i++) {
-              if (generated.length >= 220) return;
-              const accCatalog = proceduralCatalogByAccessory[acc.type] || proceduralCatalogByAccessory.shelf;
-              const picked = accCatalog[Math.floor(Math.random() * accCatalog.length)];
-              if (!picked) continue;
-
-              const localXBase = ((acc.position?.x ?? 0.5) - 0.5) * slatWidth;
-              const localYBase = ((acc.position?.y ?? 0.5) - 0.5) * slatHeight;
-
-              const absoluteX = slatPosCenter * wallLength - (slatWidth / 2) + (acc.position?.x ?? 0.5) * slatWidth;
-              let protrusion = 0;
-              (wall.columns || []).forEach((col: any) => {
-                const colStart = (col.position || 0.5) * wallLength - ((col.width || 0.4) / 2);
-                const colEnd = colStart + (col.width || 0.4);
-                if (absoluteX >= colStart && absoluteX <= colEnd && (col as any).side === slat.side) {
-                  const slatAnchorOffset = (wall.thickness || 0.1) / 2 + 0.01;
-                  protrusion = Math.max(0, (col.depth || 0.4) - slatAnchorOffset) + 0.005;
-                }
-              });
-
-              let localX = localXBase;
-              let localY = localYBase;
-              let localZ = 0.01 + protrusion;
-
-              if (acc.type === 'shelf') {
-                const span = Math.max(0.04, (acc.width || 0.5) * 0.82);
-                localX = localXBase + (((i + 1) / (count + 1)) - 0.5) * span + rnd(-0.008, 0.008);
-                // Place on top surface of shelf
-                localY = localYBase + rnd(0.06, 0.1);
-                localZ = 0.01 + protrusion + (acc.depth || 0.3) * rnd(0.32, 0.5);
-              } else if (acc.type === 'hook_single') {
-                // Keep centered around the hook and move slightly forward
-                localX = localXBase + rnd(-0.006, 0.006);
-                localY = localYBase + rnd(-0.01, 0.01);
-                localZ = 0.01 + protrusion + Math.max(0.04, (acc.depth || 0.2) * rnd(0.42, 0.62));
-              } else {
-                // Waterfall: cascade depth positions from near to far
-                localX = localXBase + rnd(-0.006, 0.006);
-                localY = localYBase + rnd(-0.012, 0.008);
-                const step = Math.max(0.03, (acc.depth || 0.3) / Math.max(2, count));
-                localZ = 0.01 + protrusion + Math.min((acc.depth || 0.3) - 0.02, 0.035 + i * step + rnd(-0.004, 0.004));
-              }
-
-              localX = Math.max(-slatWidth / 2 + 0.03, Math.min(slatWidth / 2 - 0.03, localX));
-              localY = Math.max(-slatHeight / 2 + 0.03, Math.min(slatHeight / 2 - 0.03, localY));
-
-              const world = toWorldFromSlatLocal(wall, slat, localX, localY, localZ);
-              const dims = picked.dimensions || { width: 0.2, height: 0.2, depth: 0.1 };
-              const sourceW = Math.max(0.2, dims.width || 1);
-              const sourceH = Math.max(0.2, dims.height || 1);
-              const sourceD = Math.max(0.2, dims.depth || 1);
-
-              const fitW = acc.type === 'shelf'
-                ? Math.max(0.12, Math.min((acc.width || 0.5) * 0.32, 0.45))
-                : Math.max(0.08, Math.min((acc.width || 0.2) * 0.9, 0.22));
-              const fitD = acc.type === 'shelf'
-                ? Math.max(0.1, Math.min((acc.depth || 0.3) * 0.6, 0.35))
-                : Math.max(0.06, Math.min((acc.depth || 0.2) * 0.55, 0.2));
-              const fitH = acc.type === 'shelf' ? 0.7 : 0.45;
-              const scaleFactor = Math.max(0.05, Math.min(0.65, Math.min(fitW / sourceW, fitD / sourceD, fitH / sourceH)));
-
-              generated.push({
-                id: crypto.randomUUID(),
-                name: `${picked.name}`,
-                modelUrl: 'procedural://hang-item',
-                position: { x: world.x, y: world.y, z: world.z },
-                rotation: { x: 0, y: world.rotY + rnd(-0.2, 0.2), z: 0 },
-                scale: {
-                  x: Math.max(0.03, scaleFactor),
-                  y: Math.max(0.03, scaleFactor),
-                  z: Math.max(0.03, scaleFactor),
-                },
-                metadata: {
-                  autoHangFill: true,
-                  hiddenByGlobalToggle: isAutoHungHidden,
-                  proceduralHang: true,
-                  proceduralType: picked.type,
-                  proceduralKey: picked.key,
-                  proceduralColor: picked.color,
-                  proceduralSize: {
-                    w: Math.max(0.04, dims.width),
-                    h: Math.max(0.05, dims.height),
-                    d: Math.max(0.02, dims.depth),
-                  },
-                  sourceAccessoryId: acc.id,
-                  sourceSystemId: slat.id,
-                  sourceWallId: wall.id,
-                  sourceSide: slat.side,
-                  category: 'procedural-hanging',
-                  dimensions: dims,
-                },
-              });
-            }
-          });
-        });
-      });
+      
+      const generated = generateAutoHungProductsList(
+        layout.walls,
+        layout.products,
+        toWorldFromSlatLocal,
+        isAutoHungHidden
+      );
 
       if (!generated.length) {
         toast({ title: 'لا توجد ملحقات صالحة', description: 'أضف ملحقات أولاً حتى يتم تعليق المنتجات تلقائيًا.' });

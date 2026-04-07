@@ -17,6 +17,8 @@ import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { useShopBuilder } from '../store';
 import type { ShopBuilderProduct, ShopBuilderWall, ShopBuilderColumn, ShopBuilderSlatWall } from '../types';
 import type { CameraMode } from '../store';
+import { createProceduralHangGroup } from './proceduralProducts';
+import { createWallMesh, updateWallMesh, createColumnMesh, updateColumnMesh, createSlatWallMesh } from './wall-system';
 
 // Texture loader
 const textureLoader = new THREE.TextureLoader();
@@ -1517,99 +1519,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     });
   }, []);
 
-  const createProceduralHangGroup = useCallback((product: ShopBuilderProduct): THREE.Group => {
-    const meta = (product.metadata || {}) as Record<string, unknown>;
-    const type = String(meta.proceduralType || 'box');
-    const colorHex = String(meta.proceduralColor || product.color || '#dbeafe');
-    const sizeMeta = (meta.proceduralSize || {}) as Record<string, unknown>;
-    const w = Math.max(0.04, Number(sizeMeta.w) || 0.12);
-    const h = Math.max(0.05, Number(sizeMeta.h) || 0.16);
-    const d = Math.max(0.02, Number(sizeMeta.d) || 0.06);
 
-    const root = new THREE.Group();
-    const baseMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(colorHex),
-      roughness: 0.66,
-      metalness: 0.08,
-    });
-
-    if (type === 'can') {
-      const radius = Math.max(0.02, Math.min(w, d) * 0.5);
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(radius, radius, h, 20), baseMat.clone());
-      body.castShadow = true;
-      body.receiveShadow = true;
-      root.add(body);
-    } else if (type === 'bottle') {
-      const bodyRadius = Math.max(0.02, Math.min(w, d) * 0.42);
-      const neckRadius = Math.max(0.01, bodyRadius * 0.45);
-      const capRadius = Math.max(0.009, neckRadius * 0.9);
-      const bodyHeight = h * 0.72;
-      const neckHeight = h * 0.2;
-      const capHeight = h * 0.08;
-
-      const body = new THREE.Mesh(new THREE.CylinderGeometry(bodyRadius, bodyRadius * 0.95, bodyHeight, 20), baseMat.clone());
-      body.position.y = -h * 0.14;
-      body.castShadow = true;
-      body.receiveShadow = true;
-
-      const neck = new THREE.Mesh(new THREE.CylinderGeometry(neckRadius, neckRadius, neckHeight, 16), baseMat.clone());
-      neck.position.y = body.position.y + bodyHeight * 0.5 + neckHeight * 0.5;
-      neck.castShadow = true;
-      neck.receiveShadow = true;
-
-      const cap = new THREE.Mesh(
-        new THREE.CylinderGeometry(capRadius, capRadius, capHeight, 14),
-        new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.5, metalness: 0.2 })
-      );
-      cap.position.y = neck.position.y + neckHeight * 0.5 + capHeight * 0.5;
-      cap.castShadow = true;
-      cap.receiveShadow = true;
-
-      root.add(body, neck, cap);
-    } else if (type === 'pouch') {
-      const pouch = new THREE.Mesh(new THREE.BoxGeometry(w, h, Math.max(0.02, d * 0.65)), baseMat.clone());
-      pouch.castShadow = true;
-      pouch.receiveShadow = true;
-      root.add(pouch);
-
-      const topSeal = new THREE.Mesh(
-        new THREE.BoxGeometry(w * 0.98, Math.max(0.006, h * 0.08), Math.max(0.02, d * 0.75)),
-        new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.45, metalness: 0.08 })
-      );
-      topSeal.position.y = h * 0.45;
-      root.add(topSeal);
-    } else if (type === 'hanger_pack') {
-      const pack = new THREE.Mesh(new THREE.BoxGeometry(w, h * 0.84, Math.max(0.02, d * 0.9)), baseMat.clone());
-      pack.position.y = -h * 0.06;
-      pack.castShadow = true;
-      pack.receiveShadow = true;
-      root.add(pack);
-
-      const headerCard = new THREE.Mesh(
-        new THREE.BoxGeometry(w * 0.86, h * 0.2, Math.max(0.015, d * 0.55)),
-        new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.5, metalness: 0.04 })
-      );
-      headerCard.position.y = h * 0.38;
-      root.add(headerCard);
-
-      const hookHole = new THREE.Mesh(
-        new THREE.TorusGeometry(Math.max(0.01, w * 0.14), Math.max(0.002, w * 0.025), 8, 14),
-        new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.35, metalness: 0.45 })
-      );
-      hookHole.rotation.x = Math.PI / 2;
-      hookHole.position.y = h * 0.42;
-      hookHole.position.z = Math.max(0.01, d * 0.33);
-      root.add(hookHole);
-    } else {
-      const box = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), baseMat.clone());
-      box.castShadow = true;
-      box.receiveShadow = true;
-      root.add(box);
-    }
-
-    root.name = product.name || `procedural-${product.id}`;
-    return root;
-  }, []);
 
   useEffect(() => {
     const scene = sceneRef.current;
@@ -1669,35 +1579,15 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
           const height = box.max.y - box.min.y;
           const bottomOffset = Math.abs(box.min.y);
           
-          // Smart spawn position: place object so its bottom is at floor level
-          // Only adjust on first load (when position is exactly 0.5)
-          if (product.position.y === 0.5) {
+          // Never auto-place procedural/auto-hung products on the floor;
+          // they have precise Y positions from accessory coordinates.
+          if (isProcedural) {
+            applyProductTransform(model, product);
+          } else if (product.position.y === 0.5) {
             const smartY = bottomOffset + 0.01; // Slightly above floor
-            
-            console.log(`📦 DEBUG: Product auto-placed on floor`, {
-              id: product.id,
-              name: product.name,
-              modelUrl: product.modelUrl,
-              boundingBox: { min: box.min, max: box.max },
-              height,
-              bottomOffset,
-              calculatedY: smartY,
-              position: { x: product.position.x, y: smartY, z: product.position.z }
-            });
-            
-            // Update product position in store (only once)
             upsertProduct({ id: product.id, position: { ...product.position, y: smartY } });
-            
-            // Apply with adjusted position
             applyProductTransform(model, { ...product, position: { ...product.position, y: smartY } });
           } else {
-            console.log(`📦 DEBUG: Product placed at existing position`, {
-              id: product.id,
-              name: product.name,
-              position: product.position,
-              scale: product.scale
-            });
-            // Use existing position
             applyProductTransform(model, product);
           }
           scene.add(model);

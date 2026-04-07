@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { apiGet } from '@/lib/api';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { buildProductPath } from '@/lib/product-link';
 import type { Product } from '@/types';
 import type { Slide } from '@/types/home-config';
 
@@ -367,7 +368,7 @@ const EnhancedHeroSection = ({ slides, enabled = true }: EnhancedHeroSectionProp
                       </span>
                     )}
                     <Button asChild className="bg-white text-black hover:bg-gray-100">
-                      <Link to={`/product/${currentSlideData.product.id}`}>
+                      <Link to={buildProductPath(currentSlideData.product.id)}>
                         عرض المنتج
                       </Link>
                     </Button>
@@ -432,3 +433,4 @@ const EnhancedHeroSection = ({ slides, enabled = true }: EnhancedHeroSectionProp
 };
 
 export default EnhancedHeroSection;
+

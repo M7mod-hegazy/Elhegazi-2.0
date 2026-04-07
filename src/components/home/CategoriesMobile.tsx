@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Package, Grid3x3, Sparkles, ArrowRight, Tag, MoreHorizontal, Hand } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { apiGet, type ApiResponse } from '@/lib/api';
+import { buildCategoryPath } from '@/lib/category-link';
 import type { Category } from '@/types';
 import { optimizeImage } from '@/lib/images';
 import { motion } from 'framer-motion';
@@ -13,6 +14,14 @@ import 'swiper/css';
 interface CategoriesMobileProps {
   selectedSlugs?: string[];
 }
+
+const getCategoryLink = (category: Pick<Category, 'slug' | 'id' | 'name' | 'nameAr'>): string =>
+  buildCategoryPath({
+    slug: category.slug,
+    nameAr: category.nameAr,
+    name: category.name,
+    id: category.id,
+  });
 
 // Simplified Product interface for mobile
 interface HomeProduct {
@@ -317,7 +326,7 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
                     onTouchEnd={() => setIsHovered(false)}
                   >
                     <Link
-                      to={`/category/${category.slug || category.id}`}
+                      to={getCategoryLink(category)}
                       className="group block bg-white rounded-xl sm:rounded-2xl overflow-hidden shadow-lg border-2 border-slate-200/80 relative cursor-pointer w-full h-full active:scale-95 active:shadow-xl active:border-primary/60 transition-all duration-200 ring-1 ring-slate-100"
                     >
 

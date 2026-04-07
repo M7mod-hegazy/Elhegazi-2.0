@@ -67,52 +67,67 @@ const degToRad = (deg: number) => (deg * Math.PI) / 180;
 
 function PreviewModel({
   modelUrl,
-  dimensions,
   scale,
   rotation,
+  onBaseSizeCalculated
 }: {
   modelUrl: string;
-  dimensions: { width: number; height: number; depth: number };
   scale: { x: number; y: number; z: number };
   rotation: { x: number; y: number; z: number };
+  onBaseSizeCalculated?: (size: { x: number; y: number; z: number }) => void;
 }) {
   const { scene } = useGLTF(modelUrl);
   const cloned = useMemo(() => scene.clone(true), [scene]);
-  const baseSize = useMemo(() => {
+  
+  const { sX, sY, sZ, offsetY } = useMemo(() => {
     const box = new THREE.Box3().setFromObject(cloned);
     const size = new THREE.Vector3();
     box.getSize(size);
-    return {
+    
+    const baseSize = {
       x: size.x || 1,
       y: size.y || 1,
       z: size.z || 1,
     };
-  }, [cloned]);
+    
+    setTimeout(() => {
+      onBaseSizeCalculated?.(baseSize);
+    }, 0);
 
-  const safeDimensions = {
-    width: clampPositive(dimensions.width, 0.2),
-    height: clampPositive(dimensions.height, 0.2),
-    depth: clampPositive(dimensions.depth, 0.2),
-  };
-
-  const finalScale = [
-    (safeDimensions.width / baseSize.x) * clampPositive(scale.x, 0.1),
-    (safeDimensions.height / baseSize.y) * clampPositive(scale.y, 0.1),
-    (safeDimensions.depth / baseSize.z) * clampPositive(scale.z, 0.1),
-  ] as [number, number, number];
+    const sX = clampPositive(scale.x, 0.01);
+    const sY = clampPositive(scale.y, 0.01);
+    const sZ = clampPositive(scale.z, 0.01);
+    
+    const tempGroup = new THREE.Group();
+    const tempModel = cloned.clone(true);
+    tempGroup.add(tempModel);
+    tempModel.scale.set(sX, sY, sZ);
+    tempModel.rotation.set(
+      degToRad(rotation.x || 0),
+      degToRad(rotation.y || 0),
+      degToRad(rotation.z || 0)
+    );
+    tempGroup.updateMatrixWorld(true);
+    
+    const scaledBox = new THREE.Box3().setFromObject(tempGroup);
+    return {
+      sX, sY, sZ,
+      offsetY: -scaledBox.min.y
+    };
+  }, [cloned, scale, rotation, onBaseSizeCalculated]);
 
   return (
-    <Center bottom position={[1.15, 0, 0]}>
+    <group position={[1.15, offsetY, 0]}>
       <primitive
         object={cloned}
-        scale={finalScale}
+        scale={[sX, sY, sZ]}
         rotation={[
           degToRad(rotation.x || 0),
           degToRad(rotation.y || 0),
           degToRad(rotation.z || 0),
         ]}
       />
-    </Center>
+    </group>
   );
 }
 
@@ -184,6 +199,7 @@ const Products3D = () => {
     defaultScale: { x: 1, y: 1, z: 1 },
     defaultRotation: { x: 0, y: 0, z: 0 },
   });
+  const [nativeBaseSize, setNativeBaseSize] = useState({ x: 1, y: 1, z: 1 });
 
   // Fetch products
   const fetchProducts = async () => {
@@ -1107,9 +1123,11 @@ const Products3D = () => {
                     <Suspense fallback={null}>
                       <PreviewModel
                         modelUrl={formData.modelUrl}
-                        dimensions={transformDraft.dimensions}
                         scale={transformDraft.defaultScale}
                         rotation={transformDraft.defaultRotation}
+                        onBaseSizeCalculated={(size) => {
+                          setNativeBaseSize(size);
+                        }}
                       />
                     </Suspense>
                     <OrbitControls makeDefault />
@@ -1132,21 +1150,73 @@ const Products3D = () => {
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">الأبعاد الفعلية (متر)</Label>
+                  <Label className="text-sm font-semibold">الأبعاد الفعلية للمشهد (متر)</Label>
                   <div className="grid grid-cols-3 gap-2">
-                    <Input type="number" min="0.1" step="0.1" value={transformDraft.dimensions.width} onChange={(e) => setTransformDraft((prev) => ({ ...prev, dimensions: { ...prev.dimensions, width: Number(e.target.value) } }))} placeholder="العرض" />
-                    <Input type="number" min="0.1" step="0.1" value={transformDraft.dimensions.height} onChange={(e) => setTransformDraft((prev) => ({ ...prev, dimensions: { ...prev.dimensions, height: Number(e.target.value) } }))} placeholder="الارتفاع" />
-                    <Input type="number" min="0.1" step="0.1" value={transformDraft.dimensions.depth} onChange={(e) => setTransformDraft((prev) => ({ ...prev, dimensions: { ...prev.dimensions, depth: Number(e.target.value) } }))} placeholder="العمق" />
+                    <div className="relative">
+                      <Input type="number" min="0.01" step="0.05" value={(nativeBaseSize.x * transformDraft.defaultScale.x).toFixed(2)} onChange={(e) => {
+                        const val = clampPositive(Number(e.target.value), 0.05);
+                        const newScale = val / clampPositive(nativeBaseSize.x, 0.05);
+                        setTransformDraft((prev) => ({ ...prev, defaultScale: { x: newScale, y: newScale, z: newScale } }));
+                      }} placeholder="العرض" />
+                      <span className="absolute top-1/2 left-3 -translate-y-1/2 text-xs text-slate-400">ع</span>
+                    </div>
+                    <div className="relative">
+                      <Input type="number" min="0.01" step="0.05" value={(nativeBaseSize.y * transformDraft.defaultScale.y).toFixed(2)} onChange={(e) => {
+                        const val = clampPositive(Number(e.target.value), 0.05);
+                        const newScale = val / clampPositive(nativeBaseSize.y, 0.05);
+                        setTransformDraft((prev) => ({ ...prev, defaultScale: { x: newScale, y: newScale, z: newScale } }));
+                      }} placeholder="الارتفاع" />
+                      <span className="absolute top-1/2 left-3 -translate-y-1/2 text-xs text-slate-400">ط</span>
+                    </div>
+                    <div className="relative">
+                      <Input type="number" min="0.01" step="0.05" value={(nativeBaseSize.z * transformDraft.defaultScale.z).toFixed(2)} onChange={(e) => {
+                        const val = clampPositive(Number(e.target.value), 0.05);
+                        const newScale = val / clampPositive(nativeBaseSize.z, 0.05);
+                        setTransformDraft((prev) => ({ ...prev, defaultScale: { x: newScale, y: newScale, z: newScale } }));
+                      }} placeholder="العمق" />
+                      <span className="absolute top-1/2 left-3 -translate-y-1/2 text-xs text-slate-400">ع</span>
+                    </div>
                   </div>
+                  <p className="text-[11px] text-slate-500">تمثل الأبعاد الحقيقية. تغيير أي بعد سيعدل المقياس تلقائياً للحفاظ على نسبة النموذج.</p>
                 </div>
 
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold">المقياس الافتراضي (Scale)</Label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <Input type="number" min="0.1" step="0.1" value={transformDraft.defaultScale.x} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultScale: { ...prev.defaultScale, x: Number(e.target.value) } }))} placeholder="X" />
-                    <Input type="number" min="0.1" step="0.1" value={transformDraft.defaultScale.y} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultScale: { ...prev.defaultScale, y: Number(e.target.value) } }))} placeholder="Y" />
-                    <Input type="number" min="0.1" step="0.1" value={transformDraft.defaultScale.z} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultScale: { ...prev.defaultScale, z: Number(e.target.value) } }))} placeholder="Z" />
+                  <div className="flex items-center justify-between mb-1">
+                    <Label className="text-sm font-semibold">المضاعف الشامل (Uniform Scale)</Label>
+                    <Badge variant="outline" className="text-[10px]">موصى به</Badge>
                   </div>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="range"
+                      min="0.1"
+                      max="3"
+                      step="0.05"
+                      value={transformDraft.defaultScale.x}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setTransformDraft((prev) => ({
+                          ...prev,
+                          defaultScale: { x: val, y: val, z: val }
+                        }));
+                      }}
+                      className="w-full accent-primary"
+                    />
+                    <Input
+                      type="number"
+                      min="0.1"
+                      step="0.1"
+                      className="w-20"
+                      value={transformDraft.defaultScale.x}
+                      onChange={(e) => {
+                        const val = Number(e.target.value);
+                        setTransformDraft((prev) => ({
+                          ...prev,
+                          defaultScale: { x: val, y: val, z: val }
+                        }));
+                      }}
+                    />
+                  </div>
+                  <p className="text-[11px] text-slate-500">يتيح لك تكبير أو تصغير النموذج بشكل متناسق مع الحفاظ على الأبعاد.</p>
                 </div>
 
                 <div className="space-y-2">
@@ -1167,14 +1237,14 @@ const Products3D = () => {
                   setFormData((prev) => ({
                     ...prev,
                     dimensions: {
-                      width: clampPositive(transformDraft.dimensions.width, 0.1),
-                      height: clampPositive(transformDraft.dimensions.height, 0.1),
-                      depth: clampPositive(transformDraft.dimensions.depth, 0.1),
+                      width: clampPositive(nativeBaseSize.x * transformDraft.defaultScale.x, 0.01),
+                      height: clampPositive(nativeBaseSize.y * transformDraft.defaultScale.y, 0.01),
+                      depth: clampPositive(nativeBaseSize.z * transformDraft.defaultScale.z, 0.01),
                     },
                     defaultScale: {
-                      x: clampPositive(transformDraft.defaultScale.x, 0.1),
-                      y: clampPositive(transformDraft.defaultScale.y, 0.1),
-                      z: clampPositive(transformDraft.defaultScale.z, 0.1),
+                      x: clampPositive(transformDraft.defaultScale.x, 0.01),
+                      y: clampPositive(transformDraft.defaultScale.y, 0.01),
+                      z: clampPositive(transformDraft.defaultScale.z, 0.01),
                     },
                     defaultRotation: {
                       x: Number.isFinite(transformDraft.defaultRotation.x) ? transformDraft.defaultRotation.x : 0,
@@ -1183,7 +1253,7 @@ const Products3D = () => {
                     },
                   }));
                   setIsTransformPanelOpen(false);
-                  toast({ title: 'نجح', description: 'تم تطبيق المقاسات المختارة على النموذج.' });
+                  toast({ title: 'نجح', description: 'تم تطبيق المقاسات المختارة وتحديث أبعاد النموذج.' });
                 }}
               >
                 تطبيق القيم

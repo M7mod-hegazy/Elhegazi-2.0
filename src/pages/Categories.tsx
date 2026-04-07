@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import ScrollAnimation from '@/components/ui/scroll-animation';
 import { apiGet } from '@/lib/api';
+import { buildCategoryPath } from '@/lib/category-link';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import type { Category } from '@/types';
@@ -49,23 +50,13 @@ const Categories = () => {
 
   // Get preview products for a category
   // Helper function to generate consistent category URLs
-  const getCategoryUrl = (category: Category): string => {
-    // Priority: slug > id > generated from nameAr > fallback
-    if (category.slug && category.slug.trim()) {
-      return `/category/${category.slug}`;
-    }
-    if (category.id) {
-      return `/category/${category.id}`;
-    }
-    if (category.nameAr) {
-      const generatedSlug = category.nameAr
-        .toLowerCase()
-        .replace(/\s+/g, '-')
-        .replace(/[^\w-]+/g, '');
-      return `/category/${generatedSlug}`;
-    }
-    return `/category/category-${Date.now()}`;
-  };
+  const getCategoryUrl = (category: Category): string =>
+    buildCategoryPath({
+      slug: category.slug,
+      nameAr: category.nameAr,
+      name: category.name,
+      id: category.id,
+    });
 
   const getCategoryPreviewProducts = (category: Category): Product[] => {
     if (!products.length) return [];
@@ -407,7 +398,7 @@ const Categories = () => {
                   {viewMode === 'grid' ? (
                     // Mobile-Optimized Category Card
                     <Link
-                      to={`/category/${category.slug || category.id || category.nameAr?.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '') || 'category'}`}
+                      to={getCategoryUrl(category)}
                       className="group block bg-white rounded-2xl sm:rounded-3xl overflow-hidden shadow-md sm:shadow-lg hover:shadow-xl sm:hover:shadow-2xl transition-all duration-500 sm:duration-700 transform hover:-translate-y-1 sm:hover:-translate-y-3 border-2 sm:border border-slate-300 sm:border-slate-200/60 hover:border-primary/40 relative touch-manipulation hover:scale-[1.02] cursor-pointer  sm:py-0"
                     >
                       {/* Featured Badge */}
@@ -731,7 +722,7 @@ const Categories = () => {
                   ) : (
                     // Simplified List Card with Product Preview
                     <Link
-                      to={`/category/${category.slug || category.id || category.nameAr?.toLowerCase().replace(/\s+/g, '-').replace(/[^\w-]+/g, '') || 'category'}`}
+                      to={getCategoryUrl(category)}
                       className="group block bg-white rounded-xl overflow-hidden shadow-sm hover:shadow-lg transition-all duration-300 border border-slate-200/60 hover:border-primary/30 relative hover:scale-[1.01] hover:-translate-y-1 cursor-pointer"
                     >
                       {/* Featured Badge */}

@@ -12,6 +12,7 @@ import { usePageTitle } from '@/hooks/usePageTitle';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { ContactButtons } from '@/components/ui/ContactButtons';
 import AuthModal from '@/components/ui/auth-modal';
+import { buildProductPath } from '@/lib/product-link';
 
 const Cart = () => {
   // Set page title
@@ -165,7 +166,7 @@ const Cart = () => {
                           {/* Product Info */}
                           <div className="flex-1 min-w-0">
                             <Link
-                              to={`/product/${item.productId}`}
+                          to={buildProductPath(item.productId)}
                               className="text-xl font-bold text-slate-900 hover:text-primary transition-colors duration-300 line-clamp-2"
                             >
                               {item.product.nameAr}

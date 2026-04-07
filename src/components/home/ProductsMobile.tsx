@@ -14,6 +14,8 @@ import { useDualAuth } from '@/hooks/useDualAuth';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/hooks/use-toast';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
+import { buildCategoryPath } from '@/lib/category-link';
+import { buildProductPath } from '@/lib/product-link';
 import type { Product } from '@/types';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination, Autoplay } from 'swiper/modules';
@@ -44,6 +46,15 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
   // Extract clean product ID (remove carousel suffix)
   const getCleanProductId = (id: string) => {
     return id.replace(/-set-\d+-\d+$/, '');
+  };
+
+  const getCategoryPath = (product: Product) => {
+    return buildCategoryPath({
+      slug: product.categorySlug,
+      nameAr: product.categoryAr,
+      name: product.category,
+      id: product.categoryId || product.category,
+    });
   };
 
   // Prepare products for true infinite scrolling
@@ -236,7 +247,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
               <SwiperSlide key={`${product.id}-${index}`} className="!w-[160px] !bg-transparent" style={{ background: 'transparent !important' }}>
                 <div 
                   className="relative h-full rounded-lg overflow-hidden bg-white border border-slate-200 shadow-sm cursor-pointer active:scale-95 transition-transform"
-                  onClick={() => navigate(`/product/${getCleanProductId(product.id)}`)}
+                  onClick={() => navigate(buildProductPath(getCleanProductId(product.id)))}
                 >
                   {/* Image */}
                   <div className="relative aspect-square overflow-hidden">
@@ -254,7 +265,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                     
                     {/* Category Badge - Top Right */}
                     <Link 
-                      to={`/category/${product.category}`}
+                      to={getCategoryPath(product)}
                       className="absolute top-1 right-1 text-[10px] font-semibold text-white bg-primary/90 backdrop-blur-sm px-2 py-1 rounded-md shadow-md z-10"
                       onClick={(e) => e.stopPropagation()}
                     >
@@ -337,7 +348,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                       
                       <div className="flex items-center gap-1">
                         <Link 
-                          to={`/product/${getCleanProductId(product.id)}#reviews`}
+                          to={`${buildProductPath(getCleanProductId(product.id))}#reviews`}
                           className="flex items-center gap-0.5"
                           onClick={(e) => e.stopPropagation()}
                         >
@@ -357,7 +368,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                       <Button
                         onClick={(e) => {
                           e.stopPropagation();
-                          navigate(`/product/${getCleanProductId(product.id)}`);
+                          navigate(buildProductPath(getCleanProductId(product.id)));
                         }}
                         size="sm"
                         className="h-8 w-8 p-0 rounded-lg bg-secondary hover:bg-secondary/90 text-white"

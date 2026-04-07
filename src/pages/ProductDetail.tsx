@@ -55,6 +55,8 @@ import {
 } from '@/components/ui/tooltip';
 import useDeviceDetection from '@/hooks/useDeviceDetection';
 import { cn } from '@/lib/utils';
+import { buildCategoryPath } from '@/lib/category-link';
+import { buildProductPath, isObjectId, resolveProductIdParam } from '@/lib/product-link';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
 import { useSettings } from '@/hooks/useSettings';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -228,6 +230,12 @@ const MobileProductDetail = ({
   const discountPercentage = product.discount || (product.originalPrice && product.originalPrice > product.price)
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
+  const categoryPath = buildCategoryPath({
+    slug: product.categorySlug,
+    nameAr: product.categoryAr,
+    name: product.category,
+    id: product.category,
+  });
 
   const nextImage = () => {
     setCurrentImageIndex((prev) => (prev + 1) % product.images.length);
@@ -259,7 +267,7 @@ const MobileProductDetail = ({
       <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <Button variant="ghost" size="icon" className="rounded-full" asChild>
-            <Link to={product.categorySlug ? `/category/${product.categorySlug}` : "/products"}>
+            <Link to={categoryPath}>
               <ArrowLeft className="w-6 h-6" />
             </Link>
           </Button>
@@ -289,7 +297,7 @@ const MobileProductDetail = ({
               الرئيسية
             </Link>
             <ChevronLeftIcon className="w-3 h-3 text-slate-400" />
-            <Link to={product.categorySlug ? `/category/${product.categorySlug}` : '/products'} className="text-primary hover:text-primary transition-colors font-medium">
+            <Link to={categoryPath} className="text-primary hover:text-primary transition-colors font-medium">
               {product.categoryAr || 'المنتجات'}
             </Link>
             <ChevronLeftIcon className="w-3 h-3 text-slate-400" />
@@ -786,6 +794,12 @@ const DesktopProductDetail = ({
   const discountPercentage = product.discount || (product.originalPrice && product.originalPrice > product.price)
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
+  const categoryPath = buildCategoryPath({
+    slug: product.categorySlug,
+    nameAr: product.categoryAr,
+    name: product.category,
+    id: product.category,
+  });
 
   const handleImageClick = () => {
     setCurrentImageIndex(selectedImage);
@@ -826,7 +840,7 @@ const DesktopProductDetail = ({
               الرئيسية
             </Link>
             <ChevronLeftIcon className="w-4 h-4 text-slate-400" />
-            <Link to={product.categorySlug ? `/category/${product.categorySlug}` : '/products'} className="text-primary hover:text-primary transition-colors font-medium">
+            <Link to={categoryPath} className="text-primary hover:text-primary transition-colors font-medium">
               {product.categoryAr || 'المنتجات'}
             </Link>
             <ChevronLeftIcon className="w-4 h-4 text-slate-400" />
@@ -1253,6 +1267,7 @@ const DesktopProductDetail = ({
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
+  const resolvedProductId = resolveProductIdParam(id || '');
   const navigate = useNavigate();
   const location = useLocation();
   const { addItem, isInCart, getItemByProductId } = useCart();
@@ -1279,7 +1294,7 @@ const ProductDetail = () => {
   // Fetch product and related items from backend
   useEffect(() => {
     let isMounted = true;
-    if (!id) return;
+    if (!resolvedProductId) return;
     (async () => {
       try {
         setLoading(true);
@@ -1289,7 +1304,7 @@ const ProductDetail = () => {
 
         // If not in state, fetch from API
         if (!item) {
-          const res = await apiGet<ApiProduct>(`/api/products/${id}`);
+          const res = await apiGet<ApiProduct>(`/api/products/${resolvedProductId}`);
           item = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).item as ApiProduct | undefined;
         }
 
@@ -1373,6 +1388,9 @@ const ProductDetail = () => {
         }
 
         if (isMounted) {
+          if (id && isObjectId(id)) {
+            navigate(buildProductPath(id), { replace: true });
+          }
           setProduct(mapped);
           setRelated(relatedProducts);
           setRatingHistory(realRatingHistory);
@@ -1386,7 +1404,7 @@ const ProductDetail = () => {
       }
     })();
     return () => { isMounted = false; };
-  }, [id]);
+  }, [id, resolvedProductId, navigate]);
 
   // Derived related products from fetched list
   const relatedProducts = related

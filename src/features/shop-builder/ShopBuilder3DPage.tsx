@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ShopBuilderProvider, useShopBuilder } from './store';
 import type { ShopBuilderWall, ShopBuilderSlatWall, ShopBuilderSlatAccessory, ShopBuilderColumn } from './types';
@@ -1624,87 +1624,70 @@ const ShopBuilderContent = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const handleSnapshot = useCallback(async () => {
+  const handleSnapshot = useCallback(async (): Promise<string | undefined> => {
     try {
-      // Dynamically import html2canvas
       const html2canvas = (await import('html2canvas')).default;
-
-      // Get the 3D snapshot first
       const threeSnapshot = threeRef.current?.snapshot();
-
-      // Get the main container
       const container = (document.querySelector('[data-shop-builder-container]') || document.body) as HTMLElement;
-
-      // Get the 3D container element
       const threeContainer = container.querySelector('[data-three-container]') as HTMLElement;
 
-      // Hide the 3D container temporarily
       let originalDisplay = '';
       if (threeContainer) {
         originalDisplay = threeContainer.style.display;
         threeContainer.style.display = 'none';
       }
 
-      // Capture the page without the 3D view
+      const captureScale = 2;
       const pageCanvas = await html2canvas(container, {
         allowTaint: true,
         useCORS: true,
-        scale: 1.2,
+        scale: captureScale,
         backgroundColor: '#ffffff',
         logging: false,
-        onclone: (clonedDocument) => {
-          const allElements = clonedDocument.querySelectorAll('*');
-          allElements.forEach((el: any) => {
+        scrollX: 0,
+        scrollY: -window.scrollY,
+        windowWidth: container.scrollWidth,
+        windowHeight: container.scrollHeight,
+        onclone: (clonedDoc) => {
+          clonedDoc.querySelectorAll('*').forEach((el: any) => {
             el.style.visibility = 'visible';
             el.style.opacity = '1';
           });
         },
       });
 
-      // Restore the 3D container
       if (threeContainer) {
         threeContainer.style.display = originalDisplay;
       }
 
-      // If we have a 3D snapshot, create a combined image
-      if (threeSnapshot) {
-        // Create a new canvas to combine both images
+      if (threeSnapshot && threeContainer) {
         const combinedCanvas = document.createElement('canvas');
-        const ctx = combinedCanvas.getContext('2d');
-        if (!ctx) return pageCanvas.toDataURL('image/png');
-
-        // Set canvas size to match page canvas
         combinedCanvas.width = pageCanvas.width;
         combinedCanvas.height = pageCanvas.height;
-
-        // Draw the page canvas
+        const ctx = combinedCanvas.getContext('2d');
+        if (!ctx) return pageCanvas.toDataURL('image/png');
         ctx.drawImage(pageCanvas, 0, 0);
 
-        // Find where the 3D container is and draw the 3D snapshot there
-        const threeImg = new Image();
-        threeImg.onload = () => {
-          // Calculate position and size of 3D container in the screenshot
-          if (threeContainer) {
+        const dataUrl: string = await new Promise((resolve) => {
+          const threeImg = new Image();
+          threeImg.onload = () => {
             const rect = threeContainer.getBoundingClientRect();
             const containerRect = container.getBoundingClientRect();
-            const scale = 1.2; // Same scale as html2canvas
-
-            const x = (rect.left - containerRect.left) * scale;
-            const y = (rect.top - containerRect.top) * scale;
-            const width = rect.width * scale;
-            const height = rect.height * scale;
-
-            ctx.drawImage(threeImg, x, y, width, height);
-          }
-        };
-        threeImg.src = threeSnapshot;
-
-        return combinedCanvas.toDataURL('image/png');
+            const x = (rect.left - containerRect.left) * captureScale;
+            const y = (rect.top - containerRect.top) * captureScale;
+            const w = rect.width * captureScale;
+            const h = rect.height * captureScale;
+            ctx.drawImage(threeImg, x, y, w, h);
+            resolve(combinedCanvas.toDataURL('image/png'));
+          };
+          threeImg.onerror = () => resolve(pageCanvas.toDataURL('image/png'));
+          threeImg.src = threeSnapshot;
+        });
+        return dataUrl;
       }
 
       return pageCanvas.toDataURL('image/png');
     } catch (error) {
-      // Fallback to 3D canvas snapshot
       console.warn('html2canvas error:', error, 'using 3D snapshot fallback');
       return threeRef.current?.snapshot();
     }

@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { Mail, Phone, MapPin, Facebook, Instagram, Twitter, Linkedin, Youtube, Github, Box, Users, Building2, ShoppingBag, Star, Flame, Gift, Sparkles, Tag, LogIn, UserPlus, ArrowRight, MessageCircle } from 'lucide-react';
 import Logo from '@/components/ui/Logo';
 import { Button } from '@/components/ui/button';
+import { buildCategoryPath } from '@/lib/category-link';
 
 // Premium footer link styles
 const footerLinkClass = `
@@ -118,7 +119,14 @@ const Footer = () => {
   ];
 
   // Product categories links
-  const [categories, setCategories] = useState<Array<{ slug: string; nameAr: string }>>([]);
+  const [categories, setCategories] = useState<Array<{ id?: string; slug?: string; nameAr: string; name?: string }>>([]);
+  const getCategoryPath = (cat: { id?: string; slug?: string; nameAr: string; name?: string }) =>
+    buildCategoryPath({
+      slug: cat.slug,
+      nameAr: cat.nameAr,
+      name: cat.name,
+      id: cat.id,
+    });
 
   useEffect(() => {
     const fetchCategories = async () => {
@@ -127,9 +135,11 @@ const Footer = () => {
         if (!res.ok) return;
         const data = await res.json();
         if (data.ok && data.items) {
-          setCategories(data.items.slice(0, 8).map((cat: { slug: string; nameAr?: string; name: string }) => ({
+          setCategories(data.items.slice(0, 8).map((cat: { _id?: string; slug?: string; nameAr?: string; name: string }) => ({
+            id: cat._id,
             slug: cat.slug,
-            nameAr: cat.nameAr || cat.name
+            nameAr: cat.nameAr || cat.name,
+            name: cat.name,
           })));
         }
       } catch (error) {
@@ -373,17 +383,20 @@ const Footer = () => {
             <h3 className="text-lg font-bold text-white mb-6 pb-2 border-b border-slate-700">الأقسام</h3>
             <div className="grid grid-cols-2 gap-3">
               {categories.length > 0 ? (
-                categories.map((cat) => (
+                categories.map((cat) => {
+                  const categoryPath = getCategoryPath(cat);
+                  return (
                   <Link
-                    key={cat.slug}
-                    to={`/category/${cat.slug}`}
-                    className={`${footerLinkClass} ${getActiveLinkClass(`/category/${cat.slug}`)}`}
+                    key={cat.id || cat.slug || cat.nameAr}
+                    to={categoryPath}
+                    className={`${footerLinkClass} ${getActiveLinkClass(categoryPath)}`}
                   >
                     <span className="w-2 h-2 bg-primary rounded-full group-hover:scale-150 group-hover:shadow-lg group-hover:shadow-primary/50 transition-all relative z-10"></span>
                     <span className={textAnimationClass}>{cat.nameAr}</span>
                     <ArrowRight className={arrowAnimationClass} />
                   </Link>
-                ))
+                  );
+                })
               ) : (
                 <p className="text-sm text-slate-400">جاري التحميل...</p>
               )}
@@ -594,11 +607,12 @@ const Footer = () => {
               <div className="grid grid-cols-2 gap-2">
                 {categories.length > 0 ? (
                   categories.map((cat) => {
-                    const isActive = isLinkActive(`/category/${cat.slug}`);
+                    const categoryPath = getCategoryPath(cat);
+                    const isActive = isLinkActive(categoryPath);
                     return (
                       <Link
-                        key={cat.slug}
-                        to={`/category/${cat.slug}`}
+                        key={cat.id || cat.slug || cat.nameAr}
+                        to={categoryPath}
                         className={`relative flex items-center gap-2 px-2 py-1.5 rounded text-xs transition-all group border border-slate-700/50 hover:border-primary/50 hover:shadow-[0_0_15px_rgba(var(--primary-rgb),0.15)] active:scale-95 overflow-hidden before:absolute before:inset-0 before:bg-gradient-to-r before:from-primary/0 before:via-primary/10 before:to-primary/0 before:translate-x-[-100%] hover:before:translate-x-[100%] before:transition-transform before:duration-500 ${isActive
                           ? 'bg-primary/25 text-white border-l-4 border-primary pl-1 font-semibold'
                           : 'text-slate-300 hover:text-white hover:bg-slate-800/30 hover:bg-primary/15 bg-slate-800/30'

@@ -20,6 +20,8 @@ import { useDualAuth } from '@/hooks/useDualAuth';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useToast } from '@/hooks/use-toast';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
+import { buildCategoryPath } from '@/lib/category-link';
+import { buildProductPath } from '@/lib/product-link';
 import type { Product } from '@/types';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
@@ -61,6 +63,15 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
   // Extract clean product ID (remove carousel suffix)
   const getCleanProductId = (id: string) => {
     return id.replace(/-set-\d+-\d+$/, '');
+  };
+
+  const getCategoryPath = (product: Product) => {
+    return buildCategoryPath({
+      slug: product.categorySlug,
+      nameAr: product.categoryAr,
+      name: product.category,
+      id: product.categoryId || product.category,
+    });
   };
 
   // Prepare products for true infinite scrolling
@@ -359,14 +370,14 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                     >
                       <div 
                         className="group relative h-full rounded-2xl overflow-hidden bg-white border-2 border-slate-200 hover:border-primary shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] cursor-pointer"
-                        onClick={() => navigate(`/product/${getCleanProductId(product.id)}`)}
+                        onClick={() => navigate(buildProductPath(getCleanProductId(product.id)))}
                       >
                         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 pointer-events-none overflow-hidden rounded-2xl">
                           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                         </div>
 
                         <div className="relative aspect-[4/3] overflow-hidden">
-                          <Link to={`/product/${getCleanProductId(product.id)}`} onClick={(e) => e.stopPropagation()}>
+                          <Link to={buildProductPath(getCleanProductId(product.id))} onClick={(e) => e.stopPropagation()}>
                             <img
                               src={optimizeImage(product.image || `/api/categories/${product.category}/image`, { w: 320 })}
                               alt={product.nameAr}
@@ -382,7 +393,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
 
                           {/* Category Badge - Top Right */}
                           <Link 
-                            to={`/category/${product.category}`}
+                            to={getCategoryPath(product)}
                             className="absolute top-3 right-3 text-xs font-semibold text-white bg-primary/90 backdrop-blur-sm px-3 py-1.5 rounded-lg shadow-lg hover:bg-primary transition-colors z-10"
                             onClick={(e) => e.stopPropagation()}
                           >
@@ -496,7 +507,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                         </div>
 
                         <div className="p-3 space-y-2">
-                          <Link to={`/product/${getCleanProductId(product.id)}`} className="block">
+                          <Link to={buildProductPath(getCleanProductId(product.id))} className="block">
                             <h3 className="font-bold text-sm text-slate-900 line-clamp-2 group-hover:text-primary transition-colors min-h-[2.5rem]">
                               {product.nameAr}
                             </h3>
@@ -549,7 +560,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                                   <Button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      navigate(`/product/${getCleanProductId(product.id)}`);
+                                navigate(buildProductPath(getCleanProductId(product.id)));
                                     }}
                                     className="h-10 w-10 rounded-xl bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0 relative"
                                   >

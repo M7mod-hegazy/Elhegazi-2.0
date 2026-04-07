@@ -4,6 +4,7 @@ import { Package, Grid3x3, Sparkles, ArrowRight, ChevronLeft, ChevronRight, Tag,
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { apiGet, type ApiResponse } from '@/lib/api';
+import { buildCategoryPath } from '@/lib/category-link';
 import type { Category } from '@/types';
 
 // Simplified Product interface for home page
@@ -23,6 +24,14 @@ import 'swiper/css/scrollbar';
 interface CategoriesDesktopProps {
   selectedSlugs?: string[];
 }
+
+const getCategoryLink = (category: Pick<Category, 'slug' | 'id' | 'name' | 'nameAr'>): string =>
+  buildCategoryPath({
+    slug: category.slug,
+    nameAr: category.nameAr,
+    name: category.name,
+    id: category.id,
+  });
 
 const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
   const [hoveredCategory, setHoveredCategory] = useState<string | null>(null);
@@ -346,7 +355,7 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                   }}
                 >
                   <Link
-                    to={`/category/${category.slug || category.id}`}
+                    to={getCategoryLink(category)}
                     className="group block bg-white rounded-2xl sm:rounded-3xl overflow-hidden shadow-md sm:shadow-lg hover:shadow-xl sm:hover:shadow-2xl transition-all duration-500 sm:duration-700 border border-slate-200/60 hover:border-primary/40 relative touch-manipulation cursor-pointer w-full h-full"
                   >
                 {/* Featured Badge */}

@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import AuthModal from '@/components/ui/auth-modal';
 import { cn } from '@/lib/utils';
+import { buildProductPath } from '@/lib/product-link';
 
 const RatingMessage = () => {
   const { productId } = useParams<{ productId: string }>();
@@ -52,7 +53,7 @@ const RatingMessage = () => {
       
       // Redirect to product page after 2 seconds
       setTimeout(() => {
-        navigate(`/product/${productId}`);
+        navigate(buildProductPath(productId));
       }, 2000);
     } catch (error) {
       toast({
@@ -78,7 +79,7 @@ const RatingMessage = () => {
               شكرًا لتقييمك للمنتج. سيتم نشر تقييمك بعد المراجعة.
             </p>
             <Button 
-              onClick={() => navigate(`/product/${productId}`)}
+            onClick={() => navigate(buildProductPath(productId))}
               className="w-full py-3 rounded-lg font-bold"
             >
               العودة للمنتج
