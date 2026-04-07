@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,9 +16,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ProductAnalyticsModal } from '@/components/admin/ProductAnalyticsModal';
 import { PNG3DConverter } from '@/components/admin/PNG3DConverter';
 import { ShopBuilderDefaultsModal } from '@/components/admin/ShopBuilderDefaultsModal';
+import { Canvas } from '@react-three/fiber';
+import { OrbitControls, useGLTF, Center } from '@react-three/drei';
+import * as THREE from 'three';
 
 interface Product3D {
   _id: string;
+  id?: string;
   name: string;
   nameEn?: string;
   description: string;
@@ -38,6 +42,78 @@ interface Product3D {
   usageCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+const getProductId = (product: Partial<Product3D> | null | undefined): string =>
+  String(product?._id || product?.id || '');
+
+const normalizeProduct = (product: Partial<Product3D>): Product3D => ({
+  ...(product as Product3D),
+  _id: getProductId(product),
+});
+
+type TransformValues = {
+  dimensions: { width: number; height: number; depth: number };
+  defaultScale: { x: number; y: number; z: number };
+  defaultRotation: { x: number; y: number; z: number };
+};
+
+const clampPositive = (value: number, fallback = 0.1) => {
+  if (!Number.isFinite(value) || value <= 0) return fallback;
+  return value;
+};
+
+const degToRad = (deg: number) => (deg * Math.PI) / 180;
+
+function PreviewModel({
+  modelUrl,
+  dimensions,
+  scale,
+  rotation,
+}: {
+  modelUrl: string;
+  dimensions: { width: number; height: number; depth: number };
+  scale: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+}) {
+  const { scene } = useGLTF(modelUrl);
+  const cloned = useMemo(() => scene.clone(true), [scene]);
+  const baseSize = useMemo(() => {
+    const box = new THREE.Box3().setFromObject(cloned);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    return {
+      x: size.x || 1,
+      y: size.y || 1,
+      z: size.z || 1,
+    };
+  }, [cloned]);
+
+  const safeDimensions = {
+    width: clampPositive(dimensions.width, 0.2),
+    height: clampPositive(dimensions.height, 0.2),
+    depth: clampPositive(dimensions.depth, 0.2),
+  };
+
+  const finalScale = [
+    (safeDimensions.width / baseSize.x) * clampPositive(scale.x, 0.1),
+    (safeDimensions.height / baseSize.y) * clampPositive(scale.y, 0.1),
+    (safeDimensions.depth / baseSize.z) * clampPositive(scale.z, 0.1),
+  ] as [number, number, number];
+
+  return (
+    <Center bottom position={[1.15, 0, 0]}>
+      <primitive
+        object={cloned}
+        scale={finalScale}
+        rotation={[
+          degToRad(rotation.x || 0),
+          degToRad(rotation.y || 0),
+          degToRad(rotation.z || 0),
+        ]}
+      />
+    </Center>
+  );
 }
 
 // Categories are now stored in MongoDB only
@@ -68,6 +144,7 @@ const Products3D = () => {
   const [analyticsProduct, setAnalyticsProduct] = useState<Product3D | null>(null);
   const [isConverterOpen, setIsConverterOpen] = useState(false);
   const [isDefaultsModalOpen, setIsDefaultsModalOpen] = useState(false);
+  const [isTransformPanelOpen, setIsTransformPanelOpen] = useState(false);
   
   // Category management (MongoDB)
   const [isAddingCategory, setIsAddingCategory] = useState(false);
@@ -81,6 +158,7 @@ const Products3D = () => {
   // Upload progress
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isUploading, setIsUploading] = useState(false);
+  const [hasUploadedModelSuccessfully, setHasUploadedModelSuccessfully] = useState(false);
   
   // Form state
   const [formData, setFormData] = useState({
@@ -101,6 +179,11 @@ const Products3D = () => {
     isActive: true,
     isPremium: false
   });
+  const [transformDraft, setTransformDraft] = useState<TransformValues>({
+    dimensions: { width: 1, height: 1, depth: 1 },
+    defaultScale: { x: 1, y: 1, z: 1 },
+    defaultRotation: { x: 0, y: 0, z: 0 },
+  });
 
   // Fetch products
   const fetchProducts = async () => {
@@ -115,7 +198,10 @@ const Products3D = () => {
 
       const response = await apiGet<{ items: Product3D[] }>(`/api/products-3d?${params.toString()}`);
       if (response.ok && response.items) {
-        setProducts(response.items as unknown as Product3D[]);
+        const normalized = (response.items as unknown as Partial<Product3D>[])
+          .map(normalizeProduct)
+          .filter((item) => Boolean(item._id));
+        setProducts(normalized);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -151,6 +237,18 @@ const Products3D = () => {
   // Handle search
   const handleSearch = () => {
     fetchProducts();
+  };
+
+  const canOpenTransformPanel = Boolean(formData.modelUrl) && (isEditModalOpen || hasUploadedModelSuccessfully);
+  const isPreviewableFormat = formData.format === 'glb' || formData.format === 'gltf';
+
+  const openTransformPanel = () => {
+    setTransformDraft({
+      dimensions: { ...formData.dimensions },
+      defaultScale: { ...formData.defaultScale },
+      defaultRotation: { ...formData.defaultRotation },
+    });
+    setIsTransformPanelOpen(true);
   };
 
   // Handle add category
@@ -292,6 +390,7 @@ const Products3D = () => {
               fileSize: file.size,
               format: detectedFormat
             }));
+            setHasUploadedModelSuccessfully(true);
             toast({ 
               title: 'نجح', 
               description: `تم رفع الملف بنجاح (${detectedFormat.toUpperCase()})` 
@@ -345,6 +444,7 @@ const Products3D = () => {
       isActive: true,
       isPremium: false
     });
+    setHasUploadedModelSuccessfully(false);
   };
 
   // Handle add product
@@ -371,9 +471,14 @@ const Products3D = () => {
   // Handle edit product
   const handleEditProduct = async () => {
     if (!selectedProduct) return;
+    const productId = getProductId(selectedProduct);
+    if (!productId) {
+      toast({ title: 'خطأ', description: 'معرف النموذج غير متاح للتعديل', variant: 'destructive' });
+      return;
+    }
 
     try {
-      const response = await apiPutJson(`/api/products-3d/${selectedProduct._id}`, formData);
+      const response = await apiPutJson(`/api/products-3d/${productId}`, formData);
       if (response.ok) {
         toast({ title: 'نجح', description: 'تم تحديث النموذج بنجاح' });
         setIsEditModalOpen(false);
@@ -389,6 +494,10 @@ const Products3D = () => {
 
   // Handle delete product
   const handleDeleteProduct = async (id: string) => {
+    if (!id) {
+      toast({ title: 'خطأ', description: 'معرف النموذج غير متاح للحذف', variant: 'destructive' });
+      return;
+    }
     const product = products.find(p => p._id === id);
     const usageWarning = product && product.usageCount > 0 
       ? `\n\n⚠️ تحذير: تم استخدام هذا النموذج ${product.usageCount} مرة في المشاريع.`
@@ -581,6 +690,7 @@ const Products3D = () => {
       isActive: product.isActive,
       isPremium: product.isPremium
     });
+    setHasUploadedModelSuccessfully(true);
     setIsEditModalOpen(true);
   };
 
@@ -959,6 +1069,129 @@ const Products3D = () => {
           </>
         )}
 
+        {/* 3D Transform Control Modal */}
+        <Dialog open={isTransformPanelOpen} onOpenChange={setIsTransformPanelOpen}>
+          <DialogContent className="max-w-6xl">
+            <DialogHeader>
+              <DialogTitle>لوحة التحكم ثلاثية الأبعاد للمقاسات</DialogTitle>
+              <DialogDescription>
+                معاينة النموذج بجانب جدار مرجعي 3×3 متر على الأرضية، ثم تطبيق القيم المختارة على النموذج.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-4">
+              <div className="h-[430px] rounded-xl overflow-hidden border border-slate-200 bg-slate-100">
+                {isPreviewableFormat ? (
+                  <Canvas camera={{ position: [4.5, 3.2, 5.2], fov: 42 }}>
+                    <color attach="background" args={['#eef2f7']} />
+                    <ambientLight intensity={0.8} />
+                    <directionalLight position={[6, 8, 6]} intensity={1.2} />
+                    <hemisphereLight args={['#ffffff', '#d4d4d8', 0.6]} />
+
+                    {/* Floor */}
+                    <mesh position={[0, -0.1, 0]}>
+                      <boxGeometry args={[10, 0.2, 10]} />
+                      <meshStandardMaterial color="#dbe4ee" />
+                    </mesh>
+
+                    {/* 3x3 reference wall */}
+                    <mesh position={[0, 1.5, -1.6]}>
+                      <boxGeometry args={[3, 3, 0.2]} />
+                      <meshStandardMaterial color="#ffffff" />
+                    </mesh>
+                    <lineSegments position={[0, 1.5, -1.49]}>
+                      <edgesGeometry args={[new THREE.PlaneGeometry(3, 3)]} />
+                      <lineBasicMaterial color="#94a3b8" />
+                    </lineSegments>
+
+                    <Suspense fallback={null}>
+                      <PreviewModel
+                        modelUrl={formData.modelUrl}
+                        dimensions={transformDraft.dimensions}
+                        scale={transformDraft.defaultScale}
+                        rotation={transformDraft.defaultRotation}
+                      />
+                    </Suspense>
+                    <OrbitControls makeDefault />
+                  </Canvas>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-center p-6">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-800 mb-1">المعاينة المباشرة تدعم GLB/GLTF فقط</p>
+                      <p className="text-xs text-slate-600">يمكنك تعديل القيم من اللوحة الجانبية ثم تطبيقها للحفظ.</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <p className="text-xs text-slate-600 mb-2">مرجع المشهد</p>
+                  <p className="text-sm text-slate-800">الجدار المرجعي: عرض 3م × ارتفاع 3م</p>
+                  <p className="text-xs text-slate-500 mt-1">النموذج يظهر بجانب الجدار على نفس الأرضية للمقارنة البصرية.</p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">الأبعاد الفعلية (متر)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input type="number" min="0.1" step="0.1" value={transformDraft.dimensions.width} onChange={(e) => setTransformDraft((prev) => ({ ...prev, dimensions: { ...prev.dimensions, width: Number(e.target.value) } }))} placeholder="العرض" />
+                    <Input type="number" min="0.1" step="0.1" value={transformDraft.dimensions.height} onChange={(e) => setTransformDraft((prev) => ({ ...prev, dimensions: { ...prev.dimensions, height: Number(e.target.value) } }))} placeholder="الارتفاع" />
+                    <Input type="number" min="0.1" step="0.1" value={transformDraft.dimensions.depth} onChange={(e) => setTransformDraft((prev) => ({ ...prev, dimensions: { ...prev.dimensions, depth: Number(e.target.value) } }))} placeholder="العمق" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">المقياس الافتراضي (Scale)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input type="number" min="0.1" step="0.1" value={transformDraft.defaultScale.x} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultScale: { ...prev.defaultScale, x: Number(e.target.value) } }))} placeholder="X" />
+                    <Input type="number" min="0.1" step="0.1" value={transformDraft.defaultScale.y} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultScale: { ...prev.defaultScale, y: Number(e.target.value) } }))} placeholder="Y" />
+                    <Input type="number" min="0.1" step="0.1" value={transformDraft.defaultScale.z} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultScale: { ...prev.defaultScale, z: Number(e.target.value) } }))} placeholder="Z" />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold">الدوران الافتراضي (درجة)</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    <Input type="number" min="0" max="360" step="1" value={transformDraft.defaultRotation.x} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultRotation: { ...prev.defaultRotation, x: Number(e.target.value) } }))} placeholder="X°" />
+                    <Input type="number" min="0" max="360" step="1" value={transformDraft.defaultRotation.y} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultRotation: { ...prev.defaultRotation, y: Number(e.target.value) } }))} placeholder="Y°" />
+                    <Input type="number" min="0" max="360" step="1" value={transformDraft.defaultRotation.z} onChange={(e) => setTransformDraft((prev) => ({ ...prev, defaultRotation: { ...prev.defaultRotation, z: Number(e.target.value) } }))} placeholder="Z°" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsTransformPanelOpen(false)}>إلغاء</Button>
+              <Button
+                onClick={() => {
+                  setFormData((prev) => ({
+                    ...prev,
+                    dimensions: {
+                      width: clampPositive(transformDraft.dimensions.width, 0.1),
+                      height: clampPositive(transformDraft.dimensions.height, 0.1),
+                      depth: clampPositive(transformDraft.dimensions.depth, 0.1),
+                    },
+                    defaultScale: {
+                      x: clampPositive(transformDraft.defaultScale.x, 0.1),
+                      y: clampPositive(transformDraft.defaultScale.y, 0.1),
+                      z: clampPositive(transformDraft.defaultScale.z, 0.1),
+                    },
+                    defaultRotation: {
+                      x: Number.isFinite(transformDraft.defaultRotation.x) ? transformDraft.defaultRotation.x : 0,
+                      y: Number.isFinite(transformDraft.defaultRotation.y) ? transformDraft.defaultRotation.y : 0,
+                      z: Number.isFinite(transformDraft.defaultRotation.z) ? transformDraft.defaultRotation.z : 0,
+                    },
+                  }));
+                  setIsTransformPanelOpen(false);
+                  toast({ title: 'نجح', description: 'تم تطبيق المقاسات المختارة على النموذج.' });
+                }}
+              >
+                تطبيق القيم
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
         {/* Add/Edit Modal */}
         <Dialog open={isAddModalOpen || isEditModalOpen} onOpenChange={(open) => { setIsAddModalOpen(open); setIsEditModalOpen(open); if (!open) resetForm(); }}>
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -1074,6 +1307,7 @@ const Products3D = () => {
                         onClick={(e) => {
                           e.stopPropagation();
                           setFormData({ ...formData, modelUrl: '' });
+                          setHasUploadedModelSuccessfully(false);
                         }}
                       >
                         <X className="h-3 w-3 ml-1" />
@@ -1115,7 +1349,11 @@ const Products3D = () => {
                 <Input 
                   className="mt-2" 
                   value={formData.modelUrl} 
-                  onChange={(e) => setFormData({ ...formData, modelUrl: e.target.value })} 
+                  onChange={(e) => {
+                    const next = e.target.value;
+                    setFormData({ ...formData, modelUrl: next });
+                    if (!next.trim()) setHasUploadedModelSuccessfully(false);
+                  }} 
                   placeholder="أو الصق رابط مباشر"
                 />
               </div>
@@ -1317,100 +1555,41 @@ const Products3D = () => {
                 </div>
               </div>
 
-              {/* Dimensions */}
-              <div>
-                <Label>الأبعاد (بالمتر)</Label>
-                <div className="grid grid-cols-3 gap-2 mt-1">
-                  <Input type="number" step="0.1" value={formData.dimensions.width} onChange={(e) => setFormData({ ...formData, dimensions: { ...formData.dimensions, width: Number(e.target.value) } })} placeholder="العرض" />
-                  <Input type="number" step="0.1" value={formData.dimensions.height} onChange={(e) => setFormData({ ...formData, dimensions: { ...formData.dimensions, height: Number(e.target.value) } })} placeholder="الارتفاع" />
-                  <Input type="number" step="0.1" value={formData.dimensions.depth} onChange={(e) => setFormData({ ...formData, dimensions: { ...formData.dimensions, depth: Number(e.target.value) } })} placeholder="العمق" />
+              {/* 3D Transform Panel Launcher */}
+              <div className="rounded-xl border border-slate-200 p-3 bg-slate-50/80">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-semibold text-slate-900">الأبعاد والمقياس والدوران</p>
+                    <p className="text-xs text-slate-600">
+                      افتح لوحة تحكم 3D لمعاينة النموذج بجانب جدار 3×3 متر ثم احفظ المقاسات المختارة.
+                    </p>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs text-slate-700">
+                      <div className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                        الأبعاد: {formData.dimensions.width.toFixed(2)} × {formData.dimensions.height.toFixed(2)} × {formData.dimensions.depth.toFixed(2)} م
+                      </div>
+                      <div className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                        Scale: {formData.defaultScale.x.toFixed(2)} / {formData.defaultScale.y.toFixed(2)} / {formData.defaultScale.z.toFixed(2)}
+                      </div>
+                      <div className="rounded-md bg-white border border-slate-200 px-2 py-1">
+                        Rotation: {formData.defaultRotation.x}° / {formData.defaultRotation.y}° / {formData.defaultRotation.z}°
+                      </div>
+                    </div>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={openTransformPanel}
+                    disabled={!canOpenTransformPanel}
+                    className="shrink-0"
+                  >
+                    فتح لوحة المقاسات 3D
+                  </Button>
                 </div>
-              </div>
-
-              {/* Scale Sliders */}
-              <div>
-                <Label>المقياس الافتراضي (Scale)</Label>
-                <div className="grid grid-cols-3 gap-4 mt-2">
-                  <div>
-                    <Label className="text-xs text-slate-600">X: {formData.defaultScale.x.toFixed(1)}</Label>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="10"
-                      step="0.1"
-                      value={formData.defaultScale.x}
-                      onChange={(e) => setFormData({ ...formData, defaultScale: { ...formData.defaultScale, x: Number(e.target.value) } })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-slate-600">Y: {formData.defaultScale.y.toFixed(1)}</Label>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="10"
-                      step="0.1"
-                      value={formData.defaultScale.y}
-                      onChange={(e) => setFormData({ ...formData, defaultScale: { ...formData.defaultScale, y: Number(e.target.value) } })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-slate-600">Z: {formData.defaultScale.z.toFixed(1)}</Label>
-                    <input
-                      type="range"
-                      min="0.1"
-                      max="10"
-                      step="0.1"
-                      value={formData.defaultScale.z}
-                      onChange={(e) => setFormData({ ...formData, defaultScale: { ...formData.defaultScale, z: Number(e.target.value) } })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mt-2"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Rotation Sliders */}
-              <div>
-                <Label>الدوران الافتراضي (Rotation)</Label>
-                <div className="grid grid-cols-3 gap-4 mt-2">
-                  <div>
-                    <Label className="text-xs text-slate-600">X: {formData.defaultRotation.x}°</Label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      step="15"
-                      value={formData.defaultRotation.x}
-                      onChange={(e) => setFormData({ ...formData, defaultRotation: { ...formData.defaultRotation, x: Number(e.target.value) } })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-slate-600">Y: {formData.defaultRotation.y}°</Label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      step="15"
-                      value={formData.defaultRotation.y}
-                      onChange={(e) => setFormData({ ...formData, defaultRotation: { ...formData.defaultRotation, y: Number(e.target.value) } })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mt-2"
-                    />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-slate-600">Z: {formData.defaultRotation.z}°</Label>
-                    <input
-                      type="range"
-                      min="0"
-                      max="360"
-                      step="15"
-                      value={formData.defaultRotation.z}
-                      onChange={(e) => setFormData({ ...formData, defaultRotation: { ...formData.defaultRotation, z: Number(e.target.value) } })}
-                      className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer mt-2"
-                    />
-                  </div>
-                </div>
+                {!canOpenTransformPanel && (
+                  <p className="text-[11px] text-amber-700 mt-2">
+                    يتفعّل هذا الزر بعد رفع ملف 3D بنجاح.
+                  </p>
+                )}
               </div>
 
               {/* Status */}

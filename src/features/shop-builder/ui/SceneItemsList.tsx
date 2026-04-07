@@ -44,6 +44,7 @@ export const SceneItemsList: React.FC = () => {
   };
 
   const totalColumns = layout.walls.reduce((sum, wall) => sum + (wall.columns?.length || 0), 0);
+  const visibleProducts = layout.products.filter((product) => !(product.metadata as any)?.autoHangFill);
 
   return (
     <div className="w-full bg-white/95 backdrop-blur-xl rounded-2xl border border-zinc-200/60 shadow-xl overflow-hidden flex flex-col max-h-full">
@@ -68,7 +69,7 @@ export const SceneItemsList: React.FC = () => {
               </div>
               <div className="text-right">
                 <h4 className="font-bold text-slate-900 text-sm">المنتجات</h4>
-                <p className="text-[10px] text-slate-600">{layout.products.length} منتج</p>
+                <p className="text-[10px] text-slate-600">{visibleProducts.length} منتج</p>
               </div>
             </div>
             {expandedSections.products ? (
@@ -80,13 +81,13 @@ export const SceneItemsList: React.FC = () => {
 
           {expandedSections.products && (
             <div className="px-2 pb-3 space-y-1.5 max-h-80 overflow-y-auto">
-              {layout.products.length === 0 ? (
+              {visibleProducts.length === 0 ? (
                 <div className="text-center py-6 text-slate-400">
                   <Box className="h-10 w-10 mx-auto mb-2 opacity-30" />
                   <p className="text-xs">لا توجد منتجات</p>
                 </div>
               ) : (
-                layout.products.map((product) => {
+                visibleProducts.map((product) => {
                   // Try to get thumbnail from metadata or use modelUrl
                   const thumbnailUrl = (product.metadata?.thumbnailUrl as string) ||
                     (product.metadata?.imageUrl as string) ||

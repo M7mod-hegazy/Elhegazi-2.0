@@ -957,7 +957,15 @@ app.get('/api/history', requirePermission('reports', 'read', { attach: true }), 
     ]);
 
     // Enrich with user info (username/email) when userId is present
-    const userIds = Array.from(new Set(rawItems.map(i => i.userId).filter(Boolean).map(String)));
+    const userIds = Array.from(
+      new Set(
+        rawItems
+          .map(i => i.userId)
+          .filter(Boolean)
+          .map(String)
+          .filter((id) => mongoose.Types.ObjectId.isValid(id))
+      )
+    );
     let userMap = new Map();
     if (userIds.length) {
       const users = await User.find({ _id: { $in: userIds } }).select('firstName lastName email').lean();

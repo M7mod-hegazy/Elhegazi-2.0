@@ -1,5 +1,5 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Ruler, Rotate3D, Scan, Save, Upload, Wand2, Search, Package, Eye, SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, TrendingUp, Star, Clock, Settings, Download, FileUp, RotateCcw, X, Palette, Edit2, Printer, LogOut, Camera } from 'lucide-react';
+import { Plus, Ruler, Rotate3D, Scan, Save, Upload, Wand2, Search, Package, Eye, EyeOff, SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, TrendingUp, Star, Clock, Settings, Download, FileUp, RotateCcw, X, Palette, Edit2, Printer, LogOut, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -78,6 +78,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   const importFileRef = useRef<HTMLInputElement | null>(null);
   const {
     layout,
+    setProducts,
     upsertWall,
     selectWall,
     selectedWallId,
@@ -106,7 +107,9 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   } = useShopBuilder();
   const [wallColor, setWallColor] = useState<string>('#ffffff');
   const [addProductOpen, setAddProductOpen] = useState(false);
+  const [hangProductsOpen, setHangProductsOpen] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [isAutoHanging, setIsAutoHanging] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [quitDialogOpen, setQuitDialogOpen] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -529,6 +532,293 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       addProductLockRef.current = false;
     }
   }, [findSpawnPosition, getModelPath, isAdding, selectProduct, toast, upsertProduct]);
+
+  const hangableAccessoriesCount = useMemo(() => {
+    return layout.walls.reduce((count, wall) => {
+      const slatSystems = wall.slatWalls || [];
+      const primoSystems = (wall.primoStands as any[] | undefined) || [];
+      const allSystems = [...slatSystems, ...primoSystems];
+      return count + allSystems.reduce((sum, sys: any) => sum + ((sys.accessories || []).length || 0), 0);
+    }, 0);
+  }, [layout.walls]);
+  const autoHungProductsCount = useMemo(
+    () => layout.products.filter((p) => !!(p.metadata as any)?.autoHangFill).length,
+    [layout.products]
+  );
+  const hiddenAutoHungProductsCount = useMemo(
+    () => layout.products.filter((p) => !!(p.metadata as any)?.autoHangFill && !!(p.metadata as any)?.hiddenByGlobalToggle).length,
+    [layout.products]
+  );
+  const hasAutoHungProducts = autoHungProductsCount > 0;
+  const isAutoHungHidden = hasAutoHungProducts && hiddenAutoHungProductsCount === autoHungProductsCount;
+
+  const toWorldFromSlatLocal = useCallback((wall: any, slat: any, localX: number, localY: number, localZ: number) => {
+    const start = { x: wall.start.x, z: wall.start.y };
+    const end = { x: wall.end.x, z: wall.end.y };
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const wallLength = Math.max(0.001, Math.hypot(dx, dz));
+    const wallDir = { x: dx / wallLength, z: dz / wallLength };
+    const perp = { x: -wallDir.z, z: wallDir.x };
+
+    const slatHeight = slat.height || 2;
+    const slatPosCenter = slat.fillType === 'full' ? 0.5 : (slat.position || 0.5);
+    const sideMultiplier = slat.side === 'front' ? 1 : -1;
+    const offsetDist = ((wall.thickness || 0.1) / 2 + 0.01) * sideMultiplier;
+    const basePos = {
+      x: start.x + dx * slatPosCenter,
+      z: start.z + dz * slatPosCenter,
+    };
+    const groupPos = {
+      x: basePos.x + perp.x * offsetDist,
+      y: (slat.bottomOffset || 0) + slatHeight / 2,
+      z: basePos.z + perp.z * offsetDist,
+    };
+
+    const angle = Math.atan2(dz, dx);
+    const rotY = -angle + (slat.side === 'back' ? Math.PI : 0);
+    const cos = Math.cos(rotY);
+    const sin = Math.sin(rotY);
+
+    const xRot = localX * cos - localZ * sin;
+    const zRot = localX * sin + localZ * cos;
+
+    return {
+      x: groupPos.x + xRot,
+      y: groupPos.y + localY,
+      z: groupPos.z + zRot,
+      rotY,
+    };
+  }, []);
+
+  const clearAutoHungProducts = useCallback(() => {
+    const remaining = layout.products.filter((p) => !(p.metadata as any)?.autoHangFill);
+    const removedCount = layout.products.length - remaining.length;
+    setProducts(remaining);
+    toast({
+      title: 'تم تنظيف المنتجات التلقائية',
+      description: removedCount > 0 ? `تم حذف ${removedCount} منتج مولد تلقائيًا` : 'لا يوجد منتجات تلقائية للحذف',
+    });
+  }, [layout.products, setProducts, toast]);
+
+  const toggleAutoHungProductsVisibility = useCallback(() => {
+    if (!hasAutoHungProducts) {
+      toast({
+        title: 'لا توجد منتجات معلقة',
+        description: 'قم بتوليد المنتجات المعلقة أولاً ثم جرّب الإظهار/الإخفاء.',
+      });
+      return;
+    }
+
+    const nextHidden = !isAutoHungHidden;
+    const updatedProducts = layout.products.map((product) => {
+      if (!(product.metadata as any)?.autoHangFill) return product;
+      return {
+        ...product,
+        metadata: {
+          ...(product.metadata || {}),
+          hiddenByGlobalToggle: nextHidden,
+        },
+      };
+    });
+    setProducts(updatedProducts);
+
+    if (nextHidden && selectedProductId) {
+      const selectedProduct = layout.products.find((p) => p.id === selectedProductId);
+      if ((selectedProduct?.metadata as any)?.autoHangFill) {
+        selectProduct(null);
+      }
+    }
+
+    toast({
+      title: nextHidden ? 'تم إخفاء المنتجات المعلقة' : 'تم إظهار المنتجات المعلقة',
+      description: nextHidden
+        ? `تم إخفاء ${autoHungProductsCount} منتج معلّق مؤقتًا.`
+        : `تمت إعادة إظهار ${autoHungProductsCount} منتج معلّق.`,
+    });
+  }, [autoHungProductsCount, hasAutoHungProducts, isAutoHungHidden, layout.products, selectProduct, selectedProductId, setProducts, toast]);
+
+  const generateAutoHungProducts = useCallback(async () => {
+    if (isAutoHanging) return;
+    setIsAutoHanging(true);
+    try {
+      const proceduralCatalogByAccessory: Record<string, Array<{
+        key: string;
+        name: string;
+        type: 'box' | 'can' | 'bottle' | 'pouch' | 'hanger_pack';
+        color: string;
+        dimensions: { width: number; height: number; depth: number };
+      }>> = {
+        shelf: [
+          { key: 'box-small', name: 'عبوة صندوق', type: 'box', color: '#dbeafe', dimensions: { width: 0.22, height: 0.28, depth: 0.14 } },
+          { key: 'pouch-snack', name: 'عبوة مرنة', type: 'pouch', color: '#fde68a', dimensions: { width: 0.18, height: 0.24, depth: 0.08 } },
+          { key: 'bottle-stand', name: 'زجاجة', type: 'bottle', color: '#c7d2fe', dimensions: { width: 0.10, height: 0.32, depth: 0.10 } },
+          { key: 'can-wide', name: 'علبة أسطوانية', type: 'can', color: '#bfdbfe', dimensions: { width: 0.09, height: 0.16, depth: 0.09 } },
+        ],
+        hook_single: [
+          { key: 'hang-pack', name: 'منتج معلق', type: 'hanger_pack', color: '#fecaca', dimensions: { width: 0.11, height: 0.18, depth: 0.04 } },
+          { key: 'hang-pouch', name: 'كيس معلق', type: 'pouch', color: '#fde68a', dimensions: { width: 0.10, height: 0.16, depth: 0.04 } },
+          { key: 'hang-box', name: 'علبة خفيفة', type: 'box', color: '#ddd6fe', dimensions: { width: 0.10, height: 0.14, depth: 0.05 } },
+        ],
+        hook_waterfall: [
+          { key: 'wf-pack', name: 'باكيت معلق', type: 'hanger_pack', color: '#fecdd3', dimensions: { width: 0.10, height: 0.17, depth: 0.04 } },
+          { key: 'wf-pouch', name: 'كيس انسيابي', type: 'pouch', color: '#fef3c7', dimensions: { width: 0.09, height: 0.15, depth: 0.04 } },
+          { key: 'wf-mini-box', name: 'علبة عرض', type: 'box', color: '#bae6fd', dimensions: { width: 0.10, height: 0.13, depth: 0.05 } },
+        ],
+        basket: [
+          { key: 'basket-box', name: 'منتج داخل سلة', type: 'box', color: '#bbf7d0', dimensions: { width: 0.16, height: 0.18, depth: 0.10 } },
+          { key: 'basket-can', name: 'علبة سلة', type: 'can', color: '#bfdbfe', dimensions: { width: 0.08, height: 0.14, depth: 0.08 } },
+          { key: 'basket-pouch', name: 'عبوة سلة', type: 'pouch', color: '#fde68a', dimensions: { width: 0.13, height: 0.16, depth: 0.07 } },
+        ],
+      };
+
+      const manualProducts = layout.products.filter((p) => !(p.metadata as any)?.autoHangFill);
+      const generated: any[] = [];
+      const rnd = (min: number, max: number) => min + Math.random() * (max - min);
+
+      layout.walls.forEach((wall) => {
+        const systems: any[] = [
+          ...(wall.slatWalls || []),
+          ...(((wall.primoStands as any[] | undefined) || []).map((p) => ({ ...p, systemType: 'primo' }))),
+        ];
+
+        systems.forEach((slat) => {
+          const accessories = (slat.accessories || []) as any[];
+          const slatHeight = slat.height || 2;
+          const wallLength = Math.max(0.001, Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y));
+          const slatWidth = slat.fillType === 'full' ? wallLength : (slat.width || 1);
+          const slatPosCenter = slat.fillType === 'full' ? 0.5 : (slat.position || 0.5);
+
+          accessories.forEach((acc) => {
+            let count = 1;
+            if (acc.type === 'shelf') {
+              const maxByWidth = Math.max(1, Math.floor((acc.width || 0.5) / 0.22));
+              count = Math.max(2, Math.min(6, maxByWidth + Math.floor(rnd(0, 2))));
+            } else if (acc.type === 'hook_single') {
+              count = Math.floor(rnd(1, 3));
+            } else if (acc.type === 'hook_waterfall') {
+              const maxByDepth = Math.max(2, Math.floor((acc.depth || 0.4) / 0.08));
+              count = Math.max(3, Math.min(9, maxByDepth));
+            } else {
+              count = Math.floor(rnd(2, 5));
+            }
+
+            for (let i = 0; i < count; i++) {
+              if (generated.length >= 220) return;
+              const accCatalog = proceduralCatalogByAccessory[acc.type] || proceduralCatalogByAccessory.shelf;
+              const picked = accCatalog[Math.floor(Math.random() * accCatalog.length)];
+              if (!picked) continue;
+
+              const localXBase = ((acc.position?.x ?? 0.5) - 0.5) * slatWidth;
+              const localYBase = ((acc.position?.y ?? 0.5) - 0.5) * slatHeight;
+
+              const absoluteX = slatPosCenter * wallLength - (slatWidth / 2) + (acc.position?.x ?? 0.5) * slatWidth;
+              let protrusion = 0;
+              (wall.columns || []).forEach((col: any) => {
+                const colStart = (col.position || 0.5) * wallLength - ((col.width || 0.4) / 2);
+                const colEnd = colStart + (col.width || 0.4);
+                if (absoluteX >= colStart && absoluteX <= colEnd && (col as any).side === slat.side) {
+                  const slatAnchorOffset = (wall.thickness || 0.1) / 2 + 0.01;
+                  protrusion = Math.max(0, (col.depth || 0.4) - slatAnchorOffset) + 0.005;
+                }
+              });
+
+              let localX = localXBase;
+              let localY = localYBase;
+              let localZ = 0.01 + protrusion;
+
+              if (acc.type === 'shelf') {
+                const span = Math.max(0.04, (acc.width || 0.5) * 0.82);
+                localX = localXBase + (((i + 1) / (count + 1)) - 0.5) * span + rnd(-0.008, 0.008);
+                // Place on top surface of shelf
+                localY = localYBase + rnd(0.06, 0.1);
+                localZ = 0.01 + protrusion + (acc.depth || 0.3) * rnd(0.32, 0.5);
+              } else if (acc.type === 'hook_single') {
+                // Keep centered around the hook and move slightly forward
+                localX = localXBase + rnd(-0.006, 0.006);
+                localY = localYBase + rnd(-0.01, 0.01);
+                localZ = 0.01 + protrusion + Math.max(0.04, (acc.depth || 0.2) * rnd(0.42, 0.62));
+              } else {
+                // Waterfall: cascade depth positions from near to far
+                localX = localXBase + rnd(-0.006, 0.006);
+                localY = localYBase + rnd(-0.012, 0.008);
+                const step = Math.max(0.03, (acc.depth || 0.3) / Math.max(2, count));
+                localZ = 0.01 + protrusion + Math.min((acc.depth || 0.3) - 0.02, 0.035 + i * step + rnd(-0.004, 0.004));
+              }
+
+              localX = Math.max(-slatWidth / 2 + 0.03, Math.min(slatWidth / 2 - 0.03, localX));
+              localY = Math.max(-slatHeight / 2 + 0.03, Math.min(slatHeight / 2 - 0.03, localY));
+
+              const world = toWorldFromSlatLocal(wall, slat, localX, localY, localZ);
+              const dims = picked.dimensions || { width: 0.2, height: 0.2, depth: 0.1 };
+              const sourceW = Math.max(0.2, dims.width || 1);
+              const sourceH = Math.max(0.2, dims.height || 1);
+              const sourceD = Math.max(0.2, dims.depth || 1);
+
+              const fitW = acc.type === 'shelf'
+                ? Math.max(0.12, Math.min((acc.width || 0.5) * 0.32, 0.45))
+                : Math.max(0.08, Math.min((acc.width || 0.2) * 0.9, 0.22));
+              const fitD = acc.type === 'shelf'
+                ? Math.max(0.1, Math.min((acc.depth || 0.3) * 0.6, 0.35))
+                : Math.max(0.06, Math.min((acc.depth || 0.2) * 0.55, 0.2));
+              const fitH = acc.type === 'shelf' ? 0.7 : 0.45;
+              const scaleFactor = Math.max(0.05, Math.min(0.65, Math.min(fitW / sourceW, fitD / sourceD, fitH / sourceH)));
+
+              generated.push({
+                id: crypto.randomUUID(),
+                name: `${picked.name}`,
+                modelUrl: 'procedural://hang-item',
+                position: { x: world.x, y: world.y, z: world.z },
+                rotation: { x: 0, y: world.rotY + rnd(-0.2, 0.2), z: 0 },
+                scale: {
+                  x: Math.max(0.03, scaleFactor),
+                  y: Math.max(0.03, scaleFactor),
+                  z: Math.max(0.03, scaleFactor),
+                },
+                metadata: {
+                  autoHangFill: true,
+                  hiddenByGlobalToggle: isAutoHungHidden,
+                  proceduralHang: true,
+                  proceduralType: picked.type,
+                  proceduralKey: picked.key,
+                  proceduralColor: picked.color,
+                  proceduralSize: {
+                    w: Math.max(0.04, dims.width),
+                    h: Math.max(0.05, dims.height),
+                    d: Math.max(0.02, dims.depth),
+                  },
+                  sourceAccessoryId: acc.id,
+                  sourceSystemId: slat.id,
+                  sourceWallId: wall.id,
+                  sourceSide: slat.side,
+                  category: 'procedural-hanging',
+                  dimensions: dims,
+                },
+              });
+            }
+          });
+        });
+      });
+
+      if (!generated.length) {
+        toast({ title: 'لا توجد ملحقات صالحة', description: 'أضف ملحقات أولاً حتى يتم تعليق المنتجات تلقائيًا.' });
+        return;
+      }
+
+      setProducts([...manualProducts, ...generated]);
+      selectProduct(generated[0].id);
+      toast({
+        title: 'تم التعليق التلقائي بنجاح',
+        description: `تم إضافة ${generated.length} شكل ثلاثي الأبعاد مولد محليًا على الملحقات.`,
+      });
+      setHangProductsOpen(false);
+    } catch (error) {
+      console.error('Auto hang generation failed:', error);
+      toast({ title: 'فشل توليد الأشكال', description: 'حدث خطأ أثناء التوزيع التلقائي.', variant: 'destructive' });
+    } finally {
+      setIsAutoHanging(false);
+    }
+  }, [isAutoHanging, isAutoHungHidden, layout.products, layout.walls, selectProduct, setProducts, toast, toWorldFromSlatLocal]);
 
   const clearSelection = useCallback(() => {
     onClearSelection();
@@ -1144,6 +1434,77 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     إضافة إلى المشهد
                   </>
                 )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={hangProductsOpen} onOpenChange={setHangProductsOpen}>
+          <DialogTrigger asChild>
+            <Button className="group relative h-14 min-w-[230px] rounded-2xl overflow-hidden border-0 px-0 text-white shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-0.5">
+              <div className="absolute inset-0 bg-[linear-gradient(120deg,#14532d_0%,#059669_50%,#14b8a6_100%)]" />
+              <div className="absolute -left-8 top-1/2 h-24 w-24 -translate-y-1/2 rounded-full bg-white/20 blur-2xl transition-all duration-500 group-hover:left-2" />
+              <div className="relative z-10 flex w-full items-center justify-between px-4">
+                <div className="flex items-center gap-3">
+                  <div className="grid grid-cols-2 gap-1 rounded-xl bg-white/15 p-1.5 ring-1 ring-white/30">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/20">
+                      <Package className="h-3.5 w-3.5" />
+                    </span>
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-white/20">
+                      <Grid3x3 className="h-3.5 w-3.5" />
+                    </span>
+                  </div>
+                  <span className="text-right leading-tight">
+                    <span className="block text-sm font-black">تعليق المنتجات</span>
+                    <span className="block text-[11px] text-white/85">إدارة عامة لكل الجدران والأوجه</span>
+                  </span>
+                </div>
+                <span className="rounded-full bg-white/20 px-2.5 py-1 text-[10px] font-black ring-1 ring-white/30">
+                  {isAutoHungHidden ? 'مخفي' : 'مرئي'}
+                </span>
+              </div>
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-2xl" dir="rtl">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-black text-zinc-900">إدارة تعليق المنتجات على الملحقات</DialogTitle>
+              <DialogDescription>
+                هذا مدخل عام لكل الجدران وكل الأوجه. سنربط هنا قريبًا التوزيع الذكي والسعة والتوافق.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="rounded-xl border border-zinc-200 bg-zinc-50 p-3 text-sm text-zinc-700 space-y-1">
+              <p>الملحقات المتاحة حاليًا: <span className="font-black text-zinc-900">{hangableAccessoriesCount}</span></p>
+              <p>سيتم إنشاء منتجات متعددة عشوائيًا لكل ملحق لتجربة عرض واقعية.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2 items-center">
+              <Button
+                variant="outline"
+                onClick={toggleAutoHungProductsVisibility}
+                disabled={!hasAutoHungProducts}
+                className={cn(
+                  "h-10 font-bold rounded-xl justify-start gap-2",
+                  isAutoHungHidden
+                    ? "border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                    : "border-amber-300 text-amber-700 hover:bg-amber-50"
+                )}
+              >
+                {isAutoHungHidden ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                <span>{isAutoHungHidden ? 'إظهار المنتجات المعلقة' : 'إخفاء المنتجات المعلقة'}</span>
+              </Button>
+              <div className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-xs text-zinc-600 whitespace-nowrap">
+                {hasAutoHungProducts
+                  ? `الحالة: ${isAutoHungHidden ? 'مخفية' : 'مرئية'} (${hiddenAutoHungProductsCount}/${autoHungProductsCount} مخفي)`
+                  : 'لا توجد منتجات معلّقة بعد'}
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={clearAutoHungProducts}>تفريغ التوليد التلقائي</Button>
+              <Button
+                onClick={generateAutoHungProducts}
+                disabled={isAutoHanging || hangableAccessoriesCount === 0}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {isAutoHanging ? 'جاري التوليد...' : 'توليد منتجات معلقة تلقائيًا'}
               </Button>
             </DialogFooter>
           </DialogContent>

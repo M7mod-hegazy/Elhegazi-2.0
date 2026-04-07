@@ -519,7 +519,10 @@ function InteractiveSlatNode({
              uprightSpacing={slat.uprightSpacing}
              isActive={activeAccessoryId === acc.id}
              isHovered={hoveredAccessoryId === acc.id}
-             onActivate={() => setActiveAccessoryId(acc.id)}
+             onActivate={() => {
+               onActivate();
+               setActiveAccessoryId(acc.id);
+             }}
              onHoverChange={(hovered) => setHoveredAccessoryId(hovered ? acc.id : null)}
              updateAccessory={(updates) => updateAccessory(acc.id, updates)}
              activeSide={activeSide}
@@ -601,6 +604,8 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
       const target = event.target as HTMLElement | null;
       if (!target) return;
       if (!managerRootRef.current.contains(target)) return;
+      // Only deselect when clicking inside the 2D interaction surface.
+      if (!target.closest('[data-selection-surface="2d"]')) return;
       if (target.closest('[data-selection-node="slat"], [data-selection-node="accessory"]')) return;
 
       setActiveId(null);
@@ -775,21 +780,24 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                 <span className="text-zinc-500">لا يوجد ملحق محدد.</span>
               )}
 
-              <button
-                type="button"
-                onClick={() => {
-                  setSystemInfoType(selectedSystemType);
-                  setShowSystemInfoModal(true);
-                }}
-                className="mr-auto text-[11px] px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors inline-flex items-center gap-1"
-              >
-                <Info className="w-3.5 h-3.5" />
-                تفاصيل
-              </button>
+              {selectedSlat && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSystemInfoType(selectedSystemType);
+                    setShowSystemInfoModal(true);
+                  }}
+                  className="mr-auto text-[11px] px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors inline-flex items-center gap-1"
+                >
+                  <Info className="w-3.5 h-3.5" />
+                  تفاصيل
+                </button>
+              )}
             </div>
           </div>
 
           <div
+            data-selection-surface="2d"
             className="relative bg-zinc-100 rounded-xl border border-zinc-200 overflow-auto flex items-center justify-center p-6 flex-1 min-h-[320px]"
             onPointerDown={(e) => {
               if (e.target === e.currentTarget) {
@@ -1454,6 +1462,15 @@ const ShopBuilderContent = () => {
       lastSavedStateRef.current = newStateStr;
     }
   }, [layout, historyIndex, history.length]);
+
+  // Auto-generated hanging shapes are visual-only and should not open product controls.
+  useEffect(() => {
+    if (!selectedProductId) return;
+    const selectedProduct = layout.products.find((p) => p.id === selectedProductId);
+    if ((selectedProduct?.metadata as any)?.autoHangFill) {
+      selectProduct(null);
+    }
+  }, [layout.products, selectProduct, selectedProductId]);
 
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
@@ -2282,6 +2299,7 @@ const ShopBuilderContent = () => {
         {selectedProductId && !selectedWallId && !selectedColumnId && (() => {
           const product = layout.products.find(p => p.id === selectedProductId);
           if (!product) return null;
+          if ((product.metadata as any)?.autoHangFill) return null;
           const similarCount = layout.products.filter(p => p.modelUrl === product.modelUrl).length;
 
           return (

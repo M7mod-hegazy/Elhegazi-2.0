@@ -114,6 +114,10 @@ const FloorplanCanvas: React.FC = () => {
 
   const worldWalls = layout.walls;
   const selectedWall = worldWalls.find((w) => w.id === selectedWallId);
+  const interactiveProducts = useMemo(
+    () => layout.products.filter((product) => !(product.metadata as any)?.autoHangFill),
+    [layout.products]
+  );
 
 
   const pixelsPerMeter = useMemo(() => {
@@ -341,8 +345,8 @@ const FloorplanCanvas: React.FC = () => {
       }
     });
 
-    // Draw 3D products (top-down view)
-    layout.products.forEach((product) => {
+    // Draw manual 3D products only (exclude auto-hanging procedural shapes)
+    interactiveProducts.forEach((product) => {
       const productScreenPos = toScreen({ x: product.position.x, y: product.position.z });
       
       // Estimate product size (default 1m x 1m if no scale info)
@@ -527,7 +531,7 @@ const FloorplanCanvas: React.FC = () => {
         ctx.globalAlpha = 1.0;
       });
     }
-  }, [canvasSize.width, canvasSize.height, worldWalls, selectedWallId, selectedColumnId, selectedProductId, layout.products, pixelsPerMeter, pan.x, pan.y, isDrawingMode, drawingStartPoint, drawingPreviewPoint, snappedPoint]);
+  }, [canvasSize.width, canvasSize.height, worldWalls, selectedWallId, selectedColumnId, selectedProductId, interactiveProducts, pixelsPerMeter, pan.x, pan.y, isDrawingMode, drawingStartPoint, drawingPreviewPoint, snappedPoint]);
 
   useEffect(() => {
     draw();
@@ -775,7 +779,7 @@ const FloorplanCanvas: React.FC = () => {
         // Check products first
         let clickedProductId: string | null = null;
         let productOffset: { x: number; y: number } | null = null;
-        for (const product of layout.products) {
+        for (const product of interactiveProducts) {
           const productScreenPos = toScreen({ x: product.position.x, y: product.position.z });
           const productSizeX = (product.scale?.x || 1) * pixelsPerMeter * 0.5;
           const productSizeZ = (product.scale?.z || 1) * pixelsPerMeter * 0.5;
@@ -872,7 +876,7 @@ const FloorplanCanvas: React.FC = () => {
       selectWall, 
       selectColumn, 
       selectProduct, 
-      layout.products, 
+      interactiveProducts,
       layout.walls,
       worldWalls, 
       pixelsPerMeter, 
@@ -920,7 +924,7 @@ const FloorplanCanvas: React.FC = () => {
       if (productDragState.current) {
         const worldPos = screenToWorld(pos);
         const { productId, offset } = productDragState.current;
-        const product = layout.products.find(p => p.id === productId);
+        const product = interactiveProducts.find(p => p.id === productId);
         if (product) {
           const floorSize = layout.floorSize || 24;
           const newX = Math.max(-floorSize / 2, Math.min(floorSize / 2, worldPos.x + offset.x));
@@ -991,7 +995,7 @@ const FloorplanCanvas: React.FC = () => {
       upsertWall, 
       worldWalls, 
       findSnapPoint, 
-      layout.products, 
+      interactiveProducts,
       layout.floorSize,
       upsertProduct,
       isDrawingMode,
