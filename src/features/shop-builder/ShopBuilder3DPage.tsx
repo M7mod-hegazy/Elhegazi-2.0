@@ -8,7 +8,7 @@ import ThreeScene, { type ThreeSceneHandle, type TransformMode, WALL_TEXTURES } 
 import BuilderToolbar from './ui/BuilderToolbar';
 import { SceneItemsList } from './ui/SceneItemsList';
 import { Button } from '@/components/ui/button';
-import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock, Plus, ChevronUp, Grid3x3 } from 'lucide-react';
+import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock, Plus, ChevronUp, Grid3x3, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useShopSetup } from '@/hooks/useShopSetup';
@@ -16,6 +16,129 @@ import { useTheme } from '@/context/ThemeContext';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 
 const DEFAULT_TRANSFORM_MODE: TransformMode = 'translate';
+type DisplaySystemType = 'slat' | 'supermarket_shelves' | 'primo';
+
+const DISPLAY_SYSTEM_META: Record<DisplaySystemType, {
+  label: string;
+  en: string;
+  description: string;
+  image: string;
+  features: string[];
+}> = {
+  slat: {
+    label: 'جدار شرائحي',
+    en: 'Slat Wall',
+    description: 'نظام مرن للرفوف والخطافات مع توزيع سريع على مسارات أفقية.',
+    image: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=600&q=60',
+    features: ['مرونة عالية', 'مناسب للإكسسوارات', 'تعديل سريع'],
+  },
+  supermarket_shelves: {
+    label: 'أرفف سوبر ماركت',
+    en: 'Supermarket Shelves',
+    description: 'عرض كثيف للمنتجات المعبأة مع تقسيمات أفقية واضحة.',
+    image: 'https://images.unsplash.com/photo-1542838132-92c53300491e?auto=format&fit=crop&w=600&q=60',
+    features: ['كثافة عرض', 'تنظيم صفوف', 'وضوح بصري'],
+  },
+  primo: {
+    label: 'أعمدة بريمو',
+    en: 'Primo',
+    description: 'هيكل رأسي باصطفاف مغناطيسي. الرف يثبت بين عمودين والخطافات على محور عمود.',
+    image: 'https://images.unsplash.com/photo-1573855619003-97b4799dcd8b?auto=format&fit=crop&w=600&q=60',
+    features: ['تثبيت مغناطيسي', 'دقة أعلى', 'استغلال أفضل للارتفاع'],
+  },
+};
+
+const ACCESSORY_META: Record<'shelf' | 'hook_single' | 'hook_waterfall', { label: string; image: string }> = {
+  shelf: {
+    label: 'رف مسطح',
+    image: 'https://static.commerceplatform.services/images/zoom/swws1224mp.rw_zoom.jpg',
+  },
+  hook_single: {
+    label: 'خطاف مفرد',
+    image: 'https://m.media-amazon.com/images/I/51H+WnKu2fL._AC_SX679_.jpg',
+  },
+  hook_waterfall: {
+    label: 'خطاف ملابس',
+    image: 'https://s.alicdn.com/@sc04/kf/H3e06bf17449d413f8eebd8b07b989664K/Wholesale-Retail-Store-Metal-Waterfall-Display-Hook-with-Bins-Chrome-Finish-Slatwall-Compatible-Displays-for-Shop-Showcase.jpg_300x300.jpg',
+  },
+};
+
+const DISPLAY_SYSTEM_WEB_INFO: Record<DisplaySystemType, {
+  overview: string;
+  specs: string[];
+  accessories: string[];
+  notes: string[];
+  sources: Array<{ label: string; url: string }>;
+}> = {
+  slat: {
+    overview: 'الجدار الشرائحي نظام محيطي شائع في متاجر التجزئة، يتميز بالمرونة العالية وتغيير ترتيب الملحقات بسرعة.',
+    specs: [
+      'يدعم ملحقات متعددة: أرفف، خطافات، فيس-أوت، سلال، وحوامل بروشور.',
+      'يمكن تعزيز التحمل باستخدام شرائط معدنية (Metal Strips) حسب المورد.',
+      'مناسب للتغيير المتكرر في العرض الموسمي.',
+    ],
+    accessories: [
+      'Flat Shelf / رف مسطح',
+      'Single Hook / خطاف مفرد',
+      'Waterfall Hook / خطاف ملابس',
+      'Bins - Baskets - Sign Holders - Brochure Holders',
+    ],
+    notes: [
+      'في مشروعنا: الإدخال الذكي يوزع الملحقات على المسارات مع منع التداخل.',
+      'يفضل استخدام سماكات وحمولات متوافقة مع المنتج الحقيقي قبل التنفيذ الفعلي.',
+    ],
+    sources: [
+      { label: 'Econoco - Slatwall Accessories', url: 'https://www.econoco.com/slatwall-display-system-accessories/' },
+      { label: 'Fixtures & Displays - Slatwall', url: 'https://www.fixturesanddisplays.com/store-fixtures/slatwall.html' },
+      { label: 'SI Retail - Slatwall Accessories', url: 'https://www.siretail.com/eshop/slatwall-accessories/' },
+    ],
+  },
+  supermarket_shelves: {
+    overview: 'أرفف السوبرماركت (Gondola Shelving) نظام معياري قوي لعرض كثيف، مفرد/مزدوج الوجه، مع ملحقات تنظيم متعددة.',
+    specs: [
+      'هيكل معياري: Uprights + Base + Adjustable Shelves.',
+      'إمكانية تعديل الارتفاعات والمسافات لتناسب فئات مختلفة من المنتجات.',
+      'تستخدم ملحقات تنظيم مثل dividers/fences/hooks لرفع الكفاءة.',
+    ],
+    accessories: [
+      'Shelf Dividers / فواصل رف',
+      'Front & Side Fences / حواجز أمامية وجانبية',
+      'Peg Hooks / خطافات',
+      'Pushers & Wire Shelves / دافعات ومنصات شبكية',
+    ],
+    notes: [
+      'في مشروعنا: يمكن توسيع المحرك لإدارة facings وسعة الرف لكل منتج.',
+      'تحديد العمق والارتفاع مهم قبل إدراج المنتجات ثلاثية الأبعاد بكثافة.',
+    ],
+    sources: [
+      { label: 'Gondola Shelving - ESSI', url: 'https://www.gondola-shelves.com/' },
+      { label: 'Webstaurant - Gondola Guide', url: 'https://www.webstaurantstore.com/guide/1079/what-is-gondola-shelving.html' },
+      { label: 'DispleTech - Gondola Types', url: 'https://www.displetech.com/pages/gondola-shelving-guide-types-uses-how-to-choose-the-right-system' },
+    ],
+  },
+  primo: {
+    overview: 'نظام بريمو هنا يمثل عرضًا رأسيًا قائمًا على أعمدة (uprights) مع تموضع مغناطيسي للملحقات.',
+    specs: [
+      'الرف يثبت بين عمودين (Bay-Centered Shelf).',
+      'الخطافات تتموضع على محور عمود (Upright-Centered).',
+      'محرك السحب يطبق Snap مغناطيسي لتجنب التموضع العشوائي.',
+    ],
+    accessories: [
+      'Shelf between 2 uprights / رف بين عمودين',
+      'Single Hook centered / خطاف مفرد على عمود',
+      'Waterfall Hook centered / خطاف ملابس على عمود',
+    ],
+    notes: [
+      'هذه القواعد مطبقة في منطق الإدخال الذكي الحالي بالمشروع.',
+      'المواصفات الصناعية المقابلة عادة تأتي ضمن أنظمة gondola/upright modular fixtures.',
+    ],
+    sources: [
+      { label: 'Gondola Shelving - ESSI', url: 'https://www.gondola-shelves.com/' },
+      { label: 'Webstaurant - Gondola Accessories', url: 'https://www.webstaurantstore.com/guide/1079/what-is-gondola-shelving.html' },
+      { label: 'Econoco - Slatwall Accessory Reference', url: 'https://www.econoco.com/slatwall-display-system-accessories/' },
+    ],
+  },
+};
 
 function InteractiveAccessoryNode({
    accessory,
@@ -121,10 +244,16 @@ function InteractiveAccessoryNode({
 
    return (
       <div
+         data-selection-node="accessory"
          onPointerDown={handlePointerDown}
          onMouseEnter={() => onHoverChange(true)}
          onMouseLeave={() => onHoverChange(false)}
          title={accessory.type === 'shelf' ? "رف" : accessory.type === 'hook_single' ? "خطاف مفرد" : "خطاف ملابس"}
+         className={`absolute flex border-2 shadow-sm transition-colors cursor-move ${
+           isActive
+             ? 'border-primary bg-primary/25 z-30'
+             : `${colorCls} ${bgCls} border-opacity-80 z-20`
+         } ${accessory.type === 'shelf' ? 'rounded-sm' : 'rounded-full'}`}
          style={{
             left: `${leftPct}%`,
             bottom: `${bottomPct}%`,
@@ -322,6 +451,7 @@ function InteractiveSlatNode({
 
   return (
     <div
+      data-selection-node="slat"
       onPointerDown={handlePointerDown}
       onMouseEnter={() => onHoverChange(true)}
       onMouseLeave={() => onHoverChange(false)}
@@ -412,12 +542,20 @@ function InteractiveSlatNode({
 }
 
 function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }: { targetId: string, type: 'wall' | 'column', primaryColor: string, secondaryColor: string }) {
-  const { layout, addSlatWallToWall, updateSlatWall, removeSlatWall, addAccessoryToSlat, updateAccessory, removeAccessory } = useShopBuilder();
+  const { layout, setWalls, addSlatWallToWall, updateSlatWall, removeSlatWall, addAccessoryToSlat, updateAccessory, removeAccessory } = useShopBuilder();
   const [activeSide, setActiveSide] = useState<'front'|'back'>('front');
   const [activeId, setActiveId] = useState<string|null>(null);
   const [activeAccessoryId, setActiveAccessoryId] = useState<string|null>(null);
+  const [hoveredSlatId, setHoveredSlatId] = useState<string|null>(null);
+  const [hoveredAccessoryId, setHoveredAccessoryId] = useState<string|null>(null);
   const [insertSystemType, setInsertSystemType] = useState<string>('slat');
   const [isAddingNewSystem, setIsAddingNewSystem] = useState<boolean>(false);
+  const [showInsertTypeMenu, setShowInsertTypeMenu] = useState(false);
+  const [showEditTypeMenu, setShowEditTypeMenu] = useState(false);
+  const [showSystemInfoModal, setShowSystemInfoModal] = useState(false);
+  const [systemInfoType, setSystemInfoType] = useState<DisplaySystemType>('slat');
+  const [showReflectConfirm, setShowReflectConfirm] = useState(false);
+  const [reflectWarningText, setReflectWarningText] = useState<string | null>(null);
   
   let targetObject: ShopBuilderWall | ShopBuilderColumn | undefined;
   let wallLength = 1;
@@ -441,27 +579,243 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
   if (!targetObject) return null;
   
   const slatWalls = targetObject.slatWalls?.filter(s => s.side === activeSide) || [];
+  const allSlatWalls = targetObject.slatWalls || [];
   const selectedSlat = slatWalls.find(s => s.id === activeId);
+  const selectedAccessory = selectedSlat?.accessories?.find(a => a.id === activeAccessoryId) || null;
+  const selectedSystemType = (selectedSlat?.systemType || 'slat') as DisplaySystemType;
+  const selectedSystemMeta = DISPLAY_SYSTEM_META[selectedSystemType];
+  const activeSystemInfo = DISPLAY_SYSTEM_WEB_INFO[systemInfoType];
+  const otherSide: 'front' | 'back' = activeSide === 'front' ? 'back' : 'front';
+  const sourceCount = allSlatWalls.filter(s => s.side === activeSide).length;
+  const destinationCount = allSlatWalls.filter(s => s.side === otherSide).length;
+  const containerRef = useRef<HTMLDivElement>(null);
+  const managerRootRef = useRef<HTMLDivElement>(null);
 
-   const containerRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (activeId || activeAccessoryId) setIsAddingNewSystem(false);
+  }, [activeId, activeAccessoryId]);
+
+  useEffect(() => {
+    const handleOutsidePointerDown = (event: PointerEvent) => {
+      if (!managerRootRef.current) return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (!managerRootRef.current.contains(target)) return;
+      if (target.closest('[data-selection-node="slat"], [data-selection-node="accessory"]')) return;
+
+      setActiveId(null);
+      setActiveAccessoryId(null);
+    };
+
+    document.addEventListener('pointerdown', handleOutsidePointerDown, true);
+    return () => {
+      document.removeEventListener('pointerdown', handleOutsidePointerDown, true);
+    };
+  }, []);
+
+  const handleFastAccessoryAdd = useCallback((accType: 'shelf' | 'hook_single' | 'hook_waterfall') => {
+    if (!selectedSlat) return;
+    addAccessoryToSlat(targetId, selectedSlat.id, accType);
+    // Fast mode: keep editor on system, do not open accessory settings panel.
+    setActiveAccessoryId(null);
+  }, [addAccessoryToSlat, selectedSlat, targetId]);
+
+  const cloneSlatForSide = useCallback((source: any, side: 'front' | 'back', reflectX: boolean) => {
+    const clonedAccessories = (source.accessories || []).map((acc: any) => ({
+      ...acc, // preserve all accessory fields exactly
+      id: crypto.randomUUID(),
+      position: {
+        ...(acc.position || { x: 0.5, y: 0.5 }),
+        x: reflectX ? 1 - (acc.position?.x ?? 0.5) : (acc.position?.x ?? 0.5),
+      },
+    }));
+    const sourcePosX = source.position ?? 0.5;
+    return {
+      ...source, // preserve any current/future system fields
+      position: reflectX ? 1 - sourcePosX : sourcePosX,
+      side,
+      accessories: clonedAccessories,
+    };
+  }, []);
+
+  const reflectCurrentSideToOther = useCallback(() => {
+    // Swap both sides: current side gets other-side content, and other side gets current-side content.
+    const sourceSide: 'front' | 'back' = activeSide;
+    const destinationSide: 'front' | 'back' = otherSide;
+    const sourceSystems = allSlatWalls.filter(s => s.side === sourceSide);
+    const destinationSystems = allSlatWalls.filter(s => s.side === destinationSide);
+
+    if (sourceSystems.length === 0 && destinationSystems.length === 0) {
+      setReflectWarningText('لا يوجد أنظمة على أي وجه لتنفيذ التبديل.');
+      return;
+    }
+
+    // Atomic update to avoid any race from chained remove/add actions.
+    if (type === 'wall') {
+      const nextWalls = layout.walls.map((w) => {
+        if (w.id !== targetId) return w;
+        const kept = (w.slatWalls || []).filter((s: any) => s.side !== sourceSide && s.side !== destinationSide);
+        const toCurrent = destinationSystems.map((s: any) => ({
+          ...cloneSlatForSide(s, sourceSide, false),
+          id: crypto.randomUUID(),
+          wallId: w.id,
+        }));
+        const toOther = sourceSystems.map((s: any) => ({
+          ...cloneSlatForSide(s, destinationSide, false),
+          id: crypto.randomUUID(),
+          wallId: w.id,
+        }));
+        return { ...w, slatWalls: [...kept, ...toCurrent, ...toOther] as any };
+      });
+      setWalls(nextWalls);
+    } else {
+      const nextWalls = layout.walls.map((w) => {
+        const cols = (w.columns || []).map((c: any) => {
+          if (c.id !== targetId) return c;
+          const cSlats = c.slatWalls || [];
+          const sourceColumnSystems = cSlats.filter((s: any) => s.side === sourceSide);
+          const destinationColumnSystems = cSlats.filter((s: any) => s.side === destinationSide);
+          const kept = cSlats.filter((s: any) => s.side !== sourceSide && s.side !== destinationSide);
+          const toCurrent = destinationColumnSystems.map((s: any) => ({
+            ...cloneSlatForSide(s, sourceSide, false),
+            id: crypto.randomUUID(),
+            wallId: w.id,
+          }));
+          const toOther = sourceColumnSystems.map((s: any) => ({
+            ...cloneSlatForSide(s, destinationSide, false),
+            id: crypto.randomUUID(),
+            wallId: w.id,
+          }));
+          return { ...c, slatWalls: [...kept, ...toCurrent, ...toOther] };
+        });
+        return { ...w, columns: cols };
+      });
+      setWalls(nextWalls);
+    }
+
+    // Stay on current side and just refresh selection.
+    setActiveId(null);
+    setActiveAccessoryId(null);
+    setReflectWarningText(null);
+    setShowReflectConfirm(false);
+  }, [activeSide, allSlatWalls, cloneSlatForSide, layout.walls, otherSide, setWalls, targetId, type]);
    
-   return (
-     <div className="flex flex-col md:flex-row gap-6 mt-4 w-full" style={{ minHeight: 460 }}>
-       {/* 2D Canvas */}
-       <div className="flex-1 min-w-[280px] min-h-[400px] relative bg-zinc-100 rounded-xl border border-zinc-200 overflow-auto flex items-center justify-center p-6" onPointerDown={(e) => { if (e.target === e.currentTarget) setActiveId(null); }}>
-          <div className="w-full h-full flex items-center justify-center overflow-auto min-h-0">
-             <div 
-                ref={containerRef}
-                className="bg-zinc-200 relative shadow-inner overflow-visible border-2 border-zinc-300 pointer-events-auto select-none shrink-0" 
-                style={{ 
-                   aspectRatio: `${wallLength} / ${wallHeight}`,
-                   maxWidth: wallLength > wallHeight ? '100%' : 'none',
-                   maxHeight: wallLength > wallHeight ? 'none' : '100%',
-                   minWidth: Math.min(120, wallLength * 500),
-                   ...(wallLength > wallHeight ? { width: '100%' } : { height: '100%' })
+  return (
+    <div ref={managerRootRef} className="mt-4 w-full h-full flex flex-col gap-3" style={{ minHeight: 'calc(85vh - 150px)' }}>
+       {/* Global Controls */}
+      <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 text-[11px] text-zinc-600">
+          <span className="font-bold text-zinc-800">تحكم عام بالوجه</span>
+          <span className="px-2 py-0.5 rounded-full border border-zinc-200 bg-zinc-50">
+            الحالي: {activeSide === 'front' ? 'الأمامي' : 'الخلفي'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="flex bg-zinc-100 rounded-lg p-1">
+            <button onClick={() => {setActiveSide('front'); setActiveId(null)}} className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${activeSide === 'front' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>الوجه الأمامي</button>
+            <button onClick={() => {setActiveSide('back'); setActiveId(null)}} className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${activeSide === 'back' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>الوجه الخلفي</button>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setReflectWarningText(null);
+              setShowReflectConfirm(true);
+            }}
+            className="py-2 px-3 rounded-lg border border-amber-200 bg-amber-50 hover:bg-amber-100 text-amber-700 text-[11px] font-bold transition-colors whitespace-nowrap"
+            title="تبديل المحتوى بين الوجه الحالي والوجه الآخر"
+          >
+            عكس المحتوى
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1fr)_360px] gap-4 w-full h-full">
+       {/* 2D + Info Panels */}
+      <div className="min-w-[280px] min-h-[420px] flex flex-col gap-3">
+          <div className="rounded-xl border border-zinc-200 bg-white px-3 py-2 h-14">
+            <div className="h-full flex items-center gap-2 text-[11px] text-zinc-700 whitespace-nowrap overflow-x-auto">
+              {!selectedAccessory && selectedSlat ? (
+                <>
+                  <span className="font-black text-zinc-900">{selectedSystemMeta.label}</span>
+                  <span className="px-2 py-0.5 rounded-full bg-zinc-100 border border-zinc-200">{activeSide === 'front' ? 'أمامي' : 'خلفي'}</span>
+                  <span>العرض: <b>{(selectedSlat.fillType === 'full' ? wallLength : (selectedSlat.width || 1)).toFixed(2)}م</b></span>
+                  <span>الارتفاع: <b>{selectedSlat.height.toFixed(2)}م</b></span>
+                  <span>عن الأرض: <b>{selectedSlat.bottomOffset.toFixed(2)}م</b></span>
+                  <span>الملحقات: <b>{selectedSlat.accessories?.length || 0}</b></span>
+                </>
+              ) : (
+                <span className="text-zinc-500">اختر نظام عرض لعرض البيانات.</span>
+              )}
+
+              {!selectedAccessory && <span className="mx-1 h-4 w-px bg-zinc-200" />}
+
+              {selectedAccessory ? (
+                <>
+                  <img
+                    src={ACCESSORY_META[selectedAccessory.type as 'shelf' | 'hook_single' | 'hook_waterfall']?.image}
+                    alt={ACCESSORY_META[selectedAccessory.type as 'shelf' | 'hook_single' | 'hook_waterfall']?.label || selectedAccessory.type}
+                    className="w-7 h-7 rounded object-cover border border-zinc-200 bg-white"
+                  />
+                  <span className="font-bold text-zinc-900">{ACCESSORY_META[selectedAccessory.type as 'shelf' | 'hook_single' | 'hook_waterfall']?.label || selectedAccessory.type}</span>
+                  <span>{selectedAccessory.width.toFixed(2)} × {selectedAccessory.depth.toFixed(2)}م</span>
+                  <span>({(selectedAccessory.position?.x ?? 0.5).toFixed(2)}, {(selectedAccessory.position?.y ?? 0.5).toFixed(2)})</span>
+                  <span className="inline-flex items-center gap-1">
+                    اللون:
+                    <span className="w-3 h-3 rounded border border-zinc-300 inline-block" style={{ backgroundColor: selectedAccessory.color || '#d97706' }} />
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setActiveAccessoryId(null)}
+                    className="px-2 py-0.5 rounded-md border border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700"
+                  >
+                    إلغاء
+                  </button>
+                </>
+              ) : (
+                <span className="text-zinc-500">لا يوجد ملحق محدد.</span>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setSystemInfoType(selectedSystemType);
+                  setShowSystemInfoModal(true);
                 }}
-                onPointerDown={(e) => { if (e.target === e.currentTarget) setActiveId(null); }}
-             >
+                className="mr-auto text-[11px] px-2 py-1 rounded-md border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors inline-flex items-center gap-1"
+              >
+                <Info className="w-3.5 h-3.5" />
+                تفاصيل
+              </button>
+            </div>
+          </div>
+
+          <div
+            className="relative bg-zinc-100 rounded-xl border border-zinc-200 overflow-auto flex items-center justify-center p-6 flex-1 min-h-[320px]"
+            onPointerDown={(e) => {
+              if (e.target === e.currentTarget) {
+                setActiveId(null);
+                setActiveAccessoryId(null);
+              }
+            }}
+          >
+            <div className="w-full h-full flex items-center justify-center overflow-auto min-h-0">
+               <div 
+                  ref={containerRef}
+                  className="bg-zinc-200 relative shadow-inner overflow-visible border-2 border-zinc-300 pointer-events-auto select-none shrink-0" 
+                  style={{ 
+                     aspectRatio: `${wallLength} / ${wallHeight}`,
+                     maxWidth: wallLength > wallHeight ? '100%' : 'none',
+                     maxHeight: wallLength > wallHeight ? 'none' : '100%',
+                     minWidth: Math.min(120, wallLength * 500),
+                     ...(wallLength > wallHeight ? { width: '100%' } : { height: '100%' })
+                  }}
+                  onPointerDown={(e) => {
+                    if (e.target === e.currentTarget) {
+                      setActiveId(null);
+                      setActiveAccessoryId(null);
+                    }
+                  }}
+               >
                 {/* Draw Columns - only show on the active side */}
              {type === 'wall' && (targetObject as ShopBuilderWall).columns
                 ?.filter(col => {
@@ -505,23 +859,65 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                    containerRef={containerRef}
                    activeAccessoryId={activeAccessoryId}
                    setActiveAccessoryId={setActiveAccessoryId}
+                   hoveredAccessoryId={hoveredAccessoryId}
+                   setHoveredAccessoryId={setHoveredAccessoryId}
                    updateAccessory={(accId, updates) => updateAccessory(targetId, slat.id, accId, updates)}
                    activeSide={activeSide}
+                   isHovered={hoveredSlatId === slat.id}
+                   onHoverChange={(hovered) => setHoveredSlatId(hovered ? slat.id : null)}
                 />
              ))}
+              </div>
+            </div>
           </div>
+
+          <div className="rounded-xl border border-zinc-200 bg-white p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-black text-zinc-900">ملحقات النظام المحدد</p>
+              <span className="text-xs text-zinc-500">{selectedSlat?.accessories?.length || 0} عنصر</span>
+            </div>
+            {!selectedSlat ? (
+              <p className="text-xs text-zinc-500 text-center py-3">اختر نظام عرض لعرض الملحقات المرتبطة به.</p>
+            ) : selectedSlat.accessories?.length ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                {selectedSlat.accessories.map(acc => {
+                  const meta = ACCESSORY_META[acc.type as 'shelf' | 'hook_single' | 'hook_waterfall'];
+                  const isActiveAcc = activeAccessoryId === acc.id;
+                  const isHoveredAcc = hoveredAccessoryId === acc.id;
+                  return (
+                    <button
+                      key={acc.id}
+                      type="button"
+                      onClick={() => setActiveAccessoryId(acc.id)}
+                      onMouseEnter={() => {
+                        setHoveredAccessoryId(acc.id);
+                        setHoveredSlatId(selectedSlat.id);
+                      }}
+                      onMouseLeave={() => {
+                        setHoveredAccessoryId(null);
+                        setHoveredSlatId(null);
+                      }}
+                      className={`flex items-center gap-2 p-2 rounded-lg border text-right transition-all ${
+                        isActiveAcc ? 'border-red-400 bg-red-50' : isHoveredAcc ? 'border-blue-400 bg-blue-50' : 'border-zinc-200 bg-zinc-50 hover:border-zinc-300'
+                      }`}
+                    >
+                      <img src={meta?.image} alt={meta?.label} className="w-8 h-8 rounded-md object-cover border border-zinc-200" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[11px] font-bold text-zinc-800 truncate">{meta?.label || acc.type}</p>
+                        <p className="text-[10px] text-zinc-500">{acc.width.toFixed(2)}م × {acc.depth.toFixed(2)}م</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-500 text-center py-3">لا توجد ملحقات بعد. استخدم الإضافة السريعة من لوحة التحكم.</p>
+            )}
           </div>
        </div>
        
-       {/* Controller Sidebar */}
-       <div className="w-full md:w-[340px] md:max-w-[340px] flex-shrink-0 flex flex-col gap-4 overflow-y-auto pr-2 pb-4" style={{ maxHeight: 500 }}>
-          
-          {/* Active Side Toggle (Global) */}
-          <div className="flex bg-zinc-100 rounded-lg p-1">
-             <button onClick={() => {setActiveSide('front'); setActiveId(null)}} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeSide === 'front' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>الوجه الأمامي</button>
-             <button onClick={() => {setActiveSide('back'); setActiveId(null)}} className={`flex-1 py-2 text-sm font-bold rounded-md transition-all ${activeSide === 'back' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>الوجه الخلفي</button>
-          </div>
-
+      {/* Controller Sidebar */}
+      <div className="w-full xl:w-[360px] xl:max-w-[360px] flex-shrink-0 flex flex-col gap-4 overflow-y-auto pb-3" style={{ maxHeight: 'calc(85vh - 170px)' }}>
            {!isAddingNewSystem ? (
              <button
                 onClick={() => {
@@ -534,7 +930,7 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                 إضافة نظام عرض جديد
              </button>
            ) : (
-             <div className="flex flex-col gap-4 p-4 bg-white rounded-xl border-2 border-blue-100 shadow-md relative overflow-hidden">
+             <div className="flex flex-col gap-4 p-4 bg-white rounded-xl border-2 border-blue-100 shadow-md relative overflow-visible">
                 <button 
                   onClick={() => setIsAddingNewSystem(false)}
                   className="absolute top-3 left-3 text-zinc-400 hover:text-red-500 transition-colors"
@@ -546,14 +942,41 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                 {/* System Type Selector */}
                 <div className="flex flex-col gap-1.5 flex-shrink-0">
                     <label className="text-xs font-bold text-zinc-600">1. نوع النظام</label>
-                    <select 
-                       value={insertSystemType} 
-                       onChange={e => setInsertSystemType(e.target.value)} 
-                       className="w-full p-2 border border-zinc-200 rounded-lg text-sm bg-zinc-50 outline-none focus:border-blue-500 font-semibold text-zinc-700"
-                    >
-                       <option value="slat">جدار شرائحي (Slat Wall)</option>
-                       <option value="supermarket_shelves">أرفف سوبر ماركت (Supermarket Shelves)</option>
-                    </select>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowInsertTypeMenu(v => !v)}
+                        className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 flex items-center gap-2 hover:border-zinc-300 transition-colors"
+                      >
+                        <img src={DISPLAY_SYSTEM_META[insertSystemType as DisplaySystemType].image} alt="system" className="w-9 h-9 rounded-md object-cover border border-zinc-200" />
+                        <div className="flex-1 text-right">
+                          <p className="text-xs font-bold text-zinc-900">{DISPLAY_SYSTEM_META[insertSystemType as DisplaySystemType].label}</p>
+                          <p className="text-[10px] text-zinc-500">{DISPLAY_SYSTEM_META[insertSystemType as DisplaySystemType].en}</p>
+                        </div>
+                        <ChevronUp className={`w-4 h-4 text-zinc-500 transition-transform ${showInsertTypeMenu ? '' : 'rotate-180'}`} />
+                      </button>
+                      {showInsertTypeMenu && (
+                        <div className="absolute z-30 mt-1 w-full rounded-lg border border-zinc-200 bg-white shadow-lg p-1 space-y-1 max-h-64 overflow-y-auto overscroll-contain">
+                          {(Object.keys(DISPLAY_SYSTEM_META) as DisplaySystemType[]).map((key) => (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => {
+                                setInsertSystemType(key);
+                                setShowInsertTypeMenu(false);
+                              }}
+                              className="w-full p-2 rounded-md hover:bg-zinc-50 border border-transparent hover:border-zinc-200 flex items-center gap-2 text-right"
+                            >
+                              <img src={DISPLAY_SYSTEM_META[key].image} alt={DISPLAY_SYSTEM_META[key].label} className="w-8 h-8 rounded object-cover border border-zinc-200" />
+                              <div className="flex-1">
+                                <p className="text-xs font-bold text-zinc-900">{DISPLAY_SYSTEM_META[key].label}</p>
+                                <p className="text-[10px] text-zinc-500 line-clamp-1">{DISPLAY_SYSTEM_META[key].description}</p>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                 </div>
 
                {/* Side Toggle removed from here (moved to top of sidebar) */}
@@ -564,7 +987,7 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                      onClick={() => {
                        if (slatWalls.some(s => s.fillType === 'full' && s.side === activeSide)) return alert('لا يمكن الإضافة، يوجد نظام يشغل كامل الجدار على هذا الوجه.');
                        const id = addSlatWallToWall(targetId, activeSide);
-                       updateSlatWall(targetId, id, { systemType: insertSystemType as 'slat' | 'supermarket_shelves' });
+                       updateSlatWall(targetId, id, { systemType: insertSystemType as 'slat' | 'supermarket_shelves' | 'primo' });
                        setActiveId(id);
                        setIsAddingNewSystem(false);
                      }}
@@ -578,7 +1001,7 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                      onClick={() => {
                        if (slatWalls.some(s => s.fillType === 'full' && s.side === activeSide)) return alert('لا يمكن الإضافة، يوجد نظام يشغل كامل الجدار على هذا الوجه.');
                        const id = addSlatWallToWall(targetId, activeSide);
-                       updateSlatWall(targetId, id, { systemType: insertSystemType as 'slat' | 'supermarket_shelves', fillType: 'partial', position: 0.5, width: Math.min(1, wallLength), height: Math.min(2, wallHeight) });
+                       updateSlatWall(targetId, id, { systemType: insertSystemType as 'slat' | 'supermarket_shelves' | 'primo', fillType: 'partial', position: 0.5, width: Math.min(1, wallLength), height: Math.min(2, wallHeight) });
                       setActiveId(id);
                       setIsAddingNewSystem(false);
                     }}
@@ -634,18 +1057,56 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                  <button onClick={() => { removeSlatWall(targetId, selectedSlat.id); setActiveId(null); }} className="text-red-500 hover:bg-red-50 p-1.5 rounded-md transition-colors"><Trash2 className="w-4 h-4"/></button>
                </div>
                
-               {/* System Type */}
-               <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-semibold text-zinc-600">نوع النظام</label>
-                  <select 
-                     value={selectedSlat.systemType || 'slat'} 
-                     onChange={e => updateSlatWall(targetId, selectedSlat.id, {systemType: e.target.value as any})} 
-                     className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"
-                  >
-                     <option value="slat">جدار شرائحي (Slat Wall)</option>
-                     <option value="supermarket_shelves">أرفف سوبر ماركت (Supermarket Shelves)</option>
-                  </select>
-               </div>
+              {/* System Type */}
+              <div className="flex flex-col gap-1.5">
+                 <label className="text-xs font-semibold text-zinc-600">نوع النظام</label>
+                 <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setShowEditTypeMenu(v => !v)}
+                      className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-2 flex items-center gap-2 hover:border-zinc-300 transition-colors"
+                    >
+                      <img src={DISPLAY_SYSTEM_META[selectedSystemType].image} alt={DISPLAY_SYSTEM_META[selectedSystemType].label} className="w-9 h-9 rounded-md object-cover border border-zinc-200" />
+                      <div className="flex-1 text-right">
+                        <p className="text-xs font-bold text-zinc-900">{DISPLAY_SYSTEM_META[selectedSystemType].label}</p>
+                        <p className="text-[10px] text-zinc-500">{DISPLAY_SYSTEM_META[selectedSystemType].en}</p>
+                      </div>
+                      <ChevronUp className={`w-4 h-4 text-zinc-500 transition-transform ${showEditTypeMenu ? '' : 'rotate-180'}`} />
+                    </button>
+                    {showEditTypeMenu && (
+                      <div className="absolute z-30 mt-1 w-full rounded-lg border border-zinc-200 bg-white shadow-lg p-1 space-y-1 max-h-64 overflow-y-auto overscroll-contain">
+                        {(Object.keys(DISPLAY_SYSTEM_META) as DisplaySystemType[]).map((key) => (
+                          <button
+                            key={key}
+                            type="button"
+                            onClick={() => {
+                              updateSlatWall(targetId, selectedSlat.id, { systemType: key as any });
+                              setShowEditTypeMenu(false);
+                            }}
+                            className="w-full p-2 rounded-md hover:bg-zinc-50 border border-transparent hover:border-zinc-200 flex items-center gap-2 text-right"
+                          >
+                            <img src={DISPLAY_SYSTEM_META[key].image} alt={DISPLAY_SYSTEM_META[key].label} className="w-8 h-8 rounded object-cover border border-zinc-200" />
+                            <div className="flex-1">
+                              <p className="text-xs font-bold text-zinc-900">{DISPLAY_SYSTEM_META[key].label}</p>
+                              <p className="text-[10px] text-zinc-500 line-clamp-1">{DISPLAY_SYSTEM_META[key].description}</p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                 </div>
+                 <button
+                   type="button"
+                   onClick={() => {
+                     setSystemInfoType(selectedSystemType);
+                     setShowSystemInfoModal(true);
+                   }}
+                   className="w-full mt-1 p-2 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-bold flex items-center justify-center gap-2 transition-colors"
+                 >
+                   <Info className="w-4 h-4" />
+                   عرض معلومات النظام
+                 </button>
+              </div>
                
                {/* Color */}
                <div className="flex flex-col gap-1.5">
@@ -653,16 +1114,16 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                   <input type="color" value={selectedSlat.color || '#f5f5f5'} onChange={e => updateSlatWall(targetId, selectedSlat.id, {color: e.target.value})} className="w-full h-8 rounded-md cursor-pointer border border-zinc-200"/>
                </div>
 
-               {(!selectedSlat.systemType || selectedSlat.systemType === 'slat') && (
-                 /* Spacing */
-                 <div className="flex flex-col gap-1.5">
-                    <label className="text-xs font-semibold text-zinc-600">المسافة بين الشرائح (م)</label>
-                    <input type="number" step="0.01" min="0.05" value={selectedSlat.slatSpacing} onChange={e => updateSlatWall(targetId, selectedSlat.id, {slatSpacing: Number(e.target.value)})} className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"/>
-                 </div>
-               )}
+              {(!selectedSlat.systemType || selectedSlat.systemType === 'slat' || selectedSlat.systemType === 'primo') && (
+                /* Spacing */
+                <div className="flex flex-col gap-1.5">
+                   <label className="text-xs font-semibold text-zinc-600">المسافة بين الشرائح (م)</label>
+                   <input type="number" step="0.01" min="0.05" value={selectedSlat.slatSpacing} onChange={e => updateSlatWall(targetId, selectedSlat.id, {slatSpacing: Number(e.target.value)})} className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"/>
+                </div>
+              )}
 
-               {selectedSlat.systemType === 'supermarket_shelves' && (
-                 <>
+              {selectedSlat.systemType === 'supermarket_shelves' && (
+                <>
                    <div className="flex gap-2">
                      <div className="flex flex-col gap-1.5 flex-1">
                         <label className="text-[10px] font-semibold text-zinc-500">عدد الأرفف الأفقية</label>
@@ -677,8 +1138,22 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                       <label className="text-xs font-semibold text-zinc-600">المسافة بين الأعمدة (م)</label>
                       <input type="number" step="0.1" min="0.6" value={selectedSlat.uprightSpacing || 1.0} onChange={e => updateSlatWall(targetId, selectedSlat.id, {uprightSpacing: Number(e.target.value)})} className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"/>
                    </div>
-                 </>
-               )}
+                </>
+              )}
+
+              {selectedSlat.systemType === 'primo' && (
+                <div className="flex flex-col gap-1.5">
+                   <label className="text-xs font-semibold text-zinc-600">المسافة بين الأعمدة (م)</label>
+                   <input
+                     type="number"
+                     step="0.1"
+                     min="0.4"
+                     value={selectedSlat.uprightSpacing || 0.8}
+                     onChange={e => updateSlatWall(targetId, selectedSlat.id, {uprightSpacing: Number(e.target.value)})}
+                     className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"
+                   />
+                </div>
+              )}
 
                {selectedSlat.fillType === 'partial' ? (
                   <>
@@ -716,32 +1191,26 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                   </>
                )}
 
-               {(!selectedSlat.systemType || selectedSlat.systemType === 'slat') && (
-                 <div className="pt-4 border-t border-zinc-100 flex flex-col gap-3">
-                    <label className="text-xs font-semibold text-zinc-600">إضافة الملحقات (Accessories)</label>
+              {(!selectedSlat.systemType || selectedSlat.systemType === 'slat' || selectedSlat.systemType === 'primo') && (
+                <div className="pt-4 border-t border-zinc-100 flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-semibold text-zinc-600">إضافة الملحقات (Accessories)</label>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">إدخال ذكي سريع: مفعل</span>
+                    </div>
                     <div className="grid grid-cols-3 gap-2">
-                       <button onClick={() => {
-                          const accId = addAccessoryToSlat(targetId, selectedSlat.id, 'shelf');
-                          setActiveAccessoryId(accId);
-                       }} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
+                       <button onClick={() => handleFastAccessoryAdd('shelf')} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
                           <div className="w-full aspect-square rounded-md bg-zinc-100 overflow-hidden relative">
                              <img src="https://static.commerceplatform.services/images/zoom/swws1224mp.rw_zoom.jpg" alt="رف خشبي" className="w-full h-full object-cover mix-blend-darken" />
                           </div>
                           <span className="text-[10px] font-bold text-zinc-700">رف مسطح</span>
                        </button>
-                       <button onClick={() => {
-                          const accId = addAccessoryToSlat(targetId, selectedSlat.id, 'hook_single');
-                          setActiveAccessoryId(accId);
-                       }} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
+                       <button onClick={() => handleFastAccessoryAdd('hook_single')} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
                           <div className="w-full aspect-square rounded-md bg-zinc-100 overflow-hidden relative">
                              <img src="https://m.media-amazon.com/images/I/51H+WnKu2fL._AC_SX679_.jpg" alt="شوك تعليق" className="w-full h-full object-cover mix-blend-multiply" />
                           </div>
                           <span className="text-[10px] font-bold text-zinc-700">شوك مفرد</span>
                        </button>
-                       <button onClick={() => {
-                          const accId = addAccessoryToSlat(targetId, selectedSlat.id, 'hook_waterfall');
-                          setActiveAccessoryId(accId);
-                       }} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
+                       <button onClick={() => handleFastAccessoryAdd('hook_waterfall')} className="flex flex-col items-center gap-1.5 p-1.5 border border-zinc-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-all text-center">
                           <div className="w-full aspect-square rounded-md bg-zinc-100 overflow-hidden relative">
                              <img src="https://s.alicdn.com/@sc04/kf/H3e06bf17449d413f8eebd8b07b989664K/Wholesale-Retail-Store-Metal-Waterfall-Display-Hook-with-Bins-Chrome-Finish-Slatwall-Compatible-Displays-for-Shop-Showcase.jpg_300x300.jpg" alt="خطاف ملابس" className="w-full h-full object-cover" />
                           </div>
@@ -757,7 +1226,106 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                الرجاء تحديد جدار شرائحي من معاينة الـ 2D أو إضافة واحد جديد للبدء بالتعديل.
             </div>
          )}
+
       </div>
+    </div>
+
+      <Dialog open={showSystemInfoModal} onOpenChange={setShowSystemInfoModal}>
+        <DialogContent className="max-w-3xl w-[95vw] max-h-[85vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-blue-600" />
+              {DISPLAY_SYSTEM_META[systemInfoType].label} ({DISPLAY_SYSTEM_META[systemInfoType].en})
+            </DialogTitle>
+            <DialogDescription>{activeSystemInfo.overview}</DialogDescription>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 md:grid-cols-[260px_minmax(0,1fr)] gap-4 mt-2">
+            <div className="space-y-3">
+              <img
+                src={DISPLAY_SYSTEM_META[systemInfoType].image}
+                alt={DISPLAY_SYSTEM_META[systemInfoType].label}
+                className="w-full h-44 rounded-xl object-cover border border-zinc-200"
+              />
+              <div className="rounded-xl border border-zinc-200 p-3 bg-zinc-50">
+                <p className="text-xs font-black text-zinc-800 mb-1">الحالة الحالية بالمشروع</p>
+                <div className="text-[11px] text-zinc-700 space-y-1">
+                  <p>النوع الحالي: <span className="font-bold">{selectedSystemMeta.label}</span></p>
+                  <p>الارتفاع الحالي: <span className="font-bold">{selectedSlat?.height?.toFixed(2) ?? '-'}م</span></p>
+                  <p>اللون الحالي: <span className="font-bold">{selectedSlat?.color || '#f5f5f5'}</span></p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="rounded-xl border border-zinc-200 p-3">
+                <p className="text-sm font-black text-zinc-900 mb-2">مواصفات واستخدامات</p>
+                <ul className="space-y-1 text-xs text-zinc-700">
+                  {activeSystemInfo.specs.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 p-3">
+                <p className="text-sm font-black text-zinc-900 mb-2">الملحقات الشائعة</p>
+                <ul className="space-y-1 text-xs text-zinc-700">
+                  {activeSystemInfo.accessories.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              </div>
+
+              <div className="rounded-xl border border-zinc-200 p-3">
+                <p className="text-sm font-black text-zinc-900 mb-2">ملاحظات تنفيذية</p>
+                <ul className="space-y-1 text-xs text-zinc-700">
+                  {activeSystemInfo.notes.map((item) => <li key={item}>• {item}</li>)}
+                </ul>
+              </div>
+
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showReflectConfirm} onOpenChange={setShowReflectConfirm}>
+        <DialogContent className="max-w-md" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="text-red-600">تحذير قبل تنفيذ الإجراء</DialogTitle>
+            <DialogDescription>
+              سيتم التبديل بين الوجهين: ستجلب محتوى الوجه {otherSide === 'front' ? 'الأمامي' : 'الخلفي'} إلى الوجه الحالي، وبنفس الوقت يتم نقل محتوى الوجه الحالي إلى الوجه الآخر.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+            هذا الإجراء لا يمكن التراجع عنه من هذه النافذة مباشرة.
+          </div>
+          <div className="rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-xs text-zinc-700 space-y-1">
+            <p>أنظمة الوجه الحالي قبل التبديل: <span className="font-bold">{sourceCount}</span></p>
+            <p>أنظمة الوجه الآخر قبل التبديل: <span className="font-bold">{destinationCount}</span></p>
+            <p>بعد التنفيذ: ستبقى على نفس الوجه مع استلام محتوى الوجه الآخر.</p>
+          </div>
+          {reflectWarningText && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              {reflectWarningText}
+            </div>
+          )}
+          <div className="flex items-center gap-2 justify-end">
+            <button
+              type="button"
+              onClick={() => {
+                setReflectWarningText(null);
+                setShowReflectConfirm(false);
+              }}
+              className="px-3 py-2 rounded-lg border border-zinc-200 bg-white text-zinc-700 text-sm hover:bg-zinc-50"
+            >
+              إلغاء
+            </button>
+            <button
+              type="button"
+              onClick={reflectCurrentSideToOther}
+              className="px-3 py-2 rounded-lg border border-red-200 bg-red-600 text-white text-sm hover:bg-red-700"
+            >
+              تأكيد التنفيذ
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -1590,7 +2158,19 @@ const ShopBuilderContent = () => {
 
           <div ref={three3DRef} className="flex-1 rounded-2xl bg-white/90 backdrop-blur-lg shadow-sm border border-zinc-200/60 flex flex-col relative overflow-hidden group hover:border-zinc-300 transition-colors duration-500" data-three-container>
             <div className="flex items-center justify-between p-3 bg-white/80 backdrop-blur-sm border-b border-zinc-100 z-10">
-              <h2 className="text-zinc-800 tracking-tight font-bold">معاينة ثلاثية الأبعاد تفاعلية</h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-zinc-800 tracking-tight font-bold">معاينة ثلاثية الأبعاد تفاعلية</h2>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleResetCamera}
+                  className="h-8 px-2 text-xs font-semibold border border-zinc-200 hover:bg-zinc-50 hover:border-zinc-300"
+                  title="إرجاع الكاميرا للوضع الافتراضي"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 ml-1" />
+                  إعادة الضبط
+                </Button>
+              </div>
               <div className="flex items-center gap-2">
                 {/* Camera Mode Toggle Buttons */}
                 <div className="flex gap-1 rounded-lg p-1" style={{ backgroundColor: `${primaryColor}10` }}>

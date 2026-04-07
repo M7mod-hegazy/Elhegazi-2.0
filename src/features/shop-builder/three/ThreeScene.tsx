@@ -182,6 +182,9 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
   const pointerLockControlsRef = useRef<PointerLockControls | null>(null);
   const transformControlsRef = useRef<TransformControls | null>(null);
   const frameRef = useRef<number | null>(null);
+  const cameraResetAnimRef = useRef<number | null>(null);
+  const zoomTargetDistanceRef = useRef<number | null>(null);
+  const wheelZoomHandlerRef = useRef<((event: WheelEvent) => void) | null>(null);
   const lastSizeRef = useRef<{ width: number; height: number } | null>(null);
   const gltfLoaderRef = useRef<GLTFLoader | null>(null);
   const objLoaderRef = useRef<OBJLoader | null>(null);
@@ -247,8 +250,9 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     const orbit = new OrbitControls(camera, renderer.domElement);
     orbit.enableDamping = true;
     orbit.dampingFactor = 0.08;
-    orbit.enableZoom = true;
-    orbit.zoomSpeed = 0.75;
+    // Disable built-in wheel zoom so we can drive a smoother custom zoom interpolation.
+    orbit.enableZoom = false;
+    orbit.zoomSpeed = 0.6;
     orbit.minDistance = 1.5;
     orbit.maxDistance = 120;
     orbit.enablePan = true;
@@ -287,6 +291,32 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     transformControls.addEventListener('dragging-changed', (event) => {
       orbit.enabled = !event.value;
     });
+
+    const handleSmoothWheelZoom = (event: WheelEvent) => {
+      if (cameraModeRef.current !== 'orbit') return;
+      const currentCamera = cameraRef.current;
+      const currentOrbit = orbitControlsRef.current;
+      if (!currentCamera || !currentOrbit) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof (event as WheelEvent & { stopImmediatePropagation?: () => void }).stopImmediatePropagation === 'function') {
+        (event as WheelEvent & { stopImmediatePropagation?: () => void }).stopImmediatePropagation?.();
+      }
+
+      const offset = currentCamera.position.clone().sub(currentOrbit.target);
+      const currentDistance = offset.length();
+      const baseDistance = zoomTargetDistanceRef.current ?? currentDistance;
+      const zoomFactor = Math.exp(event.deltaY * 0.0012);
+      const nextDistance = THREE.MathUtils.clamp(
+        baseDistance * zoomFactor,
+        currentOrbit.minDistance,
+        currentOrbit.maxDistance
+      );
+      zoomTargetDistanceRef.current = nextDistance;
+    };
+    wheelZoomHandlerRef.current = handleSmoothWheelZoom;
+    renderer.domElement.addEventListener('wheel', handleSmoothWheelZoom, { passive: false });
 
     // Add click handler to renderer canvas for object selection
     let mouseDownTime = 0;
@@ -499,6 +529,9 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       renderer.domElement.removeEventListener('mousedown', handleCanvasMouseDown);
       renderer.domElement.removeEventListener('click', handleCanvasClick);
       renderer.domElement.removeEventListener('contextmenu', handleContextMenu);
+      if (wheelZoomHandlerRef.current) {
+        renderer.domElement.removeEventListener('wheel', wheelZoomHandlerRef.current);
+      }
     };
   }, [upsertProduct, selectProduct, selectWall, selectColumn]);
 
@@ -590,8 +623,20 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       camera.position.y += velocity.y * delta;
     }
     
-    // Update orbit controls if in orbit mode
+    // Smooth zoom interpolation + orbit update
     if (orbit && currentMode === 'orbit') {
+      if (zoomTargetDistanceRef.current !== null) {
+        const offset = camera.position.clone().sub(orbit.target);
+        const currentDistance = offset.length();
+        const nextDistance = THREE.MathUtils.lerp(currentDistance, zoomTargetDistanceRef.current, 0.18);
+        if (offset.lengthSq() > 0) {
+          offset.setLength(nextDistance);
+          camera.position.copy(orbit.target).add(offset);
+        }
+        if (Math.abs(nextDistance - zoomTargetDistanceRef.current) < 0.01) {
+          zoomTargetDistanceRef.current = null;
+        }
+      }
       orbit.update();
     }
     
@@ -603,9 +648,37 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     const camera = cameraRef.current;
     const orbit = orbitControlsRef.current;
     if (!camera || !orbit) return;
-    camera.position.copy(CAMERA_START);
-    orbit.target.copy(CAMERA_TARGET);
-    orbit.update();
+
+    if (cameraResetAnimRef.current) {
+      cancelAnimationFrame(cameraResetAnimRef.current);
+      cameraResetAnimRef.current = null;
+    }
+
+    const startPosition = camera.position.clone();
+    const startTarget = orbit.target.clone();
+    const endPosition = CAMERA_START.clone();
+    const endTarget = CAMERA_TARGET.clone();
+    const durationMs = 520;
+    const startTime = performance.now();
+
+    const animateReset = (time: number) => {
+      const elapsed = time - startTime;
+      const rawT = Math.min(1, elapsed / durationMs);
+      // cubic ease-out for a smooth finish
+      const t = 1 - Math.pow(1 - rawT, 3);
+
+      camera.position.lerpVectors(startPosition, endPosition, t);
+      orbit.target.lerpVectors(startTarget, endTarget, t);
+      orbit.update();
+
+      if (rawT < 1) {
+        cameraResetAnimRef.current = requestAnimationFrame(animateReset);
+      } else {
+        cameraResetAnimRef.current = null;
+      }
+    };
+
+    cameraResetAnimRef.current = requestAnimationFrame(animateReset);
   }, []);
 
   const snapshot = useCallback(() => {
@@ -763,6 +836,11 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
 
       window.removeEventListener('resize', handleResize);
       if (frameRef.current) cancelAnimationFrame(frameRef.current);
+      if (cameraResetAnimRef.current) cancelAnimationFrame(cameraResetAnimRef.current);
+      zoomTargetDistanceRef.current = null;
+      if (rendererRef.current?.domElement && wheelZoomHandlerRef.current) {
+        rendererRef.current.domElement.removeEventListener('wheel', wheelZoomHandlerRef.current);
+      }
       transformControlsRef.current?.dispose();
       orbitControlsRef.current?.dispose();
       pointerLockControlsRef.current?.disconnect();

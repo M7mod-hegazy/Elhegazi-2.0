@@ -561,7 +561,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 *
 // unread support: lastSeenAt per admin
 app.get('/api/history/unread-count', async (req, res) => {
   try {
-    const userId = req.query.userId || req.header('x-user-id');
+    const userId = req.query.userId || req.header('x-user-id') || req.user?._id;
     if (!userId) return res.json({ ok: true, count: 0 });
     const seen = await HistoryRead.findOne({ userId }).lean();
     const since = seen?.lastSeenAt || new Date(0);
@@ -574,7 +574,7 @@ app.get('/api/history/unread-count', async (req, res) => {
 
 app.post('/api/history/mark-read', async (req, res) => {
   try {
-    const userId = req.body?.userId || req.header('x-user-id');
+    const userId = req.body?.userId || req.header('x-user-id') || req.user?._id;
     if (!userId) return res.status(400).json({ ok: false, error: 'userId required' });
     const doc = await HistoryRead.findOneAndUpdate(
       { userId },

@@ -989,8 +989,9 @@ const AdminHomeConfig = () => {
                           void logHistory({ section: 'home_config', action: 'hero_toggled', meta: { old: cfg.heroEnabled, new: val } }); 
                           setCfg({ ...cfg, heroEnabled: val }); 
                         }} 
-                        size="lg"
-                        className="transform scale-110"
+                        variant="danger"
+                        size="default"
+                        className="ring-1 ring-slate-200/70"
                       />
                       {cfg.heroEnabled && (
                         <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping" />
@@ -1209,9 +1210,9 @@ const AdminHomeConfig = () => {
                         void logHistory({ section: 'home_config', action: 'hero_toggled', meta: { old: cfg.heroEnabled, new: val } }); 
                         setCfg({ ...cfg, heroEnabled: val }); 
                       }} 
-                      variant={cfg.heroEnabled ? 'success' : 'default'}
-                      size="lg"
-                      className="ml-4 shadow-lg"
+                      variant="danger"
+                      size="default"
+                      className="ml-4 ring-1 ring-slate-200/70"
                     />
                     {cfg.heroEnabled && (
                       <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full animate-ping" />
