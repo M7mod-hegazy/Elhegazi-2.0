@@ -1509,32 +1509,24 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
               console.error('  📍 Texture URL:', product.texture);
             });
           } else if (!product.texture && mesh.material.map) {
-            // Remove texture if not specified
-            mesh.material.map = null;
-            
-            // Reset emissive when no texture
-            mesh.material.emissive.set(0x000000);
-            mesh.material.emissiveIntensity = 0;
-            
-            // Apply color directly to base color (no texture)
+            // Keep embedded/imported map from GLTF when no custom texture is specified.
+            // Only apply optional color tint as emissive overlay.
             if (product.color) {
-              mesh.material.color.set(product.color);
-              // Applied color to base
+              mesh.material.emissive.set(product.color);
+              mesh.material.emissiveIntensity = 0.2;
             } else {
-              mesh.material.color.set(0xffffff);
-            }
-            
-            mesh.material.needsUpdate = true;
-            // Removed texture from mesh
-          } else if (!product.texture) {
-            // No texture - apply color directly to base color
-            if (product.color) {
-              mesh.material.color.set(product.color);
               mesh.material.emissive.set(0x000000);
               mesh.material.emissiveIntensity = 0;
-              mesh.material.needsUpdate = true;
-              // Applied color to mesh
             }
+            mesh.material.needsUpdate = true;
+          } else if (!product.texture) {
+            // No map and no custom texture: only apply explicit color if provided.
+            if (product.color) {
+              mesh.material.color.set(product.color);
+            }
+            mesh.material.emissive.set(0x000000);
+            mesh.material.emissiveIntensity = 0;
+            mesh.material.needsUpdate = true;
           }
         }
       }
