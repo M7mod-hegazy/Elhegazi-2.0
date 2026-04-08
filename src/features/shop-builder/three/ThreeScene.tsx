@@ -22,6 +22,7 @@ import { createWallMesh, updateWallMesh, createColumnMesh, updateColumnMesh, cre
 
 // Texture loader
 const textureLoader = new THREE.TextureLoader();
+textureLoader.crossOrigin = 'anonymous';
 
 // Wall texture URLs - Using embedded SVG data URLs (100% reliable, no external dependencies)
 export const WALL_TEXTURES = {
@@ -105,54 +106,64 @@ export const WALL_TEXTURES = {
 // Floor texture URLs - Seamless tileable textures
 export const FLOOR_TEXTURES = {
   tiles_white: {
-    map: 'https://cdn.pixabay.com/photo/2017/08/30/01/05/milky-way-2695569_960_720.jpg',
-    normalMap: 'https://threejs.org/examples/textures/hardwood2_bump.jpg',
-    preview: 'https://cdn.pixabay.com/photo/2017/08/30/01/05/milky-way-2695569_960_720.jpg',
-  },
-  tiles_grey: {
-    map: 'https://threejs.org/examples/textures/hardwood2_diffuse.jpg',
-    normalMap: 'https://threejs.org/examples/textures/hardwood2_bump.jpg',
-    preview: 'https://threejs.org/examples/textures/hardwood2_diffuse.jpg',
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y4ZjlmYSIvPjxwYXRoIGQ9Ik0xMDAgMEwwIDAgMCAxMDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2RlZTJlNiIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Y4ZjlmYSIvPjxwYXRoIGQ9Ik0xMDAgMEwwIDAgMCAxMDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2RlZTJlNiIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+',
   },
   tiles_black: {
-    map: 'https://threejs.org/examples/textures/hardwood2_roughness.jpg',
-    normalMap: 'https://threejs.org/examples/textures/hardwood2_bump.jpg',
-    preview: 'https://threejs.org/examples/textures/hardwood2_roughness.jpg',
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzIxMjUyOSIvPjxwYXRoIGQ9Ik0xMDAgMEwwIDAgMCAxMDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzM0M2E0MCIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzIxMjUyOSIvPjxwYXRoIGQ9Ik0xMDAgMEwwIDAgMCAxMDAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzM0M2E0MCIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+',
+  },
+  tiles_checker: {
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2ZmZmZmZiIvPjxyZWN0IHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iIzFhMWExYSIvPjxyZWN0IHg9IjUwIiB5PSI1MCIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMWExYTFhIi8+PC9zdmc+',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2ZmZmZmZiIvPjxyZWN0IHdpZHRoPSI1MCIgaGVpZ2h0PSI1MCIgZmlsbD0iIzFhMWExYSIvPjxyZWN0IHg9IjUwIiB5PSI1MCIgd2lkdGg9IjUwIiBoZWlnaHQ9IjUwIiBmaWxsPSIjMWExYTFhIi8+PC9zdmc+',
   },
   wood_light: {
-    map: 'https://threejs.org/examples/textures/hardwood2_diffuse.jpg',
-    normalMap: 'https://threejs.org/examples/textures/hardwood2_bump.jpg',
-    preview: 'https://threejs.org/examples/textures/hardwood2_diffuse.jpg',
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2U2YzI4ZiIvPjxwYXRoIGQ9Ik0wIDEwIEwxMDAgMTAgTTAgMzAgTDEwMCAzMCBNMCA1NSBMMTAwIDU1IE0wIDgwIEwxMDAgODAgTTAgOTUgTDEwMCA5NSIgc3Ryb2tlPSIjZDRhMzczIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWRhc2hhcnJheT0iMTAsMiw1LDIiLz48cGF0aCBkPSJNNTAgMCBMNTAgMTAwIE0yMCAwIEwyMCAxMDAiIHN0cm9rZT0iI2Q0YTM3MyIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3N2Zz4=',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2U2YzI4ZiIvPjxwYXRoIGQ9Ik0wIDEwIEwxMDAgMTAgTTAgMzAgTDEwMCAzMCBNMCA1NSBMMTAwIDU1IE0wIDgwIEwxMDAgODAgTTAgOTUgTDEwMCA5NSIgc3Ryb2tlPSIjZDRhMzczIiBzdHJva2Utd2lkdGg9IjEuNSIgc3Ryb2tlLWRhc2hhcnJheT0iMTAsMiw1LDIiLz48cGF0aCBkPSJNNTAgMCBMNTAgMTAwIE0yMCAwIEwyMCAxMDAiIHN0cm9rZT0iI2Q0YTM3MyIgc3Ryb2tlLXdpZHRoPSIwLjUiLz48L3N2Zz4=',
   },
   wood_dark: {
-    map: 'https://threejs.org/examples/textures/hardwood2_roughness.jpg',
-    normalMap: 'https://threejs.org/examples/textures/hardwood2_bump.jpg',
-    preview: 'https://threejs.org/examples/textures/hardwood2_roughness.jpg',
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzNlMjcyMyIvPjxwYXRoIGQ9Ik0wIDE1IEwxMDAgMTUgTTAgNDAgTDEwMCA0MCBNMCA2NSBMMTAwIDY1IE0wIDg1IEwxMDAgODUiIHN0cm9rZT0iIzJiMWExNiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtZGFzaGFycmF5PSIxNSw0LDgsMyIvPjxwYXRoIGQ9Ik00MCAwIEw0MCAxMDAgTTc1IDAgTDc1IDEwMCIgc3Ryb2tlPSIjMmIxYTE2IiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4=',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzNlMjcyMyIvPjxwYXRoIGQ9Ik0wIDE1IEwxMDAgMTUgTTAgNDAgTDEwMCA0MCBNMCA2NSBMMTAwIDY1IE0wIDg1IEwxMDAgODUiIHN0cm9rZT0iIzJiMWExNiIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtZGFzaGFycmF5PSIxNSw0LDgsMyIvPjxwYXRoIGQ9Ik00MCAwIEw0MCAxMDAgTTc1IDAgTDc1IDEwMCIgc3Ryb2tlPSIjMmIxYTE2IiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4=',
   },
   wood_parquet: {
-    map: 'https://threejs.org/examples/textures/hardwood2_diffuse.jpg',
-    normalMap: 'https://threejs.org/examples/textures/hardwood2_bump.jpg',
-    preview: 'https://threejs.org/examples/textures/hardwood2_diffuse.jpg',
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Q0YTM3MyIvPjxyZWN0IHdpZHRoPSI1MCIgaGVpZ2h0PSIyNSIgZmlsbD0iI2U2YzI4ZiIgc3Ryb2tlPSIjYmM4MzUxIiBzdHJva2Utd2lkdGg9IjEiLz48cmVjdCB4PSI1MCIgd2lkdGg9IjUwIiBoZWlnaHQ9IjI1IiBmaWxsPSIjZmFlZGNlIiBzdHJva2U9IiNiYzgzNTEiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHk9IjI1IiB3aWR0aD0iMjUiIGhlaWdodD0iNTAiIGZpbGw9IiNlNmMyOGYiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iMjUiIHk9IjI1IiB3aWR0aD0iMjUiIGhlaWdodD0iNTAiIGZpbGw9IiNmYWVkY2UiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iMjUiIGZpbGw9IiNlNmMyOGYiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iNTAiIHk9IjUwIiB3aWR0aD0iMjUiIGhlaWdodD0iNTAiIGZpbGw9IiNmYWVkY2UiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iNzUiIHk9IjUwIiB3aWR0aD0iMjUiIGhlaWdodD0iNTAiIGZpbGw9IiNlNmMyOGYiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSIyNSIgZmlsbD0iI2ZhZWRjZSIgc3Ryb2tlPSIjYmM4MzUxIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4=',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2Q0YTM3MyIvPjxyZWN0IHdpZHRoPSI1MCIgaGVpZ2h0PSIyNSIgZmlsbD0iI2U2YzI4ZiIgc3Ryb2tlPSIjYmM4MzUxIiBzdHJva2Utd2lkdGg9IjEiLz48cmVjdCB4PSI1MCIgd2lkdGg9IjUwIiBoZWlnaHQ9IjI1IiBmaWxsPSIjZmFlZGNlIiBzdHJva2U9IiNiYzgzNTEiIHN0cm9rZS13aWR0aD0iMSIvPjxyZWN0IHk9IjI1IiB3aWR0aD0iMjUiIGhlaWdodD0iNTAiIGZpbGw9IiNlNmMyOGYiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iMjUiIHk9IjI1IiB3aWR0aD0iMjUiIGhlaWdodD0iNTAiIGZpbGw9IiNmYWVkY2UiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iNTAiIHk9IjI1IiB3aWR0aD0iNTAiIGhlaWdodD0iMjUiIGZpbGw9IiNlNmMyOGYiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iNTAiIHk9IjUwIiB3aWR0aD0iMjUiIGhlaWdodD0iNTAiIGZpbGw9IiNmYWVkY2UiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeD0iNzUiIHk9IjUwIiB3aWR0aD0iMjUiIGhlaWdodD0iNTAiIGZpbGw9IiNlNmMyOGYiIHN0cm9rZT0iI2JjODM1MSIgc3Ryb2tlLXdpZHRoPSIxIi8+PHJlY3QgeT0iNzUiIHdpZHRoPSI1MCIgaGVpZ2h0PSIyNSIgZmlsbD0iI2ZhZWRjZSIgc3Ryb2tlPSIjYmM4MzUxIiBzdHJva2Utd2lkdGg9IjEiLz48L3N2Zz4=',
   },
   marble_white: {
-    map: 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg',
-    normalMap: 'https://threejs.org/examples/textures/terrain/grasslight-big-nm.jpg',
-    preview: 'https://threejs.org/examples/textures/terrain/grasslight-big.jpg',
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2ZmZmZmZiIvPjxwYXRoIGQ9Ik0wIDIwIFEgMjUgNSwgNTAgMzAgVCAxMDAgMTAgTTAgNzAgUSAzMCA1MCwgNjAgODAgVCAxMDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2UyZThmMCIgc3Ryb2tlLXdpZHRoPSIyIiBvcGFjaXR5PSIwLjciLz48cGF0aCBkPSJNMjAgMTAwIFEgNDAgNzAsIDcwIDgwIFQgMTAwIDEwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2JkNWUxIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNSIvPjwvc3ZnPg==',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2ZmZmZmZiIvPjxwYXRoIGQ9Ik0wIDIwIFEgMjUgNSwgNTAgMzAgVCAxMDAgMTAgTTAgNzAgUSAzMCA1MCwgNjAgODAgVCAxMDAgNjAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2UyZThmMCIgc3Ryb2tlLXdpZHRoPSIyIiBvcGFjaXR5PSIwLjciLz48cGF0aCBkPSJNMjAgMTAwIFEgNDAgNzAsIDcwIDgwIFQgMTAwIDEwMCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjY2JkNWUxIiBzdHJva2Utd2lkdGg9IjEiIG9wYWNpdHk9IjAuNSIvPjwvc3ZnPg==',
   },
   marble_black: {
-    map: 'https://threejs.org/examples/textures/brick_diffuse.jpg',
-    normalMap: 'https://threejs.org/examples/textures/brick_bump.jpg',
-    preview: 'https://threejs.org/examples/textures/brick_diffuse.jpg',
-  },
-  vinyl_grey: {
-    map: 'https://threejs.org/examples/textures/waterdudv.jpg',
-    normalMap: 'https://threejs.org/examples/textures/waternormals.jpg',
-    preview: 'https://threejs.org/examples/textures/waterdudv.jpg',
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzExMTExMSIvPjxwYXRoIGQ9Ik0wIDMwIFEgMzAgMTAsIDYwIDQwIFQgMTAwIDIwIE0xMCAxMDAgUSA0MCA3MCwgODAgOTAgVCAxMDAgODAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y1OWUwYiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNiIvPjxwYXRoIGQ9Ik0wIDgwIFEgMjAgNjAsIDUwIDY1IFQgMTAwIDUwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4=',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzExMTExMSIvPjxwYXRoIGQ9Ik0wIDMwIFEgMzAgMTAsIDYwIDQwIFQgMTAwIDIwIE0xMCAxMDAgUSA0MCA3MCwgODAgOTAgVCAxMDAgODAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2Y1OWUwYiIgc3Ryb2tlLXdpZHRoPSIxLjUiIG9wYWNpdHk9IjAuNiIvPjxwYXRoIGQ9Ik0wIDgwIFEgMjAgNjAsIDUwIDY1IFQgMTAwIDUwIiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMC41IiBvcGFjaXR5PSIwLjMiLz48L3N2Zz4=',
   },
   concrete: {
-    map: 'https://threejs.org/examples/textures/brick_diffuse.jpg',
-    normalMap: 'https://threejs.org/examples/textures/brick_bump.jpg',
-    preview: 'https://threejs.org/examples/textures/brick_diffuse.jpg',
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzk0YTNiOCIvPjxmaWx0ZXIgaWQ9Im5vaXNlIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC44IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIHN0eWxlPSJmaWx0ZXI6dXJsKCNub2lzZSkiIG9wYWNpdHk9IjAuMTUiLz48L3N2Zz4=',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iIzk0YTNiOCIvPjxmaWx0ZXIgaWQ9Im5vaXNlIj48ZmVUdXJidWxlbmNlIHR5cGU9ImZyYWN0YWxOb2lzZSIgYmFzZUZyZXF1ZW5jeT0iMC44IiBudW1PY3RhdmVzPSIzIiBzdGl0Y2hUaWxlcz0ic3RpdGNoIi8+PC9maWx0ZXI+PHJlY3Qgd2lkdGg9IjEwMCIgaGVpZ2h0PSIxMDAiIHN0eWxlPSJmaWx0ZXI6dXJsKCNub2lzZSkiIG9wYWNpdHk9IjAuMTUiLz48L3N2Zz4=',
+  },
+  terrazzo: {
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YxZjVmOSIvPjxwb2x5Z29uIHBvaW50cz0iMTAsMTAgMTUsNSAyMCwxMiAxMiwxOCIgZmlsbD0iIzk0YTNiOCIvPjxwb2x5Z29uIHBvaW50cz0iNDAsMjAgNDgsMTUgNTAsMjUgNDIsMjgiIGZpbGw9IiNmY2QzNGQiLz48cG9seWdvbiBwb2ludHM9IjgwLDEwIDg4LDggODUsMTggNzgsMTUiIGZpbGw9IiNmODcxNzEiLz48cG9seWdvbiBwb2ludHM9IjIwLDUwIDI4LDQ1IDI1LDU1IDE4LDUyIiBmaWxsPSIjNjQ3NDhiIi8+PHBvbHlnb24gcG9pbnRzPSI2MCw2MCA2NSw1NSA3MCw2MiA2Miw2OCIgZmlsbD0iIzM0ZDM5OSIvPjxwb2x5Z29uIHBvaW50cz0iODUsODAgOTIsNzUgOTAsODUgODIsODgiIGZpbGw9IiNmYmJmMjQiLz48cG9seWdvbiBwb2ludHM9IjMwLDg1IDM4LDgwIDM1LDkwIDI4LDg4IiBmaWxsPSIjYTc4YmZhIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI0MCIgcj0iMyIgZmlsbD0iIzQ3NTU2OSIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iNzUiIHI9IjIiIGZpbGw9IiM5NGEzYjgiLz48Y2lyY2xlIGN4PSI4MCIgY3k9IjQwIiByPSIyLjUiIGZpbGw9IiNjYmQ1ZTEiLz48L3N2Zz4=',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48cmVjdCB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgZmlsbD0iI2YxZjVmOSIvPjxwb2x5Z29uIHBvaW50cz0iMTAsMTAgMTUsNSAyMCwxMiAxMiwxOCIgZmlsbD0iIzk0YTNiOCIvPjxwb2x5Z29uIHBvaW50cz0iNDAsMjAgNDgsMTUgNTAsMjUgNDIsMjgiIGZpbGw9IiNmY2QzNGQiLz48cG9seWdvbiBwb2ludHM9IjgwLDEwIDg4LDggODUsMTggNzgsMTUiIGZpbGw9IiNmODcxNzEiLz48cG9seWdvbiBwb2ludHM9IjIwLDUwIDI4LDQ1IDI1LDU1IDE4LDUyIiBmaWxsPSIjNjQ3NDhiIi8+PHBvbHlnb24gcG9pbnRzPSI2MCw2MCA2NSw1NSA3MCw2MiA2Miw2OCIgZmlsbD0iIzM0ZDM5OSIvPjxwb2x5Z29uIHBvaW50cz0iODUsODAgOTIsNzUgOTAsODUgODIsODgiIGZpbGw9IiNmYmJmMjQiLz48cG9seWdvbiBwb2ludHM9IjMwLDg1IDM4LDgwIDM1LDkwIDI4LDg4IiBmaWxsPSIjYTc4YmZhIi8+PGNpcmNsZSBjeD0iNTAiIGN5PSI0MCIgcj0iMyIgZmlsbD0iIzQ3NTU2OSIvPjxjaXJjbGUgY3g9IjE1IiBjeT0iNzUiIHI9IjIiIGZpbGw9IiM5NGEzYjgiLz48Y2lyY2xlIGN4PSI4MCIgY3k9IjQwIiByPSIyLjUiIGZpbGw9IiNjYmQ1ZTEiLz48L3N2Zz4=',
+  },
+  epoxy_grey: {
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNjYmQ1ZTEiLz48c3RvcCBvZmZzZXQ9IjUwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2cpIi8+PC9zdmc+',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9ImciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPjxzdG9wIG9mZnNldD0iMCUiIHN0b3AtY29sb3I9IiNjYmQ1ZTEiLz48c3RvcCBvZmZzZXQ9IjUwJSIgc3RvcC1jb2xvcj0iIzk0YTNiOCIvPjxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iIzY0NzQ4YiIvPjwvbGluZWFyR3JhZGllbnQ+PC9kZWZzPjxyZWN0IHdpZHRoPSIxMDAiIGhlaWdodD0iMTAwIiBmaWxsPSJ1cmwoI2cpIi8+PC9zdmc+',
+  },
+  carpet_grey: {
+    map: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjMzM0MTU1Ii8+PHBhdGggZD0iTTAgMEwxMCAxMCBNMTAgMEwwIDEwIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC41Ii8+PC9zdmc+',
+    normalMap: null,
+    preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjMzM0MTU1Ii8+PHBhdGggZD0iTTAgMEwxMCAxMCBNMTAgMEwwIDEwIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC41Ii8+PC9zdmc+',
   },
 };
 
@@ -214,6 +225,8 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     selectProduct,
     selectWall,
     selectColumn,
+    selectSlatWall,
+    selectPrimoStand,
     upsertProduct,
   } = useShopBuilder();
 
@@ -321,11 +334,9 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     renderer.domElement.addEventListener('wheel', handleSmoothWheelZoom, { passive: false });
 
     // Add click handler to renderer canvas for object selection
-    let mouseDownTime = 0;
     let mouseDownPos = { x: 0, y: 0 };
     
     const handleCanvasMouseDown = (event: MouseEvent) => {
-      mouseDownTime = Date.now();
       mouseDownPos = { x: event.clientX, y: event.clientY };
     };
     
@@ -333,7 +344,6 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
 
       
       // Ignore if it was a drag (OrbitControls)
-      const timeDiff = Date.now() - mouseDownTime;
       const distance = Math.sqrt(
         Math.pow(event.clientX - mouseDownPos.x, 2) + 
         Math.pow(event.clientY - mouseDownPos.y, 2)
@@ -341,8 +351,8 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       
 
       
-      // If mouse moved more than 5px or took more than 200ms, it's a drag
-      if (distance > 5 || timeDiff > 200) {
+      // Treat only true pointer movement as drag; long press should still count as click.
+      if (distance > 8) {
 
         return;
       }
@@ -366,11 +376,17 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
 
       // Get all scene objects
       const wallMeshes = Array.from(wallMeshRef.current.values());
+      const columnMeshes = Array.from(columnMeshRef.current.values());
+      const slatMeshes = Array.from(slatWallMeshRef.current.values());
+      const primoMeshes = Array.from(primoStandMeshRef.current.values());
       const productGroups = [...productMapRef.current.values()].map((entry) => entry.group);
       
 
       
-      const allIntersects = raycaster.intersectObjects([...wallMeshes, ...productGroups], true);
+      const allIntersects = raycaster.intersectObjects(
+        [...productGroups, ...columnMeshes, ...slatMeshes, ...primoMeshes, ...wallMeshes],
+        true
+      );
       
 
       
@@ -379,51 +395,116 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         selectProduct(null);
         selectWall(null);
         selectColumn(null);
+        selectSlatWall(null);
+        selectPrimoStand(null);
         return;
       }
 
-      const closest = allIntersects[0];
-
-      
-      // Check if it's a wall
-      const wallEntry = Array.from(wallMeshRef.current.entries())
-        .find(([, mesh]) => mesh === closest.object || closest.object.parent === mesh);
-      
-      if (wallEntry) {
-        const [wallId] = wallEntry;
-
-        // Only select wall without deselecting others
-        selectWall(wallId);
-        return;
-      }
-
-      // Check if it's a product
-      const productEntry = Array.from(productMapRef.current.entries())
-        .find(([, entry]) => {
-          let obj: THREE.Object3D | null = closest.object;
-          while (obj) {
-            if (obj === entry.group) return true;
-            obj = obj.parent;
+      for (const hit of allIntersects) {
+        const productEntry = Array.from(productMapRef.current.entries())
+          .find(([, entry]) => {
+            let obj: THREE.Object3D | null = hit.object;
+            while (obj) {
+              if (obj === entry.group) return true;
+              obj = obj.parent;
+            }
+            return false;
+          });
+        if (productEntry) {
+          const [productId] = productEntry;
+          const clickedProduct = layout.products.find((p) => p.id === productId);
+          if ((clickedProduct?.metadata as Record<string, unknown> | undefined)?.autoHangFill) {
+            continue;
           }
-          return false;
-        });
-      
-      if (productEntry) {
-        const [productId] = productEntry;
-        const clickedProduct = layout.products.find((p) => p.id === productId);
-        if ((clickedProduct?.metadata as Record<string, unknown> | undefined)?.autoHangFill) {
+          selectProduct(productId);
           return;
         }
 
-        // Only select product without deselecting others
-        selectProduct(productId);
-        return;
+        const columnEntry = Array.from(columnMeshRef.current.entries())
+          .find(([, mesh]) => {
+            let obj: THREE.Object3D | null = hit.object;
+            while (obj) {
+              if (obj === mesh) return true;
+              obj = obj.parent;
+            }
+            return false;
+          });
+        if (columnEntry) {
+          const columnKey = columnEntry[0];
+          const matchedColumn = layout.walls
+            .flatMap((wall) => (wall.columns || []).map((column) => ({ wallId: wall.id, column })))
+            .find(({ wallId, column }) => {
+              const key = `${wallId}-${column.id}`;
+              return key === columnKey;
+            });
+          selectColumn(matchedColumn?.column.id || null);
+          return;
+        }
+
+        const slatEntry = Array.from(slatWallMeshRef.current.entries())
+          .find(([, mesh]) => {
+            let obj: THREE.Object3D | null = hit.object;
+            while (obj) {
+              if (obj === mesh) return true;
+              obj = obj.parent;
+            }
+            return false;
+          });
+        if (slatEntry) {
+          const slatKey = slatEntry[0];
+          const matchedSlat = layout.walls
+            .flatMap((wall) => (wall.slatWalls || []).map((slat) => ({ wallId: wall.id, slat })))
+            .find(({ wallId, slat }) => {
+              const key = `${wallId}-${slat.id}`;
+              return key === slatKey;
+            });
+          selectSlatWall(matchedSlat?.slat.id || null);
+          return;
+        }
+
+        const primoEntry = Array.from(primoStandMeshRef.current.entries())
+          .find(([, mesh]) => {
+            let obj: THREE.Object3D | null = hit.object;
+            while (obj) {
+              if (obj === mesh) return true;
+              obj = obj.parent;
+            }
+            return false;
+          });
+        if (primoEntry) {
+          const primoKey = primoEntry[0];
+          const matchedPrimo = layout.walls
+            .flatMap((wall) => (wall.primoStands || []).map((primo) => ({ wallId: wall.id, primo })))
+            .find(({ wallId, primo }) => {
+              const key = `primo-${wallId}-${primo.id}`;
+              return key === primoKey;
+            });
+          selectPrimoStand(matchedPrimo?.primo.id || null);
+          return;
+        }
+
+        const wallEntry = Array.from(wallMeshRef.current.entries())
+          .find(([, mesh]) => {
+            let obj: THREE.Object3D | null = hit.object;
+            while (obj) {
+              if (obj === mesh) return true;
+              obj = obj.parent;
+            }
+            return false;
+          });
+        if (wallEntry) {
+          const [wallId] = wallEntry;
+          selectWall(wallId);
+          return;
+        }
       }
 
 
       selectProduct(null);
       selectWall(null);
       selectColumn(null);
+      selectSlatWall(null);
+      selectPrimoStand(null);
     };
     
     // Right-click handler to deselect all
@@ -433,6 +514,8 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       selectProduct(null);
       selectWall(null);
       selectColumn(null);
+      selectSlatWall(null);
+      selectPrimoStand(null);
     };
     
     renderer.domElement.addEventListener('mousedown', handleCanvasMouseDown);
@@ -509,8 +592,8 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       }
     });
 
-    // Grid helper with dynamic size - adjust divisions based on floor size
-    const gridDivisions = Math.floor(FLOOR_SIZE / 2); // 2 meters per division
+    // Keep grid calibrated to real-world units: 1 division = 1 meter.
+    const gridDivisions = Math.max(1, Math.round(FLOOR_SIZE));
     const grid = new THREE.GridHelper(FLOOR_SIZE, gridDivisions, 0x94a3b8, 0xcbd5e1);
     scene.add(grid);
 
@@ -539,7 +622,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         renderer.domElement.removeEventListener('wheel', wheelZoomHandlerRef.current);
       }
     };
-  }, [upsertProduct, selectProduct, selectWall, selectColumn]);
+  }, [upsertProduct, selectProduct, selectWall, selectColumn, selectSlatWall, selectPrimoStand]);
 
   const resizeRenderer = useCallback(() => {
     const renderer = rendererRef.current;
@@ -1274,8 +1357,8 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       }
     }
     
-    // Create new grid with updated size
-    const gridDivisions = Math.floor(newFloorSize / 2);
+    // Keep updated grid calibrated to real-world units: 1 division = 1 meter.
+    const gridDivisions = Math.max(1, Math.round(newFloorSize));
     const newGrid = new THREE.GridHelper(newFloorSize, gridDivisions, 0x94a3b8, 0xcbd5e1);
     scene.add(newGrid);
     

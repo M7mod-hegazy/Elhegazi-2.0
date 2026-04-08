@@ -39,6 +39,21 @@ interface ProductDragState {
   offset: { x: number; y: number };
 }
 
+interface BulkDragState {
+  anchorWorld: { x: number; y: number };
+  initialWalls: Array<{ id: string; start: { x: number; y: number }; end: { x: number; y: number } }>;
+  initialProducts: Array<{ id: string; x: number; z: number }>;
+}
+
+interface MarqueeSelectionRect {
+  startX: number;
+  startY: number;
+  currentX: number;
+  currentY: number;
+}
+
+type FloorplanPointerTool = 'default' | 'marquee';
+
 const FloorplanCanvas: React.FC = () => {
   const { primaryColor, secondaryColor } = useTheme();
   const { 
@@ -67,6 +82,7 @@ const FloorplanCanvas: React.FC = () => {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const dragState = useRef<DragState | null>(null);
   const productDragState = useRef<ProductDragState | null>(null);
+  const bulkDragState = useRef<BulkDragState | null>(null);
   const panState = useRef<{ x: number; y: number } | null>(null);
   const [floorplanReady, setFloorplanReady] = useState(false);
   
@@ -79,6 +95,11 @@ const FloorplanCanvas: React.FC = () => {
   const [showLengthInput, setShowLengthInput] = useState(false);
   const [lengthInputValue, setLengthInputValue] = useState('');
   const [lengthInputMode, setLengthInputMode] = useState<'draw' | 'selected' | null>(null);
+  const [pointerTool, setPointerTool] = useState<FloorplanPointerTool>('default');
+  const [marqueeRect, setMarqueeRect] = useState<MarqueeSelectionRect | null>(null);
+  const [multiSelectedWallIds, setMultiSelectedWallIds] = useState<string[]>([]);
+  const [multiSelectedColumnIds, setMultiSelectedColumnIds] = useState<string[]>([]);
+  const [multiSelectedProductIds, setMultiSelectedProductIds] = useState<string[]>([]);
   
   // Use ref for disableSnapping to avoid stale closure issues
   const disableSnappingRef = useRef(false);
@@ -119,6 +140,10 @@ const FloorplanCanvas: React.FC = () => {
     () => layout.products.filter((product) => !(product.metadata as any)?.autoHangFill),
     [layout.products]
   );
+  const multiSelectedWallsSet = useMemo(() => new Set(multiSelectedWallIds), [multiSelectedWallIds]);
+  const multiSelectedColumnsSet = useMemo(() => new Set(multiSelectedColumnIds), [multiSelectedColumnIds]);
+  const multiSelectedProductsSet = useMemo(() => new Set(multiSelectedProductIds), [multiSelectedProductIds]);
+  const hasMultiSelection = multiSelectedWallIds.length > 0 || multiSelectedColumnIds.length > 0 || multiSelectedProductIds.length > 0;
 
 
   const pixelsPerMeter = useMemo(() => {
@@ -127,6 +152,14 @@ const FloorplanCanvas: React.FC = () => {
     const floorSize = layout.floorSize || 24; // Default to 24m if not set
     return Math.min(availableWidth, availableHeight) / floorSize * zoom;
   }, [canvasSize.width, canvasSize.height, zoom, layout.floorSize]);
+
+  const getNormalizedRect = useCallback((rect: MarqueeSelectionRect) => {
+    const left = Math.min(rect.startX, rect.currentX);
+    const right = Math.max(rect.startX, rect.currentX);
+    const top = Math.min(rect.startY, rect.currentY);
+    const bottom = Math.max(rect.startY, rect.currentY);
+    return { left, right, top, bottom, width: right - left, height: bottom - top };
+  }, []);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -189,17 +222,18 @@ const FloorplanCanvas: React.FC = () => {
     worldWalls.forEach((wall) => {
       const start = toScreen(wall.start);
       const end = toScreen(wall.end);
+      const isWallSelected = wall.id === selectedWallId || multiSelectedWallsSet.has(wall.id);
 
       // wall line - Increased width, reduced visual height representation
       ctx.beginPath();
-      ctx.strokeStyle = wall.id === selectedWallId ? primaryColor : wall.color;
-      ctx.lineWidth = wall.id === selectedWallId ? 12 : 10; // Increased from 6/5 to 12/10
+      ctx.strokeStyle = isWallSelected ? primaryColor : wall.color;
+      ctx.lineWidth = isWallSelected ? 12 : 10; // Increased from 6/5 to 12/10
       ctx.moveTo(start.x, start.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
 
       // endpoints
-      ctx.fillStyle = wall.id === selectedWallId ? primaryColor : '#64748b';
+      ctx.fillStyle = isWallSelected ? primaryColor : '#64748b';
       ctx.beginPath();
       ctx.arc(start.x, start.y, ENDPOINT_RADIUS, 0, Math.PI * 2);
       ctx.fill();
@@ -309,9 +343,10 @@ const FloorplanCanvas: React.FC = () => {
           // Draw column based on shape
           if (column.shape === 'round') {
             // Round column
-            ctx.fillStyle = column.id === selectedColumnId ? secondaryColor : column.color;
-            ctx.strokeStyle = column.id === selectedColumnId ? primaryColor : '#64748b';
-            ctx.lineWidth = column.id === selectedColumnId ? 3 : 2;
+            const isColumnSelected = column.id === selectedColumnId || multiSelectedColumnsSet.has(column.id);
+            ctx.fillStyle = isColumnSelected ? secondaryColor : column.color;
+            ctx.strokeStyle = isColumnSelected ? primaryColor : '#64748b';
+            ctx.lineWidth = isColumnSelected ? 3 : 2;
             ctx.beginPath();
             ctx.arc(columnScreenPos.x, columnScreenPos.y, columnWidthPx / 2, 0, Math.PI * 2);
             ctx.fill();
@@ -322,9 +357,10 @@ const FloorplanCanvas: React.FC = () => {
             ctx.translate(columnScreenPos.x, columnScreenPos.y);
             ctx.rotate(wallAngle);
             
-            ctx.fillStyle = column.id === selectedColumnId ? secondaryColor : column.color;
-            ctx.strokeStyle = column.id === selectedColumnId ? primaryColor : '#64748b';
-            ctx.lineWidth = column.id === selectedColumnId ? 3 : 2;
+            const isColumnSelected = column.id === selectedColumnId || multiSelectedColumnsSet.has(column.id);
+            ctx.fillStyle = isColumnSelected ? secondaryColor : column.color;
+            ctx.strokeStyle = isColumnSelected ? primaryColor : '#64748b';
+            ctx.lineWidth = isColumnSelected ? 3 : 2;
             
             ctx.fillRect(-columnDepthPx / 2, -columnWidthPx / 2, columnDepthPx, columnWidthPx);
             ctx.strokeRect(-columnDepthPx / 2, -columnWidthPx / 2, columnDepthPx, columnWidthPx);
@@ -333,7 +369,7 @@ const FloorplanCanvas: React.FC = () => {
           }
 
           // Selection indicator
-          if (column.id === selectedColumnId) {
+          if (column.id === selectedColumnId || multiSelectedColumnsSet.has(column.id)) {
             ctx.strokeStyle = secondaryColor;
             ctx.lineWidth = 2;
             ctx.setLineDash([4, 4]);
@@ -354,7 +390,7 @@ const FloorplanCanvas: React.FC = () => {
       const productSizeX = (product.scale?.x || 1) * pixelsPerMeter * 0.5;
       const productSizeZ = (product.scale?.z || 1) * pixelsPerMeter * 0.5;
       
-      const isSelected = product.id === selectedProductId;
+      const isSelected = product.id === selectedProductId || multiSelectedProductsSet.has(product.id);
       
       ctx.save();
       ctx.translate(productScreenPos.x, productScreenPos.y);
@@ -532,7 +568,18 @@ const FloorplanCanvas: React.FC = () => {
         ctx.globalAlpha = 1.0;
       });
     }
-  }, [canvasSize.width, canvasSize.height, worldWalls, selectedWallId, selectedColumnId, selectedProductId, interactiveProducts, pixelsPerMeter, pan.x, pan.y, isDrawingMode, drawingStartPoint, drawingPreviewPoint, snappedPoint]);
+
+    if (marqueeRect) {
+      const rect = getNormalizedRect(marqueeRect);
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.12)';
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([6, 4]);
+      ctx.fillRect(rect.left, rect.top, rect.width, rect.height);
+      ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
+      ctx.setLineDash([]);
+    }
+  }, [canvasSize.width, canvasSize.height, worldWalls, selectedWallId, selectedColumnId, selectedProductId, interactiveProducts, pixelsPerMeter, pan.x, pan.y, isDrawingMode, drawingStartPoint, drawingPreviewPoint, snappedPoint, marqueeRect, getNormalizedRect, multiSelectedWallsSet, multiSelectedColumnsSet, multiSelectedProductsSet]);
 
   useEffect(() => {
     draw();
@@ -613,6 +660,213 @@ const FloorplanCanvas: React.FC = () => {
     return nearestPoint;
   }, [worldWalls]);
 
+  const applyMarqueeSelection = useCallback((rect: MarqueeSelectionRect) => {
+    const normalized = getNormalizedRect(rect);
+    if (normalized.width < 4 && normalized.height < 4) {
+      setMultiSelectedWallIds([]);
+      setMultiSelectedColumnIds([]);
+      setMultiSelectedProductIds([]);
+      return;
+    }
+
+    const centerX = canvasSize.width / 2 + pan.x;
+    const centerY = canvasSize.height / 2 + pan.y;
+    const toScreen = (point: { x: number; y: number }) => ({
+      x: centerX + point.x * pixelsPerMeter,
+      y: centerY + point.y * pixelsPerMeter,
+    });
+    const pointInRect = (x: number, y: number) =>
+      x >= normalized.left && x <= normalized.right && y >= normalized.top && y <= normalized.bottom;
+    const segmentRectOverlap = (
+      a: { x: number; y: number },
+      b: { x: number; y: number }
+    ) => {
+      const minX = Math.min(a.x, b.x);
+      const maxX = Math.max(a.x, b.x);
+      const minY = Math.min(a.y, b.y);
+      const maxY = Math.max(a.y, b.y);
+      if (maxX < normalized.left || minX > normalized.right || maxY < normalized.top || minY > normalized.bottom) {
+        return false;
+      }
+      if (pointInRect(a.x, a.y) || pointInRect(b.x, b.y)) return true;
+      const rectCenter = {
+        x: (normalized.left + normalized.right) / 2,
+        y: (normalized.top + normalized.bottom) / 2,
+      };
+      return distancePointToSegment(rectCenter, a, b) <= Math.max(normalized.width, normalized.height) / 2;
+    };
+
+    const selectedWalls: string[] = [];
+    worldWalls.forEach((wall) => {
+      const start = toScreen(wall.start);
+      const end = toScreen(wall.end);
+      if (segmentRectOverlap(start, end)) {
+        selectedWalls.push(wall.id);
+      }
+    });
+
+    const selectedColumns: string[] = [];
+    worldWalls.forEach((wall) => {
+      (wall.columns || []).forEach((column) => {
+        const columnWorldPos = {
+          x: wall.start.x + (wall.end.x - wall.start.x) * column.position,
+          y: wall.start.y + (wall.end.y - wall.start.y) * column.position,
+        };
+        const screenPos = toScreen(columnWorldPos);
+        if (pointInRect(screenPos.x, screenPos.y)) {
+          selectedColumns.push(column.id);
+        }
+      });
+    });
+
+    const selectedProducts: string[] = [];
+    interactiveProducts.forEach((product) => {
+      const screenPos = toScreen({ x: product.position.x, y: product.position.z });
+      if (pointInRect(screenPos.x, screenPos.y)) {
+        selectedProducts.push(product.id);
+      }
+    });
+
+    setMultiSelectedWallIds(selectedWalls);
+    setMultiSelectedColumnIds(selectedColumns);
+    setMultiSelectedProductIds(selectedProducts);
+
+    if (selectedProducts.length > 0) {
+      selectProduct(selectedProducts[0]);
+      selectWall(null);
+      selectColumn(null);
+    } else if (selectedWalls.length > 0) {
+      selectWall(selectedWalls[0]);
+      selectProduct(null);
+      selectColumn(null);
+    } else if (selectedColumns.length > 0) {
+      selectColumn(selectedColumns[0]);
+      selectWall(null);
+      selectProduct(null);
+    } else {
+      selectWall(null);
+      selectColumn(null);
+      selectProduct(null);
+    }
+  }, [canvasSize.width, canvasSize.height, pan.x, pan.y, pixelsPerMeter, worldWalls, interactiveProducts, getNormalizedRect, selectProduct, selectWall, selectColumn]);
+
+  const startBulkDrag = useCallback((anchorWorld: { x: number; y: number }) => {
+    const initialWalls = worldWalls
+      .filter((wall) => multiSelectedWallsSet.has(wall.id))
+      .map((wall) => ({
+        id: wall.id,
+        start: { ...wall.start },
+        end: { ...wall.end },
+      }));
+
+    const initialProducts = interactiveProducts
+      .filter((product) => multiSelectedProductsSet.has(product.id))
+      .map((product) => ({
+        id: product.id,
+        x: product.position.x,
+        z: product.position.z,
+      }));
+
+    if (initialWalls.length === 0 && initialProducts.length === 0) return false;
+
+    bulkDragState.current = {
+      anchorWorld,
+      initialWalls,
+      initialProducts,
+    };
+    return true;
+  }, [worldWalls, interactiveProducts, multiSelectedWallsSet, multiSelectedProductsSet]);
+
+  const deleteMultiSelection = useCallback(() => {
+    if (!hasMultiSelection) return;
+
+    multiSelectedProductIds.forEach((id) => removeProduct(id));
+    multiSelectedWallIds.forEach((id) => removeWall(id));
+
+    if (multiSelectedColumnIds.length > 0) {
+      worldWalls.forEach((wall) => {
+        (wall.columns || []).forEach((column) => {
+          if (multiSelectedColumnIds.includes(column.id)) {
+            removeColumn(wall.id, column.id);
+          }
+        });
+      });
+    }
+
+    setMultiSelectedWallIds([]);
+    setMultiSelectedColumnIds([]);
+    setMultiSelectedProductIds([]);
+    selectWall(null);
+    selectColumn(null);
+    selectProduct(null);
+  }, [
+    hasMultiSelection,
+    multiSelectedProductIds,
+    multiSelectedWallIds,
+    multiSelectedColumnIds,
+    removeProduct,
+    removeWall,
+    removeColumn,
+    worldWalls,
+    selectWall,
+    selectColumn,
+    selectProduct,
+  ]);
+
+  const isPointerOnCurrentSelection = useCallback((pos: { x: number; y: number }) => {
+    if (!hasMultiSelection) return false;
+
+    const centerX = canvasSize.width / 2 + pan.x;
+    const centerY = canvasSize.height / 2 + pan.y;
+    const toScreen = (point: { x: number; y: number }) => ({
+      x: centerX + point.x * pixelsPerMeter,
+      y: centerY + point.y * pixelsPerMeter,
+    });
+
+    for (const product of interactiveProducts) {
+      if (!multiSelectedProductsSet.has(product.id)) continue;
+      const screen = toScreen({ x: product.position.x, y: product.position.z });
+      const rx = (product.scale?.x || 1) * pixelsPerMeter * 0.5;
+      const rz = (product.scale?.z || 1) * pixelsPerMeter * 0.5;
+      const radius = Math.max(rx, rz) / 2 + 10;
+      if (Math.hypot(pos.x - screen.x, pos.y - screen.y) <= radius) return true;
+    }
+
+    for (const wall of worldWalls) {
+      if (!multiSelectedWallsSet.has(wall.id)) continue;
+      const start = toScreen(wall.start);
+      const end = toScreen(wall.end);
+      if (distancePointToSegment(pos, start, end) <= 15) return true;
+    }
+
+    for (const wall of worldWalls) {
+      for (const column of wall.columns || []) {
+        if (!multiSelectedColumnsSet.has(column.id)) continue;
+        const worldPos = {
+          x: wall.start.x + (wall.end.x - wall.start.x) * column.position,
+          y: wall.start.y + (wall.end.y - wall.start.y) * column.position,
+        };
+        const screen = toScreen(worldPos);
+        const size = Math.max(column.width, column.depth) * pixelsPerMeter * 0.5;
+        if (Math.hypot(pos.x - screen.x, pos.y - screen.y) <= size + 8) return true;
+      }
+    }
+
+    return false;
+  }, [
+    hasMultiSelection,
+    canvasSize.width,
+    canvasSize.height,
+    pan.x,
+    pan.y,
+    pixelsPerMeter,
+    interactiveProducts,
+    worldWalls,
+    multiSelectedProductsSet,
+    multiSelectedWallsSet,
+    multiSelectedColumnsSet,
+  ]);
+
   const onPointerDown = useCallback(
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       const bounds = event.currentTarget.getBoundingClientRect();
@@ -652,6 +906,32 @@ const FloorplanCanvas: React.FC = () => {
       if (event.button === 1) {
         event.preventDefault();
         panState.current = { x: pos.x - pan.x, y: pos.y - pan.y };
+        return;
+      }
+
+      // If current click is on the existing multi-selection, start moving it immediately.
+      if (!isDrawingMode && event.button === 0 && isPointerOnCurrentSelection(pos)) {
+        const worldPos = screenToWorld(pos);
+        if (startBulkDrag(worldPos)) {
+          dragState.current = null;
+          productDragState.current = null;
+          return;
+        }
+      }
+
+      // In marquee mode, clicking empty area starts a new rectangle selection.
+      if (!isDrawingMode && pointerTool === 'marquee' && event.button === 0) {
+        event.preventDefault();
+        event.stopPropagation();
+        dragState.current = null;
+        productDragState.current = null;
+        panState.current = null;
+        setMarqueeRect({
+          startX: pos.x,
+          startY: pos.y,
+          currentX: pos.x,
+          currentY: pos.y,
+        });
         return;
       }
 
@@ -798,6 +1078,9 @@ const FloorplanCanvas: React.FC = () => {
         }
 
         if (clickedProductId && productOffset) {
+          setMultiSelectedWallIds([]);
+          setMultiSelectedColumnIds([]);
+          setMultiSelectedProductIds([]);
           selectProduct(clickedProductId);
           selectWall(null);
           selectColumn(null);
@@ -834,6 +1117,9 @@ const FloorplanCanvas: React.FC = () => {
         }
 
         if (clickedColumn) {
+          setMultiSelectedWallIds([]);
+          setMultiSelectedColumnIds([]);
+          setMultiSelectedProductIds([]);
           selectColumn(clickedColumn.columnId);
           selectWall(null);
         } else {
@@ -853,6 +1139,9 @@ const FloorplanCanvas: React.FC = () => {
             }
           });
           if (closestId && closestDist < 15 && closestWall) {
+            setMultiSelectedWallIds([]);
+            setMultiSelectedColumnIds([]);
+            setMultiSelectedProductIds([]);
             selectWall(closestId);
             selectColumn(null);
             // Enable dragging entire wall
@@ -866,6 +1155,9 @@ const FloorplanCanvas: React.FC = () => {
               },
             };
           } else {
+            setMultiSelectedWallIds([]);
+            setMultiSelectedColumnIds([]);
+            setMultiSelectedProductIds([]);
             selectWall(null);
             selectColumn(null);
           }
@@ -892,7 +1184,12 @@ const FloorplanCanvas: React.FC = () => {
       defaultWallThickness,
       upsertWall,
       isCtrlPressed,
-      isShiftPressed
+      isShiftPressed,
+      pointerTool,
+      hasMultiSelection,
+      multiSelectedProductsSet,
+      multiSelectedWallsSet,
+      startBulkDrag
     ]
   );
 
@@ -900,6 +1197,19 @@ const FloorplanCanvas: React.FC = () => {
     (event: React.PointerEvent<HTMLCanvasElement>) => {
       const bounds = event.currentTarget.getBoundingClientRect();
       const pos = { x: event.clientX - bounds.left, y: event.clientY - bounds.top };
+
+      if (pointerTool === 'marquee' && marqueeRect) {
+        setMarqueeRect((prev) =>
+          prev
+            ? {
+                ...prev,
+                currentX: pos.x,
+                currentY: pos.y,
+              }
+            : prev
+        );
+        return;
+      }
 
       // Handle drawing mode preview - ONLY update preview, don't allow dragging
       if (isDrawingMode) {
@@ -918,6 +1228,70 @@ const FloorplanCanvas: React.FC = () => {
 
       if (panState.current) {
         setPan({ x: pos.x - panState.current.x, y: pos.y - panState.current.y });
+        return;
+      }
+
+      // Bulk move currently multi-selected walls/products while preserving relative layout.
+      if (bulkDragState.current) {
+        const worldPos = screenToWorld(pos);
+        const { anchorWorld, initialWalls, initialProducts } = bulkDragState.current;
+
+        let minX = Infinity;
+        let maxX = -Infinity;
+        let minY = Infinity;
+        let maxY = -Infinity;
+
+        initialWalls.forEach((wall) => {
+          minX = Math.min(minX, wall.start.x, wall.end.x);
+          maxX = Math.max(maxX, wall.start.x, wall.end.x);
+          minY = Math.min(minY, wall.start.y, wall.end.y);
+          maxY = Math.max(maxY, wall.start.y, wall.end.y);
+        });
+        initialProducts.forEach((product) => {
+          minX = Math.min(minX, product.x);
+          maxX = Math.max(maxX, product.x);
+          minY = Math.min(minY, product.z);
+          maxY = Math.max(maxY, product.z);
+        });
+
+        const floorHalf = (layout.floorSize || 24) / 2;
+        const rawDx = worldPos.x - anchorWorld.x;
+        const rawDy = worldPos.y - anchorWorld.y;
+        const dx = Number.isFinite(minX) && Number.isFinite(maxX)
+          ? Math.max(-floorHalf - minX, Math.min(floorHalf - maxX, rawDx))
+          : rawDx;
+        const dy = Number.isFinite(minY) && Number.isFinite(maxY)
+          ? Math.max(-floorHalf - minY, Math.min(floorHalf - maxY, rawDy))
+          : rawDy;
+
+        initialWalls.forEach((initialWall) => {
+          const target = worldWalls.find((w) => w.id === initialWall.id);
+          if (!target) return;
+          upsertWall({
+            ...target,
+            start: {
+              x: initialWall.start.x + dx,
+              y: initialWall.start.y + dy,
+            },
+            end: {
+              x: initialWall.end.x + dx,
+              y: initialWall.end.y + dy,
+            },
+          });
+        });
+
+        initialProducts.forEach((initialProduct) => {
+          const target = interactiveProducts.find((p) => p.id === initialProduct.id);
+          if (!target) return;
+          upsertProduct({
+            id: initialProduct.id,
+            position: {
+              ...target.position,
+              x: initialProduct.x + dx,
+              z: initialProduct.z + dy,
+            },
+          });
+        });
         return;
       }
 
@@ -1000,19 +1374,26 @@ const FloorplanCanvas: React.FC = () => {
       layout.floorSize,
       upsertProduct,
       isDrawingMode,
-      drawingStartPoint
+      drawingStartPoint,
+      pointerTool,
+      marqueeRect
     ]
   );
 
   const onPointerUp = useCallback(() => {
+    if (pointerTool === 'marquee' && marqueeRect) {
+      applyMarqueeSelection(marqueeRect);
+      setMarqueeRect(null);
+    }
     // Clear all drag states
     dragState.current = null;
     productDragState.current = null;
+    bulkDragState.current = null;
     panState.current = null;
     
     // In drawing mode, don't clear drawing preview
     // This allows the preview line to stay visible
-  }, []);
+  }, [pointerTool, marqueeRect, applyMarqueeSelection]);
 
   const onWheel = useCallback((event: WheelEvent) => {
     // In drawing mode, only zoom if mouse is over the canvas
@@ -1156,6 +1537,12 @@ const FloorplanCanvas: React.FC = () => {
       if (e.key === 'Shift') setIsShiftPressed(true);
       if (e.key === 'Control' || e.key === 'Meta') setIsCtrlPressed(true);
 
+      if ((e.key === 'Delete' || e.key === 'Backspace') && hasMultiSelection) {
+        e.preventDefault();
+        deleteMultiSelection();
+        return;
+      }
+
       if (e.key === 'Escape' && isDrawingMode) {
         setDrawingMode(false);
         setDrawingStartPoint(null);
@@ -1267,7 +1654,9 @@ const FloorplanCanvas: React.FC = () => {
     defaultWallThickness,
     upsertWall,
     selectWall,
-    applySelectedWallLength
+    applySelectedWallLength,
+    hasMultiSelection,
+    deleteMultiSelection
   ]);
 
   // Reset drawing state when entering/exiting drawing mode
@@ -1283,9 +1672,14 @@ const FloorplanCanvas: React.FC = () => {
       // Clear drag states
       dragState.current = null;
       productDragState.current = null;
+      bulkDragState.current = null;
       panState.current = null;
       // Reset snapping flag
       disableSnappingRef.current = false;
+    } else {
+      // Drawing mode always uses drawing pointer behavior.
+      setPointerTool('default');
+      setMarqueeRect(null);
     }
   }, [isDrawingMode]);
 
@@ -1295,6 +1689,37 @@ const FloorplanCanvas: React.FC = () => {
     <div className="flex flex-col h-full overflow-hidden relative">
       {/* Canvas with Overlay Panels */}
       <div className="flex-1 relative min-h-0" ref={containerRef}>
+        {!isDrawingMode && (
+          <div className="absolute top-3 left-3 z-20 flex items-center gap-2 rounded-xl border border-slate-200 bg-white/95 px-2 py-2 shadow-md">
+            <button
+              type="button"
+              onClick={() => {
+                setPointerTool('default');
+                setMarqueeRect(null);
+              }}
+              className={cn(
+                'rounded-lg px-3 py-1.5 text-xs font-bold transition-colors',
+                pointerTool === 'default'
+                  ? 'bg-slate-900 text-white'
+                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+              )}
+            >
+              تحديد عادي
+            </button>
+            <button
+              type="button"
+              onClick={() => setPointerTool('marquee')}
+              className={cn(
+                'rounded-lg px-3 py-1.5 text-xs font-bold transition-colors',
+                pointerTool === 'marquee'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-blue-50 text-blue-700 hover:bg-blue-100'
+              )}
+            >
+              تحديد جماعي
+            </button>
+          </div>
+        )}
         <canvas
           ref={canvasRef}
           className="w-full h-full rounded-lg bg-white shadow-lg touch-none border-2 border-slate-300"
@@ -1307,7 +1732,9 @@ const FloorplanCanvas: React.FC = () => {
                   ? 'crosshair' 
                   : isDrawingMode 
                     ? 'crosshair'
-                    : 'default' 
+                    : pointerTool === 'marquee'
+                      ? 'crosshair'
+                      : 'default' 
           }}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
@@ -1319,6 +1746,10 @@ const FloorplanCanvas: React.FC = () => {
             selectWall(null);
             selectColumn(null);
             selectProduct(null);
+            setMultiSelectedWallIds([]);
+            setMultiSelectedColumnIds([]);
+            setMultiSelectedProductIds([]);
+            setMarqueeRect(null);
           }}
         />
 

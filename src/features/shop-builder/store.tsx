@@ -194,6 +194,8 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
       setSelectedProductId(null);
       setSelectedWallId(null);
       setSelectedColumnId(null);
+      setSelectedSlatWallId(null);
+      setSelectedPrimoStandId(null);
     }
   }, []);
 
@@ -307,20 +309,32 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
 
   const selectProduct = useCallback((id: string | null) => {
     setSelectedProductId(id);
-    // Allow multi-selection: Don't auto-deselect other items
-    // Users can click empty space to deselect all
+    if (id) {
+      setSelectedWallId(null);
+      setSelectedColumnId(null);
+      setSelectedSlatWallId(null);
+      setSelectedPrimoStandId(null);
+    }
   }, []);
 
   const selectWall = useCallback((id: string | null) => {
     setSelectedWallId(id);
-    // Allow multi-selection: Don't auto-deselect other items
-    // Users can click empty space to deselect all
+    if (id) {
+      setSelectedProductId(null);
+      setSelectedColumnId(null);
+      setSelectedSlatWallId(null);
+      setSelectedPrimoStandId(null);
+    }
   }, []);
 
   const selectColumn = useCallback((id: string | null) => {
     setSelectedColumnId(id);
-    // Allow multi-selection: Don't auto-deselect other items
-    // Users can click empty space to deselect all
+    if (id) {
+      setSelectedProductId(null);
+      setSelectedWallId(null);
+      setSelectedSlatWallId(null);
+      setSelectedPrimoStandId(null);
+    }
   }, []);
 
   // Column management functions
@@ -388,6 +402,12 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
 
   const selectSlatWall = useCallback((id: string | null) => {
     setSelectedSlatWallId(id);
+    if (id) {
+      setSelectedProductId(null);
+      setSelectedWallId(null);
+      setSelectedColumnId(null);
+      setSelectedPrimoStandId(null);
+    }
   }, []);
 
   const addSlatWallToWall = useCallback((wallId: string, side: 'front'|'back' = 'front') => {
@@ -626,6 +646,12 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
 
   const selectPrimoStand = useCallback((id: string | null) => {
     setSelectedPrimoStandId(id);
+    if (id) {
+      setSelectedProductId(null);
+      setSelectedWallId(null);
+      setSelectedColumnId(null);
+      setSelectedSlatWallId(null);
+    }
   }, []);
 
   const addPrimoStandToWall = useCallback((wallId: string, side: 'front'|'back' = 'front') => {
@@ -846,14 +872,22 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     });
   }, []);
 
-  const importLayout = useCallback((next: ShopBuilderLayout) => {
+  const importLayout = useCallback((next: ShopBuilderLayout | null | undefined) => {
+    if (!next || typeof next !== 'object') {
+      console.warn('Skipped importLayout: invalid payload', next);
+      return;
+    }
+
     setLayout({
       ...next,
-      createdAt: next.createdAt ?? now(),
+      createdAt: (next as any).createdAt ?? now(),
       updatedAt: now(),
     });
     setSelectedProductId(null);
     setSelectedWallId(null);
+    setSelectedColumnId(null);
+    setSelectedSlatWallId(null);
+    setSelectedPrimoStandId(null);
   }, []);
 
   const exportLayout = useCallback(() => layout, [layout]);
@@ -897,6 +931,9 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     setLayout({ ...defaultLayout, createdAt: timestamp, updatedAt: timestamp });
     setSelectedProductId(null);
     setSelectedWallId(null);
+    setSelectedColumnId(null);
+    setSelectedSlatWallId(null);
+    setSelectedPrimoStandId(null);
     localStorage.removeItem(STORAGE_KEY);
 
   }, []);

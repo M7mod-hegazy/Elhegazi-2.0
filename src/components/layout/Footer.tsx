@@ -80,11 +80,22 @@ const Footer = () => {
   useEffect(() => {
     const fetchFooterSettings = async () => {
       try {
-        const res = await fetch('/api/settings/footer');
+        // Use the main settings endpoint; some backends don't expose /api/settings/footer.
+        const res = await fetch('/api/settings');
         if (!res.ok) return;
         const data = await res.json();
         if (data.ok) {
-          setFooterSettings(data.settings);
+          const item = data.item || {};
+          setFooterSettings({
+            storeName: item.storeName,
+            storeDescription: item.storeDescription,
+            phone: item.phone,
+            email: item.email,
+            address: item.address,
+            developerName: item.developerName,
+            developerUrl: item.developerUrl,
+            socialLinks: item.social,
+          });
         }
       } catch (error) {
         // Silently fail

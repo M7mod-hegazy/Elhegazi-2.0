@@ -353,7 +353,6 @@ export const generateAutoHungProductsList = (
             const worldBayCenterX = segLocalX + bayCenterX * sideFlip;
 
             for (let shelf = 0; shelf < shelfCount; shelf++) {
-              if (generated.length >= 300) return;
               // Match shelf Y position from createSupermarketShelvesMesh
               const shelfY = 0.15 + shelf * ((sysHeight - 0.3) / Math.max(1, shelfCount - 1));
               const localY = shelfY - sysHeight / 2;
@@ -363,7 +362,6 @@ export const generateAutoHungProductsList = (
               // Fill each shelf bay with 3-6 products
               const productsOnShelf = Math.floor(rnd(3, 7));
               for (let p = 0; p < productsOnShelf; p++) {
-                if (generated.length >= 300) return;
                 const picked = smCatalog[Math.floor(Math.random() * smCatalog.length)];
                 if (!picked) continue;
 
@@ -425,7 +423,6 @@ export const generateAutoHungProductsList = (
         }
 
         for (let i = 0; i < count; i++) {
-          if (generated.length >= 300) return;
           const accCatalog = PROCEDURAL_CATALOG[acc.type] || PROCEDURAL_CATALOG.shelf;
           const picked = accCatalog[Math.floor(Math.random() * accCatalog.length)];
           if (!picked) continue;

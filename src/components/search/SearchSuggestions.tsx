@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, X, Clock, TrendingUp } from 'lucide-react';
 import { apiGet, type ApiResponse } from '@/lib/api';
@@ -47,27 +47,9 @@ const SearchSuggestions = ({
     updatedAt: string;
   };
 
-  // Fetch popular searches on mount
+    // Keep a local fallback list to avoid noisy 404s when /api/search/popular is unavailable.
   useEffect(() => {
-    let active = true;
-    (async () => {
-      try {
-        const res = await fetch('/api/search/popular');
-        if (!res.ok) {
-          // Silently use fallback if endpoint doesn't exist
-          if (active) setPopularSearches(['آيفون', 'سامسونج', 'لابتوب', 'ساعة ذكية', 'سماعات']);
-          return;
-        }
-        const data = await res.json();
-        if (active && data.ok && Array.isArray(data.searches)) {
-          setPopularSearches(data.searches.slice(0, 5));
-        }
-      } catch (e) {
-        // Silently use fallback - endpoint not implemented yet
-        if (active) setPopularSearches(['آيفون', 'سامسونج', 'لابتوب', 'ساعة ذكية', 'سماعات']);
-      }
-    })();
-    return () => { active = false; };
+    setPopularSearches(['آيفون', 'سامسونج', 'لابتوب', 'ساعة ذكية', 'سماعات']);
   }, []);
 
   // Get product suggestions based on query
@@ -295,3 +277,4 @@ const SearchSuggestions = ({
 };
 
 export default SearchSuggestions;
+

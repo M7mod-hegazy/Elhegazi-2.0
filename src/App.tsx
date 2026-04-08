@@ -18,7 +18,39 @@ import DualProtectedRoute from "./components/auth/DualProtectedRoute";
 import { Suspense, lazy } from "react";
 import { useToast } from "@/hooks/use-toast";
 import ScrollProgressBar from "@/components/ui/scroll-progress-bar";
-const HomePage = lazy(() => import("@/pages/Index"));
+const lazyWithFallback = (loader: () => Promise<any>, label: string) =>
+  lazy(() =>
+    loader()
+      .then((mod: any) => {
+        const candidate = mod?.default;
+        const isValidComponent =
+          typeof candidate === "function" ||
+          (typeof candidate === "object" && candidate !== null && "$$typeof" in candidate);
+
+        if (isValidComponent) return { default: candidate };
+
+        console.error(`[lazy] Invalid default export for ${label}`, mod);
+        return {
+          default: () => (
+            <div className="flex items-center justify-center h-screen">
+              <p>تعذر تحميل الصفحة. يرجى تحديث المتصفح.</p>
+            </div>
+          ),
+        };
+      })
+      .catch((error) => {
+        console.error(`[lazy] Failed to load ${label}`, error);
+        return {
+          default: () => (
+            <div className="flex items-center justify-center h-screen">
+              <p>تعذر تحميل الصفحة. يرجى تحديث المتصفح.</p>
+            </div>
+          ),
+        };
+      })
+  );
+
+const HomePage = lazyWithFallback(() => import("@/pages/Index"), "HomePage");
 const Products = lazy(() => import("./pages/Products"));
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Categories = lazy(() => import("./pages/Categories"));
@@ -37,11 +69,9 @@ const Contact = lazy(() => import("./pages/Contact"));
 const Locations = lazy(() => import("./pages/Locations"));
 const OrderTracking = lazy(() => import("./pages/OrderTracking"));
 const EnhancedOrderTracking = lazy(() => import("./pages/EnhancedOrderTracking"));
-const ShopBuilder3DPage = lazy(() =>
-  import("@/features/shop-builder/ShopBuilder3DPage").catch(() => {
-    // Fallback if import fails
-    return { default: () => <div className="flex items-center justify-center h-screen"><p>Failed to load Shop Builder. Please refresh the page.</p></div> };
-  })
+const ShopBuilder3DPage = lazyWithFallback(
+  () => import("@/features/shop-builder/ShopBuilder3DPage"),
+  "ShopBuilder3DPage"
 );
 const ShopSetup = lazy(() => import("./pages/ShopSetup"));
 const ShopBuilderIntro = lazy(() => import("./pages/ShopBuilderIntro"));

@@ -20,35 +20,44 @@ export const useServiceWorker = (): ServiceWorkerState => {
   });
 
   useEffect(() => {
-    // Check if Service Workers are supported
+    // Avoid stale cached chunks during local development.
+    if (import.meta.env.DEV) {
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker
+          .getRegistrations()
+          .then((registrations) => Promise.all(registrations.map((r) => r.unregister())))
+          .catch(() => {
+            // Ignore cleanup failures in dev.
+          });
+      }
+      return;
+    }
+
+    // Check if Service Workers are supported.
     if (!('serviceWorker' in navigator)) {
-      console.log('⚠️ Service Workers not supported');
+      console.log('Service Workers not supported');
       return;
     }
 
     setState((prev) => ({ ...prev, isSupported: true }));
 
-    // Register Service Worker
     const registerServiceWorker = async () => {
       try {
         const registration = await navigator.serviceWorker.register('/service-worker.js', {
           scope: '/',
         });
 
-        console.log('✅ Service Worker registered:', registration);
+        console.log('Service Worker registered:', registration);
         setState((prev) => ({ ...prev, isRegistered: true }));
 
-        // Listen for updates
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                // New Service Worker is ready
-                console.log('🔄 Service Worker update available');
+                console.log('Service Worker update available');
                 setState((prev) => ({ ...prev, updateAvailable: true }));
 
-                // Notify user about update
                 window.dispatchEvent(
                   new CustomEvent('service-worker-update', {
                     detail: { registration },
@@ -59,14 +68,12 @@ export const useServiceWorker = (): ServiceWorkerState => {
           }
         });
       } catch (error) {
-        console.error('❌ Service Worker registration failed:', error);
+        console.error('Service Worker registration failed:', error);
       }
     };
 
-    // Delay registration to avoid blocking initial load
     const timeout = setTimeout(registerServiceWorker, 2000);
 
-    // Listen for online/offline events
     const handleOnline = () => setState((prev) => ({ ...prev, isOnline: true }));
     const handleOffline = () => setState((prev) => ({ ...prev, isOnline: false }));
 
@@ -91,12 +98,13 @@ export const useServiceWorkerUpdate = () => {
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
   useEffect(() => {
-    const handleUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      console.log('🔄 Service Worker update available');
+    if (import.meta.env.DEV) return;
+
+    const handleUpdate = () => {
+      console.log('Service Worker update available');
       setUpdateAvailable(true);
 
-      // Auto-refresh after 5 seconds
+      // Auto-refresh after 5 seconds.
       setTimeout(() => {
         window.location.reload();
       }, 5000);

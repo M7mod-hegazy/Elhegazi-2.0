@@ -162,6 +162,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     () => layout.walls.find((wall) => wall.id === selectedWallId) ?? null,
     [layout.walls, selectedWallId]
   );
+  const floorSideMeters = layout.floorSize || 24;
+  const floorAreaSquareMeters = Number((floorSideMeters * floorSideMeters).toFixed(2));
 
   const formatProductDims = useCallback(
     (product: Product3D) =>
@@ -190,7 +192,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
         setProducts3D(response.items as unknown as Product3D[]);
       } else {
-        console.error('❌ Failed to fetch products:', response);
+        console.error('âŒ Failed to fetch products:', response);
       }
     } catch (error) {
       console.error('Error fetching 3D products:', error);
@@ -542,6 +544,9 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
         }
       });
 
+      // Ensure product controls open immediately after insertion.
+      selectWall(null);
+      selectColumn(null);
       selectProduct(id);
       setAddProductOpen(false);
       toast({ title: 'تمت الإضافة', description: `${product.name} جاهز الآن داخل المشهد` });
@@ -553,7 +558,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
       setAddingProductId(null);
       addProductLockRef.current = false;
     }
-  }, [findSpawnPosition, getModelPath, isAdding, selectProduct, toast, upsertProduct]);
+  }, [findSpawnPosition, getModelPath, isAdding, selectColumn, selectProduct, selectWall, toast, upsertProduct]);
 
   const hangableAccessoriesCount = useMemo(() => {
     return layout.walls.reduce((count, wall) => {
@@ -602,7 +607,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     const cos = Math.cos(rotY);
     const sin = Math.sin(rotY);
 
-    // Standard THREE.js Y-axis rotation: local â†’ world
+    // Standard THREE.js Y-axis rotation: local -> world
     const xRot = localX * cos + localZ * sin;
     const zRot = -localX * sin + localZ * cos;
 
@@ -1459,41 +1464,47 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
         <Dialog open={floorSettingsOpen} onOpenChange={setFloorSettingsOpen}>
           <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden flex flex-col">
             <DialogHeader>
-              <DialogTitle className="text-xl font-bold">إعدادات الأرضية</DialogTitle>
+              <DialogTitle className="text-xl font-bold">
+                {'\u0625\u0639\u062f\u0627\u062f\u0627\u062a \u0627\u0644\u0623\u0631\u0636\u064a\u0629'}
+              </DialogTitle>
               <DialogDescription>
-                تخصيص حجم ونسيج الأرضية
+                {'\u062a\u062e\u0635\u064a\u0635 \u062d\u062c\u0645 \u0648\u0646\u0633\u064a\u062c \u0627\u0644\u0623\u0631\u0636\u064a\u0629'}
               </DialogDescription>
             </DialogHeader>
 
             <div className="space-y-6 py-4 overflow-y-auto flex-1">
-              {/* Floor Size Control */}
+                            {/* Floor Size Control */}
               <div>
-                <Label className="text-base font-semibold text-slate-900 mb-3 block">حجم الأرضية</Label>
+                <Label className="text-base font-semibold text-slate-900 mb-3 block">
+                  {'\u0645\u0633\u0627\u062d\u0629 \u0627\u0644\u0623\u0631\u0636\u064a\u0629'}
+                </Label>
                 <div className="space-y-3">
                   <div className="flex items-center gap-4">
-                    <span className="text-sm text-slate-600 w-24">الحجم (متر):</span>
+                    <span className="text-sm text-slate-600 w-28">{'\u0627\u0644\u0645\u0633\u0627\u062d\u0629 (\u0645\u00b2):'}</span>
                     <input
                       type="range"
                       min="12"
                       max="100"
                       step="4"
-                      value={layout.floorSize || 24}
+                      value={floorSideMeters}
                       onChange={(e) => setFloorSize(Number(e.target.value))}
                       className="flex-1 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-primary"
                     />
-                    <span className="text-lg font-bold text-primary w-16 text-center">
-                      {layout.floorSize || 24}م
+                    <span className="text-lg font-bold text-primary w-24 text-center">
+                      {floorAreaSquareMeters}{'\u0645\u00b2'}
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 pr-28">
-                    سيتم تطبيق الحجم على كل من العرض 2D والعرض 3D
+                    {'\u0627\u0644\u0645\u0642\u064a\u0627\u0633 \u0645\u0648\u062d\u062f: \u0643\u0644 1\u0645 \u0641\u064a \u0627\u0644\u0623\u0631\u0636\u064a\u0629 \u064a\u0633\u0627\u0648\u064a 1\u0645 \u0641\u064a \u0627\u0644\u062c\u062f\u0627\u0631 \u0641\u064a \u0639\u0631\u0636 2D \u06483D.'}
                   </p>
                 </div>
               </div>
 
               {/* Floor Texture Selector */}
               <div>
-                <Label className="text-base font-semibold text-slate-900 mb-3 block">نسيج الأرضية</Label>
+                <Label className="text-base font-semibold text-slate-900 mb-3 block">
+                  {'\u0646\u0633\u064a\u062c \u0627\u0644\u0623\u0631\u0636\u064a\u0629'}
+                </Label>
                 <div className="grid grid-cols-2 gap-3 max-h-96 overflow-y-auto p-2 border border-slate-200 rounded-lg">
                   {Object.entries(FLOOR_TEXTURES).map(([key, texture]) => (
                     <button
@@ -1518,15 +1529,17 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                       </div>
                       <span className="text-sm font-medium text-slate-700 text-right flex-1">
                         {key === 'tiles_white' && 'بلاط أبيض'}
-                        {key === 'tiles_grey' && 'بلاط رمادي'}
                         {key === 'tiles_black' && 'بلاط أسود'}
+                        {key === 'tiles_checker' && 'شطرنج كلاسيكي'}
                         {key === 'wood_light' && 'خشب فاتح'}
                         {key === 'wood_dark' && 'خشب غامق'}
-                        {key === 'wood_parquet' && 'باركيه'}
+                        {key === 'wood_parquet' && 'باركيه خشبي'}
                         {key === 'marble_white' && 'رخام أبيض'}
                         {key === 'marble_black' && 'رخام أسود'}
-                        {key === 'vinyl_grey' && 'فينيل'}
-                        {key === 'concrete' && 'خرسانة'}
+                        {key === 'concrete' && 'خرسانة مصقولة'}
+                        {key === 'terrazzo' && 'تيرازو ملوّن'}
+                        {key === 'epoxy_grey' && 'إيبوكسي رمادي'}
+                        {key === 'carpet_grey' && 'سجاد مكاتب'}
                       </span>
                     </button>
                   ))}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { ShopBuilderProvider, useShopBuilder } from './store';
 import type { ShopBuilderWall, ShopBuilderSlatWall, ShopBuilderSlatAccessory, ShopBuilderColumn } from './types';
@@ -1457,11 +1457,12 @@ const ShopBuilderContent = () => {
     if (newStateStr !== lastSavedStateRef.current) {
       const newState = JSON.parse(newStateStr);
       setHistory(prev => {
-        const newHistory = prev.slice(0, historyIndex + 1);
-        newHistory.push(newState);
-        return newHistory.slice(-100); // Keep last 100 states
+        const branched = prev.slice(0, historyIndex + 1);
+        branched.push(newState);
+        const trimmed = branched.slice(-100); // Keep last 100 states
+        setHistoryIndex(trimmed.length - 1);
+        return trimmed;
       });
-      setHistoryIndex(prev => prev + 1);
       lastSavedStateRef.current = newStateStr;
     }
   }, [layout, historyIndex, history.length]);
@@ -1479,6 +1480,10 @@ const ShopBuilderContent = () => {
     if (historyIndex > 0) {
       isUndoRedoingRef.current = true;
       const prevState = history[historyIndex - 1];
+      if (!prevState) {
+        isUndoRedoingRef.current = false;
+        return;
+      }
       importLayout(prevState);
       setHistoryIndex(historyIndex - 1);
       lastSavedStateRef.current = JSON.stringify(prevState);
@@ -1492,6 +1497,10 @@ const ShopBuilderContent = () => {
     if (historyIndex < history.length - 1) {
       isUndoRedoingRef.current = true;
       const nextState = history[historyIndex + 1];
+      if (!nextState) {
+        isUndoRedoingRef.current = false;
+        return;
+      }
       importLayout(nextState);
       setHistoryIndex(historyIndex + 1);
       lastSavedStateRef.current = JSON.stringify(nextState);

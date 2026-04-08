@@ -27,15 +27,17 @@ const WALL_TEXTURES = {
 
 const FLOOR_TEXTURES = {
   tiles_white: 'بلاط أبيض',
-  tiles_grey: 'بلاط رمادي',
   tiles_black: 'بلاط أسود',
+  tiles_checker: 'شطرنج كلاسيكي',
   wood_light: 'خشب فاتح',
-  wood_dark: 'خشب داكن',
+  wood_dark: 'خشب غامق',
   wood_parquet: 'باركيه خشبي',
   marble_white: 'رخام أبيض',
   marble_black: 'رخام أسود',
-  vinyl_grey: 'فينيل رمادي',
-  concrete: 'خرسانة',
+  concrete: 'خرسانة مصقولة',
+  terrazzo: 'تيرازو ملوّن',
+  epoxy_grey: 'إيبوكسي رمادي',
+  carpet_grey: 'سجاد مكاتب',
 };
 
 interface ShopBuilderDefaultsModalProps {
