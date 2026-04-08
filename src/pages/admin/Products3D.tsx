@@ -372,59 +372,137 @@ const Products3D = () => {
     setIsUploading(true);
     setUploadProgress(0);
 
-    // Auto-detect format from file extension
     const fileName = file.name.toLowerCase();
     let detectedFormat: 'glb' | 'gltf' | 'obj' | 'fbx' = 'glb';
     if (fileName.endsWith('.gltf')) detectedFormat = 'gltf';
     else if (fileName.endsWith('.obj')) detectedFormat = 'obj';
     else if (fileName.endsWith('.fbx')) detectedFormat = 'fbx';
 
+    const applyUploadedModel = (url: string) => {
+      setFormData((prev) => ({
+        ...prev,
+        modelUrl: url,
+        fileSize: file.size,
+        format: detectedFormat,
+      }));
+      setHasUploadedModelSuccessfully(true);
+      toast({
+        title: 'نجح',
+        description: `تم رفع الملف بنجاح (${detectedFormat.toUpperCase()})`,
+      });
+    };
+
+    const uploadDirectToCloudinary = async () => {
+      const signRes = await fetch('/api/cloudinary/sign-3d-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileName: file.name, fileSize: file.size, fileType: file.type || '' }),
+      });
+      const signPayload = await signRes.json().catch(() => ({}));
+      if (!signRes.ok || !signPayload?.ok || !signPayload?.item) {
+        throw new Error(signPayload?.error || 'تعذر تجهيز رفع الملف');
+      }
+
+      const signed = signPayload.item;
+      await new Promise<void>((resolve, reject) => {
+        const directForm = new FormData();
+        directForm.append('file', file);
+        directForm.append('api_key', String(signed.apiKey));
+        directForm.append('timestamp', String(signed.timestamp));
+        directForm.append('signature', String(signed.signature));
+        directForm.append('folder', String(signed.folder));
+        directForm.append('public_id', String(signed.publicId));
+        directForm.append('resource_type', String(signed.resourceType || 'raw'));
+
+        const directXhr = new XMLHttpRequest();
+        directXhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress((e.loaded / e.total) * 100);
+          }
+        });
+        directXhr.addEventListener('load', () => {
+          if (directXhr.status >= 200 && directXhr.status < 300) {
+            try {
+              const result = JSON.parse(directXhr.responseText || '{}');
+              const url = String(result?.secure_url || '');
+              if (!url) return reject(new Error('Cloudinary did not return file URL'));
+              applyUploadedModel(url);
+              resolve();
+            } catch {
+              reject(new Error('تعذر قراءة استجابة Cloudinary'));
+            }
+          } else {
+            let reason = `Cloudinary ${directXhr.status}`;
+            try {
+              const failed = JSON.parse(directXhr.responseText || '{}');
+              reason = failed?.error?.message || reason;
+            } catch {
+              // keep fallback
+            }
+            reject(new Error(reason));
+          }
+        });
+        directXhr.addEventListener('error', () => reject(new Error('فشل الاتصال بـ Cloudinary')));
+        directXhr.open('POST', String(signed.uploadUrl));
+        directXhr.send(directForm);
+      });
+    };
+
     try {
-      // Create FormData for file upload
       const uploadFormData = new FormData();
       uploadFormData.append('file', file);
       uploadFormData.append('type', '3d-model');
 
-      // Use XMLHttpRequest for progress tracking
       const xhr = new XMLHttpRequest();
-
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) {
-          const percentComplete = (e.loaded / e.total) * 100;
-          setUploadProgress(percentComplete);
+          setUploadProgress((e.loaded / e.total) * 100);
         }
       });
 
       xhr.addEventListener('load', () => {
         if (xhr.status === 200) {
           try {
-            const response = JSON.parse(xhr.responseText);
-            // Update form with uploaded file URL, size, and auto-detected format
-            setFormData(prev => ({ 
-              ...prev, 
-              modelUrl: response.url || response.fileUrl || '',
-              fileSize: file.size,
-              format: detectedFormat
-            }));
-            setHasUploadedModelSuccessfully(true);
-            toast({ 
-              title: 'نجح', 
-              description: `تم رفع الملف بنجاح (${detectedFormat.toUpperCase()})` 
-            });
+            const response = JSON.parse(xhr.responseText || '{}');
+            const url = String(response?.url || response?.fileUrl || '');
+            if (!url) throw new Error('Missing uploaded URL');
+            applyUploadedModel(url);
           } catch (error) {
             console.error('Error parsing response:', error);
             toast({ title: 'خطأ', description: 'فشل معالجة الاستجابة', variant: 'destructive' });
           }
-        } else {
-          let backendError = xhr.statusText;
-          try {
-            const parsed = JSON.parse(xhr.responseText || '{}');
-            backendError = parsed?.error || parsed?.message || backendError;
-          } catch {
-            // Keep status text fallback
-          }
-          toast({ title: 'خطأ', description: `فشل الرفع: ${backendError}`, variant: 'destructive' });
+          setIsUploading(false);
+          setUploadProgress(0);
+          return;
         }
+
+        let backendError = xhr.statusText;
+        try {
+          const parsed = JSON.parse(xhr.responseText || '{}');
+          backendError = parsed?.error || parsed?.message || backendError;
+        } catch {
+          // Keep status text fallback
+        }
+
+        if (xhr.status === 413) {
+          (async () => {
+            try {
+              await uploadDirectToCloudinary();
+            } catch (fallbackError: any) {
+              toast({
+                title: 'خطأ',
+                description: `فشل الرفع: ${fallbackError?.message || backendError}`,
+                variant: 'destructive',
+              });
+            } finally {
+              setIsUploading(false);
+              setUploadProgress(0);
+            }
+          })();
+          return;
+        }
+
+        toast({ title: 'خطأ', description: `فشل الرفع: ${backendError}`, variant: 'destructive' });
         setIsUploading(false);
         setUploadProgress(0);
       });
@@ -435,10 +513,8 @@ const Products3D = () => {
         setUploadProgress(0);
       });
 
-      // Send request to upload endpoint
       xhr.open('POST', '/api/upload-3d-model');
       xhr.send(uploadFormData);
-
     } catch (error) {
       console.error('Upload error:', error);
       setIsUploading(false);

@@ -2094,6 +2094,54 @@ app.post('/rbac/assign-custom', async (c) => {
 });
 
 // ===== CLOUDINARY =====
+app.post('/cloudinary/sign-3d-upload', async (c) => {
+  try {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return c.json({ ok: false, error: 'Cloudinary is not configured on this environment' }, 500);
+    }
+
+    const body = await c.req.json().catch(() => ({}));
+    const rawName = String(body?.fileName || 'model').trim();
+    const extMatch = rawName.match(/\.([a-zA-Z0-9]+)$/);
+    const ext = extMatch ? extMatch[1].toLowerCase() : 'bin';
+    const timestamp = Math.floor(Date.now() / 1000);
+    const random = Math.random().toString(36).slice(2, 8);
+    const publicId = `model_${Date.now()}_${random}_${ext}`;
+    const folder = '3d-models';
+    const paramsToSign = {
+      folder,
+      public_id: publicId,
+      resource_type: 'raw',
+      timestamp,
+    };
+
+    const cloudinary = await import('cloudinary').then((m) => m.v2);
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    const signature = cloudinary.utils.api_sign_request(paramsToSign, process.env.CLOUDINARY_API_SECRET);
+    return c.json({
+      ok: true,
+      item: {
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY,
+        timestamp,
+        signature,
+        folder,
+        publicId,
+        resourceType: 'raw',
+        uploadUrl: `https://api.cloudinary.com/v1_1/${process.env.CLOUDINARY_CLOUD_NAME}/raw/upload`,
+      },
+    });
+  } catch (err) {
+    console.error('[API] Cloudinary sign-3d-upload error:', err.message);
+    return c.json({ ok: false, error: err?.message || 'Unable to sign upload' }, 500);
+  }
+});
+
 app.post('/cloudinary/upload-url', async (c) => {
   try {
     const body = await c.req.json();
