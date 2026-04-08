@@ -52,7 +52,7 @@ const AuthModal = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md bg-gradient-to-br from-white to-primary/5 border-0 shadow-2xl rounded-2xl">
+      <DialogContent className="z-[100010] max-w-md bg-gradient-to-br from-white to-primary/5 border-0 shadow-2xl rounded-2xl">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold text-slate-900 mb-4 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
             {content.title}
