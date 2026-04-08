@@ -1865,8 +1865,8 @@ app.post('/upload-3d-model', async (c) => {
     if (!file || typeof file === 'string') {
       return c.json({ ok: false, error: 'No file uploaded' }, 400);
     }
-    if (Number(file.size || 0) > 8 * 1024 * 1024) {
-      return c.json({ ok: false, error: 'File too large. Max size is 8MB.' }, 413);
+    if (Number(file.size || 0) > 50 * 1024 * 1024) {
+      return c.json({ ok: false, error: 'File too large. Max size is 50MB.' }, 413);
     }
 
     const fileName = String((file && file.name) || '');
@@ -1895,7 +1895,6 @@ app.post('/upload-3d-model', async (c) => {
           folder: '3d-models',
           resource_type: 'raw',
           public_id: publicId,
-          format: fileExt.slice(1),
         },
         (error, uploaded) => {
           if (error) return reject(error);

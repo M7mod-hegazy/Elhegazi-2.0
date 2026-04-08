@@ -416,7 +416,14 @@ const Products3D = () => {
             toast({ title: 'خطأ', description: 'فشل معالجة الاستجابة', variant: 'destructive' });
           }
         } else {
-          toast({ title: 'خطأ', description: `فشل الرفع: ${xhr.statusText}`, variant: 'destructive' });
+          let backendError = xhr.statusText;
+          try {
+            const parsed = JSON.parse(xhr.responseText || '{}');
+            backendError = parsed?.error || parsed?.message || backendError;
+          } catch {
+            // Keep status text fallback
+          }
+          toast({ title: 'خطأ', description: `فشل الرفع: ${backendError}`, variant: 'destructive' });
         }
         setIsUploading(false);
         setUploadProgress(0);

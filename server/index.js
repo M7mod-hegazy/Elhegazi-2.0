@@ -557,7 +557,8 @@ app.post('/api/rbac/bootstrap-roles', async (req, res) => {
   }
 });
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+const uploadImage = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
+const upload3D = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
 
 // unread support: lastSeenAt per admin
 app.get('/api/history/unread-count', async (req, res) => {
@@ -2059,7 +2060,15 @@ app.post('/api/cloudinary/upload-url', async (req, res) => {
 });
 
 // Upload image file (multipart/form-data) to Cloudinary
-app.post('/api/cloudinary/upload-file', upload.single('file'), async (req, res) => {
+app.post('/api/cloudinary/upload-file', (req, res, next) => {
+  uploadImage.single('file')(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ ok: false, error: 'Image is too large. Max size is 8MB.' });
+    }
+    return res.status(400).json({ ok: false, error: err?.message || 'Invalid upload payload' });
+  });
+}, async (req, res) => {
   try {
     const isAdmin = await isAdminRequest(req);
     if (!isAdmin) {
@@ -2091,8 +2100,20 @@ app.post('/api/cloudinary/upload-file', upload.single('file'), async (req, res) 
 });
 
 // Upload 3D model file to Cloudinary
-app.post('/api/upload-3d-model', upload.single('file'), async (req, res) => {
+app.post('/api/upload-3d-model', (req, res, next) => {
+  upload3D.single('file')(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ ok: false, error: '3D file is too large. Max size is 50MB.' });
+    }
+    return res.status(400).json({ ok: false, error: err?.message || 'Invalid upload payload' });
+  });
+}, async (req, res) => {
   try {
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ ok: false, error: 'Cloudinary is not configured on this server' });
+    }
+
     if (!req.file) {
       return res.status(400).json({ ok: false, error: 'No file uploaded' });
     }
@@ -2110,15 +2131,13 @@ app.post('/api/upload-3d-model', upload.single('file'), async (req, res) => {
 
     // Upload to Cloudinary with raw resource type for 3D files
     // Include file extension in public_id to preserve it in the URL
-    const fileNameWithoutExt = path.basename(req.file.originalname, fileExt);
-    const publicId = `model_${Date.now()}${fileExt}`; // Include extension
+    const publicId = `model_${Date.now()}${fileExt}`; // Include extension for stable URL suffix
     
     const result = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream({
         folder: '3d-models',
         resource_type: 'raw', // Important for non-image files
         public_id: publicId,
-        format: fileExt.substring(1), // Remove the dot from extension
       }, (error, uploaded) => {
         if (error) return reject(error);
         resolve(uploaded);
