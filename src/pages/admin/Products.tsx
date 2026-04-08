@@ -169,7 +169,7 @@ type ImportItem = Partial<ProductFormData> & {
   [key: string]: string | number | boolean | string[] | undefined;
 };
 
-type ImportRowStatus = 'ready' | 'quarantined_duplicate' | 'quarantined_category' | 'invalid';
+type ImportRowStatus = 'ready' | 'quarantined_duplicate' | 'invalid';
 type ImportCategoryState = 'resolved' | 'missing' | 'ambiguous';
 
 type ImportRowReason = {
@@ -810,10 +810,16 @@ const AdminProducts = () => {
   const [isImportSubmitting, setIsImportSubmitting] = useState(false);
   const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
   const [isQuarantineModalOpen, setIsQuarantineModalOpen] = useState(false);
-  const [categoryCreateLoadingRowId, setCategoryCreateLoadingRowId] = useState<string | null>(null);
+  const [quarantineReviewIds, setQuarantineReviewIds] = useState<Set<string>>(new Set());
+  const [quarantineCheckingIds, setQuarantineCheckingIds] = useState<Set<string>>(new Set());
+  const [quarantineAcceptedRows, setQuarantineAcceptedRows] = useState<Array<{ row: ImportPreviewRow; fading: boolean }>>([]);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExportSubmitting, setIsExportSubmitting] = useState(false);
+  const [exportStep, setExportStep] = useState<'fields' | 'products'>('fields');
   const [exportScope, setExportScope] = useState<ExportScope>('filtered');
+  const [exportProductSearch, setExportProductSearch] = useState('');
+  const [exportCategoryFilter, setExportCategoryFilter] = useState<string>('all');
+  const [exportSelectedIds, setExportSelectedIds] = useState<Set<string>>(new Set());
   const [exportFields, setExportFields] = useState<Record<ExportFieldKey, boolean>>({
     nameAr: true,
     name: true,
@@ -1273,16 +1279,14 @@ const AdminProducts = () => {
   const importPreviewValidation = useMemo(() => {
     const readyRows = importPreview.filter((row) => row.__meta.status === 'ready').length;
     const quarantinedDuplicate = importPreview.filter((row) => row.__meta.status === 'quarantined_duplicate').length;
-    const quarantinedCategory = importPreview.filter((row) => row.__meta.status === 'quarantined_category').length;
     const invalidRows = importPreview.filter((row) => row.__meta.status === 'invalid').length;
 
     return {
       isValid: importPreview.length > 0 && readyRows === importPreview.length,
       readyRows,
       quarantinedDuplicate,
-      quarantinedCategory,
       invalidRowsCount: invalidRows,
-      blockedRowsCount: quarantinedDuplicate + quarantinedCategory + invalidRows,
+      blockedRowsCount: quarantinedDuplicate + invalidRows,
     };
   }, [importPreview]);
 
@@ -1504,22 +1508,55 @@ const AdminProducts = () => {
     setIsEditModalOpen(true);
   };
 
-  const exportCandidates = useMemo(() => {
-    const currentlyFiltered = products.filter((product) => {
-      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.nameAr.includes(searchTerm) ||
-        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category === selectedCategory;
-      return matchesSearch && matchesCategory;
-    });
+  const normalizeExportText = (value: string) =>
+    String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\u064B-\u0652]/g, '')
+      .replace(/\u0640/g, '')
+      .replace(/[\s\u00A0]+/g, ' ');
 
+  const exportScopePool = useMemo(() => {
     if (exportScope === 'all') return products;
     if (exportScope === 'selected') {
-      if (selectedIds.size === 0) return [];
-      return products.filter((p) => selectedIds.has(String(p.id)));
+      if (exportSelectedIds.size === 0) return [];
+      return products.filter((p) => exportSelectedIds.has(String(p.id)));
     }
-    return currentlyFiltered;
-  }, [exportScope, products, selectedIds, searchTerm, selectedCategory]);
+    return filteredProducts;
+  }, [exportScope, products, exportSelectedIds, filteredProducts]);
+
+  const exportScopePoolFiltered = useMemo(() => {
+    const poolByCategory =
+      exportCategoryFilter === 'all'
+        ? exportScopePool
+        : exportScopePool.filter((product) => {
+            const selectedCategoryItem = categories.find((c) => String(c.id) === String(exportCategoryFilter));
+            if (!selectedCategoryItem) return false;
+            const productCategoryRaw = String(product.category || '');
+            const productCategoryAr = normalizeExportText(String(product.categoryAr || ''));
+            const selectedName = normalizeExportText(String(selectedCategoryItem.name || ''));
+            const selectedNameAr = normalizeExportText(String(selectedCategoryItem.nameAr || ''));
+            return (
+              productCategoryRaw === String(selectedCategoryItem.id) ||
+              productCategoryRaw === String(selectedCategoryItem.slug || '') ||
+              productCategoryAr === selectedName ||
+              productCategoryAr === selectedNameAr
+            );
+          });
+    const q = exportProductSearch.trim().toLowerCase();
+    if (!q) return poolByCategory;
+    return poolByCategory.filter((product) => {
+      const nameEn = String(product.name || '').toLowerCase();
+      const nameAr = String(product.nameAr || '');
+      const sku = String(product.sku || '').toLowerCase();
+      return nameEn.includes(q) || nameAr.includes(exportProductSearch.trim()) || sku.includes(q);
+    });
+  }, [exportScopePool, exportProductSearch, exportCategoryFilter]);
+
+  const exportCandidates = useMemo(() => {
+    if (exportSelectedIds.size === 0) return [];
+    return products.filter((p) => exportSelectedIds.has(String(p.id)));
+  }, [products, exportSelectedIds]);
 
   const selectedExportFieldsCount = useMemo(
     () => Object.values(exportFields).filter(Boolean).length,
@@ -1557,6 +1594,29 @@ const AdminProducts = () => {
       image: checked,
     });
   };
+
+  const toggleExportProduct = (productId: string, checked: boolean) => {
+    setExportSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(productId);
+      else next.delete(productId);
+      return next;
+    });
+  };
+
+  const selectAllExportRows = () => {
+    setExportSelectedIds(new Set(exportScopePoolFiltered.map((p) => String(p.id))));
+  };
+
+  const clearExportSelection = () => {
+    setExportSelectedIds(new Set());
+  };
+
+  useEffect(() => {
+    if (!isExportModalOpen || exportStep !== 'products') return;
+    if (exportScope === 'selected') return;
+    setExportSelectedIds(new Set(exportScopePool.map((p) => String(p.id))));
+  }, [isExportModalOpen, exportStep, exportScope, exportScopePool]);
 
   const executeExportExcel = async () => {
     if (isExportSubmitting) return;
@@ -1805,17 +1865,6 @@ const AdminProducts = () => {
     return isSameProduct(p, item);
   };
 
-  const slugifyCategory = (value: string) =>
-    String(value || '')
-      .trim()
-      .toLowerCase()
-      .replace(/[\u064B-\u0652]/g, '')
-      .replace(/[^\w\u0600-\u06FF\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '')
-      .slice(0, 64);
-
   const createRowReason = (code: string, message: string): ImportRowReason => ({ code, message });
 
   const createDefaultRowMeta = (row: ImportItem, prevMeta?: ImportRowMeta): ImportRowMeta => {
@@ -1904,20 +1953,17 @@ const AdminProducts = () => {
       const nameValue = String(row.nameAr || row.name || '').trim();
       const skuValue = String(row.sku || '').trim();
       const priceValue = Number(row.price);
-      const stockValue = Number(row.stock);
 
       const hasName = nameValue.length > 0;
       const hasSku = skuValue.length > 0;
       const hasPrice = Number.isFinite(priceValue);
-      const hasStock = Number.isFinite(stockValue);
 
       if (!hasName) reasons.push(createRowReason('missing_name', 'الاسم مطلوب.'));
       if (!hasSku) reasons.push(createRowReason('missing_sku', 'الكود مطلوب.'));
       if (!hasPrice) reasons.push(createRowReason('missing_price', 'السعر غير صالح.'));
-      if (!hasStock) reasons.push(createRowReason('missing_stock', 'المخزون غير صالح.'));
 
       const categoryCandidates = findCategoryCandidates(row);
-      let categoryState: ImportCategoryState = 'missing';
+      let categoryState: ImportCategoryState = 'resolved';
       let resolvedCategoryId = '';
       let categoryResolution: ImportCategoryResolution = meta.categoryResolution;
 
@@ -1927,8 +1973,8 @@ const AdminProducts = () => {
           categoryState = 'resolved';
           resolvedCategoryId = String(exists.id);
         } else {
-          categoryState = 'missing';
-          reasons.push(createRowReason('category_resolution_lost', 'الفئة المختارة لم تعد موجودة.'));
+          categoryState = 'resolved';
+          categoryResolution = null;
         }
       } else if (categoryResolution?.type === 'create') {
         const slugKey = normalizeKey(categoryResolution.slug);
@@ -1939,18 +1985,15 @@ const AdminProducts = () => {
           resolvedCategoryId = String(existing.id);
           categoryResolution = { type: 'existing', categoryId: String(existing.id) };
         } else {
-          categoryState = 'missing';
-          reasons.push(createRowReason('category_create_pending', 'الفئة الجديدة لم تُنشأ بعد.'));
+          categoryState = 'resolved';
+          categoryResolution = null;
         }
       } else if (categoryCandidates.length === 1) {
         categoryState = 'resolved';
         resolvedCategoryId = categoryCandidates[0].id;
       } else if (categoryCandidates.length > 1) {
-        categoryState = 'ambiguous';
-        reasons.push(createRowReason('category_ambiguous', 'اسم الفئة يطابق أكثر من فئة. اختر الفئة الصحيحة.'));
-      } else {
-        categoryState = 'missing';
-        reasons.push(createRowReason('category_missing', 'الفئة غير موجودة.'));
+        categoryState = 'resolved';
+        resolvedCategoryId = categoryCandidates[0].id;
       }
 
       const dbMatches = products.filter((p) => isSameProduct(p, row));
@@ -1999,12 +2042,10 @@ const AdminProducts = () => {
       }
 
       let status: ImportRowStatus = 'ready';
-      const hasValidationErrors = !hasName || !hasSku || !hasPrice || !hasStock;
+      const hasValidationErrors = !hasName || !hasSku || !hasPrice;
 
       if (hasValidationErrors) {
         status = 'invalid';
-      } else if (categoryState !== 'resolved') {
-        status = 'quarantined_category';
       } else if (hasDuplicateConflict || (wasQuarantinedDuplicate && !hasRequiredEdits)) {
         status = 'quarantined_duplicate';
       }
@@ -2185,7 +2226,7 @@ const AdminProducts = () => {
 
     toast({
       title: "تم إنشاء المعاينة",
-      description: `تم تحضير ${preflightPreview.length} منتج مع فحص التكرار والفئات.`,
+      description: `تم تحضير ${preflightPreview.length} منتج مع فحص التكرار.`,
     });
   };
 
@@ -2199,7 +2240,7 @@ const AdminProducts = () => {
     if (blockedRows.length > 0) {
       toast({
         title: 'لا يمكن الاستيراد قبل حل الصفوف المعزولة',
-        description: `يوجد ${blockedRows.length} صف يحتاج معالجة في التكرار أو الفئة أو البيانات.`,
+        description: `يوجد ${blockedRows.length} صف يحتاج معالجة في التكرار أو البيانات الأساسية.`,
         variant: 'destructive',
       });
       setIsQuarantineModalOpen(true);
@@ -2286,37 +2327,44 @@ const AdminProducts = () => {
     setIsImportSubmitting(false);
     setIsImportConfirmOpen(false);
     setIsQuarantineModalOpen(false);
-    setCategoryCreateLoadingRowId(null);
+    setQuarantineReviewIds(new Set());
+    setQuarantineCheckingIds(new Set());
+    setQuarantineAcceptedRows([]);
   };
+
+  useEffect(() => {
+    setQuarantineReviewIds((prev) => {
+      const rowsById = new Set(importPreview.map((row) => row.__rowId));
+      const next = new Set<string>();
+      prev.forEach((id) => {
+        if (rowsById.has(id)) next.add(id);
+      });
+      importPreview.forEach((row) => {
+        if (row.__meta.status !== 'ready') {
+          next.add(row.__rowId);
+        }
+      });
+      if (next.size === prev.size && [...next].every((id) => prev.has(id))) {
+        return prev;
+      }
+      return next;
+    });
+  }, [importPreview]);
 
   const quarantinedRows = useMemo(
-    () => importPreview.filter((row) => row.__meta.status !== 'ready'),
-    [importPreview]
+    () => importPreview.filter((row) => quarantineReviewIds.has(row.__rowId)),
+    [importPreview, quarantineReviewIds]
   );
 
-  const setRowCategoryResolution = (rowId: string, resolution: ImportCategoryResolution) => {
-    setImportPreview((prev) => {
-      const next = prev.map((row) =>
-        row.__rowId === rowId
-          ? {
-              ...row,
-              __meta: {
-                ...row.__meta,
-                categoryResolution: resolution,
-              },
-            }
-          : row
-      );
-      return runImportPreflight(next, prev);
-    });
-  };
-
-  const setQuarantinedRowField = (rowId: string, field: 'name' | 'nameAr' | 'sku', value: string) => {
+  const setQuarantinedRowField = (rowId: string, field: 'name' | 'nameAr' | 'sku' | 'price', value: string) => {
     setImportPreview((prev) => {
       const next = prev.map((row) => {
         if (row.__rowId !== rowId) return row;
         if (field === 'name' || field === 'nameAr') {
           return { ...row, name: value, nameAr: value };
+        }
+        if (field === 'price') {
+          return { ...row, price: value === '' ? undefined : Number(value) };
         }
         return { ...row, [field]: value };
       });
@@ -2324,70 +2372,74 @@ const AdminProducts = () => {
     });
   };
 
-  const updateCreateCategoryDraft = (rowId: string, patch: Partial<{ name: string; slug: string }>) => {
-    setImportPreview((prev) => {
-      const next = prev.map((row) => {
-        if (row.__rowId !== rowId) return row;
-        const current = row.__meta.categoryResolution?.type === 'create'
-          ? row.__meta.categoryResolution
-          : { type: 'create' as const, name: '', slug: '' };
-        const mergedName = patch.name ?? current.name;
-        const mergedSlug = (patch.slug ?? current.slug) || slugifyCategory(mergedName);
-        return {
-          ...row,
-          __meta: {
-            ...row.__meta,
-            categoryResolution: {
-              type: 'create',
-              name: mergedName,
-              slug: mergedSlug,
-            },
-          },
-        };
-      });
-      return runImportPreflight(next, prev);
+  const acceptQuarantinedRow = (rowId: string) => {
+    setQuarantineCheckingIds((prev) => {
+      const next = new Set(prev);
+      next.add(rowId);
+      return next;
     });
-  };
 
-  const createCategoryForRow = async (rowId: string) => {
-    const row = importPreview.find((r) => r.__rowId === rowId);
-    if (!row) return;
-    const draft = row.__meta.categoryResolution?.type === 'create' ? row.__meta.categoryResolution : null;
-    const name = String(draft?.name || '').trim();
-    const slug = slugifyCategory(String(draft?.slug || name));
-    if (!name) {
-      toast({ title: 'اسم الفئة مطلوب', variant: 'destructive' });
-      return;
-    }
-    if (!slug) {
-      toast({ title: 'المعرف المختصر للفئة غير صالح', variant: 'destructive' });
-      return;
-    }
+    window.setTimeout(() => {
+      let accepted = false;
+      setImportPreview((prev) => {
+        const rechecked = runImportPreflight(prev, prev);
+        const row = rechecked.find((item) => item.__rowId === rowId);
+        if (!row) return rechecked;
 
-    setCategoryCreateLoadingRowId(rowId);
-    try {
-      const res = await apiPostJson<BackendCategory, Partial<BackendCategory>>('/api/categories', {
-        name,
-        nameAr: name,
-        slug,
+        const canAccept =
+          row.__meta.status === 'ready' &&
+          row.__meta.isConflictFreeNow &&
+          (!row.__meta.wasQuarantinedDuplicate || row.__meta.hasRequiredEdits);
+
+        if (!canAccept) {
+          return rechecked;
+        }
+
+        accepted = true;
+        setQuarantineAcceptedRows((prevRows) => {
+          const withoutDup = prevRows.filter((item) => item.row.__rowId !== rowId);
+          return [...withoutDup, { row, fading: false }];
+        });
+        setQuarantineReviewIds((prevIds) => {
+          const next = new Set(prevIds);
+          next.delete(rowId);
+          return next;
+        });
+        return rechecked;
       });
-      const createdId = String(res._id || '');
-      await refetchCategories();
-      if (createdId) {
-        setRowCategoryResolution(rowId, { type: 'existing', categoryId: createdId });
-      } else {
-        setImportPreview((prev) => runImportPreflight(prev, prev));
+
+      if (!accepted) {
+        toast({
+          title: 'الصف غير جاهز للاعتماد',
+          description: 'عدّل الاسم والكود حتى يختفي أي تطابق، ثم حاول مرة أخرى.',
+          variant: 'destructive',
+        });
+        setQuarantineCheckingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(rowId);
+          return next;
+        });
+        return;
       }
-      toast({ title: 'تم إنشاء الفئة وربطها بالصف' });
-    } catch {
+
+      window.setTimeout(() => {
+        setQuarantineAcceptedRows((prevRows) =>
+          prevRows.map((item) => (item.row.__rowId === rowId ? { ...item, fading: true } : item))
+        );
+      }, 3200);
+      window.setTimeout(() => {
+        setQuarantineAcceptedRows((prevRows) => prevRows.filter((item) => item.row.__rowId !== rowId));
+        setQuarantineCheckingIds((prev) => {
+          const next = new Set(prev);
+          next.delete(rowId);
+          return next;
+        });
+      }, 5200);
       toast({
-        title: 'تعذر إنشاء الفئة',
-        description: 'تحقق من أن المعرف المختصر غير مكرر ثم حاول مرة أخرى.',
-        variant: 'destructive',
+        title: 'تم قبول الصف',
+        description: 'تم اعتماد التعديلات وإضافة الصف إلى الجاهز للاستيراد.',
       });
-    } finally {
-      setCategoryCreateLoadingRowId(null);
-    }
+    }, 120);
   };
 
   const [columnWidths, setColumnWidths] = useState({
@@ -3843,7 +3895,22 @@ const AdminProducts = () => {
 
 
         {/* Smart Export Modal */}
-        <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen} modal={false}>
+        <Dialog
+          open={isExportModalOpen}
+          onOpenChange={(open) => {
+            setIsExportModalOpen(open);
+            if (open) {
+              setExportStep('fields');
+              setExportProductSearch('');
+              setExportCategoryFilter('all');
+              setExportScope('filtered');
+              const initialPool =
+                filteredProducts;
+              setExportSelectedIds(new Set(initialPool.map((p) => String(p.id))));
+            }
+          }}
+          modal={false}
+        >
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
@@ -3856,44 +3923,144 @@ const AdminProducts = () => {
             </DialogHeader>
 
             <div className="space-y-5">
-              <div className="rounded-xl border border-slate-200 p-4">
-                <div className="mb-3 text-sm font-semibold text-slate-700">{'\u0646\u0637\u0627\u0642 \u0627\u0644\u062a\u0635\u062f\u064a\u0631'}</div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                  <Button type="button" variant={exportScope === 'filtered' ? 'default' : 'outline'} onClick={() => setExportScope('filtered')}>
-                    {`\u0627\u0644\u0646\u062a\u064a\u062c\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629 (${filteredProducts.length})`}
+              <div className="rounded-xl border border-slate-200 p-3 bg-slate-50/70">
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={exportStep === 'fields' ? 'default' : 'outline'}
+                    onClick={() => setExportStep('fields')}
+                    className="justify-start"
+                  >
+                    1) اختيار الحقول
                   </Button>
-                  <Button type="button" variant={exportScope === 'all' ? 'default' : 'outline'} onClick={() => setExportScope('all')}>
-                    {`\u0643\u0644 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a (${products.length})`}
-                  </Button>
-                  <Button type="button" variant={exportScope === 'selected' ? 'default' : 'outline'} onClick={() => setExportScope('selected')} disabled={selectedIds.size === 0}>
-                    {`\u0627\u0644\u0645\u062d\u062f\u062f (${selectedIds.size})`}
+                  <Button
+                    type="button"
+                    variant={exportStep === 'products' ? 'default' : 'outline'}
+                    onClick={() => setExportStep('products')}
+                    disabled={selectedExportFieldsCount === 0}
+                    className="justify-start"
+                  >
+                    2) اختيار المنتجات
                   </Button>
                 </div>
               </div>
 
-              <div className="rounded-xl border border-slate-200 p-4">
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <div className="text-sm font-semibold text-slate-700">{'\u0627\u0644\u062d\u0642\u0648\u0644 \u0627\u0644\u0645\u0635\u062f\u0631\u0629'}</div>
-                  <div className="flex items-center gap-2">
-                    <Button type="button" variant="outline" size="sm" onClick={() => toggleAllExportFields(true)}>{'\u062a\u062d\u062f\u064a\u062f \u0627\u0644\u0643\u0644'}</Button>
-                    <Button type="button" variant="outline" size="sm" onClick={() => toggleAllExportFields(false)}>{'\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0643\u0644'}</Button>
+              {exportStep === 'fields' && (
+                <div className="rounded-xl border border-slate-200 p-4">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-sm font-semibold text-slate-700">{'\u0627\u0644\u062d\u0642\u0648\u0644 \u0627\u0644\u0645\u0635\u062f\u0631\u0629'}</div>
+                    <div className="flex items-center gap-2">
+                      <Button type="button" variant="outline" size="sm" onClick={() => toggleAllExportFields(true)}>{'\u062a\u062d\u062f\u064a\u062f \u0627\u0644\u0643\u0644'}</Button>
+                      <Button type="button" variant="outline" size="sm" onClick={() => toggleAllExportFields(false)}>{'\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0643\u0644'}</Button>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {exportFieldOptions.map((field) => (
+                      <label key={field.key} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 cursor-pointer hover:bg-slate-50">
+                        <div>
+                          <div className="text-sm font-medium text-slate-800">{field.label}</div>
+                          <div className="text-xs text-slate-500">{field.hint}</div>
+                        </div>
+                        <Checkbox
+                          checked={exportFields[field.key]}
+                          onCheckedChange={(checked) => setExportFields((prev) => ({ ...prev, [field.key]: Boolean(checked) }))}
+                        />
+                      </label>
+                    ))}
                   </div>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {exportFieldOptions.map((field) => (
-                    <label key={field.key} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 cursor-pointer hover:bg-slate-50">
-                      <div>
-                        <div className="text-sm font-medium text-slate-800">{field.label}</div>
-                        <div className="text-xs text-slate-500">{field.hint}</div>
-                      </div>
-                      <Checkbox
-                        checked={exportFields[field.key]}
-                        onCheckedChange={(checked) => setExportFields((prev) => ({ ...prev, [field.key]: Boolean(checked) }))}
-                      />
-                    </label>
-                  ))}
+              )}
+
+              {exportStep === 'products' && (
+                <div className="rounded-xl border border-slate-200 p-4 space-y-3">
+                  <div className="text-sm font-semibold text-slate-700">{'\u0646\u0637\u0627\u0642 \u0627\u0644\u062a\u0635\u062f\u064a\u0631'}</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-2">
+                    <div className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 flex items-center text-sm text-slate-700">
+                      {`إجمالي المنتجات بعد البحث/الفلترة (${exportScopePoolFiltered.length})`}
+                    </div>
+                    <Button type="button" variant={exportScope === 'selected' ? 'default' : 'outline'} onClick={() => setExportScope('selected')}>
+                      {`المحدد (${exportSelectedIds.size})`}
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-[1fr_220px_auto_auto] gap-2 items-center">
+                    <Input
+                      value={exportProductSearch}
+                      onChange={(e) => setExportProductSearch(e.target.value)}
+                      placeholder="ابحث داخل منتجات التصدير..."
+                    />
+                    <Select value={exportCategoryFilter} onValueChange={setExportCategoryFilter}>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="تصفية الفئة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">كل الفئات</SelectItem>
+                        {categories.map((c) => (
+                          <SelectItem key={String(c.id)} value={String(c.id)}>
+                            {c.nameAr || c.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Button type="button" variant="outline" size="sm" onClick={selectAllExportRows}>
+                      تحديد الكل
+                    </Button>
+                    <Button type="button" variant="outline" size="sm" onClick={clearExportSelection}>
+                      إلغاء التحديد
+                    </Button>
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 max-h-64 overflow-y-auto divide-y divide-slate-100">
+                    {exportScopePoolFiltered.length === 0 ? (
+                      <div className="px-3 py-6 text-sm text-slate-500 text-center">لا توجد منتجات مطابقة</div>
+                    ) : (
+                      exportScopePoolFiltered.map((product) => {
+                        const id = String(product.id);
+                        const checked = exportSelectedIds.has(id);
+                        return (
+                          <label
+                            key={id}
+                            className={`flex items-center justify-between gap-3 px-3 py-2 cursor-pointer transition ${
+                              checked
+                                ? 'bg-emerald-50 border-r-4 border-emerald-500 shadow-[inset_0_0_0_1px_rgba(16,185,129,0.25)]'
+                                : 'hover:bg-slate-50'
+                            }`}
+                          >
+                            <div className="min-w-0 flex items-center gap-2">
+                              {getProductPrimaryImage(product) ? (
+                                <img
+                                  src={optimizeImage(getProductPrimaryImage(product), { w: 48 })}
+                                  alt={product.nameAr || product.name || 'product'}
+                                  className="w-10 h-10 rounded-md border border-slate-200 object-cover bg-slate-100 shrink-0"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <div className="w-10 h-10 rounded-md border border-slate-200 bg-slate-100 shrink-0" />
+                              )}
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium text-slate-800 truncate">{product.nameAr || product.name}</div>
+                                <div className="text-xs text-slate-500 truncate">{product.sku || 'بدون كود'}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {checked ? <span className="text-[11px] font-semibold text-emerald-700">محدد</span> : null}
+                              <Checkbox
+                                checked={checked}
+                                onCheckedChange={(value) => toggleExportProduct(id, Boolean(value))}
+                              />
+                            </div>
+                          </label>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="text-xs text-slate-600">
+                    {`تم تحديد ${exportSelectedIds.size} من ${exportScopePoolFiltered.length} منتج ظاهر (${exportScopePool.length} ضمن النطاق).`}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
                 {`\u0633\u064a\u062a\u0645 \u062a\u0635\u062f\u064a\u0631 ${exportCandidates.length} \u0645\u0646\u062a\u062c \u0648 ${selectedExportFieldsCount} \u062d\u0642\u0644 \u0628\u0635\u064a\u063a\u0629 \u0645\u062a\u0648\u0627\u0641\u0642\u0629 \u0645\u0639 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f.`}
@@ -3904,19 +4071,34 @@ const AdminProducts = () => {
               <Button type="button" variant="outline" onClick={() => setIsExportModalOpen(false)} disabled={isExportSubmitting}>
                 {'\u0625\u0644\u063a\u0627\u0621'}
               </Button>
-              <Button type="button" onClick={executeExportExcel} disabled={isExportSubmitting || selectedExportFieldsCount === 0 || exportCandidates.length === 0} className="bg-emerald-600 hover:bg-emerald-700">
-                {isExportSubmitting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
-                    {'\u062c\u0627\u0631\u064a \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0645\u0644\u0641...'}
-                  </>
-                ) : (
-                  <>
-                    <FileSpreadsheet className="w-4 h-4 ml-2" />
-                    {'\u062a\u0635\u062f\u064a\u0631 Excel'}
-                  </>
-                )}
-              </Button>
+              {exportStep === 'fields' ? (
+                <Button
+                  type="button"
+                  onClick={() => setExportStep('products')}
+                  disabled={selectedExportFieldsCount === 0}
+                >
+                  التالي: اختيار المنتجات
+                </Button>
+              ) : (
+                <>
+                  <Button type="button" variant="outline" onClick={() => setExportStep('fields')} disabled={isExportSubmitting}>
+                    رجوع للحقول
+                  </Button>
+                  <Button type="button" onClick={executeExportExcel} disabled={isExportSubmitting || selectedExportFieldsCount === 0 || exportCandidates.length === 0} className="bg-emerald-600 hover:bg-emerald-700">
+                    {isExportSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
+                        {'\u062c\u0627\u0631\u064a \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0645\u0644\u0641...'}
+                      </>
+                    ) : (
+                      <>
+                        <FileSpreadsheet className="w-4 h-4 ml-2" />
+                        {'\u062a\u0635\u062f\u064a\u0631 Excel'}
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -4142,7 +4324,9 @@ const AdminProducts = () => {
                 </div>
 
                 {(() => {
-                  const rows = importPreview;
+                  const rows = importPreview
+                    .map((product, absoluteIndex) => ({ product, absoluteIndex }))
+                    .filter(({ product }) => product.__meta.status === 'ready');
                   return (
                     <>
                       <div className="max-h-96 overflow-y-auto border rounded-lg">
@@ -4159,8 +4343,7 @@ const AdminProducts = () => {
                             </TableRow>
                           </TableHeader>
                           <TableBody>
-                            {rows.map((product, index) => {
-                              const absoluteIndex = index;
+                            {rows.map(({ product, absoluteIndex }) => {
                               const catMatch = categories.find(c => String(c.id) === String(product.category) || c.nameAr === product.categoryAr || c.name === product.category);
                               const catId = catMatch ? String(catMatch.id) : '';
                               return (
@@ -4212,7 +4395,7 @@ const AdminProducts = () => {
                                   <TableCell>
                                     <div className="space-y-1">
                                       <Badge variant={product.__meta.status === 'ready' ? 'default' : 'destructive'}>
-                                        {product.__meta.status === 'ready' ? 'جاهز' : product.__meta.status === 'quarantined_duplicate' ? 'معزول: تكرار' : product.__meta.status === 'quarantined_category' ? 'معزول: فئة' : 'غير صالح'}
+                                        {product.__meta.status === 'ready' ? 'جاهز' : product.__meta.status === 'quarantined_duplicate' ? 'معزول: تكرار' : 'غير صالح'}
                                       </Badge>
                                       {product.__meta.reasons[0] ? (
                                         <div className="text-[11px] text-slate-600">{product.__meta.reasons[0].message}</div>
@@ -4238,8 +4421,8 @@ const AdminProducts = () => {
                         </Table>
                       </div>
                       <div className="flex items-center justify-between text-sm text-slate-600 mt-2">
-                        <span>عرض {rows.length} من أصل {rows.length} منتج</span>
-                        <span>بدون تقسيم صفحات</span>
+                        <span>عرض {rows.length} منتج جاهز من أصل {importPreview.length}</span>
+                        <span>الصفوف غير الجاهزة متاحة من زر المراجعة</span>
                       </div>
                     </>
                   );
@@ -4268,7 +4451,6 @@ const AdminProducts = () => {
                   <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
                     لا يمكن الاستيراد الآن. الصفوف الجاهزة: {importPreviewValidation.readyRows} من {importPreview.length}.
                     {importPreviewValidation.quarantinedDuplicate > 0 ? ` يوجد ${importPreviewValidation.quarantinedDuplicate} صف معزول بسبب التكرار.` : ''}
-                    {importPreviewValidation.quarantinedCategory > 0 ? ` يوجد ${importPreviewValidation.quarantinedCategory} صف معزول بسبب الفئة.` : ''}
                     {importPreviewValidation.invalidRowsCount > 0 ? ` يوجد ${importPreviewValidation.invalidRowsCount} صف غير صالح.` : ''}
                   </div>
                 )}
@@ -4322,28 +4504,87 @@ const AdminProducts = () => {
                     <DialogHeader>
                       <DialogTitle>مراجعة الصفوف المعزولة</DialogTitle>
                       <DialogDescription>
-                        عالج التكرارات والفئات غير الموجودة قبل الاستيراد. لا يُقبل أي صف حتى يصبح جاهزًا بالكامل.
+                        عالج التكرارات والبيانات الأساسية قبل الاستيراد. لا يُقبل أي صف حتى يصبح جاهزًا بالكامل.
                       </DialogDescription>
                     </DialogHeader>
 
                     <div className="space-y-4">
-                      {quarantinedRows.length === 0 ? (
-                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
-                          لا توجد صفوف معزولة حاليًا.
-                        </div>
-                      ) : (
-                        quarantinedRows.map((row) => {
-                          const rowIndex = importPreview.findIndex((r) => r.__rowId === row.__rowId) + 1;
-                          const createDraft = row.__meta.categoryResolution?.type === 'create' ? row.__meta.categoryResolution : { name: '', slug: '' };
+                      <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                        خطوات القبول: 1) عدّل الاسم/الكود/السعر 2) تأكد أن الصف أصبح "جاهز للاعتماد" 3) اضغط "اعتماد التعديلات".
+                      </div>
+                      {(() => {
+                        const rowsForDisplay = [
+                          ...quarantinedRows.map((row) => ({ row, accepted: false, fading: false })),
+                          ...quarantineAcceptedRows
+                            .filter((item) => !quarantinedRows.some((row) => row.__rowId === item.row.__rowId))
+                            .map((item) => ({ row: item.row, accepted: true, fading: item.fading })),
+                        ];
+                        if (rowsForDisplay.length === 0) {
                           return (
-                            <Card key={row.__rowId} className="border-red-200">
-                              <CardContent className="pt-4 space-y-3">
+                            <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                              لا توجد صفوف معزولة حاليًا.
+                            </div>
+                          );
+                        }
+                        return rowsForDisplay.map(({ row, accepted, fading }) => {
+                          const rowIndex = importPreview.findIndex((r) => r.__rowId === row.__rowId) + 1;
+                          const isChecking = quarantineCheckingIds.has(row.__rowId);
+                          const isDisabledCard = isChecking || accepted;
+                          const canAcceptRow =
+                            row.__meta.status === 'ready' &&
+                            row.__meta.isConflictFreeNow &&
+                            (!row.__meta.wasQuarantinedDuplicate || row.__meta.hasRequiredEdits);
+                          return (
+                            <Card
+                              key={row.__rowId}
+                              className={`transition-all duration-500 animate-in fade-in-0 zoom-in-[0.99] ${
+                                accepted
+                                  ? 'border-emerald-400 bg-gradient-to-br from-emerald-50 via-white to-emerald-100/70 shadow-[0_0_0_1px_rgba(16,185,129,0.25),0_16px_40px_-18px_rgba(16,185,129,0.55)]'
+                                  : canAcceptRow
+                                    ? 'border-emerald-300 bg-emerald-50/40 shadow-[0_0_0_1px_rgba(16,185,129,0.18)]'
+                                    : 'border-red-200'
+                              } ${accepted && fading ? 'opacity-0 scale-[0.985]' : 'opacity-100 scale-100'}`}
+                            >
+                              <CardContent className={`pt-4 space-y-3 relative transition-all duration-300 ${isDisabledCard ? 'pointer-events-none blur-[1.5px]' : ''}`}>
+                                {isDisabledCard ? (
+                                  <div className="absolute inset-0 z-20 rounded-md bg-white/60 backdrop-blur-[2px] flex items-center justify-center">
+                                    {isChecking ? (
+                                      <div className="inline-flex items-center gap-2 rounded-full bg-primary text-white px-3 py-1 text-xs font-medium shadow">
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                                        جاري التحقق...
+                                      </div>
+                                    ) : (
+                                      <div className="inline-flex items-center gap-2 rounded-full bg-emerald-600 text-white px-3 py-1 text-xs font-medium shadow">
+                                        <CheckCircle className="w-3.5 h-3.5" />
+                                        تم اعتماد الصف بنجاح
+                                      </div>
+                                    )}
+                                  </div>
+                                ) : null}
+                                {isChecking ? (
+                                  <div className="h-1 w-full rounded bg-primary/15 overflow-hidden">
+                                    <div className="h-full w-1/3 bg-primary animate-pulse" />
+                                  </div>
+                                ) : null}
                                 <div className="flex items-center justify-between gap-3">
                                   <div className="flex items-center gap-2">
                                     <Badge variant="destructive">{`صف ${rowIndex}`}</Badge>
                                     <Badge variant="outline">
-                                      {row.__meta.status === 'quarantined_duplicate' ? 'تكرار' : row.__meta.status === 'quarantined_category' ? 'فئة' : 'غير صالح'}
+                                      {row.__meta.status === 'ready'
+                                        ? 'جاهز للاعتماد'
+                                        : row.__meta.status === 'quarantined_duplicate'
+                                          ? 'تكرار'
+                                          : 'غير صالح'}
                                     </Badge>
+                                    {accepted ? (
+                                      <Badge className="bg-emerald-600 hover:bg-emerald-600">مقبول</Badge>
+                                    ) : null}
+                                    {isChecking ? (
+                                      <Badge variant="secondary" className="gap-1">
+                                        <RefreshCw className="w-3 h-3 animate-spin" />
+                                        جاري التحقق
+                                      </Badge>
+                                    ) : null}
                                     {row.__meta.hasRequiredEdits && !row.__meta.isConflictFreeNow ? (
                                       <Badge variant="secondary">تم التعديل لكن ما زال مطابقًا</Badge>
                                     ) : null}
@@ -4353,94 +4594,77 @@ const AdminProducts = () => {
                                   </div>
                                 </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <div className="flex items-center justify-end">
+                                  <Button
+                                    size="sm"
+                                    disabled={!canAcceptRow || isDisabledCard}
+                                    onClick={() => acceptQuarantinedRow(row.__rowId)}
+                                    className="bg-primary hover:bg-primary/90"
+                                  >
+                                    {isChecking ? (
+                                      <>
+                                        <RefreshCw className="w-3.5 h-3.5 animate-spin ml-1" />
+                                        جاري الاعتماد...
+                                      </>
+                                    ) : (
+                                      'اعتماد التعديلات'
+                                    )}
+                                  </Button>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                                   <Input
                                     value={String(row.nameAr || row.name || '')}
                                     onChange={(e) => setQuarantinedRowField(row.__rowId, 'nameAr', e.target.value)}
                                     placeholder="اسم المنتج"
+                                    disabled={isDisabledCard}
                                   />
                                   <Input
                                     value={String(row.sku || '')}
                                     onChange={(e) => setQuarantinedRowField(row.__rowId, 'sku', e.target.value)}
                                     placeholder="كود المنتج"
+                                    disabled={isDisabledCard}
+                                  />
+                                  <Input
+                                    type="number"
+                                    value={String(row.price ?? '')}
+                                    onChange={(e) => setQuarantinedRowField(row.__rowId, 'price', e.target.value)}
+                                    placeholder="السعر"
+                                    disabled={isDisabledCard}
                                   />
                                 </div>
 
-                                <div className="rounded-md border border-slate-200 p-3 space-y-3">
-                                  <div className="text-sm font-medium">معالجة الفئة</div>
-                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <Select
-                                      value={row.__meta.categoryResolution?.type === 'existing' ? row.__meta.categoryResolution.categoryId : ''}
-                                      onValueChange={(val) => setRowCategoryResolution(row.__rowId, { type: 'existing', categoryId: val })}
-                                    >
-                                      <SelectTrigger>
-                                        <SelectValue placeholder="ربط بفئة موجودة" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        {categories.map((c) => (
-                                          <SelectItem key={String(c.id)} value={String(c.id)}>{c.nameAr || c.name}</SelectItem>
+                                {canAcceptRow ? (
+                                  <div className="rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-800 space-y-1">
+                                    <div className="font-semibold">الصف جاهز للإدخال.</div>
+                                    <div>لا يوجد أي تطابق أو خطأ في هذا الصف الآن.</div>
+                                    <div>الخطوة التالية: اضغط زر "اعتماد التعديلات" لإضافته مباشرة لقائمة الاستيراد.</div>
+                                  </div>
+                                ) : (
+                                  <>
+                                    {row.__meta.reasons.length > 0 ? (
+                                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 space-y-1">
+                                        {row.__meta.reasons.map((reason, idx) => (
+                                          <div key={`${row.__rowId}-reason-${idx}`}>• {reason.message}</div>
                                         ))}
-                                      </SelectContent>
-                                    </Select>
+                                      </div>
+                                    ) : null}
 
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        type="button"
-                                        variant="outline"
-                                        onClick={() => setRowCategoryResolution(row.__rowId, { type: 'create', name: createDraft.name, slug: createDraft.slug })}
-                                      >
-                                        إنشاء فئة جديدة
-                                      </Button>
-                                      {row.__meta.categoryCandidates.length > 0 ? (
-                                        <span className="text-xs text-slate-500">{`مرشحات: ${row.__meta.categoryCandidates.map((c) => c.nameAr || c.name).join('، ')}`}</span>
-                                      ) : null}
-                                    </div>
-                                  </div>
-
-                                  {row.__meta.categoryResolution?.type === 'create' ? (
-                                    <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2">
-                                      <Input
-                                        value={createDraft.name}
-                                        onChange={(e) => updateCreateCategoryDraft(row.__rowId, { name: e.target.value, slug: createDraft.slug || slugifyCategory(e.target.value) })}
-                                        placeholder="اسم الفئة الجديدة"
-                                      />
-                                      <Input
-                                        value={createDraft.slug}
-                                        onChange={(e) => updateCreateCategoryDraft(row.__rowId, { slug: e.target.value })}
-                                        placeholder="slug"
-                                      />
-                                      <Button
-                                        type="button"
-                                        onClick={() => createCategoryForRow(row.__rowId)}
-                                        disabled={categoryCreateLoadingRowId === row.__rowId}
-                                      >
-                                        {categoryCreateLoadingRowId === row.__rowId ? 'جارٍ الإنشاء...' : 'إنشاء وربط'}
-                                      </Button>
-                                    </div>
-                                  ) : null}
-                                </div>
-
-                                {row.__meta.reasons.length > 0 ? (
-                                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 space-y-1">
-                                    {row.__meta.reasons.map((reason, idx) => (
-                                      <div key={`${row.__rowId}-reason-${idx}`}>• {reason.message}</div>
-                                    ))}
-                                  </div>
-                                ) : null}
-
-                                {row.__meta.matchTargets.length > 0 ? (
-                                  <div className="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
-                                    <div className="font-medium">التطابقات الحالية:</div>
-                                    {row.__meta.matchTargets.map((target) => (
-                                      <div key={`${row.__rowId}-${target.type}-${target.id}`}>{`• ${target.type === 'database' ? 'قاعدة البيانات' : 'داخل الملف'}: ${target.label}`}</div>
-                                    ))}
-                                  </div>
-                                ) : null}
+                                    {row.__meta.matchTargets.length > 0 ? (
+                                      <div className="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
+                                        <div className="font-medium">التطابقات الحالية:</div>
+                                        {row.__meta.matchTargets.map((target) => (
+                                          <div key={`${row.__rowId}-${target.type}-${target.id}`}>{`• ${target.type === 'database' ? 'قاعدة البيانات' : 'داخل الملف'}: ${target.label}`}</div>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                  </>
+                                )}
                               </CardContent>
                             </Card>
                           );
-                        })
-                      )}
+                        });
+                      })()}
                     </div>
 
                     <DialogFooter>
