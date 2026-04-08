@@ -25,6 +25,46 @@ async function connectMongoDB() {
   }
 }
 
+function assertSafeRemoteImageUrl(rawUrl) {
+  if (!rawUrl || typeof rawUrl !== 'string') throw new Error('url is required');
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Invalid URL');
+  }
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('Only http/https URLs are allowed');
+  }
+  return parsed.toString();
+}
+
+async function probeRemoteImageUrl(url, timeoutMs = 8000) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, { method: 'GET', redirect: 'follow', signal: controller.signal });
+    if (!response.ok) {
+      throw new Error(`Source returned ${response.status}`);
+    }
+    const contentType = String(response.headers.get('content-type') || '').toLowerCase();
+    if (!contentType.startsWith('image/')) {
+      throw new Error('URL does not point to an image');
+    }
+    return {
+      contentType,
+      contentLength: Number(response.headers.get('content-length') || 0),
+    };
+  } catch (err) {
+    if (err && err.name === 'AbortError') {
+      throw new Error('Timed out while checking image URL');
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 const app = new Hono().basePath('/api');
 
 function getClientIp(c) {
@@ -271,8 +311,17 @@ app.get('/products', async (c) => {
 
     let query = { active: { $ne: false } };
     if (ids) {
-      const idArray = ids.split(',').map(id => id.trim());
-      query._id = { $in: idArray };
+      const idArray = ids
+        .split(',')
+        .map(id => id.trim())
+        .filter(Boolean);
+      const validObjectIds = idArray.filter((id) => mongoose.Types.ObjectId.isValid(id));
+      if (validObjectIds.length > 0) {
+        query._id = { $in: validObjectIds };
+      } else {
+        // Keep deterministic response for invalid ids input instead of throwing cast errors
+        return c.json({ ok: true, items: [] });
+      }
     }
     if (categorySlug) {
       query.categorySlug = categorySlug;
@@ -1430,6 +1479,50 @@ app.post('/rbac/assign-custom', async (c) => {
 });
 
 // ===== CLOUDINARY =====
+app.post('/cloudinary/upload-url', async (c) => {
+  try {
+    const body = await c.req.json();
+    const { url, public_id, folder, validateOnly } = body || {};
+    const safeUrl = assertSafeRemoteImageUrl(url);
+    await probeRemoteImageUrl(safeUrl, 8000);
+
+    if (validateOnly) {
+      return c.json({ ok: true, item: { url: safeUrl, valid: true } });
+    }
+
+    const cloudinary = await import('cloudinary').then(m => m.v2);
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    const uploadOptions = {
+      folder: typeof folder === 'string' && folder.trim() ? folder.trim() : 'products',
+      resource_type: 'image',
+      format: 'webp',
+      quality: 'auto:good',
+      transformation: [{ width: 1280, height: 1280, crop: 'limit' }],
+    };
+
+    if (typeof public_id === 'string' && public_id.trim()) {
+      const cleaned = public_id.trim();
+      if (!/^[a-zA-Z0-9/_-]+$/.test(cleaned)) {
+        return c.json({ ok: false, error: 'Invalid public_id format' }, 400);
+      }
+      uploadOptions.public_id = cleaned;
+    }
+
+    const result = await cloudinary.uploader.upload(safeUrl, uploadOptions);
+    return c.json({ ok: true, result });
+  } catch (err) {
+    console.error('[API] Cloudinary upload-url error:', err.message);
+    const message = err?.message || 'Upload failed';
+    const isClientError = /required|invalid|only|timed out|does not point|source returned/i.test(message);
+    return c.json({ ok: false, error: message }, isClientError ? 400 : 500);
+  }
+});
+
 app.post('/cloudinary/upload-file', async (c) => {
   try {
     // Parse multipart/form-data — NOT JSON (the file is a binary blob)
