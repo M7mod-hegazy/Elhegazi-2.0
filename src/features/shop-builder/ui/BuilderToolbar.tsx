@@ -409,6 +409,13 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     navigate('/shop-builder/intro', { replace: true });
   }, [navigate]);
 
+  const handleQuitWithSave = useCallback(() => {
+    exportToFile();
+    toast({ title: 'تم حفظ نسخة من التصميم قبل الخروج' });
+    setQuitDialogOpen(false);
+    navigate('/shop-builder/intro', { replace: true });
+  }, [exportToFile, navigate, toast]);
+
   const handleQuitSessionSnapshot = useCallback(() => {
     onSnapshot();
   }, [onSnapshot]);
@@ -1748,21 +1755,21 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
             <DialogHeader>
               <DialogTitle className="text-xl font-black text-zinc-900">إنهاء الجلسة؟</DialogTitle>
               <DialogDescription className="text-zinc-600">
-                سيتم إنهاء الجلسة الحالية والعودة إلى صفحة المقدمة. التعديلات غير المحفوظة لن يتم حفظها.
+                اختر طريقة الخروج المناسبة قبل العودة لصفحة المقدمة.
               </DialogDescription>
             </DialogHeader>
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-              تنبيه: قبل الخروج يمكنك أخذ لقطة شاشة للاحتفاظ بالتصميم الحالي.
+              تنبيه: "خروج مع حفظ" ينزّل نسخة JSON من المخطط الحالي على جهازك.
             </div>
             <DialogFooter className="flex gap-2 sm:justify-end">
               <Button variant="outline" onClick={() => setQuitDialogOpen(false)}>رجوع</Button>
-              <Button variant="outline" onClick={handleQuitSessionSnapshot} className="gap-2">
-                <Camera className="h-4 w-4" />
-                أخذ صورة
-              </Button>
-              <Button onClick={handleConfirmQuitSession} className="gap-2 bg-red-600 hover:bg-red-700 text-white">
+              <Button variant="outline" onClick={handleConfirmQuitSession} className="gap-2">
                 <LogOut className="h-4 w-4" />
-                إنهاء الجلسة
+                خروج بدون حفظ
+              </Button>
+              <Button onClick={handleQuitWithSave} className="gap-2 bg-red-600 hover:bg-red-700 text-white">
+                <LogOut className="h-4 w-4" />
+                خروج مع حفظ
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -1911,4 +1918,3 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 };
 
 export default BuilderToolbar;
-

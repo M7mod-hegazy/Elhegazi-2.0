@@ -43,14 +43,10 @@ export default function ShopBuilderIntro() {
       if (!access?.hasActiveSession) {
         await startSession();
       }
-      if (canUseAdminQuickEnter) {
-        navigate('/shop-builder/editor', { state: { adminBypass: true, fromIntro: true } });
-        return;
-      }
-      if (shopData) {
-        navigate('/shop-builder/editor', { state: { fromIntro: true } });
+      if (shopData || canUseAdminQuickEnter) {
+        navigate('/shop-builder/projects', { state: { fromIntro: true } });
       } else {
-        navigate('/shop-setup', { state: { fromIntro: true } });
+        navigate('/shop-setup', { state: { fromIntro: true, redirectTo: '/shop-builder/projects' } });
       }
     } catch (err) {
       toast({
@@ -63,8 +59,8 @@ export default function ShopBuilderIntro() {
     }
   };
 
-  const handleAdminQuickEnter = () => {
-    navigate('/shop-builder/editor', { state: { adminBypass: true, fromIntro: true } });
+  const handleOpenProjects = () => {
+    navigate('/shop-builder/projects', { state: { fromIntro: true } });
   };
 
   return (
@@ -180,12 +176,12 @@ export default function ShopBuilderIntro() {
 
               {canUseAdminQuickEnter && (
                 <Button
-                  onClick={handleAdminQuickEnter}
+                  onClick={handleOpenProjects}
                   variant="outline"
                   className="gap-2 border-slate-300"
                 >
                   <Shield className="h-4 w-4" />
-                  دخول مباشر كمسؤول
+                  مشاريعي كمسؤول
                 </Button>
               )}
             </div>

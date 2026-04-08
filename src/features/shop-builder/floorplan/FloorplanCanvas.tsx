@@ -324,10 +324,14 @@ const FloorplanCanvas: React.FC = () => {
 
           // Apply side offset (perpendicular to wall)
           let sideOffset = 0;
-          if (column.side === 'left') {
-            sideOffset = -column.width / 2;
-          } else if (column.side === 'right') {
+          const normalizedSide =
+            column.side === 'back' || (column as any).side === 'right'
+              ? 'back'
+              : 'front';
+          if (normalizedSide === 'front') {
             sideOffset = column.width / 2;
+          } else if (normalizedSide === 'back') {
+            sideOffset = -column.width / 2;
           }
 
           const columnWorldPos = {

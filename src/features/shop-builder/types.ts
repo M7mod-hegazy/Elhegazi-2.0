@@ -6,7 +6,7 @@ export interface ShopBuilderColumn {
   depth: number; // Column depth (along wall)
   height: number; // Column height
   shape: 'square' | 'round' | 'rectangular';
-  side: 'center' | 'left' | 'right'; // Which side of wall the column extends from
+  side: 'front' | 'back'; // Which wall face the column extends from
   color: string;
 }
 

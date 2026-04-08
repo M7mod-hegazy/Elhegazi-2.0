@@ -79,6 +79,7 @@ import HistoryRead from './models/HistoryRead.js';
 import Rating from './models/Rating.js';
 import BuilderPricingConfig from './models/BuilderPricingConfig.js';
 import BuilderAccessSession from './models/BuilderAccessSession.js';
+import BuilderProject from './models/BuilderProject.js';
 
 // Services
 import orderAutomationService from './services/orderAutomationService.js';
@@ -1318,6 +1319,576 @@ app.post('/api/builder/session/end', async (req, res) => {
     return res.json({ ok: true, item: { ended: true, sessionId: String(active._id) } });
   } catch (err) {
     return res.status(400).json({ ok: false, error: err.message || 'Failed to end builder session' });
+  }
+});
+
+const BUILDER_PROJECT_SCHEMA_VERSION = 1;
+
+function cleanBuilderLayout(input) {
+  const layout = input && typeof input === 'object' ? input : {};
+  const walls = Array.isArray(layout.walls) ? layout.walls : [];
+  const products = Array.isArray(layout.products) ? layout.products : [];
+  return {
+    ...layout,
+    walls,
+    products,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function getBuilderProjectStats(layout) {
+  const safe = cleanBuilderLayout(layout);
+  return {
+    wallsCount: safe.walls.length,
+    productsCount: safe.products.length,
+    floorSize: Number(safe.floorSize || 24),
+  };
+}
+
+function normalizeBuilderProjectTitle(input, fallback = 'مشروع جديد') {
+  const title = String(input || '').trim();
+  if (!title) return fallback;
+  return title.slice(0, 120);
+}
+
+function parseBool(value, fallback = false) {
+  if (value === undefined || value === null) return fallback;
+  const normalized = String(value).toLowerCase().trim();
+  if (['1', 'true', 'yes', 'y'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'n'].includes(normalized)) return false;
+  return fallback;
+}
+
+async function uploadBuilderPreviewDataUrl(dataUrl, ownerActorKey = 'anon') {
+  if (!dataUrl || typeof dataUrl !== 'string') return null;
+  const trimmed = dataUrl.trim();
+  if (!trimmed.startsWith('data:image/')) return null;
+  if (trimmed.length > 8 * 1024 * 1024) {
+    throw new Error('Preview image is too large');
+  }
+  const result = await cloudinary.uploader.upload(trimmed, {
+    folder: 'builder-project-previews',
+    public_id: `preview_${ownerActorKey.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}`,
+    resource_type: 'image',
+    format: 'webp',
+    quality: 'auto:good',
+    transformation: [{ width: 1280, height: 720, crop: 'limit' }],
+  });
+  return {
+    url: result?.secure_url || '',
+    publicId: result?.public_id || '',
+  };
+}
+
+function getOwnerIdentity(req) {
+  const ownerUserId = req.user?._id ? String(req.user._id) : null;
+  const ownerActorKey = getActorKey(req);
+  const ownerEmailSnapshot = String(req.user?.email || req.header('x-user-email') || '').slice(0, 200);
+  return { ownerUserId, ownerActorKey, ownerEmailSnapshot };
+}
+
+function buildBuilderProjectsScopeFilter(req, { adminAll = false, ownerQuery = '' } = {}) {
+  const { ownerUserId, ownerActorKey } = getOwnerIdentity(req);
+  if (adminAll) {
+    const owner = String(ownerQuery || '').trim();
+    if (!owner) return {};
+    if (owner.startsWith('user:')) return { ownerUserId: owner.slice(5) };
+    if (owner.startsWith('actor:')) return { ownerActorKey: owner.slice(6) };
+    if (owner.startsWith('email:')) return { ownerEmailSnapshot: owner.slice(6) };
+    return {
+      $or: [
+        { ownerUserId: owner },
+        { ownerActorKey: owner },
+        { ownerEmailSnapshot: owner },
+      ],
+    };
+  }
+
+  if (ownerUserId) {
+    return {
+      $or: [
+        { ownerUserId },
+        { ownerActorKey },
+      ],
+    };
+  }
+  return { ownerActorKey };
+}
+
+async function cleanupSoftDeletedBuilderProjects() {
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  try {
+    await BuilderProject.deleteMany({
+      isDeleted: true,
+      deletedAt: { $lte: cutoff },
+    });
+  } catch {
+    // non-blocking cleanup
+  }
+}
+
+function mapBuilderProjectListItem(project) {
+  return {
+    _id: String(project._id),
+    title: project.title,
+    description: project.description || '',
+    previewImageUrl: project.previewImageUrl || '',
+    stats: project.stats || { wallsCount: 0, productsCount: 0, floorSize: 24 },
+    ownerUserId: project.ownerUserId || null,
+    ownerActorKey: project.ownerActorKey || null,
+    ownerEmailSnapshot: project.ownerEmailSnapshot || '',
+    isDeleted: !!project.isDeleted,
+    deletedAt: project.deletedAt || null,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    lastOpenedAt: project.lastOpenedAt || null,
+    version: Number(project.version || 1),
+  };
+}
+
+app.get('/api/builder/projects', async (req, res) => {
+  try {
+    await cleanupSoftDeletedBuilderProjects();
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(48, Math.max(1, Number(req.query.limit || 12)));
+    const skip = (page - 1) * limit;
+    const q = String(req.query.q || '').trim();
+    const deleted = parseBool(req.query.deleted, false);
+    const sortKey = String(req.query.sort || 'updated_desc');
+
+    const sortMap = {
+      updated_desc: { updatedAt: -1 },
+      created_desc: { createdAt: -1 },
+      name_asc: { title: 1 },
+      last_opened_desc: { lastOpenedAt: -1, updatedAt: -1 },
+    };
+    const sort = sortMap[sortKey] || sortMap.updated_desc;
+
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+
+    const filter = {
+      ...scope,
+      isDeleted: deleted,
+    };
+
+    if (q) {
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { title: { $regex: q, $options: 'i' } },
+          { description: { $regex: q, $options: 'i' } },
+          { ownerEmailSnapshot: { $regex: q, $options: 'i' } },
+        ],
+      });
+    }
+
+    const [items, total] = await Promise.all([
+      BuilderProject.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+      BuilderProject.countDocuments(filter),
+    ]);
+
+    return res.json({
+      ok: true,
+      items: items.map(mapBuilderProjectListItem),
+      page,
+      total,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      limit,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message || 'Failed to list builder projects' });
+  }
+});
+
+app.post('/api/builder/projects', async (req, res) => {
+  try {
+    const { ownerUserId, ownerActorKey, ownerEmailSnapshot } = getOwnerIdentity(req);
+    const body = req.body || {};
+    const layout = cleanBuilderLayout(body.layout || {});
+    const stats = getBuilderProjectStats(layout);
+    const title = normalizeBuilderProjectTitle(body.title, 'مشروع جديد');
+    const description = String(body.description || '').slice(0, 1000);
+
+    let previewImageUrl = '';
+    let previewImagePublicId = '';
+    if (typeof body.previewDataUrl === 'string' && body.previewDataUrl.trim()) {
+      const uploaded = await uploadBuilderPreviewDataUrl(body.previewDataUrl, ownerActorKey);
+      if (uploaded) {
+        previewImageUrl = uploaded.url;
+        previewImagePublicId = uploaded.publicId;
+      }
+    }
+
+    const created = await BuilderProject.create({
+      ownerUserId,
+      ownerActorKey,
+      ownerEmailSnapshot,
+      title,
+      description,
+      layout,
+      stats,
+      previewImageUrl,
+      previewImagePublicId,
+      version: 1,
+      schemaVersion: BUILDER_PROJECT_SCHEMA_VERSION,
+      lastOpenedAt: new Date(),
+    });
+
+    return res.status(201).json({ ok: true, item: mapBuilderProjectListItem(created.toObject()) });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to create builder project' });
+  }
+});
+
+app.post('/api/builder/projects/import', async (req, res) => {
+  try {
+    const body = req.body || {};
+    const layout = cleanBuilderLayout(body.layout || body.project?.layout || body.project || {});
+    if (!Array.isArray(layout.walls) || !Array.isArray(layout.products)) {
+      return res.status(400).json({ ok: false, error: 'Invalid layout payload' });
+    }
+    const { ownerUserId, ownerActorKey, ownerEmailSnapshot } = getOwnerIdentity(req);
+    const title = normalizeBuilderProjectTitle(body.title || body.project?.title || 'Imported Project', 'Imported Project');
+    const description = String(body.description || body.project?.description || '').slice(0, 1000);
+    const stats = getBuilderProjectStats(layout);
+
+    let previewImageUrl = '';
+    let previewImagePublicId = '';
+    if (typeof body.previewDataUrl === 'string' && body.previewDataUrl.trim()) {
+      const uploaded = await uploadBuilderPreviewDataUrl(body.previewDataUrl, ownerActorKey);
+      if (uploaded) {
+        previewImageUrl = uploaded.url;
+        previewImagePublicId = uploaded.publicId;
+      }
+    }
+
+    const created = await BuilderProject.create({
+      ownerUserId,
+      ownerActorKey,
+      ownerEmailSnapshot,
+      title,
+      description,
+      layout,
+      stats,
+      previewImageUrl,
+      previewImagePublicId,
+      version: 1,
+      schemaVersion: BUILDER_PROJECT_SCHEMA_VERSION,
+      lastOpenedAt: new Date(),
+    });
+    return res.status(201).json({ ok: true, item: mapBuilderProjectListItem(created.toObject()) });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to import builder project' });
+  }
+});
+
+app.get('/api/builder/projects/:id', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+    const project = await BuilderProject.findOne({
+      _id: req.params.id,
+      ...scope,
+    }).lean();
+    if (!project) return res.status(404).json({ ok: false, error: 'Project not found' });
+    return res.json({
+      ok: true,
+      item: {
+        ...mapBuilderProjectListItem(project),
+        layout: cleanBuilderLayout(project.layout || {}),
+        schemaVersion: Number(project.schemaVersion || BUILDER_PROJECT_SCHEMA_VERSION),
+      },
+    });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to load builder project' });
+  }
+});
+
+app.put('/api/builder/projects/:id', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+    const current = await BuilderProject.findOne({
+      _id: req.params.id,
+      ...scope,
+    });
+    if (!current) return res.status(404).json({ ok: false, error: 'Project not found' });
+
+    const body = req.body || {};
+    if (body.title !== undefined) current.title = normalizeBuilderProjectTitle(body.title, current.title || 'Project');
+    if (body.description !== undefined) current.description = String(body.description || '').slice(0, 1000);
+    if (body.layout !== undefined) {
+      const layout = cleanBuilderLayout(body.layout);
+      current.layout = layout;
+      current.stats = getBuilderProjectStats(layout);
+    }
+    if (body.previewImageUrl !== undefined) current.previewImageUrl = String(body.previewImageUrl || '');
+    if (body.previewImagePublicId !== undefined) current.previewImagePublicId = String(body.previewImagePublicId || '');
+
+    if (typeof body.previewDataUrl === 'string' && body.previewDataUrl.trim()) {
+      const uploaded = await uploadBuilderPreviewDataUrl(body.previewDataUrl, current.ownerActorKey || 'owner');
+      if (uploaded) {
+        current.previewImageUrl = uploaded.url;
+        current.previewImagePublicId = uploaded.publicId;
+      }
+    }
+
+    current.version = Number(current.version || 1) + 1;
+    current.schemaVersion = BUILDER_PROJECT_SCHEMA_VERSION;
+    await current.save();
+
+    return res.json({ ok: true, item: mapBuilderProjectListItem(current.toObject()) });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to update builder project' });
+  }
+});
+
+app.post('/api/builder/projects/:id/open', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+    const project = await BuilderProject.findOne({
+      _id: req.params.id,
+      ...scope,
+    });
+    if (!project) return res.status(404).json({ ok: false, error: 'Project not found' });
+    project.lastOpenedAt = new Date();
+    await project.save();
+    return res.json({ ok: true, item: mapBuilderProjectListItem(project.toObject()) });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to mark open' });
+  }
+});
+
+app.delete('/api/builder/projects/:id', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+    const project = await BuilderProject.findOne({
+      _id: req.params.id,
+      ...scope,
+    });
+    if (!project) return res.status(404).json({ ok: false, error: 'Project not found' });
+    project.isDeleted = true;
+    project.deletedAt = new Date();
+    project.deletedBy = req.user?._id ? String(req.user._id) : project.ownerActorKey;
+    await project.save();
+    return res.json({ ok: true, item: { deleted: true, id: String(project._id) } });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to delete builder project' });
+  }
+});
+
+app.post('/api/builder/projects/:id/restore', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+    const project = await BuilderProject.findOne({
+      _id: req.params.id,
+      ...scope,
+    });
+    if (!project) return res.status(404).json({ ok: false, error: 'Project not found' });
+    project.isDeleted = false;
+    project.deletedAt = null;
+    project.deletedBy = null;
+    await project.save();
+    return res.json({ ok: true, item: mapBuilderProjectListItem(project.toObject()) });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to restore builder project' });
+  }
+});
+
+app.delete('/api/builder/projects/:id/hard-delete', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+    const deleted = await BuilderProject.findOneAndDelete({
+      _id: req.params.id,
+      ...scope,
+    });
+    if (!deleted) return res.status(404).json({ ok: false, error: 'Project not found' });
+    return res.json({ ok: true, item: { hardDeleted: true, id: String(req.params.id) } });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to hard-delete builder project' });
+  }
+});
+
+app.post('/api/builder/projects/:id/duplicate', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+    const source = await BuilderProject.findOne({
+      _id: req.params.id,
+      ...scope,
+    }).lean();
+    if (!source) return res.status(404).json({ ok: false, error: 'Project not found' });
+
+    const { ownerUserId, ownerActorKey, ownerEmailSnapshot } = getOwnerIdentity(req);
+    const clone = await BuilderProject.create({
+      ownerUserId: source.ownerUserId || ownerUserId,
+      ownerActorKey: source.ownerActorKey || ownerActorKey,
+      ownerEmailSnapshot: source.ownerEmailSnapshot || ownerEmailSnapshot,
+      title: normalizeBuilderProjectTitle(`${source.title || 'Project'} (Copy)`, 'Project (Copy)'),
+      description: source.description || '',
+      layout: cleanBuilderLayout(source.layout || {}),
+      previewImageUrl: source.previewImageUrl || '',
+      previewImagePublicId: source.previewImagePublicId || '',
+      stats: source.stats || getBuilderProjectStats(source.layout || {}),
+      version: 1,
+      schemaVersion: BUILDER_PROJECT_SCHEMA_VERSION,
+      lastOpenedAt: new Date(),
+    });
+    return res.status(201).json({ ok: true, item: mapBuilderProjectListItem(clone.toObject()) });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to duplicate builder project' });
+  }
+});
+
+app.get('/api/builder/projects/:id/export', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    const adminAll = isAdmin && parseBool(req.query.allUsers, false);
+    const scope = buildBuilderProjectsScopeFilter(req, {
+      adminAll,
+      ownerQuery: req.query.owner,
+    });
+    const project = await BuilderProject.findOne({
+      _id: req.params.id,
+      ...scope,
+    }).lean();
+    if (!project) return res.status(404).json({ ok: false, error: 'Project not found' });
+    return res.json({
+      ok: true,
+      item: {
+        schemaVersion: BUILDER_PROJECT_SCHEMA_VERSION,
+        projectMeta: {
+          title: project.title,
+          description: project.description || '',
+          ownerEmailSnapshot: project.ownerEmailSnapshot || '',
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        },
+        layout: cleanBuilderLayout(project.layout || {}),
+      },
+    });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to export builder project' });
+  }
+});
+
+app.get('/api/admin/builder/projects', async (req, res) => {
+  try {
+    const admin = await isAdminRequest(req);
+    if (!admin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+
+    await cleanupSoftDeletedBuilderProjects();
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(48, Math.max(1, Number(req.query.limit || 12)));
+    const skip = (page - 1) * limit;
+    const q = String(req.query.q || '').trim();
+    const deleted = parseBool(req.query.deleted, false);
+    const sortKey = String(req.query.sort || 'updated_desc');
+    const owner = req.query.owner;
+
+    const sortMap = {
+      updated_desc: { updatedAt: -1 },
+      created_desc: { createdAt: -1 },
+      name_asc: { title: 1 },
+      last_opened_desc: { lastOpenedAt: -1, updatedAt: -1 },
+    };
+    const sort = sortMap[sortKey] || sortMap.updated_desc;
+
+    const filter = {
+      ...buildBuilderProjectsScopeFilter(req, { adminAll: true, ownerQuery: owner }),
+      isDeleted: deleted,
+    };
+    if (q) {
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { title: { $regex: q, $options: 'i' } },
+          { description: { $regex: q, $options: 'i' } },
+          { ownerEmailSnapshot: { $regex: q, $options: 'i' } },
+        ],
+      });
+    }
+
+    const [items, total] = await Promise.all([
+      BuilderProject.find(filter).sort(sort).skip(skip).limit(limit).lean(),
+      BuilderProject.countDocuments(filter),
+    ]);
+
+    return res.json({
+      ok: true,
+      items: items.map(mapBuilderProjectListItem),
+      page,
+      total,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      limit,
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message || 'Failed to list admin builder projects' });
+  }
+});
+
+app.post('/api/admin/builder/projects/:id/restore', async (req, res) => {
+  try {
+    const admin = await isAdminRequest(req);
+    if (!admin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    const project = await BuilderProject.findById(req.params.id);
+    if (!project) return res.status(404).json({ ok: false, error: 'Project not found' });
+    project.isDeleted = false;
+    project.deletedAt = null;
+    project.deletedBy = null;
+    await project.save();
+    return res.json({ ok: true, item: mapBuilderProjectListItem(project.toObject()) });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to restore project' });
+  }
+});
+
+app.delete('/api/admin/builder/projects/:id', async (req, res) => {
+  try {
+    const admin = await isAdminRequest(req);
+    if (!admin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    const deleted = await BuilderProject.findByIdAndDelete(req.params.id);
+    if (!deleted) return res.status(404).json({ ok: false, error: 'Project not found' });
+    return res.json({ ok: true, item: { deleted: true, hard: true } });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to hard-delete builder project' });
   }
 });
 

@@ -1,14 +1,17 @@
 ﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import { ShopBuilderProvider, useShopBuilder } from './store';
 import type { ShopBuilderWall, ShopBuilderSlatWall, ShopBuilderSlatAccessory, ShopBuilderColumn } from './types';
 import { useDualAuth } from '@/hooks/useDualAuth';
+import { useBuilderProject, useBuilderProjectActions } from '@/hooks/useBuilderProjects';
 import FloorplanCanvas from './floorplan/FloorplanCanvas';
 import ThreeScene, { type ThreeSceneHandle, type TransformMode, WALL_TEXTURES } from './three/ThreeScene';
 import BuilderToolbar from './ui/BuilderToolbar';
 import { SceneItemsList } from './ui/SceneItemsList';
+import { cloneSlatSystemForSide, copySourceWallSystemsToTargets } from './utils/fastCopySystems';
 import { Button } from '@/components/ui/button';
-import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock, Plus, ChevronUp, Grid3x3, Info } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock, Plus, ChevronUp, Grid3x3, Info, Save, ArrowRight, CheckCircle2, AlertTriangle, Loader2, Copy } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useShopSetup } from '@/hooks/useShopSetup';
@@ -17,6 +20,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 
 const DEFAULT_TRANSFORM_MODE: TransformMode = 'translate';
 type DisplaySystemType = 'slat' | 'supermarket_shelves' | 'primo';
+type ProjectSaveState = 'idle' | 'saving' | 'saved' | 'error';
 
 const DISPLAY_SYSTEM_META: Record<DisplaySystemType, {
   label: string;
@@ -546,6 +550,7 @@ function InteractiveSlatNode({
 
 function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }: { targetId: string, type: 'wall' | 'column', primaryColor: string, secondaryColor: string }) {
   const { layout, setWalls, addSlatWallToWall, updateSlatWall, removeSlatWall, addAccessoryToSlat, updateAccessory, removeAccessory } = useShopBuilder();
+  const { toast } = useToast();
   const [activeSide, setActiveSide] = useState<'front'|'back'>('front');
   const [activeId, setActiveId] = useState<string|null>(null);
   const [activeAccessoryId, setActiveAccessoryId] = useState<string|null>(null);
@@ -559,6 +564,9 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
   const [systemInfoType, setSystemInfoType] = useState<DisplaySystemType>('slat');
   const [showReflectConfirm, setShowReflectConfirm] = useState(false);
   const [reflectWarningText, setReflectWarningText] = useState<string | null>(null);
+  const [showBulkCopyModal, setShowBulkCopyModal] = useState(false);
+  const [copyBothSides, setCopyBothSides] = useState(false);
+  const [targetWallIds, setTargetWallIds] = useState<string[]>([]);
   
   let targetObject: ShopBuilderWall | ShopBuilderColumn | undefined;
   let wallLength = 1;
@@ -625,24 +633,6 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
     setActiveAccessoryId(null);
   }, [addAccessoryToSlat, selectedSlat, targetId]);
 
-  const cloneSlatForSide = useCallback((source: any, side: 'front' | 'back', reflectX: boolean) => {
-    const clonedAccessories = (source.accessories || []).map((acc: any) => ({
-      ...acc, // preserve all accessory fields exactly
-      id: crypto.randomUUID(),
-      position: {
-        ...(acc.position || { x: 0.5, y: 0.5 }),
-        x: reflectX ? 1 - (acc.position?.x ?? 0.5) : (acc.position?.x ?? 0.5),
-      },
-    }));
-    const sourcePosX = source.position ?? 0.5;
-    return {
-      ...source, // preserve any current/future system fields
-      position: reflectX ? 1 - sourcePosX : sourcePosX,
-      side,
-      accessories: clonedAccessories,
-    };
-  }, []);
-
   const reflectCurrentSideToOther = useCallback(() => {
     // Swap both sides: current side gets other-side content, and other side gets current-side content.
     const sourceSide: 'front' | 'back' = activeSide;
@@ -661,13 +651,11 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
         if (w.id !== targetId) return w;
         const kept = (w.slatWalls || []).filter((s: any) => s.side !== sourceSide && s.side !== destinationSide);
         const toCurrent = destinationSystems.map((s: any) => ({
-          ...cloneSlatForSide(s, sourceSide, false),
-          id: crypto.randomUUID(),
+          ...cloneSlatSystemForSide(s, sourceSide, false),
           wallId: w.id,
         }));
         const toOther = sourceSystems.map((s: any) => ({
-          ...cloneSlatForSide(s, destinationSide, false),
-          id: crypto.randomUUID(),
+          ...cloneSlatSystemForSide(s, destinationSide, false),
           wallId: w.id,
         }));
         return { ...w, slatWalls: [...kept, ...toCurrent, ...toOther] as any };
@@ -682,13 +670,11 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
           const destinationColumnSystems = cSlats.filter((s: any) => s.side === destinationSide);
           const kept = cSlats.filter((s: any) => s.side !== sourceSide && s.side !== destinationSide);
           const toCurrent = destinationColumnSystems.map((s: any) => ({
-            ...cloneSlatForSide(s, sourceSide, false),
-            id: crypto.randomUUID(),
+            ...cloneSlatSystemForSide(s, sourceSide, false),
             wallId: w.id,
           }));
           const toOther = sourceColumnSystems.map((s: any) => ({
-            ...cloneSlatForSide(s, destinationSide, false),
-            id: crypto.randomUUID(),
+            ...cloneSlatSystemForSide(s, destinationSide, false),
             wallId: w.id,
           }));
           return { ...c, slatWalls: [...kept, ...toCurrent, ...toOther] };
@@ -703,7 +689,66 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
     setActiveAccessoryId(null);
     setReflectWarningText(null);
     setShowReflectConfirm(false);
-  }, [activeSide, allSlatWalls, cloneSlatForSide, layout.walls, otherSide, setWalls, targetId, type]);
+  }, [activeSide, allSlatWalls, layout.walls, otherSide, setWalls, targetId, type]);
+
+  const sourceWallNumber = type === 'wall'
+    ? Math.max(1, layout.walls.findIndex((w) => w.id === targetId) + 1)
+    : null;
+
+  const sourceWall = type === 'wall' ? layout.walls.find((w) => w.id === targetId) : null;
+  const availableTargetWalls = type === 'wall' ? layout.walls.filter((w) => w.id !== targetId) : [];
+  const sourceFrontSystems = (sourceWall?.slatWalls || []).filter((s) => s.side === 'front');
+  const sourceBackSystems = (sourceWall?.slatWalls || []).filter((s) => s.side === 'back');
+  const sourceTotalAccessories = (sourceWall?.slatWalls || []).reduce((total, slat) => total + (slat.accessories?.length || 0), 0);
+  const sourceWallLength = sourceWall ? Math.hypot(sourceWall.end.x - sourceWall.start.x, sourceWall.end.y - sourceWall.start.y) : 0;
+
+  useEffect(() => {
+    if (!showBulkCopyModal) return;
+    setTargetWallIds(layout.walls.filter((w) => w.id !== targetId).map((w) => w.id));
+  }, [showBulkCopyModal, layout.walls, targetId]);
+
+  const copyCurrentWallToAllWalls = useCallback(() => {
+    if (type !== 'wall') return;
+    const sourceWall = layout.walls.find((w) => w.id === targetId);
+    if (!sourceWall) return;
+
+    const result = copySourceWallSystemsToTargets(layout.walls, targetId, targetWallIds, {
+      copyBothSides,
+      sourceSide: activeSide,
+    });
+    if (result.sourceSystemsCount === 0) {
+      toast({
+        title: 'لا يوجد ما يمكن نسخه',
+        description: copyBothSides
+          ? 'الجدار المحدد لا يحتوي على أنظمة عرض للنسخ.'
+          : `لا توجد أنظمة عرض على الوجه ${activeSide === 'front' ? 'الأمامي' : 'الخلفي'} للنسخ.`,
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (result.copiedWallsCount === 0) {
+      toast({
+        title: 'لا توجد جدران أخرى',
+        description: 'أضف جدارًا جديدًا أولًا ثم استخدم النسخ السريع.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setWalls(result.walls);
+    setActiveId(null);
+    setActiveAccessoryId(null);
+    setIsAddingNewSystem(false);
+    setShowBulkCopyModal(false);
+
+    toast({
+      title: 'تم النسخ السريع بنجاح',
+      description: `تم نسخ أنظمة الجدار ${sourceWallNumber ?? ''} إلى ${result.copiedWallsCount} جدار.`,
+    });
+  }, [activeSide, copyBothSides, layout.walls, setWalls, sourceWallNumber, targetId, targetWallIds, toast, type]);
+
+  const areAllTargetsSelected = availableTargetWalls.length > 0 && targetWallIds.length === availableTargetWalls.length;
    
   return (
     <div ref={managerRootRef} className="mt-4 w-full h-full flex flex-col gap-3" style={{ minHeight: 'calc(85vh - 150px)' }}>
@@ -720,6 +765,17 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
             <button onClick={() => {setActiveSide('front'); setActiveId(null)}} className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${activeSide === 'front' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>الوجه الأمامي</button>
             <button onClick={() => {setActiveSide('back'); setActiveId(null)}} className={`px-4 py-1.5 text-sm font-bold rounded-md transition-all ${activeSide === 'back' ? 'bg-white shadow text-blue-600' : 'text-zinc-500 hover:text-zinc-700 hover:bg-zinc-200'}`}>الوجه الخلفي</button>
           </div>
+          {type === 'wall' ? (
+            <button
+              type="button"
+              onClick={() => setShowBulkCopyModal(true)}
+              className="py-2 px-3 rounded-lg border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 text-[11px] font-bold transition-colors whitespace-nowrap inline-flex items-center gap-1.5"
+              title={`نسخ أنظمة الجدار ${sourceWallNumber ?? ''} إلى جميع الجدران الأخرى`}
+            >
+              <Copy className="w-3.5 h-3.5" />
+              نسخ سريع
+            </button>
+          ) : null}
           <button
             type="button"
             onClick={() => {
@@ -1292,6 +1348,140 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
         </DialogContent>
       </Dialog>
 
+      <Dialog open={showBulkCopyModal} onOpenChange={setShowBulkCopyModal}>
+        <DialogContent className="max-w-3xl w-[96vw] max-h-[88vh] overflow-y-auto" dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-primary">
+              <Copy className="w-4 h-4" />
+              النسخ السريع بين الجدران
+            </DialogTitle>
+            <DialogDescription>
+              اختر الجدران الهدف ثم نفّذ النسخ بنقرة واحدة. المصدر الحالي واضح في البطاقة التالية.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="rounded-xl border border-border bg-muted/40 p-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-black text-foreground">المصدر: الجدار {sourceWallNumber ?? '-'}</p>
+              <span className="text-[11px] px-2 py-0.5 rounded-full bg-background border border-border text-muted-foreground font-bold">
+                {copyBothSides ? 'نسخ الوجهين' : `نسخ الوجه ${activeSide === 'front' ? 'الأمامي فقط' : 'الخلفي فقط'}`}
+              </span>
+            </div>
+            <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
+              <div className="rounded-lg border border-border bg-background px-2 py-1.5">
+                <span className="text-muted-foreground">طول الجدار</span>
+                <p className="font-black text-foreground">{sourceWallLength.toFixed(2)} م</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background px-2 py-1.5">
+                <span className="text-muted-foreground">ارتفاع الجدار</span>
+                <p className="font-black text-foreground">{(sourceWall?.height || 0).toFixed(2)} م</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background px-2 py-1.5">
+                <span className="text-muted-foreground">سمك الجدار</span>
+                <p className="font-black text-foreground">{(sourceWall?.thickness || 0).toFixed(2)} م</p>
+              </div>
+              <div className="rounded-lg border border-border bg-background px-2 py-1.5">
+                <span className="text-muted-foreground">الأنظمة/الملحقات</span>
+                <p className="font-black text-foreground">{sourceFrontSystems.length + sourceBackSystems.length} / {sourceTotalAccessories}</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-border bg-background p-3 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="inline-flex items-center gap-2 rounded-lg border border-border bg-muted/40 px-2 py-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCopyBothSides((v) => !v)}
+                  className={`h-6 w-12 rounded-full transition-colors ${copyBothSides ? 'bg-primary' : 'bg-muted'} relative`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-5 w-5 rounded-full bg-background shadow transition-all ${copyBothSides ? 'right-0.5' : 'right-6'}`}
+                  />
+                </button>
+                <span className="text-xs font-bold text-foreground">نسخ الوجهين معًا</span>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTargetWallIds(availableTargetWalls.map((w) => w.id))}
+                  className="px-2.5 py-1.5 rounded-lg border border-border bg-muted/40 text-xs font-bold text-foreground hover:bg-muted"
+                >
+                  تحديد الكل
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetWallIds([])}
+                  className="px-2.5 py-1.5 rounded-lg border border-border bg-background text-xs font-bold text-foreground hover:bg-muted/40"
+                >
+                  إلغاء التحديد
+                </button>
+              </div>
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              الجدران المحددة: <span className="font-black text-foreground">{targetWallIds.length}</span> من <span className="font-black text-foreground">{availableTargetWalls.length}</span>
+              {areAllTargetsSelected ? (
+                <span className="mr-2 inline-flex items-center gap-1 text-emerald-600 font-bold">
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  الكل محدد
+                </span>
+              ) : null}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
+              {availableTargetWalls.map((wall, idx) => {
+                const isSelected = targetWallIds.includes(wall.id);
+                const wallLength = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+                return (
+                  <button
+                    key={wall.id}
+                    type="button"
+                    onClick={() => {
+                      setTargetWallIds((prev) => prev.includes(wall.id) ? prev.filter((id) => id !== wall.id) : [...prev, wall.id]);
+                    }}
+                    className={`text-right rounded-lg border px-3 py-2 transition-colors ${
+                      isSelected ? 'border-primary bg-primary/10' : 'border-border bg-background hover:bg-muted/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm font-black text-foreground">جدار {idx + 1}</p>
+                      <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}>
+                        {isSelected ? 'محدد' : 'غير محدد'}
+                      </span>
+                    </div>
+                    <div className="mt-1 text-[11px] text-muted-foreground flex items-center gap-3">
+                      <span>طول: <b>{wallLength.toFixed(2)}م</b></span>
+                      <span>ارتفاع: <b>{wall.height.toFixed(2)}م</b></span>
+                      <span>سمك: <b>{wall.thickness.toFixed(2)}م</b></span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setShowBulkCopyModal(false)}
+              className="px-3 py-2 rounded-lg border border-border bg-background text-foreground text-sm hover:bg-muted/40"
+            >
+              إلغاء
+            </button>
+            <button
+              type="button"
+              onClick={copyCurrentWallToAllWalls}
+              disabled={targetWallIds.length === 0}
+              className={`px-3 py-2 rounded-lg text-sm ${targetWallIds.length === 0 ? 'bg-muted text-muted-foreground cursor-not-allowed' : 'bg-primary text-primary-foreground hover:opacity-90'}`}
+            >
+              تنفيذ النسخ السريع
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={showReflectConfirm} onOpenChange={setShowReflectConfirm}>
         <DialogContent className="max-w-md" dir="rtl">
           <DialogHeader>
@@ -1383,6 +1573,9 @@ const TEXTURE_OPTIONS = [
 ];
 
 const ShopBuilderContent = () => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { projectId } = useParams<{ projectId: string }>();
   const [transformMode, setTransformMode] = useState<TransformMode>(DEFAULT_TRANSFORM_MODE);
   const threeRef = useRef<ThreeSceneHandle | null>(null);
 
@@ -1399,9 +1592,18 @@ const ShopBuilderContent = () => {
   // Texture dropdown state
   const [showProductTextureDropdown, setShowProductTextureDropdown] = useState(false);
   const [showWallTextureDropdown, setShowWallTextureDropdown] = useState(false);
+  const [projectTitle, setProjectTitle] = useState('مشروع 3D');
+  const [saveState, setSaveState] = useState<ProjectSaveState>('idle');
+  const [saveError, setSaveError] = useState('');
+  const [savePulse, setSavePulse] = useState(false);
+  const [isBackAnimating, setIsBackAnimating] = useState(false);
 
   const { toast } = useToast();
   const { user, adminUser, isAuthenticated, isAdminAuthenticated, isAdmin } = useDualAuth();
+  const actions = useBuilderProjectActions();
+  const isAdminScope = Boolean((location.state as any)?.allUsers) && (isAdmin || isAdminAuthenticated);
+  const projectQuery = useBuilderProject(projectId || null, isAdminScope);
+  const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
   const {
     layout,
@@ -1436,6 +1638,19 @@ const ShopBuilderContent = () => {
   const [historyIndex, setHistoryIndex] = useState(-1);
   const isUndoRedoingRef = useRef(false);
   const lastSavedStateRef = useRef<string>('');
+  const hasLoadedProjectRef = useRef(false);
+  const lastSyncedLayoutRef = useRef<string>('');
+  const lastSyncedTitleRef = useRef('');
+  const saveTimerRef = useRef<number | null>(null);
+  const isCreatingProjectRef = useRef(false);
+
+  useEffect(() => {
+    hasLoadedProjectRef.current = false;
+    lastSyncedLayoutRef.current = '';
+    lastSyncedTitleRef.current = '';
+    setSaveState('idle');
+    setSaveError('');
+  }, [projectId]);
 
   // Initialize history with first state
   useEffect(() => {
@@ -1466,6 +1681,143 @@ const ShopBuilderContent = () => {
       lastSavedStateRef.current = newStateStr;
     }
   }, [layout, historyIndex, history.length]);
+
+  const serializedLayout = useMemo(() => JSON.stringify(layout), [layout]);
+
+  const persistProject = useCallback(async (mode: 'auto' | 'manual' = 'manual') => {
+    if (!projectId || !hasLoadedProjectRef.current) return;
+    const normalizedTitle = projectTitle.trim() || 'مشروع 3D';
+    const previewDataUrl = threeRef.current?.snapshot();
+    setSaveState('saving');
+    setSaveError('');
+    try {
+      const saved = await actions.updateProject.mutateAsync({
+        id: projectId,
+        allUsers: isAdminScope,
+        payload: {
+          title: normalizedTitle,
+          layout,
+          previewDataUrl,
+        },
+      });
+      lastSyncedLayoutRef.current = JSON.stringify(layout);
+      lastSyncedTitleRef.current = normalizedTitle;
+      setProjectTitle(saved.title || normalizedTitle);
+      setSaveState('saved');
+      if (mode === 'manual') {
+        setSavePulse(true);
+        window.setTimeout(() => setSavePulse(false), 900);
+        toast({ title: 'تم حفظ المشروع' });
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'فشل حفظ المشروع';
+      setSaveState('error');
+      setSaveError(message);
+      if (mode === 'manual') {
+        toast({ title: 'فشل الحفظ', description: message, variant: 'destructive' });
+      }
+    }
+  }, [actions.updateProject, layout, projectId, projectTitle, toast]);
+
+  useEffect(() => {
+    if (projectId || hasLoadedProjectRef.current || isCreatingProjectRef.current) return;
+    let cancelled = false;
+    isCreatingProjectRef.current = true;
+    (async () => {
+      try {
+        const created = await actions.createProject.mutateAsync({
+          title: layout.shopName ? `مشروع ${layout.shopName}` : 'مشروع جديد',
+          layout,
+        });
+        if (cancelled) return;
+        hasLoadedProjectRef.current = true;
+        navigate(`/shop-builder/editor/${created._id}`, { replace: true });
+      } catch (err) {
+        if (cancelled) return;
+        toast({
+          title: 'تعذر إنشاء مشروع جديد',
+          description: err instanceof Error ? err.message : 'حدث خطأ غير متوقع',
+          variant: 'destructive',
+        });
+        navigate('/shop-builder/projects', { replace: true });
+      } finally {
+        isCreatingProjectRef.current = false;
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [actions.createProject, layout, navigate, projectId, toast]);
+
+  useEffect(() => {
+    if (!projectId || !projectQuery.data || hasLoadedProjectRef.current) return;
+    const project = projectQuery.data as any;
+    if (project?.layout) {
+      importLayout(project.layout);
+      const serialized = JSON.stringify(project.layout);
+      lastSavedStateRef.current = serialized;
+      lastSyncedLayoutRef.current = serialized;
+    }
+    const nextTitle = String(project?.title || 'مشروع 3D');
+    setProjectTitle(nextTitle);
+    lastSyncedTitleRef.current = nextTitle;
+    hasLoadedProjectRef.current = true;
+  }, [importLayout, projectId, projectQuery.data]);
+
+  useEffect(() => {
+    if (!projectId || !projectQuery.isError) return;
+    toast({
+      title: 'تعذر تحميل المشروع',
+      description: projectQuery.error instanceof Error ? projectQuery.error.message : 'هذا المشروع غير متاح',
+      variant: 'destructive',
+    });
+    navigate('/shop-builder/projects', { replace: true });
+  }, [navigate, projectId, projectQuery.error, projectQuery.isError, toast]);
+
+  useEffect(() => {
+    if (!projectId || !hasLoadedProjectRef.current) return;
+    const normalizedTitle = projectTitle.trim() || 'مشروع 3D';
+    const hasChanges =
+      serializedLayout !== lastSyncedLayoutRef.current
+      || normalizedTitle !== lastSyncedTitleRef.current;
+    if (!hasChanges) {
+      if (saveState !== 'saving') setSaveState('saved');
+      return;
+    }
+    if (saveState === 'saved') setSaveState('idle');
+    if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = window.setTimeout(() => {
+      void persistProject('auto');
+    }, 1800);
+    return () => {
+      if (saveTimerRef.current) {
+        window.clearTimeout(saveTimerRef.current);
+        saveTimerRef.current = null;
+      }
+    };
+  }, [persistProject, projectId, projectTitle, saveState, serializedLayout]);
+
+  const handleManualSave = useCallback(() => {
+    void persistProject('manual');
+  }, [persistProject]);
+
+  const handleBackToProjects = useCallback(async () => {
+    try {
+      if (projectId && hasLoadedProjectRef.current) {
+        await persistProject('auto');
+      }
+    } catch {
+      // non-blocking, back should still work
+    }
+    if (prefersReducedMotion) {
+      navigate('/shop-builder/projects');
+      return;
+    }
+    setIsBackAnimating(true);
+    window.setTimeout(() => {
+      navigate('/shop-builder/projects');
+    }, 520);
+  }, [navigate, persistProject, prefersReducedMotion, projectId]);
 
   // Auto-generated hanging shapes are visual-only and should not open product controls.
   useEffect(() => {
@@ -2106,6 +2458,60 @@ const ShopBuilderContent = () => {
               </div>
             </div>
             <div className="px-2 sm:px-3 lg:px-4 py-2.5">
+              <div className="mb-3 rounded-2xl border border-zinc-200/80 bg-gradient-to-r from-white via-zinc-50 to-white p-2.5">
+                <div className="grid grid-cols-1 gap-2 lg:grid-cols-[minmax(260px,1fr)_auto_auto_auto] lg:items-center">
+                  <div className="relative">
+                    <Input
+                      value={projectTitle}
+                      onChange={(e) => setProjectTitle(e.target.value)}
+                      placeholder="اسم المشروع"
+                      className="h-10 bg-white pe-28 text-sm font-bold"
+                    />
+                    <span className="pointer-events-none absolute start-2.5 top-1/2 -translate-y-1/2 text-[11px] text-zinc-400">
+                      Project
+                    </span>
+                  </div>
+
+                  <div className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-zinc-200 bg-white px-2.5 py-2 text-[11px] font-bold text-zinc-700 min-h-10">
+                    {saveState === 'saving' ? <Loader2 className="h-3.5 w-3.5 animate-spin text-blue-600" /> : null}
+                    {saveState === 'saved' ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> : null}
+                    {saveState === 'error' ? <AlertTriangle className="h-3.5 w-3.5 text-red-600" /> : null}
+                    {saveState === 'idle' ? <Clock className="h-3.5 w-3.5 text-zinc-500" /> : null}
+                    <span className="whitespace-nowrap">
+                      {saveState === 'saving' ? 'جارٍ الحفظ' : null}
+                      {saveState === 'saved' ? 'محفوظ' : null}
+                      {saveState === 'error' ? 'فشل الحفظ' : null}
+                      {saveState === 'idle' ? 'حفظ تلقائي' : null}
+                    </span>
+                  </div>
+
+                  <Button
+                    type="button"
+                    onClick={handleManualSave}
+                    disabled={!projectId || saveState === 'saving' || projectQuery.isLoading}
+                    className={cn(
+                      'h-10 rounded-xl gap-2 px-3 text-sm',
+                      savePulse && !prefersReducedMotion && 'animate-pulse'
+                    )}
+                  >
+                    <Save className="h-4 w-4" />
+                    حفظ
+                  </Button>
+
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => void handleBackToProjects()}
+                    className="h-10 rounded-xl gap-2 px-3 text-sm"
+                  >
+                    <ArrowRight className="h-4 w-4" />
+                    رجوع للمشاريع
+                  </Button>
+                </div>
+                {saveState === 'error' && saveError ? (
+                  <p className="mt-2 text-xs text-red-600 font-semibold truncate">{saveError}</p>
+                ) : null}
+              </div>
               <BuilderToolbar
                 transformMode={transformMode}
                 onTransformModeChange={setTransformMode}
@@ -3276,6 +3682,26 @@ const ShopBuilderContent = () => {
         <div className="w-full max-w-[1920px] mx-auto mt-4 px-2">
           <SceneItemsList />
         </div>
+
+        {projectId && projectQuery.isLoading && !hasLoadedProjectRef.current ? (
+          <div className="fixed inset-0 z-[95] bg-black/35 backdrop-blur-sm flex items-center justify-center px-4">
+            <div className="rounded-2xl bg-white border border-zinc-200 shadow-xl px-5 py-4 flex items-center gap-3">
+              <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <div className="text-sm font-bold text-zinc-800">جارٍ تحميل المشروع...</div>
+            </div>
+          </div>
+        ) : null}
+
+        {isBackAnimating ? (
+          <div className="fixed inset-0 z-[96] pointer-events-none bg-gradient-to-br from-black/80 via-slate-900/80 to-cyan-900/75 animate-[fadeIn_180ms_ease-out]">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl p-6 text-center text-white shadow-[0_35px_120px_-40px_rgba(56,189,248,0.9)] animate-[zoomIn_420ms_cubic-bezier(0.22,1,0.36,1)]">
+                <p className="text-xs uppercase tracking-[0.18em] text-cyan-200">Back To Projects</p>
+                <p className="text-lg font-black mt-1">يتم الرجوع إلى بطاقات المشاريع</p>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

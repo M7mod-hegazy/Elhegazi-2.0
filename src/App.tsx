@@ -75,6 +75,7 @@ const ShopBuilder3DPage = lazyWithFallback(
 );
 const ShopSetup = lazy(() => import("./pages/ShopSetup"));
 const ShopBuilderIntro = lazy(() => import("./pages/ShopBuilderIntro"));
+const ShopBuilderProjects = lazy(() => import("./pages/ShopBuilderProjects"));
 const PublicOrderTracking = lazy(() => import("./pages/PublicOrderTracking"));
 const OrderHistory = lazy(() => import("./pages/OrderHistory"));
 const OrderConfirmation = lazy(() => import("./pages/OrderConfirmation"));
@@ -410,7 +411,9 @@ const AppInner = () => {
             <Route path="/shop-setup" element={<ShopSetup />} />
             <Route path="/shop-builder" element={<ShopBuilderIntro />} />
             <Route path="/shop-builder/intro" element={<ShopBuilderIntro />} />
+            <Route path="/shop-builder/projects" element={<ShopBuilderProjects />} />
             <Route path="/shop-builder/editor" element={<ShopBuilder3DPage />} />
+            <Route path="/shop-builder/editor/:projectId" element={<ShopBuilder3DPage />} />
 
 
             {/* Admin Routes */}

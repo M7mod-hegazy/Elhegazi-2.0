@@ -73,6 +73,20 @@ const defaultLayout: ShopBuilderLayout = {
 const ShopBuilderContext = createContext<ShopBuilderContextValue | undefined>(undefined);
 
 const now = () => new Date().toISOString();
+const normalizeColumnSide = (side: unknown): 'front' | 'back' => {
+  if (side === 'back' || side === 'right') return 'back';
+  return 'front';
+};
+const normalizeLayoutColumns = (input: ShopBuilderLayout): ShopBuilderLayout => ({
+  ...input,
+  walls: (input.walls || []).map((wall) => ({
+    ...wall,
+    columns: (wall.columns || []).map((column) => ({
+      ...column,
+      side: normalizeColumnSide((column as any).side),
+    })),
+  })),
+});
 
 // Load from localStorage
 const loadFromStorage = (): ShopBuilderLayout | null => {
@@ -100,7 +114,7 @@ const loadFromStorage = (): ShopBuilderLayout | null => {
       }
       
 
-      return parsed;
+      return normalizeLayoutColumns(parsed);
     }
   } catch (error) {
     console.error('❌ Failed to load design from localStorage:', error);
@@ -351,7 +365,7 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
             depth: 0.5, // Default depth (عمق) = 0.5m
             height: wall.height, // Match wall height
             shape: 'square',
-            side: 'left', // Default side (جانب) = يسار (left)
+            side: 'front', // Default side = front face
             color: wall.color, // Match wall color
           };
           return {
@@ -878,8 +892,9 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
       return;
     }
 
+    const normalized = normalizeLayoutColumns(next);
     setLayout({
-      ...next,
+      ...normalized,
       createdAt: (next as any).createdAt ?? now(),
       updatedAt: now(),
     });
@@ -1064,3 +1079,4 @@ export const useShopBuilderLayout = () => {
   }
   return layout;
 };
+

@@ -1,4 +1,4 @@
-import { useState, useEffect, Fragment, useCallback, memo, useRef, useMemo } from 'react';
+﻿import { useState, useEffect, Fragment, useCallback, memo, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -169,6 +169,92 @@ type ImportItem = Partial<ProductFormData> & {
   [key: string]: string | number | boolean | string[] | undefined;
 };
 
+type ImportRowStatus = 'ready' | 'quarantined_duplicate' | 'quarantined_category' | 'invalid';
+type ImportCategoryState = 'resolved' | 'missing' | 'ambiguous';
+
+type ImportRowReason = {
+  code: string;
+  message: string;
+};
+
+type ImportRowMatchTarget = {
+  type: 'database' | 'file';
+  id: string;
+  label: string;
+};
+
+type ImportCategoryResolution =
+  | { type: 'existing'; categoryId: string }
+  | { type: 'create'; name: string; slug: string }
+  | null;
+
+type ImportRowMeta = {
+  status: ImportRowStatus;
+  reasons: ImportRowReason[];
+  matchTargets: ImportRowMatchTarget[];
+  categoryCandidates: Array<{ id: string; name: string; nameAr: string; slug: string }>;
+  categoryState: ImportCategoryState;
+  categoryResolution: ImportCategoryResolution;
+  originalName: string;
+  originalSku: string;
+  editedName: string;
+  editedSku: string;
+  hasRequiredEdits: boolean;
+  isConflictFreeNow: boolean;
+  wasQuarantinedDuplicate: boolean;
+};
+
+type ImportPreviewRow = ImportItem & {
+  __rowId: string;
+  __meta: ImportRowMeta;
+};
+
+type ExportScope = 'all' | 'filtered' | 'selected';
+type ExportFieldKey =
+  | 'nameAr'
+  | 'name'
+  | 'price'
+  | 'stock'
+  | 'sku'
+  | 'categoryAr'
+  | 'category'
+  | 'descriptionAr'
+  | 'description'
+  | 'featured'
+  | 'isHidden'
+  | 'image';
+
+const decodeMojibakeText = (value: string): string => {
+  const input = (value ?? '').toString();
+  if (!input) return '';
+  const bytes = Uint8Array.from([...input].map((c) => c.charCodeAt(0) & 0xff));
+
+  const score = (text: string) => {
+    const arabicCount = (text.match(/[\u0600-\u06FF]/g) || []).length;
+    const brokenCount = (text.match(/[\u00D8\u00D9\u00C3\u00D0\u00CA\u00C7\u00E2]/g) || []).length;
+    return arabicCount * 3 - brokenCount * 2 + (text.trim().length > 1 ? 1 : 0);
+  };
+
+  let best = input;
+  let bestScore = score(input);
+  const encodings = ['utf-8', 'windows-1256'] as const;
+
+  for (const encoding of encodings) {
+    try {
+      const decoded = new TextDecoder(encoding).decode(bytes);
+      const currentScore = score(decoded);
+      if (currentScore > bestScore) {
+        bestScore = currentScore;
+        best = decoded;
+      }
+    } catch {
+      // ignore decode failures
+    }
+  }
+
+  return best.replace(/[\u200E\u200F]/g, '').trim();
+};
+
 // Memoized top-level ProductForm to avoid remounts on parent re-render (prevents input focus loss)
 type ProductFormProps = {
   formData: ProductFormData;
@@ -245,7 +331,7 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
                 />
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-sm">ج.م</span>
               </div>
-              <p className="text-[10px] text-slate-400">يظهر مشطوباً إن كان أكبر من السعر الحالي</p>
+              <p className="text-[10px] text-slate-400">يظهر مشطوبًا إذا كان أكبر من السعر الحالي</p>
             </div>
           </div>
 
@@ -267,7 +353,7 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
                   setFormData((prev) => ({ ...prev, category: value, categoryAr: selectedCat?.nameAr || selectedCat?.name || '' }));
                 }}
               >
-                <option value="">{categories.length === 0 ? 'أنشئ فئة أولاً' : 'اختر الفئة'}</option>
+                <option value="">{categories.length === 0 ? 'أنشئ فئة أولًا' : 'اختر الفئة'}</option>
                 {categories.map((category) => (
                   <option key={category.id} value={category.id}>{category.nameAr || category.name}</option>
                 ))}
@@ -312,7 +398,7 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
               onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
               rows={5}
               className="bg-white border-slate-200 focus:border-slate-400 focus:ring-slate-400/20 shadow-sm rounded-lg resize-none"
-              placeholder="اكتب وصفاً مفصلاً للمنتج..."
+              placeholder="اكتب وصفًا مفصلًا للمنتج..."
             />
           </div>
         </div>
@@ -334,7 +420,7 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
             </div>
             <p className="text-[10px] text-slate-400 flex items-center gap-1">
               <CheckCircle className="w-3 h-3 text-green-500" />
-              الصورة الأولى رئيسية • حد أقصى 5 صور
+              الصورة الأولى رئيسية ⬢ حد أقصى 5 صور
             </p>
           </div>
 
@@ -610,7 +696,7 @@ const AdminProducts = () => {
     setBulkListCategoryId('');
     toast({
       title: 'تم جدولة تغيير الفئة',
-      description: 'سيتم التنفيذ خلال 6 ثوانٍ — يمكنك التراجع الآن',
+      description: 'سيتم التنفيذ خلال 6 ثوانٍ - يمكنك التراجع الآن',
       action: (
         <ToastAction altText="تراجع" onClick={undoBulkOps}>
           تراجع
@@ -684,7 +770,7 @@ const AdminProducts = () => {
     setScheduledDeletes(map => new Map(map).set('__bulk_price__', timer));
     toast({
       title: 'تم جدولة تعديل الأسعار',
-      description: 'سيتم التنفيذ خلال 6 ثوانٍ — يمكنك التراجع الآن',
+      description: 'سيتم التنفيذ خلال 6 ثوانٍ - يمكنك التراجع الآن',
       action: (
         <ToastAction altText="تراجع" onClick={undoBulkOps}>
           تراجع
@@ -719,8 +805,29 @@ const AdminProducts = () => {
   const [importFile, setImportFile] = useState<File | null>(null);
   const [extractedData, setExtractedData] = useState<string[][]>([]);
   const [columnMapping, setColumnMapping] = useState<{ [key: number]: string }>({});
-  const [importPreview, setImportPreview] = useState<ImportItem[]>([]);
+  const [importPreview, setImportPreview] = useState<ImportPreviewRow[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isImportSubmitting, setIsImportSubmitting] = useState(false);
+  const [isImportConfirmOpen, setIsImportConfirmOpen] = useState(false);
+  const [isQuarantineModalOpen, setIsQuarantineModalOpen] = useState(false);
+  const [categoryCreateLoadingRowId, setCategoryCreateLoadingRowId] = useState<string | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isExportSubmitting, setIsExportSubmitting] = useState(false);
+  const [exportScope, setExportScope] = useState<ExportScope>('filtered');
+  const [exportFields, setExportFields] = useState<Record<ExportFieldKey, boolean>>({
+    nameAr: true,
+    name: true,
+    price: true,
+    stock: true,
+    sku: true,
+    categoryAr: true,
+    category: true,
+    descriptionAr: false,
+    description: false,
+    featured: false,
+    isHidden: false,
+    image: false,
+  });
   const [importStep, setImportStep] = useState<'upload' | 'mapping' | 'preview' | 'complete'>('upload');
   // Bulk selection/action state for list table
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -734,6 +841,7 @@ const AdminProducts = () => {
   const [previewPerPage, setPreviewPerPage] = useState<number | 'all'>(10);
   const [previewPage, setPreviewPage] = useState(1);
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
+  const importRowSeqRef = useRef(1);
   // Matching strategy for Smart Update
   const [matchStrategy, setMatchStrategy] = useState<'auto' | 'sku' | 'name' | 'nameAr'>('auto');
   // Ensure category select opens inside dialog reliably
@@ -790,11 +898,25 @@ const AdminProducts = () => {
 
   const refetchProducts = useCallback(async () => {
     setIsLoadingProducts(true);
-    const res = await apiGet<BackendProduct>('/api/products');
-    if (res.ok && res.items) {
-      setProducts(res.items.map(mapBackendProduct));
+    try {
+      const pageSize = 200;
+      let page = 1;
+      let pages = 1;
+      const all: BackendProduct[] = [];
+
+      while (page <= pages) {
+        const res = await apiGet<BackendProduct>(`/api/products?page=${page}&limit=${pageSize}`);
+        if (!res.ok) break;
+        if (Array.isArray(res.items)) all.push(...res.items);
+        pages = Number(res.pages || 1);
+        page += 1;
+      }
+
+      const deduped = Array.from(new Map(all.map((item) => [String(item._id), item])).values());
+      setProducts(deduped.map(mapBackendProduct));
+    } finally {
+      setIsLoadingProducts(false);
     }
-    setIsLoadingProducts(false);
   }, []);
 
   const refetchCategories = useCallback(async () => {
@@ -911,7 +1033,7 @@ const AdminProducts = () => {
       title: 'تم جدولة الحذف الجماعي',
       description: (
         <div>
-          سيتم الحذف خلال 6 ثوانٍ — يمكنك التراجع الآن
+          سيتم الحذف خلال 6 ثوانٍ - يمكنك التراجع الآن
           <DeleteCountdownBar durationMs={6000} />
         </div>
       ),
@@ -973,12 +1095,18 @@ const AdminProducts = () => {
   useEffect(() => {
     if (isImportModalOpen && importStep === 'preview' && categories.length === 0) {
       toast({
-        title: 'لا توجد فئات حالياً',
+        title: 'لا توجد فئات حاليًا',
         description: 'يمكنك إنشاء فئات من صفحة الفئات، أو سنحاول استنتاجها من المنتجات والمدخلات الحالية.',
         variant: 'default'
       });
     }
   }, [isImportModalOpen, importStep, categories.length, toast]);
+
+  useEffect(() => {
+    if (!isImportModalOpen || importStep !== 'preview' || importPreview.length === 0) return;
+    setImportPreview((prev) => runImportPreflight(prev, prev));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categories, products, isImportModalOpen, importStep]);
 
   // Filter products (memoized)
   const filteredProducts = useMemo(() => {
@@ -1100,19 +1228,12 @@ const AdminProducts = () => {
       if (!cloned.descriptionAr) cloned.descriptionAr = `منتج ${index + 1}`;
       return cloned;
     });
-    // Deduplicate similar to generatePreview
-    const seen = new Set<string>();
-    return result.filter((p) => {
-      const key = normalizeKey(p.sku) || normalizeKey(p.name) || normalizeKey(p.nameAr);
-      if (!key) return true;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
+    return result;
   };
 
   const updateImportItem = (absoluteIndex: number, field: keyof ImportItem, value: string) => {
-    setImportPreview(prev => prev.map((item, idx) => {
+    setImportPreview(prev => {
+      const next = prev.map((item, idx) => {
       if (idx !== absoluteIndex) return item;
       // coerce types for known numeric/boolean fields
       if (field === 'price' || field === 'originalPrice' || field === 'weight') {
@@ -1122,7 +1243,9 @@ const AdminProducts = () => {
         return { ...item, [field]: value === 'true' };
       }
       return { ...item, [field]: value };
-    }));
+      });
+      return runImportPreflight(next, prev);
+    });
   };
 
   const applyBulkCategory = (idOverride?: string) => {
@@ -1130,15 +1253,38 @@ const AdminProducts = () => {
     if (!id) return;
     const cat = categories.find(c => String(c.id) === String(id));
     setBulkCategoryId(String(id));
-    setImportPreview(prev => prev.map(item => ({
-      ...item,
-      category: cat ? String(cat.id) : item.category,
-      categoryAr: cat?.nameAr || item.categoryAr,
-    })));
+    setImportPreview(prev => {
+      const next = prev.map(item => ({
+        ...item,
+        category: cat ? String(cat.id) : item.category,
+        categoryAr: cat?.nameAr || item.categoryAr,
+        __meta: {
+          ...item.__meta,
+          categoryResolution: cat ? ({ type: 'existing', categoryId: String(cat.id) } as ImportCategoryResolution) : item.__meta.categoryResolution,
+        },
+      }));
+      return runImportPreflight(next, prev);
+    });
     if (cat) {
-      toast({ title: 'تم تعيين الفئة جماعياً', description: `تم تعيين الفئة "${cat.nameAr || cat.name}" لجميع العناصر` });
+      toast({ title: 'تم تعيين الفئة جماعيًا', description: `تم تعيين الفئة "${cat.nameAr || cat.name}" لجميع العناصر` });
     }
   };
+
+  const importPreviewValidation = useMemo(() => {
+    const readyRows = importPreview.filter((row) => row.__meta.status === 'ready').length;
+    const quarantinedDuplicate = importPreview.filter((row) => row.__meta.status === 'quarantined_duplicate').length;
+    const quarantinedCategory = importPreview.filter((row) => row.__meta.status === 'quarantined_category').length;
+    const invalidRows = importPreview.filter((row) => row.__meta.status === 'invalid').length;
+
+    return {
+      isValid: importPreview.length > 0 && readyRows === importPreview.length,
+      readyRows,
+      quarantinedDuplicate,
+      quarantinedCategory,
+      invalidRowsCount: invalidRows,
+      blockedRowsCount: quarantinedDuplicate + quarantinedCategory + invalidRows,
+    };
+  }, [importPreview]);
 
   // Auto-generate SKU
   const generateSKU = () => {
@@ -1358,22 +1504,153 @@ const AdminProducts = () => {
     setIsEditModalOpen(true);
   };
 
-  // Export products as CSV
-  const handleExport = () => {
-    const csvContent = [
-      ['ID', 'Name', 'Category', 'Price', 'Hidden', 'SKU'].join(','),
-      ...products.map(p => [p.id, p.name, p.category, p.price, p.isHidden ? 'true' : 'false', p.sku].join(','))
-    ].join('\n');
+  const exportCandidates = useMemo(() => {
+    const currentlyFiltered = products.filter((product) => {
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.nameAr.includes(searchTerm) ||
+        product.sku.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesCategory = !selectedCategory || selectedCategory === 'all' || product.category === selectedCategory;
+      return matchesSearch && matchesCategory;
+    });
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'products.csv';
-    a.click();
-    URL.revokeObjectURL(url);
-    // audit log: export
-    void logHistory({ section: 'products', action: 'export_downloaded', note: `Exported ${products.length} products`, meta: { count: products.length } });
+    if (exportScope === 'all') return products;
+    if (exportScope === 'selected') {
+      if (selectedIds.size === 0) return [];
+      return products.filter((p) => selectedIds.has(String(p.id)));
+    }
+    return currentlyFiltered;
+  }, [exportScope, products, selectedIds, searchTerm, selectedCategory]);
+
+  const selectedExportFieldsCount = useMemo(
+    () => Object.values(exportFields).filter(Boolean).length,
+    [exportFields]
+  );
+
+  const exportFieldOptions: Array<{ key: ExportFieldKey; label: string; hint: string }> = [
+    { key: 'nameAr', label: '\u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062a\u062c (\u0639\u0631\u0628\u064a)', hint: 'nameAr' },
+    { key: 'name', label: '\u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062a\u062c (EN)', hint: 'name' },
+    { key: 'price', label: '\u0627\u0644\u0633\u0639\u0631', hint: 'price' },
+    { key: 'stock', label: '\u0627\u0644\u0645\u062e\u0632\u0648\u0646', hint: 'stock' },
+    { key: 'sku', label: '\u0627\u0644\u0643\u0648\u062f', hint: 'sku' },
+    { key: 'categoryAr', label: '\u0627\u0633\u0645 \u0627\u0644\u0641\u0626\u0629 (\u0639\u0631\u0628\u064a)', hint: 'categoryAr' },
+    { key: 'category', label: '\u0645\u0639\u0631\u0641 \u0627\u0644\u0641\u0626\u0629', hint: 'category' },
+    { key: 'descriptionAr', label: '\u0648\u0635\u0641 (\u0639\u0631\u0628\u064a)', hint: 'descriptionAr' },
+    { key: 'description', label: '\u0648\u0635\u0641 (EN)', hint: 'description' },
+    { key: 'featured', label: '\u0645\u0646\u062a\u062c \u0645\u0645\u064a\u0632', hint: 'featured' },
+    { key: 'isHidden', label: '\u0645\u062e\u0641\u064a', hint: 'isHidden' },
+    { key: 'image', label: '\u0635\u0648\u0631\u0629', hint: 'image' },
+  ];
+
+  const toggleAllExportFields = (checked: boolean) => {
+    setExportFields({
+      nameAr: checked,
+      name: checked,
+      price: checked,
+      stock: checked,
+      sku: checked,
+      categoryAr: checked,
+      category: checked,
+      descriptionAr: checked,
+      description: checked,
+      featured: checked,
+      isHidden: checked,
+      image: checked,
+    });
+  };
+
+  const executeExportExcel = async () => {
+    if (isExportSubmitting) return;
+    if (selectedExportFieldsCount === 0) {
+      toast({ title: '\u0627\u062e\u062a\u0631 \u062d\u0642\u0644\u0627\u064b \u0648\u0627\u062d\u062f\u0627\u064b \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644', variant: 'destructive' });
+      return;
+    }
+    if (exportCandidates.length === 0) {
+      toast({ title: '\u0644\u0627 \u064a\u0648\u062c\u062f \u0645\u0646\u062a\u062c\u0627\u062a \u0644\u0644\u062a\u0635\u062f\u064a\u0631', variant: 'destructive' });
+      return;
+    }
+
+    setIsExportSubmitting(true);
+    try {
+      const fieldsInOrder: ExportFieldKey[] = [
+        'nameAr',
+        'name',
+        'price',
+        'stock',
+        'sku',
+        'categoryAr',
+        'category',
+        'descriptionAr',
+        'description',
+        'featured',
+        'isHidden',
+        'image',
+      ].filter((field) => exportFields[field]);
+
+      const rows = exportCandidates.map((p) => {
+        const category = categories.find((c) => String(c.id) === String(p.category) || String(c.slug) === String(p.category));
+        const productRow: Record<string, string | number | boolean> = {};
+        fieldsInOrder.forEach((field) => {
+          switch (field) {
+            case 'nameAr':
+              productRow.nameAr = p.nameAr || p.name || '';
+              break;
+            case 'name':
+              productRow.name = p.name || p.nameAr || '';
+              break;
+            case 'price':
+              productRow.price = Number(p.price ?? 0);
+              break;
+            case 'stock':
+              productRow.stock = Number(p.stock ?? 0);
+              break;
+            case 'sku':
+              productRow.sku = p.sku || '';
+              break;
+            case 'categoryAr':
+              productRow.categoryAr = category?.nameAr || p.categoryAr || '';
+              break;
+            case 'category':
+              productRow.category = String(category?.id || p.category || '');
+              break;
+            case 'descriptionAr':
+              productRow.descriptionAr = p.descriptionAr || '';
+              break;
+            case 'description':
+              productRow.description = p.description || '';
+              break;
+            case 'featured':
+              productRow.featured = Boolean(p.featured);
+              break;
+            case 'isHidden':
+              productRow.isHidden = Boolean(p.isHidden);
+              break;
+            case 'image':
+              productRow.image = p.image || p.images?.[0] || '';
+              break;
+          }
+        });
+        return productRow;
+      });
+
+      const sheet = XLSX.utils.json_to_sheet(rows, { header: fieldsInOrder });
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, sheet, 'Products');
+      const date = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `products-import-ready-${date}.xlsx`);
+      void logHistory({
+        section: 'products',
+        action: 'export_downloaded',
+        note: `Exported ${rows.length} products for re-import`,
+        meta: { count: rows.length, scope: exportScope, fields: fieldsInOrder },
+      });
+      toast({
+        title: '\u062a\u0645 \u062a\u062c\u0647\u064a\u0632 \u0645\u0644\u0641 \u0627\u0644\u062a\u0635\u062f\u064a\u0631',
+        description: `\u062a\u0645 \u062a\u0635\u062f\u064a\u0631 ${rows.length} \u0645\u0646\u062a\u062c \u0628\u0635\u064a\u063a\u0629 \u0645\u062a\u0648\u0627\u0641\u0642\u0629 \u0645\u0639 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f`,
+      });
+      setIsExportModalOpen(false);
+    } finally {
+      setIsExportSubmitting(false);
+    }
   };
 
   // Smart Import Functions
@@ -1392,7 +1669,7 @@ const AdminProducts = () => {
       ) {
         await processExcelFile(file);
       } else {
-        throw new Error('نوع الملف غير مدعوم. يسمح فقط بملفات Excel/CSV');
+        throw new Error('نوع الملف غير مدعوم. يُسمح فقط بملفات Excel/CSV');
       }
     } catch (error) {
       toast({
@@ -1407,8 +1684,18 @@ const AdminProducts = () => {
 
   const processExcelFile = async (file: File) => {
     try {
+      const xlsxWithCodepage = XLSX as typeof XLSX & { set_cptable?: (table: unknown) => void };
+      if (xlsxWithCodepage.set_cptable) {
+        try {
+          const cptable = await import('xlsx/dist/cpexcel.full.mjs');
+          xlsxWithCodepage.set_cptable(cptable);
+        } catch {
+          // optional runtime enhancement
+        }
+      }
+
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
+      const workbook = XLSX.read(buffer, { type: 'array', cellText: true, cellDates: true });
       const firstSheetName = workbook.SheetNames[0];
       const sheet = workbook.Sheets[firstSheetName];
       const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' }) as unknown[][];
@@ -1418,9 +1705,11 @@ const AdminProducts = () => {
       }
 
       // Normalize header values to strings
-      const headers = (aoa[0] || []).map((h) => String(h));
+      const headers = (aoa[0] || []).map((h) => decodeMojibakeText(String(h)));
       const rows = aoa.slice(1);
-      const rowsStr: string[][] = rows.map((row) => row.map((v) => String(v)));
+      const rowsStr: string[][] = rows
+        .map((row) => row.map((v) => decodeMojibakeText(String(v))))
+        .filter((row) => row.some((cell) => String(cell || '').trim().length > 0));
       const extractedArray: string[][] = [headers, ...rowsStr];
       setExtractedData(extractedArray);
 
@@ -1432,13 +1721,23 @@ const AdminProducts = () => {
       const tableData: TableData = { headers, rows: rowsStr, confidence: 0.9 };
       const formatted = formatDataForPreview(tableData, smartMapping);
       const enhanced = enhancePreviewFromTable(tableData, smartMapping, formatted as ImportItem[]);
-      setImportPreview(enhanced);
+      const cleanedPreview = enhanced.filter((item) => {
+        const name = String(item.nameAr || item.name || '').trim();
+        const sku = String(item.sku || '').trim();
+        const hasPrice = Number.isFinite(Number(item.price));
+        const hasStock = Number.isFinite(Number(item.stock));
+        if (!name || name.length < 2) return false;
+        if (/^(name|اسم المنتج|السعر|price|sku|الكود|المخزون|category|الفئة)$/i.test(name)) return false;
+        return hasPrice || hasStock || sku.length > 0;
+      });
+      setImportPreview(runImportPreflight(cleanedPreview));
+      setPreviewPerPage('all');
       setPreviewPage(1);
       setImportStep('preview');
 
       toast({
         title: 'تم قراءة ملف Excel/CSV',
-        description: `تم العثور على ${rows.length} صف من البيانات في الورقة ${firstSheetName}`,
+        description: `تم العثور على ${cleanedPreview.length} صف صالح من البيانات في الورقة ${firstSheetName}`,
       });
     } catch (error) {
       throw new Error(`فشل في معالجة ملف Excel/CSV: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`);
@@ -1506,6 +1805,234 @@ const AdminProducts = () => {
     return isSameProduct(p, item);
   };
 
+  const slugifyCategory = (value: string) =>
+    String(value || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\u064B-\u0652]/g, '')
+      .replace(/[^\w\u0600-\u06FF\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+      .slice(0, 64);
+
+  const createRowReason = (code: string, message: string): ImportRowReason => ({ code, message });
+
+  const createDefaultRowMeta = (row: ImportItem, prevMeta?: ImportRowMeta): ImportRowMeta => {
+    const baseName = String(row.nameAr || row.name || '').trim();
+    const baseSku = String(row.sku || '').trim();
+    return {
+      status: prevMeta?.status || 'invalid',
+      reasons: prevMeta?.reasons || [],
+      matchTargets: prevMeta?.matchTargets || [],
+      categoryCandidates: prevMeta?.categoryCandidates || [],
+      categoryState: prevMeta?.categoryState || 'missing',
+      categoryResolution: prevMeta?.categoryResolution || null,
+      originalName: prevMeta?.originalName || baseName,
+      originalSku: prevMeta?.originalSku || baseSku,
+      editedName: baseName,
+      editedSku: baseSku,
+      hasRequiredEdits: prevMeta?.hasRequiredEdits || false,
+      isConflictFreeNow: prevMeta?.isConflictFreeNow || false,
+      wasQuarantinedDuplicate: prevMeta?.wasQuarantinedDuplicate || false,
+    };
+  };
+
+  const ensureImportRowIdentity = (row: ImportItem | ImportPreviewRow): ImportPreviewRow => {
+    const existing = row as ImportPreviewRow;
+    const rowId = existing.__rowId || `imp-row-${importRowSeqRef.current++}`;
+    const meta = createDefaultRowMeta(existing, existing.__meta);
+    return {
+      ...existing,
+      __rowId: rowId,
+      __meta: meta,
+    };
+  };
+
+  const findCategoryCandidates = (row: ImportItem) => {
+    const rawCandidates = [
+      String(row.category ?? '').trim(),
+      String(row.categoryAr ?? '').trim(),
+      String((row as Record<string, unknown>).categorySlug ?? '').trim(),
+      String((row as Record<string, unknown>).categoryCode ?? '').trim(),
+    ].filter(Boolean);
+
+    const unique = Array.from(new Set(rawCandidates));
+    const matches = categories.filter((cat) => {
+      return unique.some((candidate) => {
+        const key = normalizeKey(candidate);
+        return (
+          String(cat.id) === candidate ||
+          normalizeKey(cat.slug) === key ||
+          normalizeKey(cat.name) === key ||
+          normalizeKey(cat.nameAr) === key
+        );
+      });
+    });
+
+    return matches.map((cat) => ({
+      id: String(cat.id),
+      name: cat.name,
+      nameAr: cat.nameAr,
+      slug: cat.slug,
+    }));
+  };
+
+  const runImportPreflight = (rowsInput: Array<ImportItem | ImportPreviewRow>, previousRows?: ImportPreviewRow[]): ImportPreviewRow[] => {
+    const rows = rowsInput.map(ensureImportRowIdentity);
+    const prevMetaMap = new Map((previousRows || []).map((r) => [r.__rowId, r.__meta]));
+
+    const skuToRows = new Map<string, string[]>();
+    const nameToRows = new Map<string, string[]>();
+    const nameArToRows = new Map<string, string[]>();
+
+    rows.forEach((row) => {
+      const skuKey = normalizeSku(String(row.sku || ''));
+      const nameKey = normalizeKey(String(row.name || ''));
+      const nameArKey = normalizeKey(String(row.nameAr || row.name || ''));
+      if (skuKey) skuToRows.set(skuKey, [...(skuToRows.get(skuKey) || []), row.__rowId]);
+      if (nameKey) nameToRows.set(nameKey, [...(nameToRows.get(nameKey) || []), row.__rowId]);
+      if (nameArKey) nameArToRows.set(nameArKey, [...(nameArToRows.get(nameArKey) || []), row.__rowId]);
+    });
+
+    return rows.map((row, index) => {
+      const prevMeta = prevMetaMap.get(row.__rowId);
+      const meta = createDefaultRowMeta(row, prevMeta);
+      const reasons: ImportRowReason[] = [];
+      const matchTargets: ImportRowMatchTarget[] = [];
+
+      const nameValue = String(row.nameAr || row.name || '').trim();
+      const skuValue = String(row.sku || '').trim();
+      const priceValue = Number(row.price);
+      const stockValue = Number(row.stock);
+
+      const hasName = nameValue.length > 0;
+      const hasSku = skuValue.length > 0;
+      const hasPrice = Number.isFinite(priceValue);
+      const hasStock = Number.isFinite(stockValue);
+
+      if (!hasName) reasons.push(createRowReason('missing_name', 'الاسم مطلوب.'));
+      if (!hasSku) reasons.push(createRowReason('missing_sku', 'الكود مطلوب.'));
+      if (!hasPrice) reasons.push(createRowReason('missing_price', 'السعر غير صالح.'));
+      if (!hasStock) reasons.push(createRowReason('missing_stock', 'المخزون غير صالح.'));
+
+      const categoryCandidates = findCategoryCandidates(row);
+      let categoryState: ImportCategoryState = 'missing';
+      let resolvedCategoryId = '';
+      let categoryResolution: ImportCategoryResolution = meta.categoryResolution;
+
+      if (categoryResolution?.type === 'existing') {
+        const exists = categories.find((c) => String(c.id) === String(categoryResolution.categoryId));
+        if (exists) {
+          categoryState = 'resolved';
+          resolvedCategoryId = String(exists.id);
+        } else {
+          categoryState = 'missing';
+          reasons.push(createRowReason('category_resolution_lost', 'الفئة المختارة لم تعد موجودة.'));
+        }
+      } else if (categoryResolution?.type === 'create') {
+        const slugKey = normalizeKey(categoryResolution.slug);
+        const nameKey = normalizeKey(categoryResolution.name);
+        const existing = categories.find((c) => normalizeKey(c.slug) === slugKey || normalizeKey(c.name) === nameKey || normalizeKey(c.nameAr) === nameKey);
+        if (existing) {
+          categoryState = 'resolved';
+          resolvedCategoryId = String(existing.id);
+          categoryResolution = { type: 'existing', categoryId: String(existing.id) };
+        } else {
+          categoryState = 'missing';
+          reasons.push(createRowReason('category_create_pending', 'الفئة الجديدة لم تُنشأ بعد.'));
+        }
+      } else if (categoryCandidates.length === 1) {
+        categoryState = 'resolved';
+        resolvedCategoryId = categoryCandidates[0].id;
+      } else if (categoryCandidates.length > 1) {
+        categoryState = 'ambiguous';
+        reasons.push(createRowReason('category_ambiguous', 'اسم الفئة يطابق أكثر من فئة. اختر الفئة الصحيحة.'));
+      } else {
+        categoryState = 'missing';
+        reasons.push(createRowReason('category_missing', 'الفئة غير موجودة.'));
+      }
+
+      const dbMatches = products.filter((p) => isSameProduct(p, row));
+      dbMatches.slice(0, 4).forEach((p) => {
+        matchTargets.push({
+          type: 'database',
+          id: String(p.id),
+          label: `${p.nameAr || p.name} (${p.sku || 'بدون كود'})`,
+        });
+      });
+
+      const fileMatchIds = new Set<string>();
+      const skuKey = normalizeSku(skuValue);
+      const nameKey = normalizeKey(String(row.name || ''));
+      const nameArKey = normalizeKey(String(row.nameAr || row.name || ''));
+      if (skuKey) (skuToRows.get(skuKey) || []).forEach((id) => { if (id !== row.__rowId) fileMatchIds.add(id); });
+      if (nameKey) (nameToRows.get(nameKey) || []).forEach((id) => { if (id !== row.__rowId) fileMatchIds.add(id); });
+      if (nameArKey) (nameArToRows.get(nameArKey) || []).forEach((id) => { if (id !== row.__rowId) fileMatchIds.add(id); });
+
+      rows.forEach((r) => {
+        if (fileMatchIds.has(r.__rowId)) {
+          matchTargets.push({
+            type: 'file',
+            id: r.__rowId,
+            label: `صف ${rows.findIndex((x) => x.__rowId === r.__rowId) + 1}: ${String(r.nameAr || r.name || '').trim() || 'بدون اسم'}`,
+          });
+        }
+      });
+
+      const hasDuplicateConflict = matchTargets.length > 0;
+      const wasQuarantinedDuplicate = Boolean(meta.wasQuarantinedDuplicate || prevMeta?.status === 'quarantined_duplicate' || hasDuplicateConflict);
+      const hasRequiredEdits =
+        normalizeKey(nameValue) !== normalizeKey(meta.originalName) &&
+        normalizeSku(skuValue) !== normalizeSku(meta.originalSku);
+
+      if (hasDuplicateConflict) {
+        reasons.push(createRowReason('duplicate_conflict', 'يوجد تطابق مع منتج حالي أو صف آخر في نفس الملف.'));
+      }
+
+      if (wasQuarantinedDuplicate && !hasRequiredEdits) {
+        reasons.push(createRowReason('duplicate_requires_edits', 'يجب تعديل الاسم والكود معًا قبل السماح بالإدخال.'));
+      }
+
+      if (hasRequiredEdits && hasDuplicateConflict) {
+        reasons.push(createRowReason('duplicate_still_matching', 'تم التعديل لكنه ما زال مطابقًا.'));
+      }
+
+      let status: ImportRowStatus = 'ready';
+      const hasValidationErrors = !hasName || !hasSku || !hasPrice || !hasStock;
+
+      if (hasValidationErrors) {
+        status = 'invalid';
+      } else if (categoryState !== 'resolved') {
+        status = 'quarantined_category';
+      } else if (hasDuplicateConflict || (wasQuarantinedDuplicate && !hasRequiredEdits)) {
+        status = 'quarantined_duplicate';
+      }
+
+      const resolvedCategory = categories.find((c) => String(c.id) === resolvedCategoryId);
+
+      return {
+        ...row,
+        category: resolvedCategory ? String(resolvedCategory.id) : row.category,
+        categoryAr: resolvedCategory ? (resolvedCategory.nameAr || resolvedCategory.name) : row.categoryAr,
+        __meta: {
+          ...meta,
+          status,
+          reasons,
+          matchTargets,
+          categoryCandidates,
+          categoryState,
+          categoryResolution,
+          editedName: nameValue,
+          editedSku: skuValue,
+          hasRequiredEdits,
+          isConflictFreeNow: !hasDuplicateConflict,
+          wasQuarantinedDuplicate,
+        },
+      };
+    });
+  };
+
   // Parse prices robustly from various formats (e.g., "1,234.50", "1.234,50", "1٬234٫50", with currency symbols)
   const parsePriceValue = (val: unknown): number => {
     if (val == null) return NaN;
@@ -1514,7 +2041,7 @@ const AdminProducts = () => {
     // Convert Arabic-Indic digits to Western 0-9
     const arabicIndicMap: Record<string, string> = {
       '٠': '0', '١': '1', '٢': '2', '٣': '3', '٤': '4', '٥': '5', '٦': '6', '٧': '7', '٨': '8', '٩': '9',
-      '۰': '0', '۱': '1', '۲': '2', '۳': '3', '۴': '4', '۵': '5', '۶': '6', '۷': '7', '۸': '8', '۹': '9'
+      'Û°': '0', 'Û±': '1', 'Û²': '2', 'Û³': '3', 'Û´': '4', 'Ûµ': '5', 'Û¶': '6', 'Û·': '7', 'Û¸': '8', 'Û¹': '9'
     };
     s = s.replace(/[٠-٩۰-۹]/g, ch => arabicIndicMap[ch] || ch);
     if (!s) return NaN;
@@ -1573,7 +2100,7 @@ const AdminProducts = () => {
       // Simpler UX: auto-generate preview immediately
       const formatted = formatDataForPreview(tableData, smartMapping);
       const enhanced = enhancePreviewFromTable(tableData, smartMapping, formatted as ImportItem[]);
-      setImportPreview(enhanced);
+      setImportPreview(runImportPreflight(enhanced));
       setPreviewPage(1);
       setImportStep('preview');
 
@@ -1617,7 +2144,7 @@ const AdminProducts = () => {
       // Auto preview with enhanced names
       const formatted = formatDataForPreview(tableData, smartMapping);
       const enhanced = enhancePreviewFromTable(tableData, smartMapping, formatted as ImportItem[]);
-      setImportPreview(enhanced);
+      setImportPreview(runImportPreflight(enhanced));
       setPreviewPage(1);
       setImportStep('preview');
 
@@ -1651,33 +2178,37 @@ const AdminProducts = () => {
     const formattedData = formatDataForPreview(tableData, columnMapping) as ImportItem[];
     const enhancedPreview = enhancePreviewFromTable(tableData, columnMapping, formattedData);
 
-    // Deduplicate within the imported dataset (prefer first occurrence)
-    const seen = new Set<string>();
-    const uniquePreview = enhancedPreview.filter((p) => {
-      const key = normalizeKey(p.sku) || normalizeKey(p.name) || normalizeKey(p.nameAr);
-      if (!key) return true; // keep if no key info
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
-    setImportPreview(uniquePreview);
+    const preflightPreview = runImportPreflight(enhancedPreview);
+    setImportPreview(preflightPreview);
     setPreviewPage(1);
     setImportStep('preview');
 
     toast({
       title: "تم إنشاء المعاينة",
-      description: `تم تحضير ${uniquePreview.length} منتج للاستيراد (تم إزالة التكرارات)`,
+      description: `تم تحضير ${preflightPreview.length} منتج مع فحص التكرار والفئات.`,
     });
   };
 
   const executeImport = async () => {
-    // Skip items that already exist in current products by sku/name/nameAr
-    const incoming = importPreview.filter((item) => {
-      const exists = products.some((p) => isSameProduct(p, item));
-      return !exists;
-    });
+    if (isImportSubmitting) return;
 
+    const finalPreflight = runImportPreflight(importPreview, importPreview);
+    setImportPreview(finalPreflight);
+
+    const blockedRows = finalPreflight.filter((row) => row.__meta.status !== 'ready');
+    if (blockedRows.length > 0) {
+      toast({
+        title: 'لا يمكن الاستيراد قبل حل الصفوف المعزولة',
+        description: `يوجد ${blockedRows.length} صف يحتاج معالجة في التكرار أو الفئة أو البيانات.`,
+        variant: 'destructive',
+      });
+      setIsQuarantineModalOpen(true);
+      return;
+    }
+
+    const incoming = finalPreflight;
+
+    setIsImportSubmitting(true);
     try {
       await Promise.all(incoming.map(async (productData, index) => {
         const categoryId = productData.category ? String(productData.category) : undefined;
@@ -1707,6 +2238,9 @@ const AdminProducts = () => {
       }, 1500);
     } catch (e) {
       toast({ title: 'فشل استيراد بعض المنتجات', variant: 'destructive' });
+    } finally {
+      setIsImportSubmitting(false);
+      setIsImportConfirmOpen(false);
     }
   };
 
@@ -1746,9 +2280,114 @@ const AdminProducts = () => {
     setImportPreview([]);
     setImportStep('upload');
     setIsProcessing(false);
-    setPreviewPerPage(10);
+    setPreviewPerPage('all');
     setPreviewPage(1);
     setBulkCategoryId('');
+    setIsImportSubmitting(false);
+    setIsImportConfirmOpen(false);
+    setIsQuarantineModalOpen(false);
+    setCategoryCreateLoadingRowId(null);
+  };
+
+  const quarantinedRows = useMemo(
+    () => importPreview.filter((row) => row.__meta.status !== 'ready'),
+    [importPreview]
+  );
+
+  const setRowCategoryResolution = (rowId: string, resolution: ImportCategoryResolution) => {
+    setImportPreview((prev) => {
+      const next = prev.map((row) =>
+        row.__rowId === rowId
+          ? {
+              ...row,
+              __meta: {
+                ...row.__meta,
+                categoryResolution: resolution,
+              },
+            }
+          : row
+      );
+      return runImportPreflight(next, prev);
+    });
+  };
+
+  const setQuarantinedRowField = (rowId: string, field: 'name' | 'nameAr' | 'sku', value: string) => {
+    setImportPreview((prev) => {
+      const next = prev.map((row) => {
+        if (row.__rowId !== rowId) return row;
+        if (field === 'name' || field === 'nameAr') {
+          return { ...row, name: value, nameAr: value };
+        }
+        return { ...row, [field]: value };
+      });
+      return runImportPreflight(next, prev);
+    });
+  };
+
+  const updateCreateCategoryDraft = (rowId: string, patch: Partial<{ name: string; slug: string }>) => {
+    setImportPreview((prev) => {
+      const next = prev.map((row) => {
+        if (row.__rowId !== rowId) return row;
+        const current = row.__meta.categoryResolution?.type === 'create'
+          ? row.__meta.categoryResolution
+          : { type: 'create' as const, name: '', slug: '' };
+        const mergedName = patch.name ?? current.name;
+        const mergedSlug = (patch.slug ?? current.slug) || slugifyCategory(mergedName);
+        return {
+          ...row,
+          __meta: {
+            ...row.__meta,
+            categoryResolution: {
+              type: 'create',
+              name: mergedName,
+              slug: mergedSlug,
+            },
+          },
+        };
+      });
+      return runImportPreflight(next, prev);
+    });
+  };
+
+  const createCategoryForRow = async (rowId: string) => {
+    const row = importPreview.find((r) => r.__rowId === rowId);
+    if (!row) return;
+    const draft = row.__meta.categoryResolution?.type === 'create' ? row.__meta.categoryResolution : null;
+    const name = String(draft?.name || '').trim();
+    const slug = slugifyCategory(String(draft?.slug || name));
+    if (!name) {
+      toast({ title: 'اسم الفئة مطلوب', variant: 'destructive' });
+      return;
+    }
+    if (!slug) {
+      toast({ title: 'المعرف المختصر للفئة غير صالح', variant: 'destructive' });
+      return;
+    }
+
+    setCategoryCreateLoadingRowId(rowId);
+    try {
+      const res = await apiPostJson<BackendCategory, Partial<BackendCategory>>('/api/categories', {
+        name,
+        nameAr: name,
+        slug,
+      });
+      const createdId = String(res._id || '');
+      await refetchCategories();
+      if (createdId) {
+        setRowCategoryResolution(rowId, { type: 'existing', categoryId: createdId });
+      } else {
+        setImportPreview((prev) => runImportPreflight(prev, prev));
+      }
+      toast({ title: 'تم إنشاء الفئة وربطها بالصف' });
+    } catch {
+      toast({
+        title: 'تعذر إنشاء الفئة',
+        description: 'تحقق من أن المعرف المختصر غير مكرر ثم حاول مرة أخرى.',
+        variant: 'destructive',
+      });
+    } finally {
+      setCategoryCreateLoadingRowId(null);
+    }
   };
 
   const [columnWidths, setColumnWidths] = useState({
@@ -1975,7 +2614,7 @@ const AdminProducts = () => {
                 </div>
                 <div className="bg-orange-400/30 rounded-xl p-3">
                   <div className="flex justify-between items-center">
-                    <span className="text-orange-100 text-sm">تنبيه</span>
+                    <span className="text-orange-100 text-sm">تنبيه!</span>
                     <span className="text-white font-bold">عاجل</span>
                   </div>
                 </div>
@@ -2073,7 +2712,16 @@ const AdminProducts = () => {
                   className="bg-slate-50 hover:bg-slate-100 border-slate-200 text-slate-700 shadow-sm"
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  استيراد
+                  استيراد ملف المنتجات
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="bg-emerald-50 hover:bg-emerald-100 border-emerald-200 text-emerald-700 shadow-sm"
+                >
+                  <FileSpreadsheet className="w-4 h-4 mr-2" />
+                  {'\u062a\u0635\u062f\u064a\u0631 \u0645\u0646\u062a\u062c\u0627\u062a'}
                 </Button>
                 <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} modal={false}>
                   <Button
@@ -2097,7 +2745,7 @@ const AdminProducts = () => {
                             إضافة منتج جديد
                           </DialogTitle>
                           <DialogDescription className="text-lg text-slate-600 font-medium mt-1">
-                            أدخل تفاصيل المنتج الجديد وقم بإضافته إلى المتجر
+                            أدخل تفاصيل المنتج الجديد ثم قم بإضافته إلى المتجر
                           </DialogDescription>
                         </div>
                       </div>
@@ -2165,38 +2813,10 @@ const AdminProducts = () => {
                 </Select>
               </div>
 
-              {/* Export Button */}
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="h-10 w-10 bg-white border-slate-200 shadow-sm hidden md:flex"
-                      onClick={() => {
-                        const data = filteredProducts.map(p => ({
-                          الاسم: p.nameAr,
-                          الكود: p.sku,
-                          السعر: p.price,
-                          الفئة: categories.find(c => c.id === p.category)?.nameAr || '',
-                          الحالة: p.isHidden ? 'مخفي' : 'ظاهر'
-                        }));
-                        const ws = XLSX.utils.json_to_sheet(data);
-                        const wb = XLSX.utils.book_new();
-                        XLSX.utils.book_append_sheet(wb, ws, 'Products');
-                        XLSX.writeFile(wb, 'products-export.xlsx');
-                      }}
-                    >
-                      <FileSpreadsheet className="w-4 h-4 text-slate-600" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>تصدير Excel</TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
             </div>
 
             {/* Mobile Actions Row */}
-            <div className="flex md:hidden gap-2 mt-3">
+            <div className="grid grid-cols-3 md:hidden gap-2 mt-3">
               <Button
                 variant="outline"
                 size="sm"
@@ -2204,7 +2824,16 @@ const AdminProducts = () => {
                 className="flex-1 h-10 bg-white border-slate-200"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                استيراد
+                استيراد ملف المنتجات
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsExportModalOpen(true)}
+                className="flex-1 h-10 bg-emerald-50 border-emerald-200 text-emerald-700"
+              >
+                <FileSpreadsheet className="w-4 h-4 mr-2" />
+                {'\u062a\u0635\u062f\u064a\u0631'}
               </Button>
               <Button
                 onClick={() => { resetForm(); setIsCreateModalOpen(true); }}
@@ -2397,14 +3026,6 @@ const AdminProducts = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  <Button
-                    variant="outline"
-                    onClick={handleExport}
-                    className="bg-gradient-to-r from-green-50 to-green-100 border-green-200 text-green-700 hover:from-green-100 hover:to-green-200 shadow-md"
-                  >
-                    <FileSpreadsheet className="w-4 h-4 mr-2" />
-                    تصدير
-                  </Button>
                 </div>
               </div>
             </CardHeader>
@@ -2420,7 +3041,7 @@ const AdminProducts = () => {
                   </div>
                   <Select value={bulkAction} onValueChange={(v: string) => setBulkAction(v === 'delete' ? 'delete' : v === 'change_category' ? 'change_category' : v === 'price_adjust' ? 'price_adjust' : 'none')}>
                     <SelectTrigger className="w-48 bg-white/80 border-primary/20 shadow-md">
-                      <SelectValue placeholder="اختر إجراءً" />
+                      <SelectValue placeholder="اختر إجراء" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="delete">حذف</SelectItem>
@@ -2567,14 +3188,6 @@ const AdminProducts = () => {
                             <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('visibility')} />
                           </TableHead>
                           <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
-                            style={{ width: columnWidths.status }}>
-                            <div className="flex items-center justify-center gap-2">
-                              <Clock className="w-4 h-4 text-primary" />
-                              <span>الحالة</span>
-                            </div>
-                            <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('status')} />
-                          </TableHead>
-                          <TableHead className="text-center relative select-none whitespace-nowrap bg-gradient-to-r from-slate-100 to-primary/5 font-bold text-slate-700"
                             style={{ width: columnWidths.actions }}>
                             <span>الإجراءات</span>
                             <span className="absolute left-0 top-0 h-full w-1.5 cursor-ew-resize hover:bg-primary/60 transition-colors" onMouseDown={startResize('actions')} />
@@ -2712,7 +3325,7 @@ const AdminProducts = () => {
                                 <div className="space-y-1">
                                   {(() => {
                                     const cat = categories.find(c => String(c.id) === String(product.category) || c.slug === product.category);
-                                    const displayName = cat ? (cat.nameAr || cat.name) : (product.categoryAr || '—');
+                                    const displayName = cat ? (cat.nameAr || cat.name) : (product.categoryAr || 'â€”');
                                     const displayCode = cat ? (cat.slug || String(cat.id)) : String(product.category || '');
                                     return (
                                       <>
@@ -2761,36 +3374,6 @@ const AdminProducts = () => {
                                     onCheckedChange={(checked) => handleToggleVisibility(product.id, Boolean(checked))}
                                   />
                                   <Label htmlFor={`hidden-${product.id}`}>مخفي</Label>
-                                </div>
-                              </TableCell>
-
-                              <TableCell className="text-center" style={{ width: columnWidths.status }}>
-                                <div className="flex flex-col items-center justify-center gap-1">
-                                  <div className="flex items-center gap-2">
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <span className={`w-2.5 h-2.5 rounded-full ${product.isHidden ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`} />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        {product.isHidden ? 'هذا المنتج مخفي' : 'هذا المنتج ظاهر'}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                    <span className={`text-xs font-semibold ${product.isHidden ? 'text-amber-600' : 'text-green-600'}`}>
-                                      {product.isHidden ? 'مخفي' : 'ظاهر'}
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-col gap-1 items-center">
-                                    {product.featured && (
-                                      <Badge variant="secondary" className="bg-yellow-50 text-yellow-700 border-yellow-200 text-[10px] w-fit">
-                                        مميز
-                                      </Badge>
-                                    )}
-                                    {product.stock !== undefined && (
-                                      <Badge variant="outline" className={`text-[10px] w-fit ${product.stock <= 5 ? 'border-red-200 text-red-600' : 'text-slate-500'}`}>
-                                        المخزون: {product.stock}
-                                      </Badge>
-                                    )}
-                                  </div>
                                 </div>
                               </TableCell>
 
@@ -3258,6 +3841,85 @@ const AdminProducts = () => {
           </DialogContent>
         </Dialog>
 
+
+        {/* Smart Export Modal */}
+        <Dialog open={isExportModalOpen} onOpenChange={setIsExportModalOpen} modal={false}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" onOpenAutoFocus={(e) => e.preventDefault()}>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileSpreadsheet className="w-5 h-5 text-emerald-600" />
+                {'\u062a\u0635\u062f\u064a\u0631 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0628\u0635\u064a\u063a\u0629 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f'}
+              </DialogTitle>
+              <DialogDescription>
+                {'\u0627\u062e\u062a\u0631 \u0645\u0627 \u062a\u0631\u064a\u062f \u062a\u0635\u062f\u064a\u0631\u0647 \u0628\u0633\u0631\u0639\u0629\u060c \u0648\u0633\u064a\u062a\u0645 \u0625\u062e\u0631\u0627\u062c \u0645\u0644\u0641 Excel \u0645\u062a\u0648\u0627\u0641\u0642 \u0645\u0639 \u0627\u0633\u062a\u064a\u0631\u0627\u062f \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a \u0627\u0644\u0630\u0643\u064a.'}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="space-y-5">
+              <div className="rounded-xl border border-slate-200 p-4">
+                <div className="mb-3 text-sm font-semibold text-slate-700">{'\u0646\u0637\u0627\u0642 \u0627\u0644\u062a\u0635\u062f\u064a\u0631'}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <Button type="button" variant={exportScope === 'filtered' ? 'default' : 'outline'} onClick={() => setExportScope('filtered')}>
+                    {`\u0627\u0644\u0646\u062a\u064a\u062c\u0629 \u0627\u0644\u062d\u0627\u0644\u064a\u0629 (${filteredProducts.length})`}
+                  </Button>
+                  <Button type="button" variant={exportScope === 'all' ? 'default' : 'outline'} onClick={() => setExportScope('all')}>
+                    {`\u0643\u0644 \u0627\u0644\u0645\u0646\u062a\u062c\u0627\u062a (${products.length})`}
+                  </Button>
+                  <Button type="button" variant={exportScope === 'selected' ? 'default' : 'outline'} onClick={() => setExportScope('selected')} disabled={selectedIds.size === 0}>
+                    {`\u0627\u0644\u0645\u062d\u062f\u062f (${selectedIds.size})`}
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 p-4">
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm font-semibold text-slate-700">{'\u0627\u0644\u062d\u0642\u0648\u0644 \u0627\u0644\u0645\u0635\u062f\u0631\u0629'}</div>
+                  <div className="flex items-center gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => toggleAllExportFields(true)}>{'\u062a\u062d\u062f\u064a\u062f \u0627\u0644\u0643\u0644'}</Button>
+                    <Button type="button" variant="outline" size="sm" onClick={() => toggleAllExportFields(false)}>{'\u0625\u0644\u063a\u0627\u0621 \u0627\u0644\u0643\u0644'}</Button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {exportFieldOptions.map((field) => (
+                    <label key={field.key} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 cursor-pointer hover:bg-slate-50">
+                      <div>
+                        <div className="text-sm font-medium text-slate-800">{field.label}</div>
+                        <div className="text-xs text-slate-500">{field.hint}</div>
+                      </div>
+                      <Checkbox
+                        checked={exportFields[field.key]}
+                        onCheckedChange={(checked) => setExportFields((prev) => ({ ...prev, [field.key]: Boolean(checked) }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                {`\u0633\u064a\u062a\u0645 \u062a\u0635\u062f\u064a\u0631 ${exportCandidates.length} \u0645\u0646\u062a\u062c \u0648 ${selectedExportFieldsCount} \u062d\u0642\u0644 \u0628\u0635\u064a\u063a\u0629 \u0645\u062a\u0648\u0627\u0641\u0642\u0629 \u0645\u0639 \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f.`}
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsExportModalOpen(false)} disabled={isExportSubmitting}>
+                {'\u0625\u0644\u063a\u0627\u0621'}
+              </Button>
+              <Button type="button" onClick={executeExportExcel} disabled={isExportSubmitting || selectedExportFieldsCount === 0 || exportCandidates.length === 0} className="bg-emerald-600 hover:bg-emerald-700">
+                {isExportSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
+                    {'\u062c\u0627\u0631\u064a \u0625\u0646\u0634\u0627\u0621 \u0627\u0644\u0645\u0644\u0641...'}
+                  </>
+                ) : (
+                  <>
+                    <FileSpreadsheet className="w-4 h-4 ml-2" />
+                    {'\u062a\u0635\u062f\u064a\u0631 Excel'}
+                  </>
+                )}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
         {/* Smart Import Modal */}
         <Dialog open={isImportModalOpen} onOpenChange={setIsImportModalOpen} modal={false}>
           <DialogContent className="max-w-[90vw] max-h-[90vh] w-[90vw] overflow-visible" onOpenAutoFocus={(e) => e.preventDefault()}>
@@ -3267,7 +3929,7 @@ const AdminProducts = () => {
                 استيراد المنتجات الذكي
               </DialogTitle>
               <DialogDescription>
-                ارفع ملف Excel/CSV يحتوي على جدول المنتجات وسيقوم النظام بقراءته تلقائياً
+                ارفع ملف Excel/CSV يحتوي على جدول المنتجات وسيقوم النظام بقراءته تلقائيًا
               </DialogDescription>
             </DialogHeader>
 
@@ -3281,7 +3943,7 @@ const AdminProducts = () => {
                     <div>
                       <h3 className="text-lg font-semibold mb-2">ارفع ملف المنتجات</h3>
                       <p className="text-slate-600 mb-4">
-                        يدعم النظام فقط ملفات Excel/CSV التي تحتوي على جداول
+                        يدعم النظام فقط ملفات Excel/CSV التي تحتوي على جدول
                       </p>
                       <input
                         type="file"
@@ -3442,34 +4104,19 @@ const AdminProducts = () => {
               <div className="space-y-6">
                 <div className="flex items-center justify-between gap-4">
                   <h3 className="text-lg font-semibold">معاينة المنتجات المستوردة</h3>
-                  <div className="flex items-center gap-2">
-                    <Label className="text-sm">عرض:</Label>
-                    <Select value={previewPerPage === 'all' ? 'all' : String(previewPerPage)} onValueChange={(v) => {
-                      if (v === 'all') { setPreviewPerPage('all'); setPreviewPage(1); }
-                      else { setPreviewPerPage(Number(v)); setPreviewPage(1); }
-                    }}>
-                      <SelectTrigger className="w-28">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="25">25</SelectItem>
-                        <SelectItem value="50">50</SelectItem>
-                        <SelectItem value="all">الكل</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {(() => {
-                      const total = importPreview.length;
-                      const size = previewPerPage === 'all' ? total : previewPerPage;
-                      const pages = Math.max(1, Math.ceil(total / size));
-                      return (
-                        <div className="flex items-center gap-2">
-                          <Button variant="outline" size="sm" disabled={previewPage <= 1} onClick={() => setPreviewPage(p => Math.max(1, p - 1))}>السابق</Button>
-                          <span className="text-sm">صفحة {previewPage} من {pages}</span>
-                          <Button variant="outline" size="sm" disabled={previewPage >= pages} onClick={() => setPreviewPage(p => Math.min(pages, p + 1))}>التالي</Button>
-                        </div>
-                      );
-                    })()}
+                  <div className="flex items-center gap-3">
+                    <div className="text-sm text-slate-600">
+                      {`جاهز: ${importPreviewValidation.readyRows} / ${importPreview.length}`}
+                    </div>
+                    <Button
+                      type="button"
+                      variant={quarantinedRows.length > 0 ? 'destructive' : 'outline'}
+                      size="sm"
+                      onClick={() => setIsQuarantineModalOpen(true)}
+                      disabled={quarantinedRows.length === 0}
+                    >
+                      {`مراجعة الصفوف المعزولة (${quarantinedRows.length})`}
+                    </Button>
                   </div>
                 </div>
 
@@ -3483,7 +4130,7 @@ const AdminProducts = () => {
                     </SelectTrigger>
                     <SelectContent position="popper" side="bottom" align="start" className="z-[99999]" sideOffset={6}>
                       {categories.length === 0 ? (
-                        <div className="px-3 py-2 text-sm text-muted-foreground">لا توجد فئات حالياً</div>
+                        <div className="px-3 py-2 text-sm text-muted-foreground">لا توجد فئات حاليًا</div>
                       ) : (
                         categories.map(c => (
                           <SelectItem key={String(c.id)} value={String(c.id)}>{c.nameAr || c.name}</SelectItem>
@@ -3495,11 +4142,7 @@ const AdminProducts = () => {
                 </div>
 
                 {(() => {
-                  const total = importPreview.length;
-                  const size = previewPerPage === 'all' ? total : previewPerPage;
-                  const start = (previewPage - 1) * size;
-                  const end = previewPerPage === 'all' ? total : Math.min(total, start + size);
-                  const rows = importPreview.slice(start, end);
+                  const rows = importPreview;
                   return (
                     <>
                       <div className="max-h-96 overflow-y-auto border rounded-lg">
@@ -3511,20 +4154,24 @@ const AdminProducts = () => {
                               <TableHead>الكود</TableHead>
                               <TableHead>المخزون</TableHead>
                               <TableHead>الفئة</TableHead>
+                              <TableHead>الحالة</TableHead>
                               <TableHead className="w-20 text-center">إزالة</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {rows.map((product, index) => {
-                              const absoluteIndex = start + index;
+                              const absoluteIndex = index;
                               const catMatch = categories.find(c => String(c.id) === String(product.category) || c.nameAr === product.categoryAr || c.name === product.category);
                               const catId = catMatch ? String(catMatch.id) : '';
                               return (
-                                <TableRow key={absoluteIndex}>
+                                <TableRow key={product.__rowId}>
                                   <TableCell>
                                     <Input value={String(product.nameAr ?? product.name ?? '')} onChange={(e) => {
                                       const v = e.target.value;
-                                      setImportPreview(prev => prev.map((it, i) => i === absoluteIndex ? { ...it, name: v, nameAr: v } : it));
+                                      setImportPreview(prev => {
+                                        const next = prev.map((it, i) => i === absoluteIndex ? { ...it, name: v, nameAr: v } : it);
+                                        return runImportPreflight(next, prev);
+                                      });
                                     }} placeholder="اسم المنتج" />
                                   </TableCell>
                                   <TableCell>
@@ -3539,7 +4186,18 @@ const AdminProducts = () => {
                                   <TableCell>
                                     <Select value={catId} onOpenChange={(open) => open ? toast({ title: 'فتح قائمة الفئات' }) : undefined} onValueChange={(val) => {
                                       const cat = categories.find(c => String(c.id) === String(val));
-                                      setImportPreview(prev => prev.map((it, i) => i === absoluteIndex ? { ...it, category: cat ? String(cat.id) : '', categoryAr: cat?.nameAr } : it));
+                                      setImportPreview(prev => {
+                                        const next = prev.map((it, i) => i === absoluteIndex ? {
+                                          ...it,
+                                          category: cat ? String(cat.id) : '',
+                                          categoryAr: cat?.nameAr,
+                                          __meta: {
+                                            ...it.__meta,
+                                            categoryResolution: cat ? ({ type: 'existing', categoryId: String(cat.id) } as ImportCategoryResolution) : it.__meta.categoryResolution,
+                                          },
+                                        } : it);
+                                        return runImportPreflight(next, prev);
+                                      });
                                     }}>
                                       <SelectTrigger className="w-44 pointer-events-auto relative z-[1]">
                                         <SelectValue placeholder="الفئة" />
@@ -3551,13 +4209,23 @@ const AdminProducts = () => {
                                       </SelectContent>
                                     </Select>
                                   </TableCell>
+                                  <TableCell>
+                                    <div className="space-y-1">
+                                      <Badge variant={product.__meta.status === 'ready' ? 'default' : 'destructive'}>
+                                        {product.__meta.status === 'ready' ? 'جاهز' : product.__meta.status === 'quarantined_duplicate' ? 'معزول: تكرار' : product.__meta.status === 'quarantined_category' ? 'معزول: فئة' : 'غير صالح'}
+                                      </Badge>
+                                      {product.__meta.reasons[0] ? (
+                                        <div className="text-[11px] text-slate-600">{product.__meta.reasons[0].message}</div>
+                                      ) : null}
+                                    </div>
+                                  </TableCell>
                                   <TableCell className="text-center">
                                     <Button
                                       type="button"
                                       variant="outline"
                                       size="icon"
                                       className="rounded-full hover:bg-red-50 hover:text-red-600 border-red-200/60"
-                                      onClick={() => setImportPreview(prev => prev.filter((_, i) => i !== absoluteIndex))}
+                                      onClick={() => setImportPreview(prev => runImportPreflight(prev.filter((_, i) => i !== absoluteIndex), prev))}
                                       aria-label="حذف الصف"
                                     >
                                       <Trash2 className="w-4 h-4" />
@@ -3570,8 +4238,8 @@ const AdminProducts = () => {
                         </Table>
                       </div>
                       <div className="flex items-center justify-between text-sm text-slate-600 mt-2">
-                        <span>عرض {end - start} من أصل {total} منتج</span>
-                        <span>الصفحة {previewPage}</span>
+                        <span>عرض {rows.length} من أصل {rows.length} منتج</span>
+                        <span>بدون تقسيم صفحات</span>
                       </div>
                     </>
                   );
@@ -3581,10 +4249,205 @@ const AdminProducts = () => {
                   <Button onClick={() => setImportStep('mapping')} variant="outline">
                     رجوع
                   </Button>
-                  <Button onClick={executeImport} className="bg-green-600 hover:bg-green-700">
-                    استيراد {importPreview.length} منتج
+                  <Button
+                    onClick={() => setIsImportConfirmOpen(true)}
+                    disabled={!importPreviewValidation.isValid || isImportSubmitting}
+                    className="bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:text-slate-600"
+                  >
+                    {isImportSubmitting ? (
+                      <>
+                        <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
+                        {'\u062c\u0627\u0631\u064a \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f...'}
+                      </>
+                    ) : (
+                      <>{`\u0627\u0633\u062a\u064a\u0631\u0627\u062f ${importPreview.length} \u0645\u0646\u062a\u062c`}</>
+                    )}
                   </Button>
                 </div>
+                {!importPreviewValidation.isValid && importPreview.length > 0 && (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                    لا يمكن الاستيراد الآن. الصفوف الجاهزة: {importPreviewValidation.readyRows} من {importPreview.length}.
+                    {importPreviewValidation.quarantinedDuplicate > 0 ? ` يوجد ${importPreviewValidation.quarantinedDuplicate} صف معزول بسبب التكرار.` : ''}
+                    {importPreviewValidation.quarantinedCategory > 0 ? ` يوجد ${importPreviewValidation.quarantinedCategory} صف معزول بسبب الفئة.` : ''}
+                    {importPreviewValidation.invalidRowsCount > 0 ? ` يوجد ${importPreviewValidation.invalidRowsCount} صف غير صالح.` : ''}
+                  </div>
+                )}
+                <Dialog
+                  open={isImportConfirmOpen}
+                  onOpenChange={(open) => {
+                    if (!isImportSubmitting) setIsImportConfirmOpen(open);
+                  }}
+                >
+                  <DialogContent className="max-w-md">
+                    <DialogHeader>
+                      <DialogTitle className="flex items-center gap-2">
+                        <AlertTriangle className="w-5 h-5 text-amber-600" />
+                        {'\u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f'}
+                      </DialogTitle>
+                      <DialogDescription>
+                        {`\u0633\u064a\u062a\u0645 \u0627\u0633\u062a\u064a\u0631\u0627\u062f ${importPreview.length} \u0645\u0646\u062a\u062c \u0625\u0644\u0649 \u0642\u0627\u0639\u062f\u0629 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a. \u0647\u0644 \u062a\u0631\u064a\u062f \u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629\u061f`}
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                      {'\u062a\u0646\u0628\u064a\u0647: \u0644\u0646 \u064a\u062a\u0645 \u062a\u062e\u0637\u064a \u0623\u064a \u0635\u0641 \u062a\u0644\u0642\u0627\u0626\u064a\u064b\u0627. \u064a\u062c\u0628 \u062d\u0644 \u0643\u0644 \u0627\u0644\u0635\u0641\u0648\u0641 \u0627\u0644\u0645\u0639\u0632\u0648\u0644\u0629 \u0623\u0648\u0644\u064b\u0627.'}
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsImportConfirmOpen(false)}
+                        disabled={isImportSubmitting}
+                      >
+                        {'\u0625\u0644\u063a\u0627\u0621'}
+                      </Button>
+                      <Button
+                        onClick={executeImport}
+                        disabled={isImportSubmitting}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isImportSubmitting ? (
+                          <>
+                            <RefreshCw className="w-4 h-4 ml-2 animate-spin" />
+                            {'\u062c\u0627\u0631\u064a \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f...'}
+                          </>
+                        ) : (
+                          <>{'\u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f'}</>
+                        )}
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
+
+                <Dialog open={isQuarantineModalOpen} onOpenChange={setIsQuarantineModalOpen}>
+                  <DialogContent className="max-w-5xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle>مراجعة الصفوف المعزولة</DialogTitle>
+                      <DialogDescription>
+                        عالج التكرارات والفئات غير الموجودة قبل الاستيراد. لا يُقبل أي صف حتى يصبح جاهزًا بالكامل.
+                      </DialogDescription>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                      {quarantinedRows.length === 0 ? (
+                        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                          لا توجد صفوف معزولة حاليًا.
+                        </div>
+                      ) : (
+                        quarantinedRows.map((row) => {
+                          const rowIndex = importPreview.findIndex((r) => r.__rowId === row.__rowId) + 1;
+                          const createDraft = row.__meta.categoryResolution?.type === 'create' ? row.__meta.categoryResolution : { name: '', slug: '' };
+                          return (
+                            <Card key={row.__rowId} className="border-red-200">
+                              <CardContent className="pt-4 space-y-3">
+                                <div className="flex items-center justify-between gap-3">
+                                  <div className="flex items-center gap-2">
+                                    <Badge variant="destructive">{`صف ${rowIndex}`}</Badge>
+                                    <Badge variant="outline">
+                                      {row.__meta.status === 'quarantined_duplicate' ? 'تكرار' : row.__meta.status === 'quarantined_category' ? 'فئة' : 'غير صالح'}
+                                    </Badge>
+                                    {row.__meta.hasRequiredEdits && !row.__meta.isConflictFreeNow ? (
+                                      <Badge variant="secondary">تم التعديل لكن ما زال مطابقًا</Badge>
+                                    ) : null}
+                                  </div>
+                                  <div className="text-xs text-slate-500">
+                                    {`قبل: ${row.__meta.originalName || '-'} | ${row.__meta.originalSku || '-'}`}
+                                  </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                  <Input
+                                    value={String(row.nameAr || row.name || '')}
+                                    onChange={(e) => setQuarantinedRowField(row.__rowId, 'nameAr', e.target.value)}
+                                    placeholder="اسم المنتج"
+                                  />
+                                  <Input
+                                    value={String(row.sku || '')}
+                                    onChange={(e) => setQuarantinedRowField(row.__rowId, 'sku', e.target.value)}
+                                    placeholder="كود المنتج"
+                                  />
+                                </div>
+
+                                <div className="rounded-md border border-slate-200 p-3 space-y-3">
+                                  <div className="text-sm font-medium">معالجة الفئة</div>
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <Select
+                                      value={row.__meta.categoryResolution?.type === 'existing' ? row.__meta.categoryResolution.categoryId : ''}
+                                      onValueChange={(val) => setRowCategoryResolution(row.__rowId, { type: 'existing', categoryId: val })}
+                                    >
+                                      <SelectTrigger>
+                                        <SelectValue placeholder="ربط بفئة موجودة" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {categories.map((c) => (
+                                          <SelectItem key={String(c.id)} value={String(c.id)}>{c.nameAr || c.name}</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={() => setRowCategoryResolution(row.__rowId, { type: 'create', name: createDraft.name, slug: createDraft.slug })}
+                                      >
+                                        إنشاء فئة جديدة
+                                      </Button>
+                                      {row.__meta.categoryCandidates.length > 0 ? (
+                                        <span className="text-xs text-slate-500">{`مرشحات: ${row.__meta.categoryCandidates.map((c) => c.nameAr || c.name).join('، ')}`}</span>
+                                      ) : null}
+                                    </div>
+                                  </div>
+
+                                  {row.__meta.categoryResolution?.type === 'create' ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-[1fr_1fr_auto] gap-2">
+                                      <Input
+                                        value={createDraft.name}
+                                        onChange={(e) => updateCreateCategoryDraft(row.__rowId, { name: e.target.value, slug: createDraft.slug || slugifyCategory(e.target.value) })}
+                                        placeholder="اسم الفئة الجديدة"
+                                      />
+                                      <Input
+                                        value={createDraft.slug}
+                                        onChange={(e) => updateCreateCategoryDraft(row.__rowId, { slug: e.target.value })}
+                                        placeholder="slug"
+                                      />
+                                      <Button
+                                        type="button"
+                                        onClick={() => createCategoryForRow(row.__rowId)}
+                                        disabled={categoryCreateLoadingRowId === row.__rowId}
+                                      >
+                                        {categoryCreateLoadingRowId === row.__rowId ? 'جارٍ الإنشاء...' : 'إنشاء وربط'}
+                                      </Button>
+                                    </div>
+                                  ) : null}
+                                </div>
+
+                                {row.__meta.reasons.length > 0 ? (
+                                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 space-y-1">
+                                    {row.__meta.reasons.map((reason, idx) => (
+                                      <div key={`${row.__rowId}-reason-${idx}`}>• {reason.message}</div>
+                                    ))}
+                                  </div>
+                                ) : null}
+
+                                {row.__meta.matchTargets.length > 0 ? (
+                                  <div className="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
+                                    <div className="font-medium">التطابقات الحالية:</div>
+                                    {row.__meta.matchTargets.map((target) => (
+                                      <div key={`${row.__rowId}-${target.type}-${target.id}`}>{`• ${target.type === 'database' ? 'قاعدة البيانات' : 'داخل الملف'}: ${target.label}`}</div>
+                                    ))}
+                                  </div>
+                                ) : null}
+                              </CardContent>
+                            </Card>
+                          );
+                        })
+                      )}
+                    </div>
+
+                    <DialogFooter>
+                      <Button variant="outline" onClick={() => setIsQuarantineModalOpen(false)}>إغلاق</Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             )}
 
@@ -3611,7 +4474,7 @@ const AdminProducts = () => {
                 تحديث المنتجات الذكي
               </DialogTitle>
               <DialogDescription>
-                ارفع ملف Excel/CSV لتحديث الأسعار فقط للمنتجات المطابقة (سيتم المطابقة بالكود أو الاسم)
+                ارفع ملف Excel/CSV لتحديث الأسعار فقط للمنتجات المطابقة (سيتم التطابق بالكود أو الاسم)
               </DialogDescription>
             </DialogHeader>
 
@@ -3667,7 +4530,7 @@ const AdminProducts = () => {
                     <span className="font-medium">وضع التحديث</span>
                   </div>
                   <p className="text-sm text-slate-600 mt-1">
-                    سيتم تحديث المنتجات الموجودة فقط، لن يتم إضافة منتجات جديدة
+                    سيتم تحديث المنتجات الموجودة فقط، ولن يتم إضافة منتجات جديدة
                   </p>
                 </div>
 
@@ -3808,7 +4671,7 @@ const AdminProducts = () => {
                                           variant="outline"
                                           size="icon"
                                           className="rounded-full hover:bg-red-50 hover:text-red-600 border-red-200/60"
-                                          onClick={() => setImportPreview(prev => prev.filter((_, i) => i !== idx))}
+                                          onClick={() => setImportPreview(prev => runImportPreflight(prev.filter((_, i) => i !== idx), prev))}
                                           aria-label="حذف الصف"
                                         >
                                           <Trash2 className="w-4 h-4" />
@@ -3868,4 +4731,3 @@ const AdminProducts = () => {
 };
 
 export default AdminProducts;
-
