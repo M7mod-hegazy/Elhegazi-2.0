@@ -23,6 +23,7 @@ import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { buildCategoryPath } from '@/lib/category-link';
 import { buildProductPath } from '@/lib/product-link';
 import type { Product } from '@/types';
+import { apiGet } from '@/lib/api';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Navigation, Pagination, Autoplay } from 'swiper/modules';
 import 'swiper/css';
@@ -47,6 +48,9 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
   const [hoveredRating, setHoveredRating] = useState<{[key: string]: number}>({});
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
   const [selectedRating, setSelectedRating] = useState(0);
+  const [modalComments, setModalComments] = useState<Array<{ id: string; userId: string; userName: string; rating: number; review?: string; date: string }>>([]);
+  const [modalStats, setModalStats] = useState<{ averageRating: number; totalReviews: number }>({ averageRating: 0, totalReviews: 0 });
+  const [ratingOverrides, setRatingOverrides] = useState<Record<string, { rating: number; reviews: number }>>({});
   const navigate = useNavigate();
   const { addItem, isInCart: checkIsInCart, getItemByProductId } = useCart();
   const { isAuthenticated, isAdmin } = useDualAuth();
@@ -184,10 +188,35 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
   const handleRatingClick = (e: React.MouseEvent, product: Product, rating?: number) => {
     e.preventDefault();
     e.stopPropagation();
-    setSelectedProduct(product);
+    setSelectedProduct({
+      ...product,
+      id: getCleanProductId(product.id),
+    });
     setSelectedRating(rating || 0);
     setShowCommentsModal(true);
   };
+
+  const loadProductRatings = useCallback(async (productId: string) => {
+    try {
+      const res = await apiGet<any>(`/api/products/${productId}/ratings`);
+      if (!('ok' in res) || !res.ok) return;
+      const items = Array.isArray(res.items) ? res.items : [];
+      const totalReviews = Number(res.total ?? items.length ?? 0);
+      const averageRating = Number(
+        res.averageRating ?? (totalReviews > 0 ? (items.reduce((sum: number, item: any) => sum + Number(item.rating || 0), 0) / totalReviews) : 0)
+      );
+      setModalComments(items);
+      setModalStats({ averageRating, totalReviews });
+      setRatingOverrides((prev) => ({
+        ...prev,
+        [getCleanProductId(productId)]: { rating: averageRating, reviews: totalReviews },
+      }));
+    } catch (error) {
+      console.warn('Failed to load product ratings:', error);
+      setModalComments([]);
+      setModalStats({ averageRating: 0, totalReviews: 0 });
+    }
+  }, []);
 
   const handleStarHover = (productId: string, rating: number) => {
     setHoveredRating(prev => ({ ...prev, [productId]: rating }));
@@ -205,56 +234,29 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
     }
   };
 
-  const handleRatingSubmit = (rating: number, review?: string) => {
-
-    // Here you would typically make an API call to save the rating
-    // For now, just close the modal
-    setShowCommentsModal(false);
-    setSelectedProduct(null);
+  const handleRatingSubmit = async () => {
+    if (!selectedProduct?.id) return;
+    await loadProductRatings(selectedProduct.id);
   };
 
   const handleCommentsModalClose = () => {
     setShowCommentsModal(false);
     setSelectedProduct(null);
   };
-
-  // Generate mock comments for demo purposes
-  const generateMockComments = (productId: string) => {
-    return [
-      {
-        id: '1',
-        userId: 'user1',
-        userName: 'أحمد محمد',
-        rating: 5,
-        review: 'منتج ممتاز وجودة عالية، أنصح بشرائه',
-        date: '2024-01-15'
-      },
-      {
-        id: '2',
-        userId: 'user2',
-        userName: 'فاطمة علي',
-        rating: 4,
-        review: 'جيد جداً ولكن التوصيل كان متأخر قليلاً',
-        date: '2024-01-10'
-      },
-      {
-        id: '3',
-        userId: 'user3',
-        userName: 'محمود حسن',
-        rating: 5,
-        review: 'رائع! تماماً كما هو موضح في الصور',
-        date: '2024-01-08'
-      }
-    ];
-  };
+  useEffect(() => {
+    if (!showCommentsModal || !selectedProduct?.id) return;
+    loadProductRatings(selectedProduct.id);
+  }, [showCommentsModal, selectedProduct?.id, loadProductRatings]);
 
   const renderStars = (product: Product) => {
+    const stats = ratingOverrides[getCleanProductId(product.id)];
+    const effectiveRating = stats?.rating ?? (product.rating || 0);
     const productHoveredRating = hoveredRating[product.id] || 0;
     
     return Array.from({ length: 5 }, (_, i) => {
       const starIndex = i + 1;
       const isHoveredStar = productHoveredRating >= starIndex;
-      const isRated = i < Math.floor(product.rating || 0);
+      const isRated = i < Math.floor(effectiveRating);
       const shouldHighlight = productHoveredRating > 0 ? isHoveredStar : isRated;
       
       return (
@@ -542,7 +544,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                                   className="text-xs text-slate-500 cursor-pointer hover:text-primary transition-colors"
                                   onClick={(e) => handleRatingClick(e, product)}
                                 >
-                                  ({product.reviews || 0})
+                                  ({(ratingOverrides[getCleanProductId(product.id)]?.reviews ?? product.reviews ?? 0)})
                                 </span>
                               </div>
                               {(product.sku || product.id) && (
@@ -664,12 +666,12 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
         <CommentsModal
           isOpen={showCommentsModal}
           onClose={handleCommentsModalClose}
-          comments={generateMockComments(selectedProduct.id)}
-          productId={selectedProduct.id}
+          comments={modalComments}
+          productId={getCleanProductId(selectedProduct.id)}
           productName={selectedProduct.nameAr}
           onRatingSubmit={handleRatingSubmit}
-          averageRating={selectedProduct.rating || 0}
-          totalReviews={selectedProduct.reviews || 0}
+          averageRating={modalStats.averageRating || selectedProduct.rating || 0}
+          totalReviews={modalStats.totalReviews || selectedProduct.reviews || 0}
           initialRating={selectedRating}
         />
       )}
@@ -690,3 +692,4 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
 };
 
 export default ProductsDesktop;
+

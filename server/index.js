@@ -97,7 +97,7 @@ app.use(compression());
 app.use(express.json({ limit: '2mb' }));
 
 // Attach minimal auth user from headers (to be replaced by real auth)
-// Also validates user exists in DB; falls back to dev admin if ID is stale/invalid
+// Also validates user exists in DB. Dev admin fallback is restricted to admin-mode requests only.
 app.use(async (req, _res, next) => {
   try {
     const userId = req.header('x-user-id');
@@ -109,8 +109,11 @@ app.use(async (req, _res, next) => {
       }
       // If user ID is stale/invalid, fall through to dev fallback below
     }
-    // Dev fallback identity: when no valid user resolved, resolve by ADMIN_DEV_USER_EMAIL
-    if (!req.user && process.env.ADMIN_DEV_USER_EMAIL) {
+    const authMode = String(req.header('x-auth-mode') || '').toLowerCase();
+    const hasAdminSecret = !!req.header('x-admin-secret');
+    const adminModeRequest = authMode === 'admin' || hasAdminSecret || req.path.startsWith('/api/admin');
+    // Dev fallback identity: only for explicit admin-mode requests
+    if (!req.user && adminModeRequest && process.env.ADMIN_DEV_USER_EMAIL) {
       const u = await User.findOne({ email: process.env.ADMIN_DEV_USER_EMAIL }).select('_id').lean();
       if (u) req.user = { _id: String(u._id), email: process.env.ADMIN_DEV_USER_EMAIL };
     }
@@ -2397,6 +2400,41 @@ app.post('/api/categories/update-counts', requirePermission('categories', 'updat
 });
 
 // Product CRUD
+async function attachRatingStatsToProducts(items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const ids = items
+    .map((item) => String(item?._id || item?.id || ''))
+    .filter(Boolean)
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (ids.length === 0) return items;
+
+  const stats = await Rating.aggregate([
+    { $match: { product: { $in: ids } } },
+    {
+      $group: {
+        _id: '$product',
+        avgRating: { $avg: '$rating' },
+        reviews: { $sum: 1 },
+      },
+    },
+  ]);
+
+  const statsMap = new Map(
+    stats.map((s) => [String(s._id), { rating: Number(s.avgRating || 0), reviews: Number(s.reviews || 0) }])
+  );
+
+  return items.map((item) => {
+    const key = String(item?._id || item?.id || '');
+    const stat = statsMap.get(key) || { rating: 0, reviews: 0 };
+    return {
+      ...item,
+      rating: Number(stat.rating.toFixed(1)),
+      reviews: stat.reviews,
+    };
+  });
+}
+
 app.get('/api/products', async (req, res) => {
   const { page = 1, limit = 20, featured, categorySlug, search, ids, fields } = req.query;
   try {
@@ -2410,7 +2448,8 @@ app.get('/api/products', async (req, res) => {
       const docs = await Product.find({ _id: { $in: idList } })
         .select(projection)
         .lean();
-      return sendJsonWithEtag(req, res, { ok: true, items: docs, total: docs.length, page: 1, pages: 1 });
+      const itemsWithStats = await attachRatingStatsToProducts(docs);
+      return sendJsonWithEtag(req, res, { ok: true, items: itemsWithStats, total: itemsWithStats.length, page: 1, pages: 1 });
     }
 
     let q = {};
@@ -2434,7 +2473,8 @@ app.get('/api/products', async (req, res) => {
       Product.find(q).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).select(projection).lean(),
       Product.countDocuments(q),
     ]);
-    return sendJsonWithEtag(req, res, { ok: true, items, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
+    const itemsWithStats = await attachRatingStatsToProducts(items);
+    return sendJsonWithEtag(req, res, { ok: true, items: itemsWithStats, total, page: Number(page), pages: Math.ceil(total / Number(limit)) });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -2445,7 +2485,103 @@ app.get('/api/products/:id', async (req, res) => {
   // Only check permissions for admin users trying to access
   const item = await Product.findById(req.params.id).lean();
   if (!item) return res.status(404).json({ ok: false, error: 'Not found' });
-  res.json({ ok: true, item });
+  const [itemWithStats] = await attachRatingStatsToProducts([item]);
+  res.json({ ok: true, item: itemWithStats });
+});
+
+app.get('/api/products/:id/ratings', async (req, res) => {
+  try {
+    const productId = String(req.params.id || '');
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid product id' });
+    }
+
+    const productExists = await Product.exists({ _id: productId });
+    if (!productExists) return res.status(404).json({ ok: false, error: 'Product not found' });
+
+    const ratings = await Rating.find({ product: productId })
+      .sort({ updatedAt: -1, createdAt: -1 })
+      .populate('user', 'name email')
+      .lean();
+
+    const items = ratings.map((r) => ({
+      id: String(r._id),
+      userId: String(r.user?._id || ''),
+      userName: r.user?.name || r.user?.email || 'مستخدم',
+      rating: Number(r.rating || 0),
+      review: r.review || '',
+      date: r.updatedAt || r.createdAt || new Date(),
+    }));
+
+    const total = items.length;
+    const averageRating = total > 0 ? Number((items.reduce((sum, r) => sum + r.rating, 0) / total).toFixed(1)) : 0;
+    return res.json({ ok: true, items, total, averageRating });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/products/:id/ratings', async (req, res) => {
+  try {
+    const productId = String(req.params.id || '');
+    if (!mongoose.Types.ObjectId.isValid(productId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid product id' });
+    }
+    if (!req.user?._id) {
+      return res.status(401).json({ ok: false, error: 'Authentication required' });
+    }
+
+    const { rating, review } = req.body || {};
+    const normalizedRating = Number(rating);
+    if (!Number.isFinite(normalizedRating) || normalizedRating < 1 || normalizedRating > 5) {
+      return res.status(400).json({ ok: false, error: 'Rating must be between 1 and 5' });
+    }
+    const normalizedReview = String(review || '').trim().slice(0, 500);
+
+    const productExists = await Product.exists({ _id: productId });
+    if (!productExists) return res.status(404).json({ ok: false, error: 'Product not found' });
+
+    const existing = await Rating.findOne({ product: productId, user: req.user._id }).select('_id').lean();
+    if (existing) {
+      return res.status(409).json({ ok: false, error: 'You have already rated this product' });
+    }
+
+    const saved = await Rating.create({
+      product: productId,
+      user: req.user._id,
+      rating: normalizedRating,
+      review: normalizedReview,
+    });
+    await saved.populate('user', 'name email');
+
+    const stats = await Rating.aggregate([
+      { $match: { product: new mongoose.Types.ObjectId(productId) } },
+      {
+        $group: {
+          _id: '$product',
+          averageRating: { $avg: '$rating' },
+          totalReviews: { $sum: 1 },
+        },
+      },
+    ]);
+
+    const summary = stats[0] || { averageRating: 0, totalReviews: 0 };
+    return res.status(201).json({
+      ok: true,
+      item: {
+        id: String(saved._id),
+        userId: String(saved.user?._id || req.user._id),
+        userName: saved.user?.name || saved.user?.email || req.user?.email || 'مستخدم',
+        rating: Number(saved.rating || 0),
+        review: saved.review || '',
+        date: saved.updatedAt || saved.createdAt || new Date(),
+      },
+      averageRating: Number(Number(summary.averageRating || 0).toFixed(1)),
+      totalReviews: Number(summary.totalReviews || 0),
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
 });
 
 app.post('/api/products', requirePermission('products', 'create', { attach: true }), async (req, res) => {

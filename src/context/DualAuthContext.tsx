@@ -254,6 +254,7 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           isAuthenticated: true,
           isAdmin: u.role === 'admin'
         }));
+        try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
         return { success: true, user: u };
       } catch {
         const u: User = {
@@ -271,6 +272,7 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           isAuthenticated: true,
           isAdmin: false
         }));
+        try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
         return { success: true, user: u };
       }
     } catch (err) {
@@ -309,6 +311,7 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isAdminAuthenticated: true,
         adminToken: token
       }));
+      try { localStorage.setItem('AUTH_MODE', 'admin'); } catch { /* ignore */ }
       return { success: true, user: u, isAdmin: u.role === 'admin' };
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'فشل تسجيل دخول المشرف';
@@ -351,6 +354,7 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             isAuthenticated: true,
             isAdmin: u.role === 'admin'
           }));
+          try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
           return { success: true, user: u, isAdmin: u.role === 'admin' };
         } catch {
           const u: User = {
@@ -368,6 +372,7 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             isAuthenticated: true,
             isAdmin: false
           }));
+          try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
           return { success: true, user: u, isAdmin: false };
         }
       }
@@ -415,6 +420,7 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isAuthenticated: true,
         isAdmin: u.role === 'admin'
       }));
+      try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
       return { success: true, user: u };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'حدث خطأ أثناء إنشاء الحساب';

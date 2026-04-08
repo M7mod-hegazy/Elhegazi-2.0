@@ -140,18 +140,28 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
         setMessage(defaultMessage);
         setIsSending(false);
         
-        // Open WhatsApp web with pre-filled message
+        // Open WhatsApp app first with pre-filled message, then fallback.
         setTimeout(() => {
-          
           if (phoneNumber) {
-            // Use WhatsApp web URL which properly handles the message parameter
-            // This is the most reliable method that works on all platforms
-            const webLink = `https://web.whatsapp.com/send?phone=${phoneNumber}&text=${encodedMessage}`;
-            
-            // Open WhatsApp web in new tab
-            window.open(webLink, '_blank', 'noopener,noreferrer');
+            const appLink = `whatsapp://send?phone=${phoneNumber}&text=${encodedMessage}`;
+            const fallbackLink = `https://wa.me/${phoneNumber}?text=${encodedMessage}`;
+
+            // Try native app deeplink first.
+            window.location.href = appLink;
+
+            // Fallback when app protocol isn't available.
+            window.setTimeout(() => {
+              try {
+                const fallbackWindow = window.open(fallbackLink, '_blank', 'noopener,noreferrer');
+                if (!fallbackWindow) {
+                  window.location.href = fallbackLink;
+                }
+              } catch {
+                window.location.href = fallbackLink;
+              }
+            }, 900);
           } else {
-            console.error('❌ Could not extract phone number from:', whatsappUrl);
+            console.error('Could not extract phone number from:', whatsappUrl);
           }
         }, 50);
       } catch (err) {

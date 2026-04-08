@@ -1359,6 +1359,8 @@ const ProductDetail = () => {
 
         // Fetch real rating history from backend
         let realRatingHistory: RatingHistory[] = [];
+        let realAverageRating = mapped.rating || 0;
+        let realTotalReviews = mapped.reviews || 0;
         try {
 
           if (item._id && item._id !== 'undefined') {
@@ -1368,6 +1370,8 @@ const ProductDetail = () => {
             // Check if the response has items
             if ('items' in ratingsRes && ratingsRes.ok) {
               const ratingsItems = ratingsRes.items ?? [];
+              realAverageRating = Number((ratingsRes as any).averageRating ?? realAverageRating);
+              realTotalReviews = Number((ratingsRes as any).total ?? ratingsItems.length ?? realTotalReviews);
 
 
               realRatingHistory = ratingsItems.map(rating => ({
@@ -1391,7 +1395,11 @@ const ProductDetail = () => {
           if (id && isObjectId(id)) {
             navigate(buildProductPath(id), { replace: true });
           }
-          setProduct(mapped);
+          setProduct({
+            ...mapped,
+            rating: realAverageRating,
+            reviews: realTotalReviews,
+          });
           setRelated(relatedProducts);
           setRatingHistory(realRatingHistory);
           setSelectedImage(0);
@@ -1653,9 +1661,21 @@ const ProductDetail = () => {
         comments={ratingHistory}
         productId={product._id}
         productName={product.nameAr || product.name}
-        onRatingSubmit={(rating, review) => {
-          // In a real implementation, you would update the product rating
-
+        onRatingSubmit={async (rating, review) => {
+          try {
+            const ratingsRes = await apiGet<any>(`/api/products/${product._id}/ratings`);
+            if ('ok' in ratingsRes && ratingsRes.ok) {
+              const items = Array.isArray(ratingsRes.items) ? ratingsRes.items : [];
+              setRatingHistory(items);
+              setProduct((prev) => prev ? ({
+                ...prev,
+                rating: Number(ratingsRes.averageRating ?? prev.rating ?? 0),
+                reviews: Number(ratingsRes.total ?? items.length ?? prev.reviews ?? 0),
+              }) : prev);
+            }
+          } catch (error) {
+            console.warn('Failed to refresh product ratings after submit:', error);
+          }
         }}
         averageRating={product.rating || 0}
         totalReviews={product.reviews || 0}

@@ -19,17 +19,18 @@ async function request(input: RequestInfo, init?: RequestInit): Promise<unknown>
     const token = typeof window !== 'undefined' ? localStorage.getItem('auth.token') : null;
     const mode = typeof window !== 'undefined' ? localStorage.getItem('AUTH_MODE') : null;
     
-    // Use admin credentials if available, otherwise use regular user credentials
-    if (adminUid && !headers.has('x-user-id')) headers.set('x-user-id', adminUid);
-    else if (uid && !headers.has('x-user-id')) headers.set('x-user-id', uid);
-    
-    if (adminEmail && !headers.has('x-user-email')) headers.set('x-user-email', adminEmail);
-    else if (email && !headers.has('x-user-email')) headers.set('x-user-email', email);
+    // Choose identity strictly by explicit auth mode to avoid leaking admin identity
+    const preferAdmin = mode === 'admin';
+    const effectiveUid = preferAdmin ? adminUid : uid;
+    const effectiveEmail = preferAdmin ? adminEmail : email;
+
+    if (effectiveUid && !headers.has('x-user-id')) headers.set('x-user-id', effectiveUid);
+    if (effectiveEmail && !headers.has('x-user-email')) headers.set('x-user-email', effectiveEmail);
     
     if (mode && !headers.has('x-auth-mode')) headers.set('x-auth-mode', mode);
     
-    if (adminToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${adminToken}`);
-    else if (token && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${token}`);
+    const effectiveToken = preferAdmin ? adminToken : token;
+    if (effectiveToken && !headers.has('Authorization')) headers.set('Authorization', `Bearer ${effectiveToken}`);
     
     // Legacy support for admin secret override
     const adminSecret = typeof window !== 'undefined' ? localStorage.getItem('ADMIN_SECRET') : null;

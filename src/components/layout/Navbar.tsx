@@ -1,6 +1,6 @@
-import { useState, useEffect, useMemo } from 'react';
+﻿import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Menu, X, ShoppingCart, User, LogOut, Settings, Package, Heart, ChevronDown, Search } from 'lucide-react';
+import { Menu, X, ShoppingCart, User, LogOut, Settings, Package, Heart, ChevronDown, Search, ShieldCheck } from 'lucide-react';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { useCart } from '@/hooks/useCart';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -48,7 +48,7 @@ const Navbar = () => {
 
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated, isAdmin, logout } = useDualAuth();
+  const { user, adminUser, isAuthenticated, isAdminAuthenticated, isAdmin, logout } = useDualAuth();
   const { itemCount } = useCart();
   const { favoritesCount } = useFavorites();
   const { hidePrices } = usePricingSettings();
@@ -71,6 +71,16 @@ const Navbar = () => {
     const email = user?.email || '';
     return email ? email.split('@')[0] : '';
   })();
+  const adminDisplayName = (() => {
+    const source = adminUser ?? user;
+    const fn = source?.firstName?.trim() || '';
+    const ln = source?.lastName?.trim() || '';
+    const full = `${fn} ${ln}`.trim();
+    if (full) return full;
+    const email = source?.email || '';
+    return email ? email.split('@')[0] : 'Admin';
+  })();
+  const isAdminSession = isAdminAuthenticated || (isAuthenticated && isAdmin);
 
   const handleLogout = () => {
     logout();
@@ -348,46 +358,59 @@ const Navbar = () => {
               )}
 
               {/* User Menu */}
-              {isAuthenticated ? (
+              {isAdminSession ? (
                 <div className="hidden lg:block">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="sm" className="flex items-center space-x-2 space-x-reverse">
-                      <User className="w-5 h-5" />
-                      <span className="hidden md:inline">{displayName}</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <DropdownMenuItem asChild>
-                      <Link to="/profile" className="flex items-center space-x-2 space-x-reverse">
-                        <User className="w-4 h-4" />
-                        <span>الملف الشخصي</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                      <Link to="/orders" className="flex items-center space-x-2 space-x-reverse">
-                        <Package className="w-4 h-4" />
-                        <span>طلباتي</span>
-                      </Link>
-                    </DropdownMenuItem>
-                    {isAdmin && (
-                      <>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem asChild>
-                          <Link to="/admin/dashboard" className="flex items-center space-x-2 space-x-reverse">
-                            <Settings className="w-4 h-4" />
-                            <span>لوحة الإدارة</span>
-                          </Link>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={handleLogout} className="text-destructive">
-                      <LogOut className="w-4 h-4 ml-2" />
-                      <span>تسجيل الخروج</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size="sm" className="flex items-center gap-2 rounded-full bg-gradient-to-r from-slate-900 to-slate-700 px-4 text-white shadow-sm hover:from-slate-800 hover:to-slate-600">
+                        <ShieldCheck className="w-4 h-4" />
+                        <span className="hidden md:inline">{adminDisplayName}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem asChild>
+                        <Link to="/admin/dashboard" className="flex items-center space-x-2 space-x-reverse">
+                          <Settings className="w-4 h-4" />
+                          <span>لوحة الإدارة</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                        <LogOut className="w-4 h-4 ml-2" />
+                        <span>تسجيل الخروج</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              ) : isAuthenticated ? (
+                <div className="hidden lg:block">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="flex items-center space-x-2 space-x-reverse">
+                        <User className="w-5 h-5" />
+                        <span className="hidden md:inline">{displayName}</span>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-56">
+                      <DropdownMenuItem asChild>
+                        <Link to="/profile" className="flex items-center space-x-2 space-x-reverse">
+                          <User className="w-4 h-4" />
+                          <span>الملف الشخصي</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuItem asChild>
+                        <Link to="/orders" className="flex items-center space-x-2 space-x-reverse">
+                          <Package className="w-4 h-4" />
+                          <span>طلباتي</span>
+                        </Link>
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout} className="text-destructive">
+                        <LogOut className="w-4 h-4 ml-2" />
+                        <span>تسجيل الخروج</span>
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               ) : (
                 <div className="hidden lg:flex items-center space-x-2 space-x-reverse">
@@ -531,7 +554,28 @@ const Navbar = () => {
 
               {/* User Section */}
               <div className="space-y-2">
-                {isAuthenticated ? (
+                {isAdminSession ? (
+                  <>
+                    <Link
+                      to="/admin/dashboard"
+                      onClick={() => setIsMobileMenuOpen(false)}
+                      className="flex items-center gap-2 py-3 px-4 rounded-lg bg-slate-900 text-white hover:bg-slate-800 transition-all duration-300 ease-out"
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span className="font-medium">{adminDisplayName}</span>
+                    </Link>
+                    <button
+                      onClick={() => {
+                        handleLogout();
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="flex items-center gap-2 w-full py-3 px-4 rounded-lg hover:bg-destructive/10 transition-all duration-300 ease-out text-destructive font-medium"
+                    >
+                      <LogOut className="w-4 h-4" />
+                      <span>تسجيل الخروج</span>
+                    </button>
+                  </>
+                ) : isAuthenticated ? (
                   <>
                     <Link
                       to="/profile"
@@ -549,16 +593,6 @@ const Navbar = () => {
                       <Package className="w-4 h-4" />
                       <span className="font-medium">طلباتي</span>
                     </Link>
-                    {isAdmin && (
-                      <Link
-                        to="/admin/dashboard"
-                        onClick={() => setIsMobileMenuOpen(false)}
-                        className="flex items-center gap-2 py-3 px-4 rounded-lg hover:bg-muted/80 transition-all duration-300 ease-out"
-                      >
-                        <Settings className="w-4 h-4" />
-                        <span className="font-medium">لوحة الإدارة</span>
-                      </Link>
-                    )}
                     <button
                       onClick={() => {
                         handleLogout();

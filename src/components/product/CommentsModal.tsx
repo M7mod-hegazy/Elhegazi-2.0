@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import Rating from '@/components/product/Rating';
+import AuthModal from '@/components/ui/auth-modal';
+import { useDualAuth } from '@/hooks/useDualAuth';
 
 type Comment = {
   id: string;
@@ -29,122 +31,133 @@ export type CommentsModalProps = {
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
   return date.toLocaleDateString('ar-EG', {
+    year: 'numeric',
+    weekday: 'long',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
   });
 };
 
-const CommentsModal = ({ 
-  isOpen, 
-  onClose, 
-  comments, 
+const CommentsModal = ({
+  isOpen,
+  onClose,
+  comments,
   productId,
-  productName,
   onRatingSubmit,
   averageRating,
   totalReviews,
-  initialRating = 0
+  initialRating = 0,
 }: CommentsModalProps) => {
   const [showRatingForm, setShowRatingForm] = useState(initialRating > 0);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { user, adminUser, isAuthenticated, isAdminAuthenticated } = useDualAuth();
 
-  // Prevent body scroll when modal is open
+  const currentUserId = String(user?.id || adminUser?.id || '');
+  const hasCurrentUserRated =
+    !!currentUserId && comments.some((comment) => String(comment.userId) === currentUserId);
+  const canRate = isAuthenticated || isAdminAuthenticated;
+
   useEffect(() => {
-    if (isOpen) {
-      // Store original overflow value
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-      document.documentElement.style.overflow = 'hidden';
-      
-      // Cleanup function to restore scroll when component unmounts or modal closes
-      return () => {
-        document.body.style.overflow = originalOverflow || '';
-        document.documentElement.style.overflow = '';
-      };
-    }
+    if (!isOpen) return;
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = originalOverflow || '';
+      document.documentElement.style.overflow = '';
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
 
   const modalContent = (
-    <div 
-      className="fixed inset-0 bg-black/90 backdrop-blur-lg z-[99999] flex items-center justify-center p-4"
+    <div
+      className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/90 p-4 backdrop-blur-lg"
       style={{ backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
       onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          onClose();
-        }
+        if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div 
-        className="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl border border-slate-200 relative z-[100000]"
+      <div
+        className="relative z-[100000] max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 bg-white border-b border-slate-200 p-4 flex items-center justify-between rounded-t-2xl">
+        <div className="sticky top-0 flex items-center justify-between rounded-t-2xl border-b border-slate-200 bg-white p-4">
           <h2 className="text-xl font-bold text-slate-900">تقييمات المنتج</h2>
           <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full">
-            <X className="w-5 h-5" />
+            <X className="h-5 w-5" />
           </Button>
         </div>
-        
+
         <div className="p-6">
-          {/* Product Rating Summary */}
-          <div className="flex items-center gap-8 mb-8 p-4 bg-slate-50 rounded-xl">
+          <div className="mb-8 flex items-center gap-8 rounded-xl bg-slate-50 p-4">
             <div className="text-center">
               <div className="text-4xl font-bold text-slate-900">{averageRating.toFixed(1)}</div>
-              <div className="flex items-center gap-1 justify-center mt-1">
+              <div className="mt-1 flex items-center justify-center gap-1">
                 {[...Array(5)].map((_, i) => (
                   <Star
                     key={i}
                     className={cn(
-                      "w-5 h-5",
-                      i < Math.floor(averageRating)
-                        ? "text-amber-500 fill-amber-500"
-                        : "text-slate-300"
+                      'h-5 w-5',
+                      i < Math.floor(averageRating) ? 'fill-amber-500 text-amber-500' : 'text-slate-300'
                     )}
                   />
                 ))}
               </div>
-              <div className="text-slate-600 text-sm mt-1">
-                ({totalReviews} تقييم)
-              </div>
+              <div className="mt-1 text-sm text-slate-600">({totalReviews} تقييم)</div>
             </div>
-            
+
             <div className="flex-1">
               {[5, 4, 3, 2, 1].map((star) => {
-                const count = comments.filter(c => c.rating === star).length;
+                const count = comments.filter((c) => c.rating === star).length;
                 const percentage = totalReviews > 0 ? (count / totalReviews) * 100 : 0;
-                
                 return (
-                  <div key={star} className="flex items-center gap-3 mb-2">
-                    <div className="flex items-center gap-1 w-12">
+                  <div key={star} className="mb-2 flex items-center gap-3">
+                    <div className="flex w-12 items-center gap-1">
                       <span>{star}</span>
-                      <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                      <Star className="h-4 w-4 fill-amber-500 text-amber-500" />
                     </div>
-                    <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                      <div 
-                        className="h-full bg-amber-500 rounded-full"
-                        style={{ width: `${percentage}%` }}
-                      ></div>
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200">
+                      <div className="h-full rounded-full bg-amber-500" style={{ width: `${percentage}%` }} />
                     </div>
-                    <span className="text-sm text-slate-600 w-8">{count}</span>
+                    <span className="w-8 text-sm text-slate-600">{count}</span>
                   </div>
                 );
               })}
             </div>
           </div>
-          
-          {/* Add Rating Button */}
+
           <div className="mb-6">
-            <Button 
-              onClick={() => setShowRatingForm(!showRatingForm)}
-              className="bg-primary hover:bg-primary/90"
+            <Button
+              onClick={() => {
+                if (!canRate) {
+                  setShowAuthModal(true);
+                  return;
+                }
+                if (!hasCurrentUserRated) setShowRatingForm(!showRatingForm);
+              }}
+              disabled={hasCurrentUserRated}
+              className="bg-primary hover:bg-primary/90 disabled:opacity-70"
             >
-              {showRatingForm ? 'إلغاء التقييم' : 'أضف تقييمك'}
+              {!canRate
+                ? 'سجل الدخول لإضافة تقييم'
+                : hasCurrentUserRated
+                  ? 'تم تقييم هذا المنتج'
+                  : showRatingForm
+                    ? 'إلغاء التقييم'
+                    : 'أضف تقييمك'}
             </Button>
-            
-            {showRatingForm && (
-              <div className="mt-4 p-4 border border-slate-200 rounded-xl relative z-30">
-                <Rating 
+
+            {!canRate && <p className="mt-2 text-xs text-slate-500">يجب تسجيل الدخول قبل إرسال تقييم.</p>}
+            {canRate && hasCurrentUserRated && (
+              <p className="mt-2 text-xs text-slate-500">لا يمكنك تقييم هذا المنتج أكثر من مرة.</p>
+            )}
+
+            {showRatingForm && canRate && !hasCurrentUserRated && (
+              <div className="relative z-30 mt-4 rounded-xl border border-slate-200 p-4">
+                <Rating
                   productId={productId}
                   initialRating={initialRating}
                   onRatingSubmit={(rating, review) => {
@@ -155,43 +168,46 @@ const CommentsModal = ({
               </div>
             )}
           </div>
-          
-          {/* Comments List */}
+
           <div className="space-y-4">
             {comments.length > 0 ? (
               comments.map((comment) => (
-                <div key={comment.id} className="bg-slate-50 rounded-lg p-4">
-                  <div className="flex justify-between items-start mb-2">
+                <div key={comment.id} className="rounded-lg bg-slate-50 p-4">
+                  <div className="mb-2 flex items-start justify-between">
                     <div className="font-medium text-slate-900">{comment.userName}</div>
                     <div className="text-sm text-slate-500">{formatDate(comment.date)}</div>
                   </div>
-                  <div className="flex items-center gap-1 mb-2">
+                  <div className="mb-2 flex items-center gap-1">
                     {[...Array(5)].map((_, i) => (
                       <Star
                         key={i}
                         className={cn(
-                          "w-4 h-4",
-                          i < comment.rating
-                            ? "text-amber-500 fill-amber-500"
-                            : "text-slate-300"
+                          'h-4 w-4',
+                          i < comment.rating ? 'fill-amber-500 text-amber-500' : 'text-slate-300'
                         )}
                       />
                     ))}
                   </div>
-                  {comment.review && (
-                    <p className="text-slate-700 text-sm">{comment.review}</p>
-                  )}
+                  {comment.review && <p className="text-sm text-slate-700">{comment.review}</p>}
                 </div>
               ))
             ) : (
-              <div className="text-center py-8 text-slate-500">
+              <div className="py-8 text-center text-slate-500">
                 <p>لا توجد تقييمات بعد</p>
-                <p className="text-sm mt-2">كن أول من يقيم هذا المنتج</p>
+                <p className="mt-2 text-sm">كن أول من يقيم هذا المنتج</p>
               </div>
             )}
           </div>
         </div>
       </div>
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        action="general"
+        title="تسجيل الدخول مطلوب"
+        description="يجب تسجيل الدخول لتقييم المنتجات."
+      />
     </div>
   );
 

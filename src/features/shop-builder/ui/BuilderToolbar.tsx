@@ -1,4 +1,4 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Plus, Ruler, Rotate3D, Scan, Save, Upload, Search, Package, Eye, EyeOff, SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, TrendingUp, Star, Clock, Settings, Download, FileUp, RotateCcw, X, Palette, Edit2, Printer, LogOut, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -351,6 +351,21 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     selectWall(id);
     toast({ title: 'تم إضافة جدار جديد', description: 'يمكنك سحب أطرافه لتغيير الأبعاد.' });
   }, [layout.walls.length, layout.defaultWallColor, selectWall, toast, upsertWall]);
+
+  const handleAddDoor = useCallback((material: string) => {
+    const offset = layout.walls.length * 2.4;
+    const id = upsertWall({
+      start: { x: -2 + offset, y: -1.5 },
+      end: { x: -2 + offset, y: -0.5 },
+      height: 2.2,
+      thickness: 0.1,
+      color: '#ffffff',
+      texture: `door_${material}`
+    });
+    selectWall(id);
+    toast({ title: 'تم إدراج الباب', description: 'تم إدراج الباب بنجاح في مساحة العمل. يمكنك تعديله مثل الجدار.' });
+  }, [layout.walls.length, selectWall, toast, upsertWall]);
+
   const handleWallColorChange = useCallback(
     (value: string) => {
       setWallColor(value);
@@ -768,6 +783,33 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
               <Plus className="h-4 w-4" />
             </Button>
           </div>
+
+          {/* Divider */}
+          <div className="hidden sm:block w-px h-7 bg-zinc-200" />
+          
+          {/* Add Door Dropdown */}
+          <DropdownMenu dir="rtl">
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-11 sm:h-11 px-4 gap-2 font-bold text-base sm:text-sm border-0 border-r border-zinc-200 rounded-none bg-white hover:bg-zinc-50"
+              >
+                <Package className="h-5 w-5 sm:h-4 sm:w-4 text-primary" />
+                إضافة باب
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48 p-1 rounded-xl">
+              <DropdownMenuItem onClick={() => handleAddDoor('glass')} className="font-semibold cursor-pointer rounded-lg mb-1">
+                باب زجاجي (Glass)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAddDoor('wood')} className="font-semibold cursor-pointer rounded-lg mb-1">
+                باب خشبي (Wood)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleAddDoor('metal')} className="font-semibold cursor-pointer rounded-lg">
+                باب معدني (Metal)
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
 
