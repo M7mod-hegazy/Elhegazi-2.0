@@ -12,6 +12,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { PointerLockControls } from 'three/examples/jsm/controls/PointerLockControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader.js';
 import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader.js';
 import { useShopBuilder } from '../store';
@@ -200,6 +201,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
   const wheelZoomHandlerRef = useRef<((event: WheelEvent) => void) | null>(null);
   const lastSizeRef = useRef<{ width: number; height: number } | null>(null);
   const gltfLoaderRef = useRef<GLTFLoader | null>(null);
+  const dracoLoaderRef = useRef<DRACOLoader | null>(null);
   const objLoaderRef = useRef<OBJLoader | null>(null);
   const fbxLoaderRef = useRef<FBXLoader | null>(null);
   const productMapRef = useRef<Map<string, ProductEntry>>(new Map());
@@ -599,6 +601,9 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
 
     // Initialize all loaders
     gltfLoaderRef.current = new GLTFLoader();
+    dracoLoaderRef.current = new DRACOLoader();
+    dracoLoaderRef.current.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+    gltfLoaderRef.current.setDRACOLoader(dracoLoaderRef.current);
     objLoaderRef.current = new OBJLoader();
     fbxLoaderRef.current = new FBXLoader();
 
@@ -621,6 +626,8 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       if (wheelZoomHandlerRef.current) {
         renderer.domElement.removeEventListener('wheel', wheelZoomHandlerRef.current);
       }
+      dracoLoaderRef.current?.dispose();
+      dracoLoaderRef.current = null;
     };
   }, [upsertProduct, selectProduct, selectWall, selectColumn, selectSlatWall, selectPrimoStand]);
 
