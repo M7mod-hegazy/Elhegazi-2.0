@@ -75,6 +75,7 @@ export interface ShopBuilderSlatWall {
   height: number;
   bottomOffset: number; // distance from floor
   color?: string;
+  outerColor?: string; // outer/front edge color (mainly for supermarket shelves)
   slatSpacing?: number; // distance between slats (for slat wall)
   shelfCount?: number; // for supermarket shelves
   shelfDepth?: number; // for supermarket shelves

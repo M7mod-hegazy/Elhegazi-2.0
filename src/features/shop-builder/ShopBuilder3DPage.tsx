@@ -144,6 +144,32 @@ const DISPLAY_SYSTEM_WEB_INFO: Record<DisplaySystemType, {
   },
 };
 
+function normalizeHexColor(input?: string, fallback = '#dc2626'): string {
+  if (!input) return fallback;
+  const value = input.trim();
+  if (/^#[0-9a-fA-F]{6}$/.test(value)) return value;
+  if (/^#[0-9a-fA-F]{3}$/.test(value)) {
+    return `#${value[1]}${value[1]}${value[2]}${value[2]}${value[3]}${value[3]}`;
+  }
+  return fallback;
+}
+
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const safeHex = normalizeHexColor(hex);
+  const raw = safeHex.slice(1);
+  const num = Number.parseInt(raw, 16);
+  return {
+    r: (num >> 16) & 255,
+    g: (num >> 8) & 255,
+    b: num & 255,
+  };
+}
+
+function rgbaFromHex(hex: string, alpha: number): string {
+  const { r, g, b } = hexToRgb(hex);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 function InteractiveAccessoryNode({
    accessory,
    slatWidth,
@@ -467,19 +493,27 @@ function InteractiveSlatNode({
         bottom: `${bottomPct}%`,
         width: `${widthPct}%`,
         height: `${heightPct}%`,
-        backgroundColor: slat.systemType === 'supermarket_shelves' ? '#fff' : isPrimo ? '#eef2f7' : (slat.color || '#f5f5f5'),
-        backgroundImage: slat.systemType === 'supermarket_shelves'
-           ? `repeating-linear-gradient(90deg, rgba(0,0,0,0.3) 0px, rgba(0,0,0,0.3) 4px, transparent 4px, transparent ${Math.max(1, ((slat.uprightSpacing || 1.0) / width) * 100)}%), 
-              repeating-linear-gradient(0deg, transparent, transparent calc(${100 / (slat.shelfCount || 5)}% - 4px), ${slat.color || '#e11d48'} calc(${100 / (slat.shelfCount || 5)}% - 4px), ${slat.color || '#e11d48'} ${100 / (slat.shelfCount || 5)}%)`
-           : isPrimo
-           ? `linear-gradient(180deg, rgba(255,255,255,0.65), rgba(226,232,240,0.65)),
-              repeating-linear-gradient(90deg, rgba(30,41,59,0.35) 0px, rgba(30,41,59,0.35) 4px, transparent 4px, transparent ${primoBaySpacingPct}%)`
-           : `repeating-linear-gradient(0deg, transparent, transparent calc(100% - 2px), rgba(0,0,0,0.2) calc(100% - 2px), rgba(0,0,0,0.2) 100%)`,
-        backgroundSize: slat.systemType === 'supermarket_shelves'
-           ? `100% 100%, 100% 100%` 
-           : isPrimo
-           ? `100% 100%, 100% 100%`
-           : `100% ${100 / (slat.height / Math.max(0.01, slat.slatSpacing))}%`,
+        ...(slat.systemType === 'supermarket_shelves'
+          ? (() => {
+              const base = normalizeHexColor(slat.color || '#dc2626');
+              const outer = normalizeHexColor(slat.outerColor || base, base);
+              return {
+                backgroundColor: rgbaFromHex(base, 0.22),
+                backgroundImage: `repeating-linear-gradient(90deg, ${rgbaFromHex(outer, 0.86)} 0px, ${rgbaFromHex(outer, 0.86)} 4px, transparent 4px, transparent ${Math.max(1, ((slat.uprightSpacing || 1.0) / width) * 100)}%), 
+                repeating-linear-gradient(0deg, transparent, transparent calc(${100 / (slat.shelfCount || 5)}% - 4px), ${rgbaFromHex(outer, 1)} calc(${100 / (slat.shelfCount || 5)}% - 4px), ${rgbaFromHex(outer, 1)} ${100 / (slat.shelfCount || 5)}%)`,
+                backgroundSize: '100% 100%, 100% 100%',
+              };
+            })()
+          : {
+              backgroundColor: isPrimo ? '#eef2f7' : (slat.color || '#f5f5f5'),
+              backgroundImage: isPrimo
+                ? `linear-gradient(180deg, rgba(255,255,255,0.65), rgba(226,232,240,0.65)),
+               repeating-linear-gradient(90deg, rgba(30,41,59,0.35) 0px, rgba(30,41,59,0.35) 4px, transparent 4px, transparent ${primoBaySpacingPct}%)`
+                : `repeating-linear-gradient(0deg, transparent, transparent calc(100% - 2px), rgba(0,0,0,0.2) calc(100% - 2px), rgba(0,0,0,0.2) 100%)`,
+              backgroundSize: isPrimo
+                ? `100% 100%, 100% 100%`
+                : `100% ${100 / (slat.height / Math.max(0.01, slat.slatSpacing))}%`,
+            }),
         boxShadow: isHovered && !isActive
           ? '0 0 0 2px rgba(255,255,255,0.95), 0 0 0 5px rgba(37,99,235,0.35)'
           : undefined,
@@ -1172,10 +1206,56 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                  </button>
               </div>
                
-               {/* Color */}
+                {/* Color */}
                <div className="flex flex-col gap-1.5">
                   <label className="text-xs font-semibold text-zinc-600">اللون الأساسي</label>
-                  <input type="color" value={selectedSlat.color || '#f5f5f5'} onChange={e => updateSlatWall(targetId, selectedSlat.id, {color: e.target.value})} className="w-full h-8 rounded-md cursor-pointer border border-zinc-200"/>
+                  {selectedSlat.systemType === 'supermarket_shelves' ? (
+                    <div className="space-y-2 rounded-lg border border-zinc-200 bg-zinc-50 p-2">
+                      <div className="text-[11px] font-semibold text-zinc-600">اللون العام للنظام</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={normalizeHexColor(selectedSlat.color || '#dc2626')}
+                          onChange={e => updateSlatWall(targetId, selectedSlat.id, { color: e.target.value })}
+                          className="w-16 h-8 rounded-md cursor-pointer border border-zinc-300 bg-white"
+                        />
+                        <Input
+                          value={normalizeHexColor(selectedSlat.color || '#dc2626')}
+                          onChange={(e) => updateSlatWall(targetId, selectedSlat.id, { color: normalizeHexColor(e.target.value, '#dc2626') })}
+                          className="h-8 text-xs ltr text-left"
+                          placeholder="#dc2626"
+                        />
+                      </div>
+                      <div className="h-px bg-zinc-200" />
+                      <div className="text-[11px] font-semibold text-zinc-600">لون الجزء الخارجي (الحواف/الخطوط)</div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={normalizeHexColor(selectedSlat.outerColor || selectedSlat.color || '#dc2626')}
+                          onChange={e => updateSlatWall(targetId, selectedSlat.id, { outerColor: e.target.value })}
+                          className="w-16 h-8 rounded-md cursor-pointer border border-zinc-300 bg-white"
+                        />
+                        <Input
+                          value={normalizeHexColor(selectedSlat.outerColor || selectedSlat.color || '#dc2626')}
+                          onChange={(e) =>
+                            updateSlatWall(targetId, selectedSlat.id, {
+                              outerColor: normalizeHexColor(e.target.value, normalizeHexColor(selectedSlat.color || '#dc2626')),
+                            })
+                          }
+                          className="h-8 text-xs ltr text-left"
+                          placeholder="#dc2626"
+                        />
+                      </div>
+                      <span className="text-[11px] text-zinc-500">لوحة ألوان كاملة بدون خيارات محدودة مع فصل اللون العام عن لون الحواف الخارجية.</span>
+                    </div>
+                  ) : (
+                    <input
+                      type="color"
+                      value={selectedSlat.color || '#f5f5f5'}
+                      onChange={e => updateSlatWall(targetId, selectedSlat.id, { color: e.target.value })}
+                      className="w-full h-8 rounded-md cursor-pointer border border-zinc-200"
+                    />
+                  )}
                </div>
 
               {(!selectedSlat.systemType || selectedSlat.systemType === 'slat' || selectedSlat.systemType === 'primo') && (

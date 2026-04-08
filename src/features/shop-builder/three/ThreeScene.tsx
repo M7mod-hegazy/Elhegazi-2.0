@@ -1150,15 +1150,36 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         }
       }
     });
+    const disposeGroup = (group: THREE.Object3D) => {
+      group.traverse((child) => {
+        if (child instanceof THREE.Mesh) {
+          child.geometry?.dispose();
+          if (Array.isArray(child.material)) {
+            child.material.forEach((material) => {
+              if ((material as THREE.MeshStandardMaterial).map) {
+                ((material as THREE.MeshStandardMaterial).map as THREE.Texture).dispose();
+              }
+              material.dispose();
+            });
+          } else if (child.material) {
+            const mat = child.material as THREE.MeshStandardMaterial;
+            if (mat.map) mat.map.dispose();
+            mat.dispose();
+          }
+        }
+      });
+    };
 
-    // Limit to 20 walls max for performance
-    console.log('🧱 DEBUG: Processing walls', {
-      totalWalls: layout.walls.length,
-      processing: Math.min(layout.walls.length, 20),
-      defaultWallTexture: layout.defaultWallTexture || 'none'
-    });
-    
-    layout.walls.slice(0, 20).forEach((wall, index) => {
+    const buildSlatSignature = (wall: ShopBuilderWall, slat: ShopBuilderSlatWall) =>
+      JSON.stringify({
+        wallStart: wall.start,
+        wallEnd: wall.end,
+        wallThickness: wall.thickness,
+        wallColumns: wall.columns || [],
+        slat,
+      });
+
+    layout.walls.forEach((wall) => {
       const existing = wallMeshMap.get(wall.id);
       if (existing) {
         updateWallMesh(existing, wall, texturesCache.current);
@@ -1166,35 +1187,31 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         const mesh = createWallMesh(wall, texturesCache.current);
         wallMeshMap.set(wall.id, mesh);
         scene.add(mesh);
-        console.log(`🧱 DEBUG: Wall ${index + 1} created`, {
-          id: wall.id,
-          start: wall.start,
-          end: wall.end,
-          height: wall.height,
-          texture: wall.texture || 'default',
-          color: wall.color
-        });
       }
+      const wallStart = new THREE.Vector3(wall.start.x, 0, wall.start.y);
+      const wallEnd = new THREE.Vector3(wall.end.x, 0, wall.end.y);
 
       // Render slat walls for this wall
       if (wall.slatWalls && wall.slatWalls.length > 0) {
         wall.slatWalls.forEach((slat) => {
           const slatKey = `${wall.id}-${slat.id}`;
           const existingSlat = slatWallMeshRef.current.get(slatKey);
-          
+          const signature = buildSlatSignature(wall, slat);
+
+          if (existingSlat && existingSlat.userData?.sbSignature === signature) {
+            const slatPosCenter = slat.fillType === 'full' ? 0.5 : (slat.position || 0.5);
+            updateSlatWallPosition(existingSlat, wall, slat, wallStart, wallEnd, slatPosCenter);
+            return;
+          }
+
           if (existingSlat) {
             scene.remove(existingSlat);
-            existingSlat.traverse((child) => {
-               if (child instanceof THREE.Mesh) {
-                  child.geometry?.dispose();
-                  if (child.material?.map) child.material.map.dispose();
-                  child.material?.dispose();
-               }
-            });
+            disposeGroup(existingSlat);
             slatWallMeshRef.current.delete(slatKey);
           }
-          
+
           const slatMesh = createSlatWallMesh(wall, slat);
+          slatMesh.userData = { ...(slatMesh.userData || {}), sbSignature: signature };
           slatWallMeshRef.current.set(slatKey, slatMesh);
           scene.add(slatMesh);
         });
@@ -1205,17 +1222,6 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
         wall.primoStands.forEach((primo) => {
           const primoKey = `primo-${wall.id}-${primo.id}`;
           const existing = primoStandMeshRef.current.get(primoKey);
-          if (existing) {
-            scene.remove(existing);
-            existing.traverse((child) => {
-               if (child instanceof THREE.Mesh) {
-                  child.geometry?.dispose();
-                  if (child.material?.map) child.material.map.dispose();
-                  child.material?.dispose();
-               }
-            });
-            primoStandMeshRef.current.delete(primoKey);
-          }
           // Cast primo to ShopBuilderSlatWall shape since createSlatWallMesh is generic
           const slatLike = {
             ...primo,
@@ -1225,7 +1231,21 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
             shelfCount: undefined,
             shelfDepth: undefined,
           };
+          const signature = buildSlatSignature(wall, slatLike as any);
+          if (existing && existing.userData?.sbSignature === signature) {
+            const primoPosCenter = slatLike.fillType === 'full' ? 0.5 : (slatLike.position || 0.5);
+            updateSlatWallPosition(existing, wall, slatLike as any, wallStart, wallEnd, primoPosCenter);
+            return;
+          }
+
+          if (existing) {
+            scene.remove(existing);
+            disposeGroup(existing);
+            primoStandMeshRef.current.delete(primoKey);
+          }
+
           const primoMesh = createSlatWallMesh(wall, slatLike as any);
+          primoMesh.userData = { ...(primoMesh.userData || {}), sbSignature: signature };
           primoStandMeshRef.current.set(primoKey, primoMesh);
           scene.add(primoMesh);
         });
@@ -1286,13 +1306,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     slatWallMeshRef.current.forEach((mesh, key) => {
       if (!currentSlatKeys.has(key)) {
         scene.remove(mesh);
-        mesh.traverse((child) => {
-           if (child instanceof THREE.Mesh) {
-              child.geometry?.dispose();
-              if (child.material?.map) child.material.map.dispose();
-              child.material?.dispose();
-           }
-        });
+        disposeGroup(mesh);
         slatWallMeshRef.current.delete(key);
       }
     });
@@ -1309,13 +1323,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     primoStandMeshRef.current.forEach((mesh, key) => {
       if (!currentPrimoKeys.has(key)) {
         scene.remove(mesh);
-        mesh.traverse((child) => {
-           if (child instanceof THREE.Mesh) {
-              child.geometry?.dispose();
-              if (child.material?.map) child.material.map.dispose();
-              child.material?.dispose();
-           }
-        });
+        disposeGroup(mesh);
         primoStandMeshRef.current.delete(key);
       }
     });
@@ -2314,12 +2322,19 @@ function createSupermarketShelvesMesh(group: THREE.Group, slat: ShopBuilderSlatW
    const shelfDepth = slat.shelfDepth || 0.4;
    const uprightSpacing = slat.uprightSpacing || 1.0;
    const sysHeight = slat.height || 2;
-   const color = slat.color || '#e11d48'; // default to red/pink accent
-   
-   const uprightMaterial = new THREE.MeshStandardMaterial({ color: '#f5f5f5', roughness: 0.6, metalness: 0.1 });
-   const shelfMaterial = new THREE.MeshStandardMaterial({ color: '#ffffff', roughness: 0.8 });
-   const accentMaterial = new THREE.MeshStandardMaterial({ color: color, roughness: 0.5 });
-   const backPanelMaterial = new THREE.MeshStandardMaterial({ color: '#fcfcfc', roughness: 0.9 });
+   const color = slat.color || '#e11d48';
+   const outerColor = slat.outerColor || color;
+   const baseColor = new THREE.Color(color);
+   const edgeColor = new THREE.Color(outerColor);
+   const tint = (towardsWhite: number) => baseColor.clone().lerp(new THREE.Color('#ffffff'), Math.max(0, Math.min(1, towardsWhite)));
+   const edgeShade = (towardsBlack: number) => edgeColor.clone().lerp(new THREE.Color('#111111'), Math.max(0, Math.min(1, towardsBlack)));
+
+   // Apply the selected display color across the full supermarket system, with readable tints/shades.
+   // Stronger global coloring for supermarket system (not only edge accents).
+   const uprightMaterial = new THREE.MeshStandardMaterial({ color: tint(0.12), roughness: 0.58, metalness: 0.12 });
+   const shelfMaterial = new THREE.MeshStandardMaterial({ color: tint(0.18), roughness: 0.78, metalness: 0.04 });
+    const accentMaterial = new THREE.MeshStandardMaterial({ color: edgeShade(0.28), roughness: 0.46, metalness: 0.16 });
+   const backPanelMaterial = new THREE.MeshStandardMaterial({ color: tint(0.24), roughness: 0.88, metalness: 0.02 });
    
    const sideFlip = slat.side === 'back' ? -1 : 1;
 
@@ -2567,3 +2582,4 @@ function updateColumnMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, column: ShopB
     mesh.rotation.y = 0;
   }
 }
+

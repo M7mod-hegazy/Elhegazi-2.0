@@ -10,7 +10,7 @@ import { useTheme } from '@/context/ThemeContext';
 import { useShopBuilder, useShopBuilderLayout } from '../store';
 import type { TransformMode } from '../three/ThreeScene';
 import { WALL_TEXTURES, FLOOR_TEXTURES } from '../three/ThreeScene';
-import { generateAutoHungProductsList } from '../three/proceduralProducts';
+import { generateAutoHungProductsList, MAX_AUTO_HUNG_PRODUCTS } from '../three/proceduralProducts';
 
 // Wall texture options - mapped from WALL_TEXTURES
 const WALL_TEXTURE_OPTIONS = [
@@ -693,9 +693,12 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
 
       setProducts([...manualProducts, ...generated]);
       selectProduct(generated[0].id);
+      const isLikelyCapped = generated.length >= Math.max(300, MAX_AUTO_HUNG_PRODUCTS - Math.min(800, manualProducts.length));
       toast({
         title: 'تم التعليق التلقائي بنجاح',
-        description: `تم إضافة ${generated.length} شكل ثلاثي الأبعاد مولد محليًا على الملحقات.`,
+        description: isLikelyCapped
+          ? `تم إضافة ${generated.length} عنصرًا مع تحسين تلقائي للأداء بسبب كثرة الملحقات/العروض.`
+          : `تم إضافة ${generated.length} شكل ثلاثي الأبعاد مولد محليًا على الملحقات.`,
       });
       setHangProductsOpen(false);
     } catch (error) {

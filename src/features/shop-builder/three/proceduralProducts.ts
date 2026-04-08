@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { ShopBuilderProduct, ShopBuilderWall } from '../types';
 
+export const MAX_AUTO_HUNG_PRODUCTS = 1600;
+
 // ─── Expanded Procedural Catalog ─────────────────────────────────────────────
 
 export const PROCEDURAL_CATALOG: Record<string, Array<{
@@ -282,8 +284,30 @@ export const generateAutoHungProductsList = (
 ): ShopBuilderProduct[] => {
   const generated: ShopBuilderProduct[] = [];
   const rnd = (min: number, max: number) => min + Math.random() * (max - min);
+  const existingManualCount = existingProducts.filter((p) => !(p.metadata as any)?.autoHangFill).length;
+  const maxGenerated = Math.max(300, MAX_AUTO_HUNG_PRODUCTS - Math.min(800, existingManualCount));
+
+  let systemsCount = 0;
+  let accessoryCount = 0;
+  walls.forEach((wall) => {
+    const slatSystems = wall.slatWalls || [];
+    const primoSystems = ((wall.primoStands as any[] | undefined) || []);
+    systemsCount += slatSystems.length + primoSystems.length;
+    slatSystems.forEach((s: any) => { accessoryCount += (s.accessories || []).length; });
+    primoSystems.forEach((s: any) => { accessoryCount += (s.accessories || []).length; });
+  });
+
+  const complexityScore = systemsCount * 10 + accessoryCount * 6;
+  const densityScale =
+    complexityScore > 4000 ? 0.35 :
+    complexityScore > 2500 ? 0.5 :
+    complexityScore > 1500 ? 0.65 :
+    complexityScore > 900 ? 0.8 : 1;
+  const scaleCount = (base: number, min = 1) => Math.max(min, Math.floor(base * densityScale));
+  const canPushMore = () => generated.length < maxGenerated;
 
   walls.forEach((wall) => {
+    if (!canPushMore()) return;
     // Combine slatWalls (includes primo via systemType) and primoStands
     const systems: any[] = [
       ...(wall.slatWalls || []),
@@ -291,6 +315,7 @@ export const generateAutoHungProductsList = (
     ];
 
     systems.forEach((slat) => {
+      if (!canPushMore()) return;
       const slatHeight = slat.height || 2;
       const wallLength = Math.max(0.001, Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y));
       const slatWidth = slat.fillType === 'full' ? wallLength : (slat.width || 1);
@@ -341,6 +366,7 @@ export const generateAutoHungProductsList = (
         const sideFlip = slat.side === 'back' ? -1 : 1;
 
         segments.forEach(seg => {
+          if (!canPushMore()) return;
           const segWidth = seg.end - seg.start;
           if (segWidth < 0.1) return;
           const baysCount = Math.ceil(segWidth / uprightSpacing);
@@ -349,10 +375,12 @@ export const generateAutoHungProductsList = (
           const segLocalX = (segCenter - (slatPosCenter * wallLength)) * sideFlip;
 
           for (let bay = 0; bay < baysCount; bay++) {
+            if (!canPushMore()) break;
             const bayCenterX = -segWidth / 2 + (bay + 0.5) * bayWidth;
             const worldBayCenterX = segLocalX + bayCenterX * sideFlip;
 
             for (let shelf = 0; shelf < shelfCount; shelf++) {
+              if (!canPushMore()) break;
               // Match shelf Y position from createSupermarketShelvesMesh
               const shelfY = 0.15 + shelf * ((sysHeight - 0.3) / Math.max(1, shelfCount - 1));
               const localY = shelfY - sysHeight / 2;
@@ -360,8 +388,10 @@ export const generateAutoHungProductsList = (
               const sDepth = isBaseShelf ? shelfDepth + 0.05 : shelfDepth;
 
               // Fill each shelf bay with 3-6 products
-              const productsOnShelf = Math.floor(rnd(3, 7));
+              const baseProductsOnShelf = Math.floor(rnd(3, 7));
+              const productsOnShelf = scaleCount(baseProductsOnShelf, 1);
               for (let p = 0; p < productsOnShelf; p++) {
+                if (!canPushMore()) break;
                 const picked = smCatalog[Math.floor(Math.random() * smCatalog.length)];
                 if (!picked) continue;
 
@@ -408,21 +438,23 @@ export const generateAutoHungProductsList = (
       const accessories = (slat.accessories || []) as any[];
 
       accessories.forEach((acc) => {
+        if (!canPushMore()) return;
         let count = 1;
         if (acc.type === 'shelf') {
           const maxByWidth = Math.max(1, Math.floor((acc.width || 0.5) / 0.22));
-          count = Math.max(2, Math.min(6, maxByWidth + Math.floor(rnd(0, 2))));
+          count = scaleCount(Math.max(2, Math.min(6, maxByWidth + Math.floor(rnd(0, 2)))), 1);
         } else if (acc.type === 'hook_single') {
-          count = Math.floor(rnd(1, 3));
+          count = scaleCount(Math.floor(rnd(1, 3)), 1);
         } else if (acc.type === 'hook_waterfall') {
           // Clothes hangers: fewer items, spaced along the rod
           const maxByDepth = Math.max(2, Math.floor((acc.depth || 0.4) / 0.06));
-          count = Math.max(2, Math.min(7, maxByDepth));
+          count = scaleCount(Math.max(2, Math.min(7, maxByDepth)), 1);
         } else {
-          count = Math.floor(rnd(2, 5));
+          count = scaleCount(Math.floor(rnd(2, 5)), 1);
         }
 
         for (let i = 0; i < count; i++) {
+          if (!canPushMore()) break;
           const accCatalog = PROCEDURAL_CATALOG[acc.type] || PROCEDURAL_CATALOG.shelf;
           const picked = accCatalog[Math.floor(Math.random() * accCatalog.length)];
           if (!picked) continue;
