@@ -99,6 +99,100 @@ async function isAdminRequest(c) {
   }
 }
 
+const BUILDER_PROJECT_SCHEMA_VERSION = 1;
+const parseBool = (value, fallback = false) => {
+  if (value === undefined || value === null || value === '') return fallback;
+  const normalized = String(value).toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(normalized);
+};
+
+function getOwnerIdentity(c) {
+  const ownerUserId = c.req.header('x-user-id') || null;
+  const ownerActorKey = getActorKey(c);
+  const ownerEmailSnapshot = c.req.header('x-user-email') || '';
+  return { ownerUserId, ownerActorKey, ownerEmailSnapshot };
+}
+
+function getBuilderProjectStats(layout) {
+  const safe = layout && typeof layout === 'object' ? layout : {};
+  return {
+    wallsCount: Array.isArray(safe.walls) ? safe.walls.length : 0,
+    productsCount: Array.isArray(safe.products) ? safe.products.length : 0,
+    floorSize: Number(safe.floorSize || 24),
+  };
+}
+
+function cleanBuilderLayout(layout) {
+  const safe = layout && typeof layout === 'object' ? { ...layout } : {};
+  if (!Array.isArray(safe.walls)) safe.walls = [];
+  if (!Array.isArray(safe.products)) safe.products = [];
+  return safe;
+}
+
+function mapBuilderProjectListItem(project) {
+  return {
+    _id: String(project._id),
+    title: project.title || 'Project',
+    description: project.description || '',
+    previewImageUrl: project.previewImageUrl || '',
+    previewImagePublicId: project.previewImagePublicId || '',
+    stats: project.stats || getBuilderProjectStats(project.layout || {}),
+    ownerUserId: project.ownerUserId || null,
+    ownerActorKey: project.ownerActorKey || null,
+    ownerEmailSnapshot: project.ownerEmailSnapshot || '',
+    isDeleted: !!project.isDeleted,
+    deletedAt: project.deletedAt || null,
+    createdAt: project.createdAt,
+    updatedAt: project.updatedAt,
+    lastOpenedAt: project.lastOpenedAt || null,
+    version: Number(project.version || 1),
+  };
+}
+
+function buildBuilderScopeFilter(c, { adminAll = false, ownerQuery } = {}) {
+  if (adminAll) {
+    const owner = String(ownerQuery || '').trim();
+    if (!owner) return {};
+    return {
+      $or: [
+        { ownerUserId: owner },
+        { ownerActorKey: owner },
+        { ownerEmailSnapshot: { $regex: owner, $options: 'i' } },
+      ],
+    };
+  }
+
+  const userId = c.req.header('x-user-id') || null;
+  const actorKey = getActorKey(c);
+  if (userId) {
+    return { $or: [{ ownerUserId: userId }, { ownerActorKey: actorKey }] };
+  }
+  return { ownerActorKey: actorKey };
+}
+
+async function uploadBuilderPreviewDataUrl(previewDataUrl, ownerActorKey) {
+  if (typeof previewDataUrl !== 'string' || !previewDataUrl.trim()) return null;
+  if (!previewDataUrl.startsWith('data:image/')) return null;
+  if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) return null;
+
+  const cloudinary = await import('cloudinary').then((m) => m.v2);
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+  });
+
+  const uploaded = await cloudinary.uploader.upload(previewDataUrl, {
+    folder: 'builder-project-previews',
+    public_id: `preview_${ownerActorKey.replace(/[^a-zA-Z0-9_-]/g, '_')}_${Date.now()}`,
+    resource_type: 'image',
+    format: 'webp',
+    quality: 'auto:good',
+    transformation: [{ width: 1400, height: 900, crop: 'limit' }],
+  });
+  return { url: uploaded.secure_url, publicId: uploaded.public_id };
+}
+
 // Middleware: Connect to MongoDB for all requests
 app.use('*', async (c, next) => {
   try {
@@ -757,6 +851,350 @@ app.post('/builder/session/end', async (c) => {
   }
 });
 
+// ===== BUILDER PROJECTS =====
+app.get('/builder/projects', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const page = Math.max(1, Number(c.req.query('page') || 1));
+    const limit = Math.min(48, Math.max(1, Number(c.req.query('limit') || 12)));
+    const skip = (page - 1) * limit;
+    const q = String(c.req.query('q') || '').trim();
+    const deleted = parseBool(c.req.query('deleted'), false);
+    const sortKey = String(c.req.query('sort') || 'updated_desc');
+
+    const sortMap = {
+      updated_desc: { updatedAt: -1 },
+      created_desc: { createdAt: -1 },
+      name_asc: { title: 1 },
+      last_opened_desc: { lastOpenedAt: -1, updatedAt: -1 },
+    };
+    const sort = sortMap[sortKey] || sortMap.updated_desc;
+    const filter = { ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }), isDeleted: deleted };
+
+    if (q) {
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { title: { $regex: q, $options: 'i' } },
+          { description: { $regex: q, $options: 'i' } },
+          { ownerEmailSnapshot: { $regex: q, $options: 'i' } },
+        ],
+      });
+    }
+
+    const [items, total] = await Promise.all([
+      BuilderProject.find(filter).sort(sort).skip(skip).limit(limit).lean().maxTimeMS(12000),
+      BuilderProject.countDocuments(filter).maxTimeMS(12000),
+    ]);
+
+    return c.json({
+      ok: true,
+      items: items.map(mapBuilderProjectListItem),
+      page,
+      total,
+      pages: Math.max(1, Math.ceil(total / limit)),
+      limit,
+    });
+  } catch (err) {
+    console.error('[API] builder/projects list error:', err.message);
+    return c.json({ ok: false, error: err.message || 'Failed to list projects' }, 500);
+  }
+});
+
+app.post('/builder/projects', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const body = await c.req.json().catch(() => ({}));
+    const { ownerUserId, ownerActorKey, ownerEmailSnapshot } = getOwnerIdentity(c);
+    const layout = cleanBuilderLayout(body.layout || {});
+    const stats = getBuilderProjectStats(layout);
+
+    let previewImageUrl = '';
+    let previewImagePublicId = '';
+    if (typeof body.previewDataUrl === 'string' && body.previewDataUrl.trim()) {
+      const uploaded = await uploadBuilderPreviewDataUrl(body.previewDataUrl, ownerActorKey);
+      if (uploaded) {
+        previewImageUrl = uploaded.url;
+        previewImagePublicId = uploaded.publicId;
+      }
+    }
+
+    const created = await BuilderProject.create({
+      ownerUserId,
+      ownerActorKey,
+      ownerEmailSnapshot,
+      title: String(body.title || 'مشروع جديد').slice(0, 120),
+      description: String(body.description || '').slice(0, 1000),
+      layout,
+      previewImageUrl,
+      previewImagePublicId,
+      stats,
+      version: 1,
+      schemaVersion: BUILDER_PROJECT_SCHEMA_VERSION,
+      lastOpenedAt: new Date(),
+    });
+    return c.json({ ok: true, item: mapBuilderProjectListItem(created.toObject()) }, 201);
+  } catch (err) {
+    console.error('[API] builder/projects create error:', err.message);
+    return c.json({ ok: false, error: err.message || 'Failed to create project' }, 400);
+  }
+});
+
+app.post('/builder/projects/import', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const body = await c.req.json().catch(() => ({}));
+    const { ownerUserId, ownerActorKey, ownerEmailSnapshot } = getOwnerIdentity(c);
+    const layout = cleanBuilderLayout(body.layout || body.project?.layout || body.project || {});
+    const stats = getBuilderProjectStats(layout);
+    const title = String(body.title || body.project?.title || 'Imported Project').slice(0, 120);
+    const description = String(body.description || body.project?.description || '').slice(0, 1000);
+
+    let previewImageUrl = '';
+    let previewImagePublicId = '';
+    if (typeof body.previewDataUrl === 'string' && body.previewDataUrl.trim()) {
+      const uploaded = await uploadBuilderPreviewDataUrl(body.previewDataUrl, ownerActorKey);
+      if (uploaded) {
+        previewImageUrl = uploaded.url;
+        previewImagePublicId = uploaded.publicId;
+      }
+    }
+
+    const created = await BuilderProject.create({
+      ownerUserId,
+      ownerActorKey,
+      ownerEmailSnapshot,
+      title,
+      description,
+      layout,
+      previewImageUrl,
+      previewImagePublicId,
+      stats,
+      version: 1,
+      schemaVersion: BUILDER_PROJECT_SCHEMA_VERSION,
+      lastOpenedAt: new Date(),
+    });
+    return c.json({ ok: true, item: mapBuilderProjectListItem(created.toObject()) }, 201);
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to import project' }, 400);
+  }
+});
+
+app.get('/builder/projects/:id', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const filter = { _id: c.req.param('id'), ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }) };
+    const project = await BuilderProject.findOne(filter).lean().maxTimeMS(12000);
+    if (!project) return c.json({ ok: false, error: 'Project not found' }, 404);
+    return c.json({ ok: true, item: { ...mapBuilderProjectListItem(project), layout: cleanBuilderLayout(project.layout || {}), schemaVersion: Number(project.schemaVersion || 1) } });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to load project' }, 400);
+  }
+});
+
+app.put('/builder/projects/:id', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const body = await c.req.json().catch(() => ({}));
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const filter = { _id: c.req.param('id'), ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }) };
+    const current = await BuilderProject.findOne(filter).maxTimeMS(12000);
+    if (!current) return c.json({ ok: false, error: 'Project not found' }, 404);
+
+    if (body.title !== undefined) current.title = String(body.title || 'Project').slice(0, 120);
+    if (body.description !== undefined) current.description = String(body.description || '').slice(0, 1000);
+    if (body.layout !== undefined) {
+      const layout = cleanBuilderLayout(body.layout);
+      current.layout = layout;
+      current.stats = getBuilderProjectStats(layout);
+    }
+    if (body.previewImageUrl !== undefined) current.previewImageUrl = String(body.previewImageUrl || '');
+    if (body.previewImagePublicId !== undefined) current.previewImagePublicId = String(body.previewImagePublicId || '');
+
+    if (typeof body.previewDataUrl === 'string' && body.previewDataUrl.trim()) {
+      const uploaded = await uploadBuilderPreviewDataUrl(body.previewDataUrl, current.ownerActorKey || getActorKey(c));
+      if (uploaded) {
+        current.previewImageUrl = uploaded.url;
+        current.previewImagePublicId = uploaded.publicId;
+      }
+    }
+
+    current.version = Number(current.version || 1) + 1;
+    current.schemaVersion = BUILDER_PROJECT_SCHEMA_VERSION;
+    await current.save();
+    return c.json({ ok: true, item: mapBuilderProjectListItem(current.toObject()) });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to update project' }, 400);
+  }
+});
+
+app.post('/builder/projects/:id/open', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const filter = { _id: c.req.param('id'), ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }) };
+    const project = await BuilderProject.findOne(filter).maxTimeMS(12000);
+    if (!project) return c.json({ ok: false, error: 'Project not found' }, 404);
+    project.lastOpenedAt = new Date();
+    await project.save();
+    return c.json({ ok: true, item: mapBuilderProjectListItem(project.toObject()) });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to mark open' }, 400);
+  }
+});
+
+app.delete('/builder/projects/:id', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const filter = { _id: c.req.param('id'), ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }) };
+    const project = await BuilderProject.findOne(filter).maxTimeMS(12000);
+    if (!project) return c.json({ ok: false, error: 'Project not found' }, 404);
+    project.isDeleted = true;
+    project.deletedAt = new Date();
+    project.deletedBy = c.req.header('x-user-id') || project.ownerActorKey;
+    await project.save();
+    return c.json({ ok: true, item: { deleted: true, id: String(project._id) } });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to delete project' }, 400);
+  }
+});
+
+app.post('/builder/projects/:id/restore', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const filter = { _id: c.req.param('id'), ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }) };
+    const project = await BuilderProject.findOne(filter).maxTimeMS(12000);
+    if (!project) return c.json({ ok: false, error: 'Project not found' }, 404);
+    project.isDeleted = false;
+    project.deletedAt = null;
+    project.deletedBy = null;
+    await project.save();
+    return c.json({ ok: true, item: mapBuilderProjectListItem(project.toObject()) });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to restore project' }, 400);
+  }
+});
+
+app.delete('/builder/projects/:id/hard-delete', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const filter = { _id: c.req.param('id'), ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }) };
+    const deleted = await BuilderProject.findOneAndDelete(filter).maxTimeMS(12000);
+    if (!deleted) return c.json({ ok: false, error: 'Project not found' }, 404);
+    return c.json({ ok: true, item: { hardDeleted: true, id: c.req.param('id') } });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to permanently delete project' }, 400);
+  }
+});
+
+app.post('/builder/projects/:id/duplicate', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const filter = { _id: c.req.param('id'), ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }) };
+    const source = await BuilderProject.findOne(filter).lean().maxTimeMS(12000);
+    if (!source) return c.json({ ok: false, error: 'Project not found' }, 404);
+
+    const { ownerUserId, ownerActorKey, ownerEmailSnapshot } = getOwnerIdentity(c);
+    const created = await BuilderProject.create({
+      ownerUserId: source.ownerUserId || ownerUserId,
+      ownerActorKey: source.ownerActorKey || ownerActorKey,
+      ownerEmailSnapshot: source.ownerEmailSnapshot || ownerEmailSnapshot,
+      title: `${source.title || 'Project'} (Copy)`.slice(0, 120),
+      description: source.description || '',
+      layout: cleanBuilderLayout(source.layout || {}),
+      previewImageUrl: source.previewImageUrl || '',
+      previewImagePublicId: source.previewImagePublicId || '',
+      stats: source.stats || getBuilderProjectStats(source.layout || {}),
+      version: 1,
+      schemaVersion: BUILDER_PROJECT_SCHEMA_VERSION,
+      lastOpenedAt: new Date(),
+    });
+    return c.json({ ok: true, item: mapBuilderProjectListItem(created.toObject()) }, 201);
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to duplicate project' }, 400);
+  }
+});
+
+app.get('/builder/projects/:id/export', async (c) => {
+  try {
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const isAdmin = await isAdminRequest(c);
+    const adminAll = isAdmin && parseBool(c.req.query('allUsers'), false);
+    const filter = { _id: c.req.param('id'), ...buildBuilderScopeFilter(c, { adminAll, ownerQuery: c.req.query('owner') }) };
+    const project = await BuilderProject.findOne(filter).lean().maxTimeMS(12000);
+    if (!project) return c.json({ ok: false, error: 'Project not found' }, 404);
+    return c.json({
+      ok: true,
+      item: {
+        schemaVersion: Number(project.schemaVersion || BUILDER_PROJECT_SCHEMA_VERSION),
+        projectMeta: {
+          title: project.title,
+          description: project.description || '',
+          ownerEmailSnapshot: project.ownerEmailSnapshot || '',
+          createdAt: project.createdAt,
+          updatedAt: project.updatedAt,
+        },
+        layout: cleanBuilderLayout(project.layout || {}),
+      },
+    });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to export project' }, 400);
+  }
+});
+
+app.get('/admin/builder/projects', async (c) => {
+  try {
+    const admin = await isAdminRequest(c);
+    if (!admin) return c.json({ ok: false, error: 'Admin authentication required' }, 403);
+    const { default: BuilderProject } = await import('../server/models/BuilderProject.js');
+    const page = Math.max(1, Number(c.req.query('page') || 1));
+    const limit = Math.min(48, Math.max(1, Number(c.req.query('limit') || 12)));
+    const skip = (page - 1) * limit;
+    const q = String(c.req.query('q') || '').trim();
+    const deleted = parseBool(c.req.query('deleted'), false);
+    const sortKey = String(c.req.query('sort') || 'updated_desc');
+    const sortMap = {
+      updated_desc: { updatedAt: -1 },
+      created_desc: { createdAt: -1 },
+      name_asc: { title: 1 },
+      last_opened_desc: { lastOpenedAt: -1, updatedAt: -1 },
+    };
+    const sort = sortMap[sortKey] || sortMap.updated_desc;
+    const filter = { ...buildBuilderScopeFilter(c, { adminAll: true, ownerQuery: c.req.query('owner') }), isDeleted: deleted };
+    if (q) {
+      filter.$and = filter.$and || [];
+      filter.$and.push({
+        $or: [
+          { title: { $regex: q, $options: 'i' } },
+          { description: { $regex: q, $options: 'i' } },
+          { ownerEmailSnapshot: { $regex: q, $options: 'i' } },
+        ],
+      });
+    }
+    const [items, total] = await Promise.all([
+      BuilderProject.find(filter).sort(sort).skip(skip).limit(limit).lean().maxTimeMS(12000),
+      BuilderProject.countDocuments(filter).maxTimeMS(12000),
+    ]);
+    return c.json({ ok: true, items: items.map(mapBuilderProjectListItem), page, total, pages: Math.max(1, Math.ceil(total / limit)), limit });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message || 'Failed to list admin projects' }, 500);
+  }
+});
+
 // ===== SETTINGS =====
 app.get('/settings', async (c) => {
   try {
@@ -1107,8 +1545,30 @@ app.post('/orders/bulk/status', async (c) => {
 app.get('/products-3d', async (c) => {
   try {
     const { default: Product3D } = await import('../server/models/Product3D.js');
-    const products = await Product3D.find({}).lean().maxTimeMS(8000);
-    return c.json({ ok: true, items: products });
+    const page = Math.max(Number(c.req.query('page') || 1), 1);
+    const limit = Math.min(Math.max(Number(c.req.query('limit') || 50), 1), 200);
+    const skip = (page - 1) * limit;
+    const category = c.req.query('category');
+    const search = c.req.query('search');
+    const isActive = c.req.query('isActive');
+    const sort = c.req.query('sort') || 'date';
+
+    const query = {};
+    if (category && category !== 'all') query.category = category;
+    if (search) query.name = { $regex: search, $options: 'i' };
+    if (isActive !== undefined && isActive !== '') query.isActive = String(isActive) === 'true';
+
+    let sortOption = { createdAt: -1 };
+    if (sort === 'name') sortOption = { name: 1 };
+    else if (sort === 'usage') sortOption = { usageCount: -1 };
+    else if (sort === 'size') sortOption = { fileSize: -1 };
+
+    const [items, total] = await Promise.all([
+      Product3D.find(query).sort(sortOption).skip(skip).limit(limit).lean().maxTimeMS(8000),
+      Product3D.countDocuments(query).maxTimeMS(8000),
+    ]);
+
+    return c.json({ ok: true, items, total, page, limit });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
@@ -1128,11 +1588,106 @@ app.get('/products-3d/:id', async (c) => {
   }
 });
 
-app.get('/products-3d-categories', async (c) => {
+app.post('/products-3d', async (c) => {
   try {
     const { default: Product3D } = await import('../server/models/Product3D.js');
-    const categories = await Product3D.distinct('category').maxTimeMS(8000);
-    return c.json({ ok: true, items: categories });
+    const body = await c.req.json();
+    const product = await Product3D.create(body);
+    return c.json({ ok: true, item: product }, 201);
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 400);
+  }
+});
+
+app.put('/products-3d/:id', async (c) => {
+  try {
+    const { default: Product3D } = await import('../server/models/Product3D.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const product = await Product3D.findByIdAndUpdate(id, body, {
+      new: true,
+      runValidators: true,
+    }).maxTimeMS(8000);
+    if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true, item: product });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 400);
+  }
+});
+
+app.delete('/products-3d/:id', async (c) => {
+  try {
+    const { default: Product3D } = await import('../server/models/Product3D.js');
+    const id = c.req.param('id');
+    const product = await Product3D.findByIdAndDelete(id).maxTimeMS(8000);
+    if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 400);
+  }
+});
+
+app.post('/products-3d/:id/use', async (c) => {
+  try {
+    const { default: Product3D } = await import('../server/models/Product3D.js');
+    const id = c.req.param('id');
+    const product = await Product3D.findByIdAndUpdate(
+      id,
+      { $inc: { usageCount: 1 } },
+      { new: true }
+    ).maxTimeMS(8000);
+    if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true, item: product });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 400);
+  }
+});
+
+app.get('/products-3d-categories', async (c) => {
+  try {
+    const { default: Settings } = await import('../server/models/Settings.js');
+    let settings = await Settings.findOne().lean().maxTimeMS(8000);
+    if (!settings) {
+      settings = await Settings.create({});
+    }
+    const categories = settings?.products3DCategories || ['أثاث', 'أجهزة', 'إضاءة', 'ديكور', 'أخرى'];
+    return c.json({ ok: true, categories });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/products-3d-categories', async (c) => {
+  try {
+    const { default: Settings } = await import('../server/models/Settings.js');
+    const body = await c.req.json();
+    const categories = Array.isArray(body?.categories) ? body.categories : null;
+    if (!categories) return c.json({ ok: false, error: 'Categories must be an array' }, 400);
+
+    let settings = await Settings.findOne().maxTimeMS(8000);
+    if (!settings) {
+      settings = await Settings.create({ products3DCategories: categories });
+    } else {
+      settings.products3DCategories = categories;
+      await settings.save();
+    }
+    return c.json({ ok: true, categories: settings.products3DCategories || categories });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/products-3d/categories/list', async (c) => {
+  try {
+    const { default: Product3D } = await import('../server/models/Product3D.js');
+    const items = await Product3D.distinct('category').maxTimeMS(8000);
+    return c.json({ ok: true, items });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
@@ -1305,11 +1860,72 @@ app.post('/support/contact', async (c) => {
 // ===== 3D MODEL UPLOAD =====
 app.post('/upload-3d-model', async (c) => {
   try {
-    const body = await c.req.json();
-    return c.json({ ok: true, item: { message: '3D model uploaded', url: body.url } });
+    const formData = await c.req.formData();
+    const file = formData.get('file');
+    if (!file || typeof file === 'string') {
+      return c.json({ ok: false, error: 'No file uploaded' }, 400);
+    }
+    if (Number(file.size || 0) > 8 * 1024 * 1024) {
+      return c.json({ ok: false, error: 'File too large. Max size is 8MB.' }, 413);
+    }
+
+    const fileName = String((file && file.name) || '');
+    const fileExt = fileName.includes('.') ? fileName.slice(fileName.lastIndexOf('.')).toLowerCase() : '';
+    const allowedTypes = ['.glb', '.gltf', '.obj', '.fbx'];
+    if (!allowedTypes.includes(fileExt)) {
+      return c.json({ ok: false, error: `Invalid file type. Allowed types: ${allowedTypes.join(', ')}` }, 400);
+    }
+
+    const cloudinary = await import('cloudinary').then((m) => m.v2);
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return c.json({ ok: false, error: 'Cloudinary is not configured on production environment' }, 500);
+    }
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+    const publicId = `model_${Date.now()}${fileExt}`;
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        {
+          folder: '3d-models',
+          resource_type: 'raw',
+          public_id: publicId,
+          format: fileExt.slice(1),
+        },
+        (error, uploaded) => {
+          if (error) return reject(error);
+          resolve(uploaded);
+        }
+      );
+      stream.end(buffer);
+    });
+
+    return c.json({
+      ok: true,
+      url: result.secure_url,
+      publicId: result.public_id,
+      fileSize: result.bytes,
+      format: fileExt.slice(1),
+    });
   } catch (err) {
-    console.error('[API] Error:', err.message);
-    return c.json({ ok: false, error: err.message }, 500);
+    const message = err?.message || '3D upload failed';
+    console.error('[API] upload-3d-model error:', message);
+    const lower = String(message).toLowerCase();
+    const status = (
+      lower.includes('too large')
+      || lower.includes('entity too large')
+      || lower.includes('payload too large')
+    ) ? 413 : (
+      lower.includes('invalid')
+      || lower.includes('no file')
+      || lower.includes('unsupported')
+    ) ? 400 : 500;
+    return c.json({ ok: false, error: message }, status);
   }
 });
 

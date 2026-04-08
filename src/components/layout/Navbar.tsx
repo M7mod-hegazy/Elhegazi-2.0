@@ -322,7 +322,7 @@ const Navbar = () => {
                     setShowAuthModal(true);
                   }
                 }}
-                className="relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out"
+                className="hidden lg:inline-flex relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out"
               >
                 <Heart className="w-6 h-6 text-foreground" />
                 {isAuthenticated && !isAdmin && favoritesCount > 0 && (
@@ -336,7 +336,7 @@ const Navbar = () => {
               {!hidePrices && (
                 <Link
                   to="/cart"
-                  className="relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out group"
+                  className="hidden lg:inline-flex relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out group"
                 >
                   <ShoppingCart className="w-6 h-6 text-foreground group-hover:scale-110 transition-transform duration-200" />
                   {itemCount > 0 && (
@@ -349,6 +349,7 @@ const Navbar = () => {
 
               {/* User Menu */}
               {isAuthenticated ? (
+                <div className="hidden lg:block">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="flex items-center space-x-2 space-x-reverse">
@@ -387,6 +388,7 @@ const Navbar = () => {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                </div>
               ) : (
                 <div className="hidden lg:flex items-center space-x-2 space-x-reverse">
                   <Button variant="ghost" size="sm" asChild>
