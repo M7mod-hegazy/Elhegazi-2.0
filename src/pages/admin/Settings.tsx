@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { clearThemeCache } from '@/lib/themeInit';
-import { apiGet, apiPutJson } from '@/lib/api';
+import { apiGet, apiPostJson, apiPutJson } from '@/lib/api';
 import { themePresets, getCurrentTheme } from '@/lib/themePresets';
 import { useSettings } from '@/hooks/useSettings';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -66,6 +66,13 @@ interface SettingsDoc {
 
 // Hook placeholder
 const useDeviceDetection = () => ({ isMobile: false, isTablet: false });
+const OWNER_VAULT_TOKEN_KEY = 'owner.vault.token';
+
+type OwnerVisibility = {
+  publicPages: Record<string, boolean>;
+  adminModules: Record<string, boolean>;
+  featureFlags: Record<string, boolean>;
+};
 
 const AdminSettings = () => {
   const { toast } = useToast();
@@ -74,10 +81,23 @@ const AdminSettings = () => {
   const [loaded, setLoaded] = useState(false);
   const [storeOpen, setStoreOpen] = useState(true);
   const [socialOpen, setSocialOpen] = useState(false);
-  const [userOpen, setUserOpen] = useState(false);
-  const [orderOpen, setOrderOpen] = useState(false);
-  const [checkoutOpen, setCheckoutOpen] = useState(false);
-  const [pricingOpen, setPricingOpen] = useState(false);
+  const [, setUserOpen] = useState(false);
+  const [, setOrderOpen] = useState(false);
+  const [, setCheckoutOpen] = useState(false);
+  const [, setPricingOpen] = useState(false);
+  const [ownerVaultOpen, setOwnerVaultOpen] = useState(false);
+  const [ownerVaultPassword, setOwnerVaultPassword] = useState('');
+  const [ownerVaultToken, setOwnerVaultToken] = useState<string>(() => localStorage.getItem(OWNER_VAULT_TOKEN_KEY) || '');
+  const [ownerVaultAuthed, setOwnerVaultAuthed] = useState(false);
+  const [ownerVaultBusy, setOwnerVaultBusy] = useState(false);
+  const [ownerVaultSearch, setOwnerVaultSearch] = useState('');
+  const [ownerSection, setOwnerSection] = useState<'vault' | 'theme' | 'registration' | 'orders' | 'checkout' | 'pricing'>('vault');
+  const [ownerVaultEnabled, setOwnerVaultEnabled] = useState(true);
+  const [ownerVaultVisibility, setOwnerVaultVisibility] = useState<OwnerVisibility>({
+    publicPages: {},
+    adminModules: {},
+    featureFlags: {},
+  });
 
   // Get settings from useSettings
   const { 
@@ -152,6 +172,27 @@ const AdminSettings = () => {
   };
 
   const isEmpty = (v?: string | null) => !v || !v.trim().length;
+
+  const ownerVaultHeaders = useCallback(() => {
+    const headers: Record<string, string> = {};
+    if (ownerVaultToken) headers['x-owner-vault-token'] = ownerVaultToken;
+    const adminSecret = localStorage.getItem('ADMIN_SECRET');
+    if (adminSecret) headers['x-admin-secret'] = adminSecret;
+    return headers;
+  }, [ownerVaultToken]);
+
+  const loadOwnerVaultVisibility = useCallback(async () => {
+    if (!ownerVaultToken) return;
+    const res = await fetch('/api/owner-vault/visibility', {
+      method: 'GET',
+      headers: ownerVaultHeaders(),
+      credentials: 'include',
+    });
+    const data = await res.json();
+    if (!res.ok || !data?.ok) throw new Error(data?.error || 'تعذر تحميل الإعدادات الخاصة');
+    setOwnerVaultEnabled(data.item?.enabled !== false);
+    setOwnerVaultVisibility(data.item?.visibility || { publicPages: {}, adminModules: {}, featureFlags: {} });
+  }, [ownerVaultHeaders, ownerVaultToken]);
 
   // Load settings from API
   useEffect(() => {
@@ -236,6 +277,35 @@ const AdminSettings = () => {
     defaultStoreInfo.name,
     defaultStoreInfo.phone
   ]);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!ownerVaultToken) return;
+      try {
+        const res = await fetch('/api/owner-vault/status', {
+          method: 'GET',
+          headers: ownerVaultHeaders(),
+          credentials: 'include',
+        });
+        const data = await res.json();
+        if (mounted && res.ok && data?.ok && data.item?.authenticated) {
+          setOwnerVaultAuthed(true);
+          await loadOwnerVaultVisibility();
+          return;
+        }
+      } catch {
+        // ignore
+      }
+      if (!mounted) return;
+      setOwnerVaultAuthed(false);
+      setOwnerVaultToken('');
+      localStorage.removeItem(OWNER_VAULT_TOKEN_KEY);
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [ownerVaultHeaders, ownerVaultToken, loadOwnerVaultVisibility]);
 
   const saveSettings = useCallback(
     async (quiet = false, context?: 'store' | 'social' | 'registration' | 'orders' | 'checkout' | 'theme' | 'pricing') => {
@@ -343,6 +413,79 @@ const AdminSettings = () => {
     }
   };
 
+  const handleOwnerVaultLogin = async () => {
+    try {
+      setOwnerVaultBusy(true);
+      const res = await apiPostJson<{ token: string }>('/api/owner-vault/login', { password: ownerVaultPassword });
+      if (!res.ok || !res.item?.token) throw new Error('كلمة المرور غير صحيحة');
+      setOwnerVaultToken(res.item.token);
+      localStorage.setItem(OWNER_VAULT_TOKEN_KEY, res.item.token);
+      setOwnerVaultAuthed(true);
+      setOwnerVaultPassword('');
+      await loadOwnerVaultVisibility();
+      toast({ title: 'الإعدادات الخاصة', description: 'تم فتح الإعدادات الخاصة بنجاح' });
+    } catch (error) {
+      toast({
+        title: 'الإعدادات الخاصة',
+        description: error instanceof Error ? error.message : 'تعذر تسجيل الدخول',
+        variant: 'destructive',
+      });
+    } finally {
+      setOwnerVaultBusy(false);
+    }
+  };
+
+  const handleOwnerVaultLogout = async () => {
+    try {
+      setOwnerVaultBusy(true);
+      await fetch('/api/owner-vault/logout', {
+        method: 'POST',
+        headers: ownerVaultHeaders(),
+        credentials: 'include',
+      });
+    } catch {
+      // ignore
+    } finally {
+      localStorage.removeItem(OWNER_VAULT_TOKEN_KEY);
+      setOwnerVaultToken('');
+      setOwnerVaultAuthed(false);
+      setOwnerVaultBusy(false);
+    }
+  };
+
+  const handleOwnerToggle = (scope: keyof OwnerVisibility, key: string, value: boolean) => {
+    setOwnerVaultVisibility((prev) => ({
+      ...prev,
+      [scope]: {
+        ...(prev[scope] || {}),
+        [key]: value,
+      },
+    }));
+  };
+
+  const handleSaveOwnerVisibility = async () => {
+    try {
+      setOwnerVaultBusy(true);
+      const res = await fetch('/api/owner-vault/visibility', {
+        method: 'PUT',
+        headers: { ...ownerVaultHeaders(), 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ enabled: ownerVaultEnabled, visibility: ownerVaultVisibility }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.ok) throw new Error(data?.error || 'تعذر حفظ الإعدادات الخاصة');
+      toast({ title: 'الإعدادات الخاصة', description: 'تم حفظ إعدادات الإخفاء' });
+    } catch (error) {
+      toast({
+        title: 'الإعدادات الخاصة',
+        description: error instanceof Error ? error.message : 'تعذر حفظ الإعدادات الخاصة',
+        variant: 'destructive',
+      });
+    } finally {
+      setOwnerVaultBusy(false);
+    }
+  };
+
   const handleBackupData = () => {
     const data = {
       settings: { storeInfo, social, checkoutEnabled, shippingCost, expressShippingCost, freeShippingThreshold, taxRate },
@@ -416,6 +559,8 @@ const AdminSettings = () => {
                     setUserOpen(false);
                     setOrderOpen(false);
                     setCheckoutOpen(false);
+                    setPricingOpen(false);
+                    setOwnerVaultOpen(false);
                   }}
                 >
                   <Store className="w-4 h-4 ml-2" />
@@ -430,68 +575,29 @@ const AdminSettings = () => {
                     setUserOpen(false);
                     setOrderOpen(false);
                     setCheckoutOpen(false);
+                    setPricingOpen(false);
+                    setOwnerVaultOpen(false);
                   }}
                 >
                   <Globe className="w-4 h-4 ml-2" />
                   الروابط الاجتماعية
                 </Button>
                 <Button
-                  variant={userOpen ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setStoreOpen(false);
-                    setSocialOpen(false);
-                    setUserOpen(true);
-                    setOrderOpen(false);
-                    setCheckoutOpen(false);
-                  }}
-                >
-                  <Users className="w-4 h-4 ml-2" />
-                  إعدادات التسجيل
-                </Button>
-                <Button
-                  variant={orderOpen ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setStoreOpen(false);
-                    setSocialOpen(false);
-                    setUserOpen(false);
-                    setOrderOpen(true);
-                    setCheckoutOpen(false);
-                  }}
-                >
-                  <ShoppingCart className="w-4 h-4 ml-2" />
-                  إعدادات الطلبات
-                </Button>
-                <Button
-                  variant={checkoutOpen ? "default" : "ghost"}
+                  variant={ownerVaultOpen ? "default" : "ghost"}
                   className="w-full justify-start"
                   onClick={() => {
                     setStoreOpen(false);
                     setSocialOpen(false);
                     setUserOpen(false);
                     setOrderOpen(false);
-                    setCheckoutOpen(true);
+                    setCheckoutOpen(false);
                     setPricingOpen(false);
+                    setOwnerVaultOpen(true);
+                    setOwnerSection('vault');
                   }}
                 >
-                  <CreditCard className="w-4 h-4 ml-2" />
-                  إعدادات الدفع
-                </Button>
-                <Button
-                  variant={pricingOpen ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setStoreOpen(false);
-                    setSocialOpen(false);
-                    setUserOpen(false);
-                    setOrderOpen(false);
-                    setCheckoutOpen(false);
-                    setPricingOpen(true);
-                  }}
-                >
-                  <ShoppingCart className="w-4 h-4 ml-2" />
-                  إعدادات الأسعار
+                  <Shield className="w-4 h-4 ml-2" />
+                  إعدادات خاصة
                 </Button>
               </CardContent>
             </Card>
@@ -533,7 +639,7 @@ const AdminSettings = () => {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Store Information */}
-            {storeOpen && (
+            {(storeOpen || (ownerVaultOpen && ownerSection === 'theme')) && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -850,7 +956,7 @@ const AdminSettings = () => {
             )}
 
             {/* Registration Settings */}
-            {userOpen && (
+            {ownerVaultOpen && ownerSection === 'registration' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -908,7 +1014,7 @@ const AdminSettings = () => {
             )}
 
             {/* Order Settings */}
-            {orderOpen && (
+            {ownerVaultOpen && ownerSection === 'orders' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -978,7 +1084,7 @@ const AdminSettings = () => {
             )}
 
             {/* Checkout Settings */}
-            {checkoutOpen && (
+            {ownerVaultOpen && ownerSection === 'checkout' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1089,7 +1195,7 @@ const AdminSettings = () => {
             )}
 
             {/* Pricing Settings */}
-            {pricingOpen && (
+            {ownerVaultOpen && ownerSection === 'pricing' && (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1155,6 +1261,95 @@ const AdminSettings = () => {
                 </CardContent>
               </Card>
             )}
+
+            {ownerVaultOpen && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    إعدادات خاصة
+                  </CardTitle>
+                  <CardDescription>تحكم المالك في إظهار وإخفاء الصفحات والميزات</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {!ownerVaultAuthed ? (
+                    <div className="space-y-3">
+                      <Label htmlFor="owner-vault-password">كلمة المرور</Label>
+                      <Input
+                        id="owner-vault-password"
+                        type="password"
+                        value={ownerVaultPassword}
+                        onChange={(e) => setOwnerVaultPassword(e.target.value)}
+                        placeholder="أدخل كلمة المرور"
+                      />
+                      <Button
+                        onClick={handleOwnerVaultLogin}
+                        disabled={ownerVaultBusy || !ownerVaultPassword.trim()}
+                        className="w-full"
+                      >
+                        {ownerVaultBusy ? 'جارٍ التحقق...' : 'دخول'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                        <Button className="col-span-2 md:col-span-3 order-first" variant={ownerSection === 'vault' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('vault')}>التحكم</Button>
+                        <Button variant={ownerSection === 'theme' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('theme')}>الثيم والألوان</Button>
+                        <Button variant={ownerSection === 'registration' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('registration')}>إعدادات التسجيل</Button>
+                        <Button variant={ownerSection === 'orders' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('orders')}>إعدادات الطلبات</Button>
+                        <Button variant={ownerSection === 'checkout' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('checkout')}>إعدادات الدفع</Button>
+                        <Button variant={ownerSection === 'pricing' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('pricing')}>إعدادات الأسعار</Button>
+                      </div>
+
+                      {ownerSection === 'vault' && (
+                        <>
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <Switch checked={ownerVaultEnabled} onCheckedChange={setOwnerVaultEnabled} />
+                              <span className="text-sm">تفعيل الحجب</span>
+                            </div>
+                            <Button variant="outline" onClick={handleOwnerVaultLogout} disabled={ownerVaultBusy}>
+                              خروج
+                            </Button>
+                          </div>
+
+                          <Input
+                            placeholder="ابحث عن صفحة أو ميزة..."
+                            value={ownerVaultSearch}
+                            onChange={(e) => setOwnerVaultSearch(e.target.value)}
+                          />
+
+                          {(['publicPages', 'adminModules', 'featureFlags'] as Array<keyof OwnerVisibility>).map((scope) => (
+                            <div key={scope} className="space-y-2 rounded-lg border p-3">
+                              <h3 className="font-semibold">
+                                {scope === 'publicPages' ? 'الصفحات العامة' : scope === 'adminModules' ? 'وحدات الإدارة' : 'الميزات'}
+                              </h3>
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                {Object.entries(ownerVaultVisibility?.[scope] || {})
+                                  .filter(([key]) => !ownerVaultSearch || key.toLowerCase().includes(ownerVaultSearch.toLowerCase()))
+                                  .map(([key, value]) => (
+                                    <div key={`${scope}-${key}`} className="flex items-center justify-between rounded-md border px-3 py-2">
+                                      <span className="text-sm">{key}</span>
+                                      <Switch
+                                        checked={Boolean(value)}
+                                        onCheckedChange={(checked) => handleOwnerToggle(scope, key, checked)}
+                                      />
+                                    </div>
+                                  ))}
+                              </div>
+                            </div>
+                          ))}
+
+                          <Button onClick={handleSaveOwnerVisibility} disabled={ownerVaultBusy} className="w-full">
+                            {ownerVaultBusy ? 'جارٍ الحفظ...' : 'حفظ'}
+                          </Button>
+                        </>
+                      )}
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
@@ -1163,3 +1358,4 @@ const AdminSettings = () => {
 };
 
 export default AdminSettings;
+

@@ -32,6 +32,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Button } from '@/components/ui/button';
+import { useOwnerVisibility } from '@/hooks/useOwnerVisibility';
 
 // Organized navigation with groups
 const navigationGroups = [
@@ -88,6 +89,30 @@ const AdminSidebarEnhanced = ({ collapsed, onToggle, isMobile, mobileMenuOpen, o
   const { isAuthenticated, token } = useDualAuth();
   const { logo, isLoading: logoLoading } = useLogo();
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const { isVisible } = useOwnerVisibility();
+
+  const filteredGroups = navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        const key =
+          item.href === '/admin/dashboard' ? 'dashboard' :
+          item.href === '/admin/products' ? 'products' :
+          item.href === '/admin/products-3d' ? 'products3d' :
+          item.href === '/admin/categories' ? 'categories' :
+          item.href === '/admin/orders' ? 'orders' :
+          item.href === '/admin/profit' ? 'profit' :
+          item.href === '/admin/users' ? 'users' :
+          item.href === '/admin/locations' ? 'locations' :
+          item.href === '/admin/history' ? 'history' :
+          item.href === '/admin/home-config' ? 'homeConfig' :
+          item.href === '/admin/settings' ? 'settings' :
+          item.href === '/admin/qr-codes' ? 'qrcodes' :
+          null;
+        return key ? isVisible('adminModules', key) : true;
+      })
+    }))
+    .filter((group) => group.items.length > 0);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -175,7 +200,7 @@ const AdminSidebarEnhanced = ({ collapsed, onToggle, isMobile, mobileMenuOpen, o
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-3 space-y-1 scrollbar-hide relative bg-background/30">
-        {navigationGroups.map((group, groupIndex) => (
+        {filteredGroups.map((group, groupIndex) => (
           <div key={group.title} className={groupIndex > 0 ? 'mt-8' : ''}>
             {(isMobile || !collapsed) && (
               <div className="px-4 py-2 font-black text-[10px] text-muted-foreground uppercase opacity-50 tracking-[0.2em]">

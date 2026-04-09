@@ -27,32 +27,72 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700&display=swap" rel="stylesheet" crossorigin="anonymous" />
+      <script>
+      (function () {
+        function hexToRgb(hex) {
+          var safe = String(hex || '').trim();
+          if (!/^#([0-9a-fA-F]{6})$/.test(safe)) return null;
+          var n = parseInt(safe.slice(1), 16);
+          return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+        }
+        try {
+          var legacyCached = localStorage.getItem('theme_cache');
+          var cached = localStorage.getItem('app-theme-data');
+          var theme = legacyCached ? JSON.parse(legacyCached) : (cached ? JSON.parse(cached) : null);
+          var primaryHex = (theme && theme.primaryColor) || '#111827';
+          var secondaryHex = (theme && theme.secondaryColor) || '#374151';
+          var p = hexToRgb(primaryHex) || { r: 17, g: 24, b: 39 };
+          var s = hexToRgb(secondaryHex) || { r: 55, g: 65, b: 81 };
+          var root = document.documentElement;
+          var preBg = 'rgb(' + Math.round(p.r * 0.22) + ', ' + Math.round(p.g * 0.22) + ', ' + Math.round(p.b * 0.26) + ')';
+          var preFg = 'rgb(255,255,255)';
+          root.style.setProperty('--pre-bg', preBg);
+          root.style.setProperty('--pre-fg', preFg);
+          root.style.setProperty('--pre-primary', primaryHex);
+          root.style.setProperty('--pre-secondary', secondaryHex);
+          root.style.setProperty('--pre-primary-rgb', p.r + ' ' + p.g + ' ' + p.b);
+          root.style.setProperty('--pre-secondary-rgb', s.r + ' ' + s.g + ' ' + s.b);
+          var logoEl = document.getElementById('splash-logo');
+          if (logoEl && theme && theme.logo) {
+            logoEl.setAttribute('src', theme.logo);
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
 
   <body>
     <!-- Static pre-React splash (shows even on hard reloads) -->
-    <div id="pre-splash" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#020617;z-index:9999;overflow:hidden">
+    <div id="pre-splash" style="position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:var(--pre-bg,#020617);z-index:9999;overflow:hidden">
       <!-- Background Decorative Blobs -->
-      <div style="position:absolute;top:-10%;left:-10%;width:40%;height:40%;background:rgba(59,130,246,0.1);filter:blur(80px);border-radius:50%;animation:pre-splash-blob 10s infinite"></div>
+      <div style="position:absolute;top:-10%;left:-10%;width:40%;height:40%;background:rgb(var(--pre-primary-rgb, 59 130 246) / 0.16);filter:blur(80px);border-radius:50%;animation:pre-splash-blob 10s infinite"></div>
       
       <div style="text-align:center;position:relative;z-index:10">
         <div style="position:relative;margin-bottom:32px;display:inline-block">
           <!-- Main Logo with Pulse -->
-          <img src="/iconPng.png" alt="Logo" style="width:84px;height:84px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 15px rgba(59,130,246,0.4));animation:pre-splash-pulse 2s ease-in-out infinite" id="splash-logo" />
+          <img src="/iconPng.png" alt="Logo" style="width:84px;height:84px;object-fit:contain;position:relative;z-index:2;filter:drop-shadow(0 0 15px rgb(var(--pre-primary-rgb, 59 130 246) / 0.5));animation:pre-splash-pulse 2s ease-in-out infinite" id="splash-logo" />
           
           <!-- Outer Ring -->
-          <div style="position:absolute;inset:-15px;border:2px solid rgba(59,130,246,0.1);border-radius:24px;animation:pre-splash-spin 3s linear infinite"></div>
+          <div style="position:absolute;inset:-15px;border:2px solid rgb(var(--pre-secondary-rgb, 139 92 246) / 0.2);border-radius:24px;animation:pre-splash-spin 3s linear infinite"></div>
         </div>
         
-        <div style="color:#fff;font-family:system-ui,-apple-system,sans-serif;letter-spacing:0.1em;font-weight:900;text-transform:uppercase;font-size:14px;margin-top:16px;opacity:0.8;animation:pre-splash-text 2s ease-in-out infinite">جاري التحميل...</div>
+        <div style="color:var(--pre-fg,#ffffff);font-family:system-ui,-apple-system,sans-serif;letter-spacing:0.1em;font-weight:900;text-transform:uppercase;font-size:14px;margin-top:16px;opacity:0.8;animation:pre-splash-text 2s ease-in-out infinite">جاري التحميل...</div>
         
         <!-- Minimal Progress Bar Filler -->
-        <div style="width:120px;height:2px;background:rgba(255,255,255,0.05);margin:24px auto 0;border-radius:10px;overflow:hidden">
-          <div style="width:40%;height:100%;background:#3b82f6;border-radius:10px;animation:pre-splash-progress 2s ease-in-out infinite"></div>
+        <div style="width:120px;height:2px;background:rgb(255 255 255 / 0.12);margin:24px auto 0;border-radius:10px;overflow:hidden">
+          <div style="width:40%;height:100%;background:var(--pre-primary,#111827);border-radius:10px;animation:pre-splash-progress 2s ease-in-out infinite"></div>
         </div>
       </div>
     </div>
     <style>
+      :root {
+        --pre-bg: #0f172a;
+        --pre-fg: #ffffff;
+        --pre-primary: #111827;
+        --pre-secondary: #374151;
+        --pre-primary-rgb: 17 24 39;
+        --pre-secondary-rgb: 55 65 81;
+      }
       @keyframes pre-splash-spin { to { transform: rotate(360deg); } }
       @keyframes pre-splash-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.05); opacity: 0.8; } }
       @keyframes pre-splash-progress { 0% { transform: translateX(-100%); } 100% { transform: translateX(250%); } }
@@ -63,3 +103,4 @@
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
+

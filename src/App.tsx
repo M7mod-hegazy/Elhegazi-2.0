@@ -18,6 +18,7 @@ import DualProtectedRoute from "./components/auth/DualProtectedRoute";
 import { Suspense, lazy } from "react";
 import { useToast } from "@/hooks/use-toast";
 import ScrollProgressBar from "@/components/ui/scroll-progress-bar";
+import { useOwnerVisibility } from "@/hooks/useOwnerVisibility";
 const lazyWithFallback = (loader: () => Promise<any>, label: string) =>
   lazy(() =>
     loader()
@@ -114,6 +115,7 @@ const AppInner = () => {
   const { siteName } = useSiteName();
   const { toast } = useToast();
   const [docLoaded, setDocLoaded] = useState(false);
+  const { loading: ownerVisibilityLoading, isVisible } = useOwnerVisibility();
 
   // Update favicon and loading screen logo dynamically
   useFavicon();
@@ -272,33 +274,33 @@ const AppInner = () => {
 
       {/* Global Splash overlay (desktop + mobile) */}
       {showSplash && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#020617] overflow-hidden transition-opacity duration-700">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background overflow-hidden transition-opacity duration-700">
           {/* Immersive Deep Space Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#020617] via-[#0f172a] to-[#020617]"></div>
+          <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted)/0.55)] to-[hsl(var(--background))]"></div>
           
           {/* Dynamic Light Rays / Orbs */}
           <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-primary/20 blur-[150px] rounded-full animate-splash-blob mix-blend-screen opacity-50"></div>
-          <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-blue-600/15 blur-[150px] rounded-full animate-splash-blob mix-blend-screen opacity-50" style={{ animationDelay: '-4s' }}></div>
+          <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-secondary/20 blur-[150px] rounded-full animate-splash-blob mix-blend-screen opacity-50" style={{ animationDelay: '-4s' }}></div>
           
           <div className="text-center relative z-10 flex flex-col items-center scale-110">
             {/* Orbital Logo System */}
             <div className="relative mb-16 group">
               {/* Outer Orbital Ring 1 */}
               <div className="absolute inset-[-40px] border border-primary/10 rounded-full animate-[spin_8s_linear_infinite] scale-100 opacity-60">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-full shadow-[0_0_10px_#3b82f6]"></div>
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-full" style={{ boxShadow: '0 0 12px hsl(var(--primary) / 0.8)' }}></div>
               </div>
               
               {/* Outer Orbital Ring 2 */}
-              <div className="absolute inset-[-40px] border border-blue-500/10 rounded-full animate-[spin_12s_linear_infinite_reverse] scale-90 opacity-40">
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-blue-400 rounded-full shadow-[0_0_8px_#60a5fa]"></div>
+              <div className="absolute inset-[-40px] border border-secondary/15 rounded-full animate-[spin_12s_linear_infinite_reverse] scale-90 opacity-40">
+                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-secondary rounded-full" style={{ boxShadow: '0 0 10px hsl(var(--secondary) / 0.8)' }}></div>
               </div>
 
               {/* Inner Glowing Aura */}
               <div className="absolute inset-[-10px] bg-primary/10 blur-3xl rounded-full scale-110 animate-pulse"></div>
               
               {/* Main Logo Container */}
-              <div className="relative w-40 h-40 flex items-center justify-center bg-white/5 backdrop-blur-3xl rounded-[2.5rem] border border-white/10 shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)] animate-splash-pulse">
-                <img src="/iconPng.png" alt="Logo" className="w-24 h-24 object-contain drop-shadow-[0_0_25px_rgba(59,130,246,0.6)]" />
+              <div className="relative w-40 h-40 flex items-center justify-center bg-card/30 backdrop-blur-3xl rounded-[2.5rem] border border-border/50 shadow-[0_35px_60px_-15px_hsl(var(--foreground)/0.35)] animate-splash-pulse">
+                <img src="/iconPng.png" alt="Logo" className="w-24 h-24 object-contain" style={{ filter: 'drop-shadow(0 0 20px hsl(var(--primary) / 0.65))' }} />
                 
                 {/* Micro-Interaction Highlight */}
                 <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-[2.5rem]"></div>
@@ -308,7 +310,7 @@ const AppInner = () => {
             {/* Typography Section */}
             <div className="space-y-8 max-w-sm">
               <div className="flex flex-col items-center gap-3">
-                <h2 className="text-white text-3xl font-black tracking-[0.25em] uppercase animate-splash-text bg-clip-text text-transparent bg-gradient-to-b from-white to-white/40 drop-shadow-sm font-cairo">
+                <h2 className="text-foreground text-3xl font-black tracking-[0.25em] uppercase animate-splash-text bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/40 drop-shadow-sm font-cairo">
                   {siteName || 'جاري التحميل'}
                 </h2>
                 <div className="h-1 w-20 bg-gradient-to-r from-transparent via-primary to-transparent rounded-full opacity-50"></div>
@@ -319,8 +321,8 @@ const AppInner = () => {
                 <p className="text-primary/40 font-black text-[10px] uppercase tracking-[0.5em] mb-4 animate-pulse">
                   SYSTEM INITIALIZING
                 </p>
-                <div className="h-[2px] w-full bg-white/5 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary w-2/3 rounded-full animate-[shimmer_2.5s_infinite] shadow-[0_0_15px_#3b82f6]"></div>
+                <div className="h-[2px] w-full bg-foreground/10 rounded-full overflow-hidden">
+                  <div className="h-full bg-primary w-2/3 rounded-full animate-[shimmer_2.5s_infinite]" style={{ boxShadow: '0 0 15px hsl(var(--primary) / 0.75)' }}></div>
                 </div>
               </div>
             </div>
@@ -328,7 +330,7 @@ const AppInner = () => {
           
           {/* Footer Detail */}
           <div className="fixed bottom-12 left-0 right-0 flex justify-center opacity-20 hover:opacity-100 transition-opacity duration-1000">
-             <div className="flex items-center gap-4 text-[9px] font-black tracking-[0.4em] text-white/50 uppercase">
+             <div className="flex items-center gap-4 text-[9px] font-black tracking-[0.4em] text-foreground/50 uppercase">
                 <span>Secure Console</span>
                 <span className="w-1 h-1 bg-primary rounded-full"></span>
                 <span>Powered by Al-Hegazi v2.0</span>
@@ -338,82 +340,85 @@ const AppInner = () => {
       )}
       <Layout>
         <Suspense fallback={<div className="p-6 text-center text-white/90">جارٍ تحميل الصفحة...</div>}>
+          {ownerVisibilityLoading ? (
+            <div className="p-6 text-center text-white/90">جارٍ تجهيز الصلاحيات...</div>
+          ) : (
           <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/products" element={<Products />} />
-            <Route path="/product/:id" element={<ProductDetail />} />
-            <Route path="/product/:productId/rating" element={<RatingMessage />} />
-            <Route path="/categories" element={<Categories />} />
-            <Route path="/category/:slug" element={<CategoryPage />} />
-            <Route path="/featured" element={<FeaturedProducts />} />
-            <Route path="/best-sellers" element={<BestSellers />} />
-            <Route path="/special-offers" element={<SpecialOffers />} />
-            <Route path="/latest" element={<LatestProducts />} />
-            <Route path="/cart" element={<Cart />} />
-            <Route path="/checkout" element={<ModernCheckout />} />
-            <Route path="/checkout/legacy" element={<Checkout />} />
+            <Route path="/" element={isVisible('publicPages', 'home') ? <HomePage /> : <NotFound />} />
+            <Route path="/products" element={isVisible('publicPages', 'products') ? <Products /> : <NotFound />} />
+            <Route path="/product/:id" element={isVisible('publicPages', 'productDetail') ? <ProductDetail /> : <NotFound />} />
+            <Route path="/product/:productId/rating" element={isVisible('featureFlags', 'rating') ? <RatingMessage /> : <NotFound />} />
+            <Route path="/categories" element={isVisible('publicPages', 'categories') ? <Categories /> : <NotFound />} />
+            <Route path="/category/:slug" element={isVisible('publicPages', 'categories') ? <CategoryPage /> : <NotFound />} />
+            <Route path="/featured" element={isVisible('publicPages', 'products') ? <FeaturedProducts /> : <NotFound />} />
+            <Route path="/best-sellers" element={isVisible('publicPages', 'products') ? <BestSellers /> : <NotFound />} />
+            <Route path="/special-offers" element={isVisible('publicPages', 'products') ? <SpecialOffers /> : <NotFound />} />
+            <Route path="/latest" element={isVisible('publicPages', 'products') ? <LatestProducts /> : <NotFound />} />
+            <Route path="/cart" element={isVisible('publicPages', 'cart') ? <Cart /> : <NotFound />} />
+            <Route path="/checkout" element={isVisible('publicPages', 'checkout') ? <ModernCheckout /> : <NotFound />} />
+            <Route path="/checkout/legacy" element={isVisible('publicPages', 'checkout') ? <Checkout /> : <NotFound />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/profile" element={
               <ProtectedRoute>
-                <Profile />
+                {isVisible('publicPages', 'profile') ? <Profile /> : <NotFound />}
               </ProtectedRoute>
             } />
             <Route path="/orders" element={
               <ProtectedRoute>
-                <Orders />
+                {isVisible('publicPages', 'orders') ? <Orders /> : <NotFound />}
               </ProtectedRoute>
             } />
             <Route path="/order-history" element={
               <ProtectedRoute>
-                <OrderHistory />
+                {isVisible('publicPages', 'orders') ? <OrderHistory /> : <NotFound />}
               </ProtectedRoute>
             } />
             <Route path="/order-confirmation" element={
               <ProtectedRoute>
-                <OrderConfirmation />
+                {isVisible('publicPages', 'orders') ? <OrderConfirmation /> : <NotFound />}
               </ProtectedRoute>
             } />
             <Route path="/order/:id" element={
               <ProtectedRoute>
-                <EnhancedOrderTracking />
+                {isVisible('publicPages', 'orders') ? <EnhancedOrderTracking /> : <NotFound />}
               </ProtectedRoute>
             } />
             <Route path="/order/:id/legacy" element={
               <ProtectedRoute>
-                <OrderTracking />
+                {isVisible('publicPages', 'orders') ? <OrderTracking /> : <NotFound />}
               </ProtectedRoute>
             } />
-            <Route path="/track" element={<PublicOrderTracking />} />
+            <Route path="/track" element={isVisible('publicPages', 'orders') ? <PublicOrderTracking /> : <NotFound />} />
             <Route path="/favorites" element={
               <ProtectedRoute>
-                <Favorites />
+                {(isVisible('publicPages', 'favorites') && isVisible('featureFlags', 'favorites')) ? <Favorites /> : <NotFound />}
               </ProtectedRoute>
             } />
             <Route path="/returns/:id" element={
               <ProtectedRoute>
-                <Returns />
+                {isVisible('publicPages', 'orders') ? <Returns /> : <NotFound />}
               </ProtectedRoute>
             } />
             <Route path="/addresses" element={
               <ProtectedRoute>
-                <Addresses />
+                {isVisible('publicPages', 'profile') ? <Addresses /> : <NotFound />}
               </ProtectedRoute>
             } />
             <Route path="/payment-methods" element={
               <ProtectedRoute>
-                <PaymentMethods />
+                {isVisible('publicPages', 'profile') ? <PaymentMethods /> : <NotFound />}
               </ProtectedRoute>
             } />
-            <Route path="/about" element={<About />} />
-            <Route path="/contact" element={<Contact />} />
-            <Route path="/locations" element={<Locations />} />
-            <Route path="/shop-setup" element={<ShopSetup />} />
-            <Route path="/shop-builder" element={<ShopBuilderIntro />} />
-            <Route path="/shop-builder/intro" element={<ShopBuilderIntro />} />
-            <Route path="/shop-builder/projects" element={<ShopBuilderProjects />} />
-            <Route path="/shop-builder/editor" element={<ShopBuilder3DPage />} />
-            <Route path="/shop-builder/editor/:projectId" element={<ShopBuilder3DPage />} />
+            <Route path="/about" element={isVisible('publicPages', 'about') ? <About /> : <NotFound />} />
+            <Route path="/contact" element={isVisible('publicPages', 'contact') ? <Contact /> : <NotFound />} />
+            <Route path="/locations" element={isVisible('publicPages', 'locations') ? <Locations /> : <NotFound />} />
+            <Route path="/shop-setup" element={isVisible('publicPages', 'shopBuilder') ? <ShopSetup /> : <NotFound />} />
+            <Route path="/shop-builder" element={isVisible('publicPages', 'shopBuilder') ? <ShopBuilderIntro /> : <NotFound />} />
+            <Route path="/shop-builder/intro" element={isVisible('publicPages', 'shopBuilder') ? <ShopBuilderIntro /> : <NotFound />} />
+            <Route path="/shop-builder/projects" element={isVisible('publicPages', 'shopBuilder') ? <ShopBuilderProjects /> : <NotFound />} />
+            <Route path="/shop-builder/editor" element={isVisible('publicPages', 'shopBuilder') ? <ShopBuilder3DPage /> : <NotFound />} />
+            <Route path="/shop-builder/editor/:projectId" element={isVisible('publicPages', 'shopBuilder') ? <ShopBuilder3DPage /> : <NotFound />} />
 
 
             {/* Admin Routes */}
@@ -421,77 +426,77 @@ const AppInner = () => {
             <Route path="/admin/login" element={<AdminLogin />} />
             <Route path="/admin/dashboard" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminDashboard />
+                {isVisible('adminModules', 'dashboard') ? <AdminDashboard /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/products" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminProducts />
+                {isVisible('adminModules', 'products') ? <AdminProducts /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/products-3d" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminProducts3D />
+                {isVisible('adminModules', 'products3d') ? <AdminProducts3D /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/models-3d-analytics" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminModels3DAnalytics />
+                {isVisible('adminModules', 'products3d') ? <AdminModels3DAnalytics /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/categories" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminCategories />
+                {isVisible('adminModules', 'categories') ? <AdminCategories /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/orders" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminOrders />
+                {isVisible('adminModules', 'orders') ? <AdminOrders /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/users" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminUsers />
+                {isVisible('adminModules', 'users') ? <AdminUsers /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/locations" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminLocations />
+                {isVisible('adminModules', 'locations') ? <AdminLocations /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/qr-codes" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminQRCodes />
+                {isVisible('adminModules', 'qrcodes') ? <AdminQRCodes /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/home-config" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminHomeConfig />
+                {isVisible('adminModules', 'homeConfig') ? <AdminHomeConfig /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/settings" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminSettings />
+                {isVisible('adminModules', 'settings') ? <AdminSettings /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/history" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminHistory />
+                {isVisible('adminModules', 'history') ? <AdminHistory /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/order/:id" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminOrderTracking />
+                {isVisible('adminModules', 'orders') ? <AdminOrderTracking /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/profit" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminProfit />
+                {isVisible('adminModules', 'profit') ? <AdminProfit /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/shareholders" element={
               <DualProtectedRoute requireAdmin={true}>
-                <AdminShareholders />
+                {isVisible('adminModules', 'shareholders') ? <AdminShareholders /> : <NotFound />}
               </DualProtectedRoute>
             } />
 
@@ -499,6 +504,7 @@ const AppInner = () => {
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          )}
         </Suspense>
       </Layout>
     </>

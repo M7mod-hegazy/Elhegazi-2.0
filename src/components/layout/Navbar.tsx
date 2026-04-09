@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge';
 import { apiGet, type ApiResponse } from '@/lib/api';
 import { buildCategoryPath } from '@/lib/category-link';
 import type { Category } from '@/types';
+import { useOwnerVisibility } from '@/hooks/useOwnerVisibility';
 
 type ApiCategory = {
   _id: string;
@@ -52,6 +53,7 @@ const Navbar = () => {
   const { itemCount } = useCart();
   const { favoritesCount } = useFavorites();
   const { hidePrices } = usePricingSettings();
+  const { isVisible } = useOwnerVisibility();
 
   const isActivePath = (path: string) => location.pathname === path;
   const getCategoryPath = (category: Pick<Category, 'slug' | 'nameAr' | 'name' | 'id'>) =>
@@ -144,7 +146,14 @@ const Navbar = () => {
     { path: '/about', label: 'من نحن', labelEn: 'About' },
     { path: '/locations', label: 'فروعنا', labelEn: 'Locations' },
     // Contact removed as requested
-  ];
+  ].filter((item) => {
+    if (item.path === '/') return isVisible('publicPages', 'home');
+    if (item.path === '/products') return isVisible('publicPages', 'products');
+    if (item.path === '/shop-builder') return isVisible('publicPages', 'shopBuilder');
+    if (item.path === '/about') return isVisible('publicPages', 'about');
+    if (item.path === '/locations') return isVisible('publicPages', 'locations');
+    return true;
+  });
 
   return (
     <>
@@ -323,27 +332,29 @@ const Navbar = () => {
               style={prefersReducedMotion ? undefined : { transitionDelay: '360ms' }}
             >
               {/* Favorites Button - Available for all users */}
-              <Link
-                to={isAuthenticated && !isAdmin ? "/favorites" : "#"}
-                onClick={(e) => {
-                  if (!isAuthenticated || isAdmin) {
-                    e.preventDefault();
-                    setAuthAction('favorites');
-                    setShowAuthModal(true);
-                  }
-                }}
-                className="hidden lg:inline-flex relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out"
-              >
-                <Heart className="w-6 h-6 text-foreground" />
-                {isAuthenticated && !isAdmin && favoritesCount > 0 && (
-                  <Badge className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full px-1">
-                    {favoritesCount > 99 ? '99+' : favoritesCount}
-                  </Badge>
-                )}
-              </Link>
+              {isVisible('featureFlags', 'favorites') && isVisible('publicPages', 'favorites') && (
+                <Link
+                  to={isAuthenticated && !isAdmin ? "/favorites" : "#"}
+                  onClick={(e) => {
+                    if (!isAuthenticated || isAdmin) {
+                      e.preventDefault();
+                      setAuthAction('favorites');
+                      setShowAuthModal(true);
+                    }
+                  }}
+                  className="hidden lg:inline-flex relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out"
+                >
+                  <Heart className="w-6 h-6 text-foreground" />
+                  {isAuthenticated && !isAdmin && favoritesCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 bg-red-500 text-white text-xs min-w-[20px] h-5 flex items-center justify-center rounded-full px-1">
+                      {favoritesCount > 99 ? '99+' : favoritesCount}
+                    </Badge>
+                  )}
+                </Link>
+              )}
 
               {/* Cart Button - Hidden when prices are hidden */}
-              {!hidePrices && (
+              {!hidePrices && isVisible('publicPages', 'cart') && (
                 <Link
                   to="/cart"
                   className="hidden lg:inline-flex relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out group"
@@ -435,27 +446,29 @@ const Navbar = () => {
                 </button>
 
                 {/* Heart/Favorites */}
-                <Link
-                  to={isAuthenticated && !isAdmin ? "/favorites" : "#"}
-                  onClick={(e) => {
-                    if (!isAuthenticated || isAdmin) {
-                      e.preventDefault();
-                      setAuthAction('favorites');
-                      setShowAuthModal(true);
-                    }
-                  }}
-                  className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
-                >
-                  <Heart className="w-5 h-5" />
-                  {isAuthenticated && !isAdmin && favoritesCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
-                      {favoritesCount}
-                    </Badge>
-                  )}
-                </Link>
+                {isVisible('featureFlags', 'favorites') && isVisible('publicPages', 'favorites') && (
+                  <Link
+                    to={isAuthenticated && !isAdmin ? "/favorites" : "#"}
+                    onClick={(e) => {
+                      if (!isAuthenticated || isAdmin) {
+                        e.preventDefault();
+                        setAuthAction('favorites');
+                        setShowAuthModal(true);
+                      }
+                    }}
+                    className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
+                  >
+                    <Heart className="w-5 h-5" />
+                    {isAuthenticated && !isAdmin && favoritesCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs">
+                        {favoritesCount}
+                      </Badge>
+                    )}
+                  </Link>
+                )}
 
                 {/* Cart - Only show if prices are visible */}
-                {!hidePrices && (
+                {!hidePrices && isVisible('publicPages', 'cart') && (
                   <Link
                     to="/cart"
                     className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+﻿import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { gsap } from 'gsap';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
@@ -18,6 +18,7 @@ import AnimatedProductCard from './AnimatedProductCard';
 import BackgroundPattern from './BackgroundPattern';
 import { useHomeConfig } from '@/hooks/useHomeConfig';
 import type { Slide as ConfigSlide } from '@/types/home-config';
+import { useTheme } from '@/context/ThemeContext';
 
 // Using shared Product type from '@/types'
 
@@ -160,7 +161,7 @@ const Belt: React.FC<{ products: Product[]; speedPxPerSec?: number; sets?: numbe
             </div>
             
             {/* Loading Text */}
-            <p className="text-white/70 text-sm font-medium">جاري التحميل...</p>
+            <p className="text-white/70 text-sm font-medium">Ø¬Ø§Ø±ÙŠ Ø§Ù„ØªØ­Ù…ÙŠÙ„...</p>
           </div>
         </div>
       </section>
@@ -229,6 +230,7 @@ const Belt: React.FC<{ products: Product[]; speedPxPerSec?: number; sets?: numbe
 };
 
 const MobileHeroSection: React.FC = () => {
+  const { primaryColor } = useTheme();
   const { hidePrices } = usePricingSettings();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
@@ -250,15 +252,15 @@ const MobileHeroSection: React.FC = () => {
     {
       id: '1',
       name: 'Premium Smartphone',
-      nameAr: 'هاتف ذكي متميز',
+      nameAr: 'Ù‡Ø§ØªÙ Ø°ÙƒÙŠ Ù…ØªÙ…ÙŠØ²',
       description: 'High-end smartphone with advanced features',
-      descriptionAr: 'هاتف ذكي رائد بمميزات متقدمة',
+      descriptionAr: 'Ù‡Ø§ØªÙ Ø°ÙƒÙŠ Ø±Ø§Ø¦Ø¯ Ø¨Ù…Ù…ÙŠØ²Ø§Øª Ù…ØªÙ‚Ø¯Ù…Ø©',
       price: 2999,
       originalPrice: 3499,
       image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTAwNDR8MHwxfHNlYXJjaHwxfHxzbWFydHBob25lJTIwbW9iaWxlJTIwcGhvbmUlMjB0ZWNobm9sb2d5fGVufDB8MXx8fDE3NTY4OTQ5NDB8MA&ixlib=rb-4.1.0&q=85',
       images: [],
       category: 'electronics',
-      categoryAr: 'إلكترونيات',
+      categoryAr: 'Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠØ§Øª',
       featured: true,
       discount: 15,
       rating: 4.8,
@@ -271,15 +273,15 @@ const MobileHeroSection: React.FC = () => {
     {
       id: '2',
       name: 'Wireless Headphones',
-      nameAr: 'سماعات لاسلكية',
+      nameAr: 'Ø³Ù…Ø§Ø¹Ø§Øª Ù„Ø§Ø³Ù„ÙƒÙŠØ©',
       description: 'Comfortable wireless headphones with long battery life',
-      descriptionAr: 'سماعات مريحة بعمر بطارية طويل',
+      descriptionAr: 'Ø³Ù…Ø§Ø¹Ø§Øª Ù…Ø±ÙŠØ­Ø© Ø¨Ø¹Ù…Ø± Ø¨Ø·Ø§Ø±ÙŠØ© Ø·ÙˆÙŠÙ„',
       price: 899,
       originalPrice: 1199,
       image: 'https://images.unsplash.com/photo-1608148118722-56da485f9e84?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTAwNDR8MHwxfHNlYXJjaHw0fHxoZWFkcGhvbmVzJTIwd2lyZWxlc3MlMjBhdWRpb3xlbnwwfDB8fHwxNzU2ODk0OTQwfDA&ixlib=rb-4.1.0&q=85',
       images: [],
       category: 'audio',
-      categoryAr: 'صوتيات',
+      categoryAr: 'ØµÙˆØªÙŠØ§Øª',
       featured: true,
       discount: 25,
       rating: 4.6,
@@ -292,15 +294,15 @@ const MobileHeroSection: React.FC = () => {
     {
       id: '3',
       name: 'Luxury Watch',
-      nameAr: 'ساعة فاخرة',
+      nameAr: 'Ø³Ø§Ø¹Ø© ÙØ§Ø®Ø±Ø©',
       description: 'Elegant luxury watch with premium materials',
-      descriptionAr: 'ساعة فاخرة بمواد متميزة',
+      descriptionAr: 'Ø³Ø§Ø¹Ø© ÙØ§Ø®Ø±Ø© Ø¨Ù…ÙˆØ§Ø¯ Ù…ØªÙ…ÙŠØ²Ø©',
       price: 1599,
       originalPrice: 1999,
       image: 'https://images.unsplash.com/photo-1623391306881-7bdb8f98f738?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTAwNDR8MHwxfHNlYXJjaHwzfHx3YXRjaCUyMGx1eHVyeSUyMHRpbWVwaWVjZXxlbnwwfDJ8fHwxNzU2ODk0OTQwfDA&ixlib=rb-4.1.0&q=85',
       images: [],
       category: 'accessories',
-      categoryAr: 'إكسسوارات',
+      categoryAr: 'Ø¥ÙƒØ³Ø³ÙˆØ§Ø±Ø§Øª',
       featured: true,
       discount: 20,
       rating: 4.9,
@@ -342,34 +344,34 @@ const MobileHeroSection: React.FC = () => {
   const fallbackSlides: MobileSlide[] = [
     {
       id: 1,
-      title: "تكنولوجيا متطورة",
-      subtitle: "أحدث الهواتف الذكية",
-      ctaText: "تسوق الآن",
+      title: "ØªÙƒÙ†ÙˆÙ„ÙˆØ¬ÙŠØ§ Ù…ØªØ·ÙˆØ±Ø©",
+      subtitle: "Ø£Ø­Ø¯Ø« Ø§Ù„Ù‡ÙˆØ§ØªÙ Ø§Ù„Ø°ÙƒÙŠØ©",
+      ctaText: "ØªØ³ÙˆÙ‚ Ø§Ù„Ø¢Ù†",
       ctaLink: "/products",
       bgGradient: "from-indigo-600 via-purple-600 to-pink-600",
-      badge: "جديد",
+      badge: "Ø¬Ø¯ÙŠØ¯",
       product: mobileProducts[0],
       products: [mobileProducts[0], mobileProducts[1], mobileProducts[2]]
     },
     {
       id: 2,
-      title: "عروض حصرية",
-      subtitle: "خصومات تصل إلى 70%",
-      ctaText: "اشتري الآن",
+      title: "Ø¹Ø±ÙˆØ¶ Ø­ØµØ±ÙŠØ©",
+      subtitle: "Ø®ØµÙˆÙ…Ø§Øª ØªØµÙ„ Ø¥Ù„Ù‰ 70%",
+      ctaText: "Ø§Ø´ØªØ±ÙŠ Ø§Ù„Ø¢Ù†",
       ctaLink: "/products?sale=true",
       bgGradient: "from-red-500 via-orange-500 to-yellow-500",
-      badge: "خصم 70%",
+      badge: "Ø®ØµÙ… 70%",
       product: mobileProducts[1],
       products: [mobileProducts[1], mobileProducts[2], mobileProducts[0]]
     },
     {
       id: 3,
-      title: "جودة مضمونة",
-      subtitle: "منتجات أصلية فقط",
-      ctaText: "اطلع على الضمان",
+      title: "Ø¬ÙˆØ¯Ø© Ù…Ø¶Ù…ÙˆÙ†Ø©",
+      subtitle: "Ù…Ù†ØªØ¬Ø§Øª Ø£ØµÙ„ÙŠØ© ÙÙ‚Ø·",
+      ctaText: "Ø§Ø·Ù„Ø¹ Ø¹Ù„Ù‰ Ø§Ù„Ø¶Ù…Ø§Ù†",
       ctaLink: "/about",
       bgGradient: "from-emerald-500 via-teal-500 to-cyan-500",
-      badge: "ضمان شامل",
+      badge: "Ø¶Ù…Ø§Ù† Ø´Ø§Ù…Ù„",
       product: mobileProducts[2],
       products: [mobileProducts[2], mobileProducts[0], mobileProducts[1]]
     }
@@ -383,7 +385,7 @@ const MobileHeroSection: React.FC = () => {
       id: i + 1,
       title: s.title || '',
       subtitle: s.subtitle || '',
-      ctaText: s.buttonText || 'تسوق الآن',
+      ctaText: s.buttonText || 'ØªØ³ÙˆÙ‚ Ø§Ù„Ø¢Ù†',
       ctaLink: s.buttonLink || '/products',
       bgGradient: (s.bgGradient || (s.theme === 'sale' ? 'from-red-500 via-orange-500 to-yellow-500' : s.theme === 'quality' ? 'from-emerald-500 via-teal-500 to-cyan-500' : 'from-indigo-600 via-purple-600 to-pink-600')),
       pattern: s.pattern || undefined,
@@ -547,7 +549,7 @@ const MobileHeroSection: React.FC = () => {
       >
         <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />
         <div className="relative z-10 px-6 py-8 bg-black/30 rounded-xl border border-white/10 text-white/90 text-center">
-          لا توجد شرائح مضافة بعد. يرجى إضافة شريحة من لوحة التحكم.
+          Ù„Ø§ ØªÙˆØ¬Ø¯ Ø´Ø±Ø§Ø¦Ø­ Ù…Ø¶Ø§ÙØ© Ø¨Ø¹Ø¯. ÙŠØ±Ø¬Ù‰ Ø¥Ø¶Ø§ÙØ© Ø´Ø±ÙŠØ­Ø© Ù…Ù† Ù„ÙˆØ­Ø© Ø§Ù„ØªØ­ÙƒÙ….
         </div>
       </section>
     );
@@ -562,10 +564,16 @@ const MobileHeroSection: React.FC = () => {
     >
       {/* Persistent Reload Splash: stays until window 'load' or fallback timeout */}
       {showSplash && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-gradient-to-br from-slate-900 to-black">
+        <div
+          className="fixed inset-0 z-[9999] flex items-center justify-center"
+          style={{ background: 'linear-gradient(135deg, hsl(var(--background)), hsl(var(--muted)))' }}
+        >
           <div className="text-center">
-            <div className="w-14 h-14 border-4 border-white/30 border-t-white rounded-full animate-spin mx-auto mb-4" />
-            <div className="text-white/90 font-semibold">جاري تحميل الصفحة...</div>
+            <div
+              className="w-14 h-14 border-4 rounded-full animate-spin mx-auto mb-4"
+              style={{ borderColor: 'hsl(var(--border))', borderTopColor: primaryColor || 'hsl(var(--primary))' }}
+            />
+            <div className="text-foreground/90 font-semibold">Ø¬Ø§Ø±ÙŠ ØªØ­Ù…ÙŠÙ„ Ø§Ù„ØµÙØ­Ø©...</div>
           </div>
         </div>
       )}
@@ -668,10 +676,10 @@ const MobileHeroSection: React.FC = () => {
             >
               {/* Loading/Error banners (non-blocking) */}
               {loading && (
-                <div className="mb-2 text-white/80 text-xs">جاري تحميل المنتجات المميزة...</div>
+                <div className="mb-2 text-white/80 text-xs">Ø¬Ø§Ø±ÙŠ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª Ø§Ù„Ù…Ù…ÙŠØ²Ø©...</div>
               )}
               {error && !loading && (
-                <div className="mb-2 text-red-200 text-xs">تعذر تحميل المنتجات ({error}) — سيتم عرض منتجات افتراضية</div>
+                <div className="mb-2 text-red-200 text-xs">ØªØ¹Ø°Ø± ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª ({error}) â€” Ø³ÙŠØªÙ… Ø¹Ø±Ø¶ Ù…Ù†ØªØ¬Ø§Øª Ø§ÙØªØ±Ø§Ø¶ÙŠØ©</div>
               )}
               <Belt products={beltProducts} speedPxPerSec={200} sets={beltSets} hidePrices={hidePrices} />
             </div>
@@ -692,7 +700,7 @@ const MobileHeroSection: React.FC = () => {
               >
                 <Link to={currentSlideData?.ctaLink || '/products'} className="flex items-center gap-2 text-black hover:text-black">
                   <ShoppingBag className="w-4 h-4 text-black" />
-                  <span className="text-black">{currentSlideData?.ctaText || 'تسوق الآن'}</span>
+                  <span className="text-black">{currentSlideData?.ctaText || 'ØªØ³ÙˆÙ‚ Ø§Ù„Ø¢Ù†'}</span>
                   <ArrowRight className="w-3 h-3 text-black transition-transform duration-300 group-hover:translate-x-1" />
                 </Link>
               </Button>
@@ -736,3 +744,4 @@ const MobileHeroSection: React.FC = () => {
 };
 
 export default MobileHeroSection;
+

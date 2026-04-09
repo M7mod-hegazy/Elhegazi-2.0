@@ -191,6 +191,195 @@ async function getBuilderPricingConfig() {
   return cfg;
 }
 
+const OWNER_VAULT_SESSION_MINUTES = 15;
+
+const DEFAULT_OWNER_VISIBILITY = {
+  publicPages: {
+    home: true,
+    products: true,
+    productDetail: true,
+    categories: true,
+    cart: true,
+    checkout: true,
+    favorites: true,
+    profile: true,
+    orders: true,
+    about: true,
+    contact: true,
+    locations: true,
+    shopBuilder: true,
+  },
+  adminModules: {
+    dashboard: true,
+    products: true,
+    products3d: true,
+    categories: true,
+    orders: true,
+    users: true,
+    locations: true,
+    qrcodes: true,
+    homeConfig: true,
+    settings: true,
+    history: true,
+    profit: true,
+    shareholders: true,
+  },
+  featureFlags: {
+    rating: true,
+    favorites: true,
+    shopBuilder3d: true,
+    prices: true,
+  },
+};
+
+function mergeVisibility(visibility = {}) {
+  return {
+    publicPages: { ...DEFAULT_OWNER_VISIBILITY.publicPages, ...(visibility.publicPages || {}) },
+    adminModules: { ...DEFAULT_OWNER_VISIBILITY.adminModules, ...(visibility.adminModules || {}) },
+    featureFlags: { ...DEFAULT_OWNER_VISIBILITY.featureFlags, ...(visibility.featureFlags || {}) },
+  };
+}
+
+function sanitizeOwnerVault(ownerVault = {}) {
+  return {
+    enabled: ownerVault.enabled !== false,
+    visibility: mergeVisibility(ownerVault.visibility || {}),
+    updatedBy: ownerVault.updatedBy || '',
+    updatedAt: ownerVault.updatedAt || null,
+  };
+}
+
+function sanitizeSettingsDoc(doc) {
+  if (!doc) return doc;
+  const next = JSON.parse(JSON.stringify(doc));
+  if (next.ownerVault) {
+    next.ownerVault = sanitizeOwnerVault(next.ownerVault);
+  } else {
+    next.ownerVault = sanitizeOwnerVault({});
+  }
+  return next;
+}
+
+function hashOwnerPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${derived}`;
+}
+
+function verifyOwnerPassword(password, encoded) {
+  if (!encoded || !encoded.startsWith('scrypt$')) return false;
+  const parts = String(encoded).split('$');
+  if (parts.length !== 3) return false;
+  const salt = parts[1];
+  const storedHex = parts[2];
+  const incomingHex = crypto.scryptSync(password, salt, 64).toString('hex');
+  const stored = Buffer.from(storedHex, 'hex');
+  const incoming = Buffer.from(incomingHex, 'hex');
+  if (stored.length !== incoming.length) return false;
+  return crypto.timingSafeEqual(stored, incoming);
+}
+
+function hashOwnerToken(token) {
+  return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
+function getOwnerTokenFromReq(req) {
+  const auth = String(req.header('authorization') || '');
+  if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim();
+  return String(req.header('x-owner-vault-token') || '').trim();
+}
+
+async function getOwnerVaultConfig() {
+  let settings = await Settings.findOne();
+  if (!settings) settings = await Settings.create({});
+  if (!settings.ownerVault) settings.ownerVault = {};
+  if (!settings.ownerVault.passwordHash) {
+    const bootstrapPassword = process.env.OWNER_VAULT_PASSWORD || process.env.ADMIN_PASSWORD || '';
+    if (bootstrapPassword) settings.ownerVault.passwordHash = hashOwnerPassword(bootstrapPassword);
+  }
+  if (!settings.ownerVault.visibility) settings.ownerVault.visibility = DEFAULT_OWNER_VISIBILITY;
+  settings.ownerVault.visibility = mergeVisibility(settings.ownerVault.visibility);
+  if (settings.isModified()) await settings.save();
+  return settings;
+}
+
+async function getOwnerVisibility() {
+  const settings = await getOwnerVaultConfig();
+  const ownerVault = settings.ownerVault || {};
+  return {
+    enabled: ownerVault.enabled !== false,
+    visibility: mergeVisibility(ownerVault.visibility || {}),
+  };
+}
+
+async function isVisibilityEnabled(scope, key) {
+  const { enabled, visibility } = await getOwnerVisibility();
+  if (!enabled) return true;
+  return Boolean(visibility?.[scope]?.[key] ?? true);
+}
+
+function visibilityMiddleware(scope, key) {
+  return async (_req, res, next) => {
+    try {
+      const enabled = await isVisibilityEnabled(scope, key);
+      if (!enabled) return res.status(404).json({ ok: false, error: 'Not found' });
+      return next();
+    } catch (err) {
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  };
+}
+
+async function visibilityByAudience(req, publicKey, adminKey) {
+  const isAdmin = await isAdminRequest(req);
+  if (isAdmin && adminKey) return isVisibilityEnabled('adminModules', adminKey);
+  return isVisibilityEnabled('publicPages', publicKey);
+}
+
+function visibilityResourceMiddleware(publicKey, adminKey) {
+  return async (req, res, next) => {
+    try {
+      const enabled = await visibilityByAudience(req, publicKey, adminKey);
+      if (!enabled) return res.status(404).json({ ok: false, error: 'Not found' });
+      return next();
+    } catch (err) {
+      return res.status(500).json({ ok: false, error: err.message });
+    }
+  };
+}
+
+async function requireOwnerVaultSession(req, res, next) {
+  try {
+    const token = getOwnerTokenFromReq(req);
+    if (!token) return res.status(401).json({ ok: false, error: 'Owner vault authentication required' });
+    const settings = await getOwnerVaultConfig();
+    const session = settings.ownerVault?.session || {};
+    if (!session.tokenHash || !session.expiresAt) {
+      return res.status(401).json({ ok: false, error: 'Owner vault session missing' });
+    }
+    const expected = String(session.tokenHash);
+    const incoming = hashOwnerToken(token);
+    const same = expected.length === incoming.length && crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(incoming));
+    if (!same) return res.status(401).json({ ok: false, error: 'Invalid owner vault session' });
+    const now = Date.now();
+    const exp = new Date(session.expiresAt).getTime();
+    if (!Number.isFinite(exp) || exp < now) return res.status(401).json({ ok: false, error: 'Owner vault session expired' });
+
+    settings.ownerVault.session.lastActivityAt = new Date(now);
+    settings.ownerVault.session.expiresAt = new Date(now + OWNER_VAULT_SESSION_MINUTES * 60 * 1000);
+    await settings.save();
+    return next();
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+}
+
+function createOwnerVaultSession() {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + OWNER_VAULT_SESSION_MINUTES * 60 * 1000);
+  return { token, tokenHash: hashOwnerToken(token), expiresAt };
+}
+
 async function isAdminRequest(req) {
   try {
     const hdr = req.header('x-admin-secret') || '';
@@ -216,6 +405,195 @@ async function getActiveBuilderSession(actorKey) {
   if (!active) return null;
   return active;
 }
+
+// Public visibility state for route/menu gating in frontend
+app.get('/api/site-visibility', async (_req, res) => {
+  try {
+    const payload = await getOwnerVisibility();
+    return res.json({
+      ok: true,
+      item: {
+        enabled: payload.enabled,
+        visibility: payload.visibility,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Owner Vault authentication and controls
+app.post('/api/owner-vault/login', async (req, res) => {
+  try {
+    const password = String(req.body?.password || '');
+    if (!password) return res.status(400).json({ ok: false, error: 'Password is required' });
+
+    const settings = await getOwnerVaultConfig();
+    const hash = String(settings.ownerVault?.passwordHash || '');
+    if (!hash) return res.status(400).json({ ok: false, error: 'Owner Vault password is not initialized' });
+
+    const valid = verifyOwnerPassword(password, hash);
+    if (!valid) return res.status(401).json({ ok: false, error: 'Invalid password' });
+
+    const session = createOwnerVaultSession();
+    settings.ownerVault.session = {
+      tokenHash: session.tokenHash,
+      expiresAt: session.expiresAt,
+      lastActivityAt: new Date(),
+    };
+    await settings.save();
+
+    return res.json({
+      ok: true,
+      item: {
+        token: session.token,
+        expiresAt: session.expiresAt,
+        timeoutMinutes: OWNER_VAULT_SESSION_MINUTES,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/owner-vault/logout', requireOwnerVaultSession, async (_req, res) => {
+  try {
+    const settings = await getOwnerVaultConfig();
+    settings.ownerVault.session = {
+      tokenHash: '',
+      expiresAt: null,
+      lastActivityAt: null,
+    };
+    await settings.save();
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/owner-vault/status', async (req, res) => {
+  try {
+    const token = getOwnerTokenFromReq(req);
+    if (!token) return res.json({ ok: true, item: { authenticated: false } });
+    const settings = await getOwnerVaultConfig();
+    const session = settings.ownerVault?.session || {};
+    const tokenHash = String(session.tokenHash || '');
+    if (!tokenHash || !session.expiresAt) return res.json({ ok: true, item: { authenticated: false } });
+    const same = tokenHash === hashOwnerToken(token);
+    const exp = new Date(session.expiresAt).getTime();
+    if (!same || !Number.isFinite(exp) || exp < Date.now()) return res.json({ ok: true, item: { authenticated: false } });
+    return res.json({
+      ok: true,
+      item: {
+        authenticated: true,
+        expiresAt: session.expiresAt,
+        timeoutMinutes: OWNER_VAULT_SESSION_MINUTES,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.put('/api/owner-vault/password', requireOwnerVaultSession, async (req, res) => {
+  try {
+    const currentPassword = String(req.body?.currentPassword || '');
+    const newPassword = String(req.body?.newPassword || '');
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ ok: false, error: 'New password must be at least 8 characters' });
+    }
+    const settings = await getOwnerVaultConfig();
+    const currentHash = String(settings.ownerVault?.passwordHash || '');
+    if (currentHash && !verifyOwnerPassword(currentPassword, currentHash)) {
+      return res.status(401).json({ ok: false, error: 'Current password is invalid' });
+    }
+    settings.ownerVault.passwordHash = hashOwnerPassword(newPassword);
+    settings.ownerVault.updatedBy = req.user?.email || req.user?._id || 'owner-vault';
+    settings.ownerVault.updatedAt = new Date();
+    await settings.save();
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/owner-vault/password/reset-emergency', async (req, res) => {
+  try {
+    const resetKey = String(req.body?.resetKey || '').trim();
+    const recoveryEmail = String(req.body?.email || '').trim().toLowerCase();
+    const newPassword = String(req.body?.newPassword || '');
+    if (!process.env.OWNER_VAULT_EMERGENCY_RESET_KEY) {
+      return res.status(403).json({ ok: false, error: 'Emergency reset is disabled' });
+    }
+    if (!resetKey || resetKey !== process.env.OWNER_VAULT_EMERGENCY_RESET_KEY) {
+      return res.status(403).json({ ok: false, error: 'Invalid emergency key' });
+    }
+    const expectedRecoveryEmail = String(process.env.OWNER_VAULT_RECOVERY_EMAIL || '').trim().toLowerCase();
+    if (expectedRecoveryEmail && recoveryEmail !== expectedRecoveryEmail) {
+      return res.status(403).json({ ok: false, error: 'Invalid recovery email' });
+    }
+    if (!newPassword || newPassword.length < 8) {
+      return res.status(400).json({ ok: false, error: 'New password must be at least 8 characters' });
+    }
+    const settings = await getOwnerVaultConfig();
+    settings.ownerVault.passwordHash = hashOwnerPassword(newPassword);
+    settings.ownerVault.session = {
+      tokenHash: '',
+      expiresAt: null,
+      lastActivityAt: null,
+    };
+    settings.ownerVault.updatedBy = 'emergency-reset';
+    settings.ownerVault.updatedAt = new Date();
+    await settings.save();
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/owner-vault/visibility', requireOwnerVaultSession, async (_req, res) => {
+  try {
+    const payload = await getOwnerVisibility();
+    return res.json({
+      ok: true,
+      item: {
+        enabled: payload.enabled,
+        visibility: payload.visibility,
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.put('/api/owner-vault/visibility', requireOwnerVaultSession, async (req, res) => {
+  try {
+    const visibility = mergeVisibility(req.body?.visibility || {});
+    const enabled = req.body?.enabled !== false;
+    const settings = await getOwnerVaultConfig();
+    settings.ownerVault.visibility = visibility;
+    settings.ownerVault.enabled = enabled;
+    settings.ownerVault.updatedBy = req.user?.email || req.user?._id || 'owner-vault';
+    settings.ownerVault.updatedAt = new Date();
+    await settings.save();
+    return res.json({
+      ok: true,
+      item: {
+        enabled: settings.ownerVault.enabled !== false,
+        visibility: mergeVisibility(settings.ownerVault.visibility || {}),
+      },
+    });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+// Deep visibility enforcement for core resources
+app.use('/api/products', visibilityResourceMiddleware('products', 'products'));
+app.use('/api/categories', visibilityResourceMiddleware('categories', 'categories'));
+app.use('/api/locations', visibilityResourceMiddleware('locations', 'locations'));
+app.use('/api/builder', visibilityResourceMiddleware('shopBuilder', 'products3d'));
+app.use('/api/products-3d', visibilityResourceMiddleware('shopBuilder', 'products3d'));
 
 app.post('/api/orders/bulk/status', requirePermission('orders', 'update', { attach: true }), async (req, res) => {
   try {
@@ -2490,6 +2868,8 @@ app.get('/api/products/:id', async (req, res) => {
 });
 
 app.get('/api/products/:id/ratings', async (req, res) => {
+  const ratingsEnabled = await isVisibilityEnabled('featureFlags', 'rating');
+  if (!ratingsEnabled) return res.status(404).json({ ok: false, error: 'Not found' });
   try {
     const productId = String(req.params.id || '');
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -2522,6 +2902,8 @@ app.get('/api/products/:id/ratings', async (req, res) => {
 });
 
 app.post('/api/products/:id/ratings', async (req, res) => {
+  const ratingsEnabled = await isVisibilityEnabled('featureFlags', 'rating');
+  if (!ratingsEnabled) return res.status(404).json({ ok: false, error: 'Not found' });
   try {
     const productId = String(req.params.id || '');
     if (!mongoose.Types.ObjectId.isValid(productId)) {
@@ -3590,6 +3972,8 @@ app.get('/api/my/returns', async (req, res) => {
 
 // New endpoint for rating an order
 app.post('/api/orders/rate', async (req, res) => {
+  const ratingsEnabled = await isVisibilityEnabled('featureFlags', 'rating');
+  if (!ratingsEnabled) return res.status(404).json({ ok: false, error: 'Not found' });
   try {
     const { orderId, rating, review } = req.body || {};
     
@@ -3843,12 +4227,16 @@ app.post('/api/auth/login', async (req, res) => {
 
 // --- Favorites ---
 app.get('/api/users/:id/favorites', async (req, res) => {
+  const favoritesEnabled = await isVisibilityEnabled('featureFlags', 'favorites');
+  if (!favoritesEnabled) return res.status(404).json({ ok: false, error: 'Not found' });
   const user = await User.findById(req.params.id).lean();
   if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
   return res.json({ ok: true, items: user.favorites || [] });
 });
 
 app.post('/api/users/:id/favorites/:productId', async (req, res) => {
+  const favoritesEnabled = await isVisibilityEnabled('featureFlags', 'favorites');
+  if (!favoritesEnabled) return res.status(404).json({ ok: false, error: 'Not found' });
   const { id, productId } = req.params;
   const user = await User.findById(id);
   if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
@@ -3858,6 +4246,8 @@ app.post('/api/users/:id/favorites/:productId', async (req, res) => {
 });
 
 app.delete('/api/users/:id/favorites/:productId', async (req, res) => {
+  const favoritesEnabled = await isVisibilityEnabled('featureFlags', 'favorites');
+  if (!favoritesEnabled) return res.status(404).json({ ok: false, error: 'Not found' });
   const { id, productId } = req.params;
   const user = await User.findById(id);
   if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
@@ -3867,6 +4257,8 @@ app.delete('/api/users/:id/favorites/:productId', async (req, res) => {
 });
 
 app.delete('/api/users/:id/favorites', async (req, res) => {
+  const favoritesEnabled = await isVisibilityEnabled('featureFlags', 'favorites');
+  if (!favoritesEnabled) return res.status(404).json({ ok: false, error: 'Not found' });
   const user = await User.findById(req.params.id);
   if (!user) return res.status(404).json({ ok: false, error: 'User not found' });
   user.favorites = [];
@@ -3940,7 +4332,7 @@ app.get('/api/settings', async (req, res) => {
     if (!doc) {
       doc = (await Settings.create({})).toObject();
     }
-    return sendJsonWithEtag(req, res, { ok: true, item: doc });
+    return sendJsonWithEtag(req, res, { ok: true, item: sanitizeSettingsDoc(doc) });
   } catch (err) {
     console.error('❌ Error fetching settings:', err);
     return res.status(500).json({ ok: false, error: err.message });
@@ -4014,7 +4406,7 @@ app.put('/api/settings', async (req, res) => {
       details: 'Global settings were updated',
       meta: { keys: Object.keys(payload || {}) },
     });
-    return res.json({ ok: true, item: updated });
+    return res.json({ ok: true, item: sanitizeSettingsDoc(updated) });
   } catch (err) {
     console.error('❌ Error saving settings:', err);
     return res.status(400).json({ ok: false, error: err.message });

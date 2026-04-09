@@ -3,9 +3,9 @@
  * Caches critical assets for instant load and offline support
  */
 
-const CACHE_NAME = 'app-cache-v3';
-const RUNTIME_CACHE = 'runtime-cache-v1';
-const IMAGE_CACHE = 'image-cache-v1';
+const CACHE_NAME = 'app-cache-v4';
+const RUNTIME_CACHE = 'runtime-cache-v2';
+const IMAGE_CACHE = 'image-cache-v2';
 
 // Critical assets to cache on install
 const CRITICAL_ASSETS = [
