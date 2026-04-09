@@ -66,7 +66,7 @@ interface SettingsDoc {
 
 // Hook placeholder
 const useDeviceDetection = () => ({ isMobile: false, isTablet: false });
-const OWNER_VAULT_TOKEN_KEY = 'owner.vault.token';
+const OWNER_VAULT_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
 type OwnerVisibility = {
   publicPages: Record<string, boolean>;
@@ -87,7 +87,7 @@ const AdminSettings = () => {
   const [, setPricingOpen] = useState(false);
   const [ownerVaultOpen, setOwnerVaultOpen] = useState(false);
   const [ownerVaultPassword, setOwnerVaultPassword] = useState('');
-  const [ownerVaultToken, setOwnerVaultToken] = useState<string>(() => localStorage.getItem(OWNER_VAULT_TOKEN_KEY) || '');
+  const [ownerVaultToken, setOwnerVaultToken] = useState<string>('');
   const [ownerVaultAuthed, setOwnerVaultAuthed] = useState(false);
   const [ownerVaultBusy, setOwnerVaultBusy] = useState(false);
   const [ownerVaultSearch, setOwnerVaultSearch] = useState('');
@@ -279,6 +279,27 @@ const AdminSettings = () => {
   ]);
 
   useEffect(() => {
+    // Force Owner Vault to close on full page reload (does not affect admin auth).
+    (async () => {
+      try {
+        const adminSecret = localStorage.getItem('ADMIN_SECRET');
+        const headers: Record<string, string> = {};
+        if (adminSecret) headers['x-admin-secret'] = adminSecret;
+        await fetch('/api/owner-vault/logout', {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+        });
+      } catch {
+        // ignore
+      } finally {
+        setOwnerVaultAuthed(false);
+        setOwnerVaultToken('');
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
     let mounted = true;
     (async () => {
       if (!ownerVaultToken) return;
@@ -300,7 +321,6 @@ const AdminSettings = () => {
       if (!mounted) return;
       setOwnerVaultAuthed(false);
       setOwnerVaultToken('');
-      localStorage.removeItem(OWNER_VAULT_TOKEN_KEY);
     })();
     return () => {
       mounted = false;
@@ -419,7 +439,6 @@ const AdminSettings = () => {
       const res = await apiPostJson<{ token: string }>('/api/owner-vault/login', { password: ownerVaultPassword });
       if (!res.ok || !res.item?.token) throw new Error('كلمة المرور غير صحيحة');
       setOwnerVaultToken(res.item.token);
-      localStorage.setItem(OWNER_VAULT_TOKEN_KEY, res.item.token);
       setOwnerVaultAuthed(true);
       setOwnerVaultPassword('');
       await loadOwnerVaultVisibility();
@@ -435,23 +454,95 @@ const AdminSettings = () => {
     }
   };
 
-  const handleOwnerVaultLogout = async () => {
+  const autoSaveOwnerVaultState = useCallback(async () => {
+    if (!ownerVaultAuthed) return;
+    try {
+      if (ownerSection === 'vault') {
+        const res = await fetch('/api/owner-vault/visibility', {
+          method: 'PUT',
+          headers: { ...ownerVaultHeaders(), 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ enabled: ownerVaultEnabled, visibility: ownerVaultVisibility }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || 'تعذر حفظ إعدادات الإخفاء');
+        return;
+      }
+      await saveSettings(true, ownerSection);
+    } catch (error) {
+      console.error('Owner vault autosave failed:', error);
+    }
+  }, [ownerSection, ownerVaultAuthed, ownerVaultEnabled, ownerVaultHeaders, ownerVaultVisibility, saveSettings]);
+
+  const handleOwnerVaultLogout = async (mode: 'manual' | 'idle' | 'reload' = 'manual') => {
     try {
       setOwnerVaultBusy(true);
+      await autoSaveOwnerVaultState();
       await fetch('/api/owner-vault/logout', {
         method: 'POST',
         headers: ownerVaultHeaders(),
         credentials: 'include',
       });
+      if (mode !== 'reload') {
+        toast({ title: 'الإعدادات الخاصة', description: mode === 'idle' ? 'تم تسجيل الخروج تلقائيًا بعد 15 دقيقة خمول' : 'تم تسجيل الخروج من الإعدادات الخاصة' });
+      }
     } catch {
       // ignore
     } finally {
-      localStorage.removeItem(OWNER_VAULT_TOKEN_KEY);
       setOwnerVaultToken('');
       setOwnerVaultAuthed(false);
       setOwnerVaultBusy(false);
     }
   };
+
+  useEffect(() => {
+    if (!ownerVaultAuthed) return;
+    let timer: number | null = null;
+
+    const resetTimer = () => {
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        handleOwnerVaultLogout('idle');
+      }, OWNER_VAULT_IDLE_TIMEOUT_MS);
+    };
+
+    const events: Array<keyof WindowEventMap> = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
+    resetTimer();
+
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [ownerVaultAuthed, handleOwnerVaultLogout]);
+
+  useEffect(() => {
+    if (!ownerVaultAuthed) return;
+
+    const handleBeforeUnload = () => {
+      const payload = JSON.stringify({ enabled: ownerVaultEnabled, visibility: ownerVaultVisibility });
+      try {
+        fetch('/api/owner-vault/visibility', {
+          method: 'PUT',
+          headers: { ...ownerVaultHeaders(), 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: payload,
+          keepalive: true,
+        });
+        fetch('/api/owner-vault/logout', {
+          method: 'POST',
+          headers: ownerVaultHeaders(),
+          credentials: 'include',
+          keepalive: true,
+        });
+      } catch {
+        // ignore
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [ownerVaultAuthed, ownerVaultEnabled, ownerVaultHeaders, ownerVaultVisibility]);
 
   const handleOwnerToggle = (scope: keyof OwnerVisibility, key: string, value: boolean) => {
     setOwnerVaultVisibility((prev) => ({
@@ -533,114 +624,171 @@ const AdminSettings = () => {
 
   return (
     <AdminLayout>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-slate-900">الإعدادات</h1>
-          <p className="text-slate-600">إدارة إعدادات المتجر والتطبيق</p>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Sidebar Navigation */}
-          <div className="lg:col-span-1 space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <SettingsIcon className="w-5 h-5" />
-                  إعدادات سريعة
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2">
-                <Button
-                  variant={storeOpen ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setStoreOpen(true);
-                    setSocialOpen(false);
-                    setUserOpen(false);
-                    setOrderOpen(false);
-                    setCheckoutOpen(false);
-                    setPricingOpen(false);
-                    setOwnerVaultOpen(false);
-                  }}
-                >
-                  <Store className="w-4 h-4 ml-2" />
-                  معلومات المتجر
-                </Button>
-                <Button
-                  variant={socialOpen ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setStoreOpen(false);
-                    setSocialOpen(true);
-                    setUserOpen(false);
-                    setOrderOpen(false);
-                    setCheckoutOpen(false);
-                    setPricingOpen(false);
-                    setOwnerVaultOpen(false);
-                  }}
-                >
-                  <Globe className="w-4 h-4 ml-2" />
-                  الروابط الاجتماعية
-                </Button>
-                <Button
-                  variant={ownerVaultOpen ? "default" : "ghost"}
-                  className="w-full justify-start"
-                  onClick={() => {
-                    setStoreOpen(false);
-                    setSocialOpen(false);
-                    setUserOpen(false);
-                    setOrderOpen(false);
-                    setCheckoutOpen(false);
-                    setPricingOpen(false);
-                    setOwnerVaultOpen(true);
-                    setOwnerSection('vault');
-                  }}
-                >
-                  <Shield className="w-4 h-4 ml-2" />
-                  إعدادات خاصة
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Backup/Restore */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Database className="w-5 h-5" />
-                  النسخ الاحتياطي
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button className="w-full" onClick={handleBackupData}>
-                  <Download className="w-4 h-4 ml-2" />
-                  تصدير الإعدادات
-                </Button>
-                <div>
-                  <Label htmlFor="restore-file" className="cursor-pointer">
-                    <Button variant="outline" className="w-full" asChild>
-                      <span>
-                        <Upload className="w-4 h-4 ml-2" />
-                        استيراد الإعدادات
-                      </span>
-                    </Button>
-                  </Label>
-                  <Input
-                    id="restore-file"
-                    type="file"
-                    accept=".json"
-                    className="hidden"
-                    onChange={handleRestoreData}
-                  />
+      <div className="space-y-6 pb-8">
+        <Card className="border-slate-200/80 bg-white shadow-sm">
+          <CardContent className="p-6 md:p-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+              <div>
+                <h1 className="text-3xl font-black tracking-tight text-slate-900">لوحة إعدادات المتجر</h1>
+                <p className="mt-1 text-sm text-slate-600">إدارة الهوية، الروابط، وإعدادات المالك من واجهة واحدة منظمة.</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center">
+                  <p className="text-xs text-slate-500">الوضع الحالي</p>
+                  <p className="text-sm font-bold text-slate-900">{ownerVaultOpen ? 'إعدادات خاصة' : socialOpen ? 'روابط اجتماعية' : 'معلومات المتجر'}</p>
                 </div>
-              </CardContent>
-            </Card>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center">
+                  <p className="text-xs text-slate-500">الحالة</p>
+                  <p className="text-sm font-bold text-slate-900">{loading ? 'جاري الحفظ' : 'جاهز'}</p>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-center col-span-2 md:col-span-1">
+                  <p className="text-xs text-slate-500">Owner Vault</p>
+                  <p className="text-sm font-bold text-slate-900">{ownerVaultAuthed ? 'مفعّل' : 'مقفل'}</p>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+          <div className="space-y-4 xl:col-span-4">
+            <div className="xl:sticky xl:top-24 space-y-4">
+              <Card className="border-slate-200/80 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <SettingsIcon className="w-5 h-5" />
+                    لوحة التحكم
+                  </CardTitle>
+                  <CardDescription>اختر القسم الذي تريد العمل عليه</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button
+                    variant={storeOpen ? "default" : "outline"}
+                    className="h-12 w-full justify-between rounded-xl"
+                    onClick={() => {
+                      setStoreOpen(true);
+                      setSocialOpen(false);
+                      setUserOpen(false);
+                      setOrderOpen(false);
+                      setCheckoutOpen(false);
+                      setPricingOpen(false);
+                      setOwnerVaultOpen(false);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Store className="w-4 h-4" />
+                      معلومات المتجر
+                    </span>
+                    <span className="text-xs opacity-75">عام</span>
+                  </Button>
+                  <Button
+                    variant={socialOpen ? "default" : "outline"}
+                    className="h-12 w-full justify-between rounded-xl"
+                    onClick={() => {
+                      setStoreOpen(false);
+                      setSocialOpen(true);
+                      setUserOpen(false);
+                      setOrderOpen(false);
+                      setCheckoutOpen(false);
+                      setPricingOpen(false);
+                      setOwnerVaultOpen(false);
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Globe className="w-4 h-4" />
+                      الروابط الاجتماعية
+                    </span>
+                    <span className="text-xs opacity-75">تواصل</span>
+                  </Button>
+                  <Button
+                    variant={ownerVaultOpen ? "default" : "outline"}
+                    className="h-12 w-full justify-between rounded-xl"
+                    onClick={() => {
+                      setStoreOpen(false);
+                      setSocialOpen(false);
+                      setUserOpen(false);
+                      setOrderOpen(false);
+                      setCheckoutOpen(false);
+                      setPricingOpen(false);
+                      setOwnerVaultOpen(true);
+                      setOwnerSection('vault');
+                    }}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Shield className="w-4 h-4" />
+                      إعدادات خاصة
+                    </span>
+                    <span className="text-xs opacity-75">مالك</span>
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <Card className="border-slate-200/80 shadow-sm">
+                <CardHeader className="pb-3">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Database className="w-5 h-5" />
+                    الأدوات
+                  </CardTitle>
+                  <CardDescription>نسخة احتياطية واسترجاع سريع</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Button className="h-11 w-full rounded-xl" onClick={handleBackupData}>
+                    <Download className="w-4 h-4 ml-2" />
+                    تصدير الإعدادات
+                  </Button>
+                  <div>
+                    <Label htmlFor="restore-file" className="cursor-pointer">
+                      <Button variant="outline" className="h-11 w-full rounded-xl" asChild>
+                        <span>
+                          <Upload className="w-4 h-4 ml-2" />
+                          استيراد الإعدادات
+                        </span>
+                      </Button>
+                    </Label>
+                    <Input
+                      id="restore-file"
+                      type="file"
+                      accept=".json"
+                      className="hidden"
+                      onChange={handleRestoreData}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
+          <div className="space-y-6 xl:col-span-8">
+            {ownerVaultOpen && ownerVaultAuthed && (
+              <Card className="sticky top-20 z-20 border-slate-200/90 bg-white/95 shadow-sm backdrop-blur">
+                <CardContent className="p-3">
+                  <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm font-semibold text-slate-700">تنقل الإعدادات الخاصة</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-500">خروج تلقائي بعد 15 دقيقة خمول</span>
+                        <Button variant="outline" size="sm" className="rounded-lg" disabled={ownerVaultBusy} onClick={() => handleOwnerVaultLogout('manual')}>
+                          خروج
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Button variant={ownerSection === 'vault' ? 'default' : 'outline'} size="sm" className="rounded-lg" onClick={() => setOwnerSection('vault')}>التحكم</Button>
+                      <Button variant={ownerSection === 'theme' ? 'default' : 'outline'} size="sm" className="rounded-lg" onClick={() => setOwnerSection('theme')}>الثيم والألوان</Button>
+                      <Button variant={ownerSection === 'registration' ? 'default' : 'outline'} size="sm" className="rounded-lg" onClick={() => setOwnerSection('registration')}>إعدادات التسجيل</Button>
+                      <Button variant={ownerSection === 'orders' ? 'default' : 'outline'} size="sm" className="rounded-lg" onClick={() => setOwnerSection('orders')}>إعدادات الطلبات</Button>
+                      <Button variant={ownerSection === 'checkout' ? 'default' : 'outline'} size="sm" className="rounded-lg" onClick={() => setOwnerSection('checkout')}>إعدادات الدفع</Button>
+                      <Button variant={ownerSection === 'pricing' ? 'default' : 'outline'} size="sm" className="rounded-lg" onClick={() => setOwnerSection('pricing')}>إعدادات الأسعار</Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Store Information */}
             {(storeOpen || (ownerVaultOpen && ownerSection === 'theme')) && (
-              <Card>
+              <Card className="border-slate-200/80 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Store className="w-5 h-5" />
@@ -827,7 +975,7 @@ const AdminSettings = () => {
 
             {/* Social Links */}
             {socialOpen && (
-              <Card>
+              <Card className="border-slate-200/80 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Globe className="w-5 h-5" />
@@ -957,7 +1105,7 @@ const AdminSettings = () => {
 
             {/* Registration Settings */}
             {ownerVaultOpen && ownerSection === 'registration' && (
-              <Card>
+              <Card className="border-slate-200/80 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Users className="w-5 h-5" />
@@ -1015,7 +1163,7 @@ const AdminSettings = () => {
 
             {/* Order Settings */}
             {ownerVaultOpen && ownerSection === 'orders' && (
-              <Card>
+              <Card className="border-slate-200/80 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5" />
@@ -1085,7 +1233,7 @@ const AdminSettings = () => {
 
             {/* Checkout Settings */}
             {ownerVaultOpen && ownerSection === 'checkout' && (
-              <Card>
+              <Card className="border-slate-200/80 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <CreditCard className="w-5 h-5" />
@@ -1196,7 +1344,7 @@ const AdminSettings = () => {
 
             {/* Pricing Settings */}
             {ownerVaultOpen && ownerSection === 'pricing' && (
-              <Card>
+              <Card className="border-slate-200/80 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <ShoppingCart className="w-5 h-5" />
@@ -1239,16 +1387,6 @@ const AdminSettings = () => {
 
                       try {
                         await saveSettings(false, 'pricing');
-
-                        
-                        // Force refresh all pages by clearing cache and reloading
-
-                        localStorage.clear();
-                        
-                        // Wait a moment then reload
-                        setTimeout(() => {
-                          window.location.reload();
-                        }, 1000);
                       } catch (err) {
                         console.error('❌ Failed to save pricing settings:', err);
                       }
@@ -1263,7 +1401,7 @@ const AdminSettings = () => {
             )}
 
             {ownerVaultOpen && (
-              <Card>
+              <Card className="border-slate-200/80 shadow-sm">
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Shield className="w-5 h-5" />
@@ -1291,61 +1429,50 @@ const AdminSettings = () => {
                       </Button>
                     </div>
                   ) : (
-                    <>
-                      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                        <Button className="col-span-2 md:col-span-3 order-first" variant={ownerSection === 'vault' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('vault')}>التحكم</Button>
-                        <Button variant={ownerSection === 'theme' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('theme')}>الثيم والألوان</Button>
-                        <Button variant={ownerSection === 'registration' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('registration')}>إعدادات التسجيل</Button>
-                        <Button variant={ownerSection === 'orders' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('orders')}>إعدادات الطلبات</Button>
-                        <Button variant={ownerSection === 'checkout' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('checkout')}>إعدادات الدفع</Button>
-                        <Button variant={ownerSection === 'pricing' ? 'default' : 'outline'} size="sm" onClick={() => setOwnerSection('pricing')}>إعدادات الأسعار</Button>
-                      </div>
-
-                      {ownerSection === 'vault' && (
-                        <>
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                              <Switch checked={ownerVaultEnabled} onCheckedChange={setOwnerVaultEnabled} />
-                              <span className="text-sm">تفعيل الحجب</span>
-                            </div>
-                            <Button variant="outline" onClick={handleOwnerVaultLogout} disabled={ownerVaultBusy}>
-                              خروج
-                            </Button>
+                    ownerSection === 'vault' ? (
+                      <>
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2">
+                            <Switch checked={ownerVaultEnabled} onCheckedChange={setOwnerVaultEnabled} />
+                            <span className="text-sm">تفعيل الحجب</span>
                           </div>
+                          <span className="text-xs text-slate-500">يتم حفظ التغييرات تلقائيًا قبل الخروج</span>
+                        </div>
 
-                          <Input
-                            placeholder="ابحث عن صفحة أو ميزة..."
-                            value={ownerVaultSearch}
-                            onChange={(e) => setOwnerVaultSearch(e.target.value)}
-                          />
+                        <Input
+                          placeholder="ابحث عن صفحة أو ميزة..."
+                          value={ownerVaultSearch}
+                          onChange={(e) => setOwnerVaultSearch(e.target.value)}
+                        />
 
-                          {(['publicPages', 'adminModules', 'featureFlags'] as Array<keyof OwnerVisibility>).map((scope) => (
-                            <div key={scope} className="space-y-2 rounded-lg border p-3">
-                              <h3 className="font-semibold">
-                                {scope === 'publicPages' ? 'الصفحات العامة' : scope === 'adminModules' ? 'وحدات الإدارة' : 'الميزات'}
-                              </h3>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                {Object.entries(ownerVaultVisibility?.[scope] || {})
-                                  .filter(([key]) => !ownerVaultSearch || key.toLowerCase().includes(ownerVaultSearch.toLowerCase()))
-                                  .map(([key, value]) => (
-                                    <div key={`${scope}-${key}`} className="flex items-center justify-between rounded-md border px-3 py-2">
-                                      <span className="text-sm">{key}</span>
-                                      <Switch
-                                        checked={Boolean(value)}
-                                        onCheckedChange={(checked) => handleOwnerToggle(scope, key, checked)}
-                                      />
-                                    </div>
-                                  ))}
-                              </div>
+                        {(['publicPages', 'adminModules', 'featureFlags'] as Array<keyof OwnerVisibility>).map((scope) => (
+                          <div key={scope} className="space-y-2 rounded-lg border p-3">
+                            <h3 className="font-semibold">
+                              {scope === 'publicPages' ? 'الصفحات العامة' : scope === 'adminModules' ? 'وحدات الإدارة' : 'الميزات'}
+                            </h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                              {Object.entries(ownerVaultVisibility?.[scope] || {})
+                                .filter(([key]) => !ownerVaultSearch || key.toLowerCase().includes(ownerVaultSearch.toLowerCase()))
+                                .map(([key, value]) => (
+                                  <div key={`${scope}-${key}`} className="flex items-center justify-between rounded-md border px-3 py-2">
+                                    <span className="text-sm">{key}</span>
+                                    <Switch
+                                      checked={Boolean(value)}
+                                      onCheckedChange={(checked) => handleOwnerToggle(scope, key, checked)}
+                                    />
+                                  </div>
+                                ))}
                             </div>
-                          ))}
+                          </div>
+                        ))}
 
-                          <Button onClick={handleSaveOwnerVisibility} disabled={ownerVaultBusy} className="w-full">
-                            {ownerVaultBusy ? 'جارٍ الحفظ...' : 'حفظ'}
-                          </Button>
-                        </>
-                      )}
-                    </>
+                        <Button onClick={handleSaveOwnerVisibility} disabled={ownerVaultBusy} className="w-full">
+                          {ownerVaultBusy ? 'جارٍ الحفظ...' : 'حفظ'}
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-slate-500">اختر قسمًا من شريط التنقل العلوي.</p>
+                    )
                   )}
                 </CardContent>
               </Card>

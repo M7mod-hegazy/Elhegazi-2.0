@@ -14,34 +14,36 @@ const Switch = React.forwardRef<
   SwitchProps
 >(({ className, variant = 'default', size = 'default', showIcon = false, ...props }, ref) => {
   const variantClasses = {
-    default: 'data-[state=checked]:bg-primary/90 data-[state=checked]:border-primary',
-    success: 'data-[state=checked]:bg-emerald-500 data-[state=checked]:border-emerald-600',
-    warning: 'data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-600',
-    danger: 'data-[state=checked]:bg-red-500 data-[state=checked]:border-red-600',
-    purple: 'data-[state=checked]:bg-violet-500 data-[state=checked]:border-violet-600',
-    gradient: 'data-[state=checked]:bg-indigo-500 data-[state=checked]:border-indigo-600'
+    // Keep API compatibility while aligning all switches to theme colors.
+    default: 'data-[state=checked]:bg-primary',
+    success: 'data-[state=checked]:bg-primary',
+    warning: 'data-[state=checked]:bg-primary',
+    danger: 'data-[state=checked]:bg-primary',
+    purple: 'data-[state=checked]:bg-primary',
+    gradient: 'data-[state=checked]:bg-primary'
   }
 
   const sizeClasses = {
     sm: 'h-5 w-9',
     default: 'h-6 w-11',
-    lg: 'h-8 w-14'
+    lg: 'h-7 w-14'
   }
 
   const thumbSizeClasses = {
-    sm: 'h-4 w-4 data-[state=checked]:translate-x-[18px]',
-    default: 'h-5 w-5 data-[state=checked]:translate-x-[22px]',
-    lg: 'h-7 w-7 data-[state=checked]:translate-x-[26px]'
+    sm: 'h-4 w-4 data-[state=checked]:translate-x-4 data-[state=unchecked]:translate-x-0',
+    default: 'h-5 w-5 data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0',
+    lg: 'h-6 w-6 data-[state=checked]:translate-x-7 data-[state=unchecked]:translate-x-0'
   }
 
   return (
     <SwitchPrimitives.Root
+      dir="ltr"
       className={cn(
-        "peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border transition-all duration-200 ease-out",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+        "peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border p-[2px] transition-all duration-200 ease-out",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        "data-[state=unchecked]:bg-slate-100 data-[state=unchecked]:border-slate-300",
-        "data-[state=checked]:shadow-sm",
+        "data-[state=unchecked]:bg-muted/80 data-[state=unchecked]:border-border/80 data-[state=unchecked]:shadow-inner",
+        "data-[state=checked]:border-primary/80 data-[state=checked]:shadow-[0_0_0_1px_hsl(var(--primary)/0.2),0_6px_16px_hsl(var(--primary)/0.28)]",
         sizeClasses[size],
         variantClasses[variant],
         className
@@ -51,14 +53,15 @@ const Switch = React.forwardRef<
     >
       <SwitchPrimitives.Thumb
         className={cn(
-          "pointer-events-none relative block rounded-full bg-white shadow transition-transform duration-200 ease-out",
-          "data-[state=unchecked]:translate-x-[2px]",
+          "pointer-events-none relative block rounded-full border border-border/50 bg-background shadow-sm transition-all duration-200 ease-out",
+          "data-[state=checked]:bg-primary-foreground data-[state=checked]:border-primary-foreground/60",
+          "data-[state=unchecked]:translate-x-0",
           thumbSizeClasses[size]
         )}
       >
         {showIcon && (
           <div className="absolute inset-0 flex items-center justify-center opacity-0 data-[state=checked]:opacity-100 transition-opacity duration-150">
-            <svg className="w-2.5 h-2.5 text-slate-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+            <svg className="w-2.5 h-2.5 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
