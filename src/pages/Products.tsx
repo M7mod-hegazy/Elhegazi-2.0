@@ -27,6 +27,7 @@ import { apiGet, type ApiResponse } from '@/lib/api';
 import { Product, ProductFilters, SortOption, Category } from '@/types';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import SocialLinks from '@/components/layout/SocialLinks';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
 
 type ApiCategory = {
   _id: string;
@@ -72,6 +73,7 @@ const DEFAULT_MAX_PRICE = 10000;
 const Products = () => {
   // Set page title
   usePageTitle('المنتجات');
+  const { hidePrices } = usePricingSettings();
   
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -444,7 +446,7 @@ const Products = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {sortOptions.map((option) => (
+                    {sortOptions.filter(opt => !hidePrices || (opt.value !== 'price-low' && opt.value !== 'price-high')).map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.labelAr}
                       </SelectItem>
@@ -519,6 +521,7 @@ const Products = () => {
                 </div>
 
                 {/* Price Range */}
+                {!hidePrices && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">نطاق السعر</label>
                   <div className="space-y-2">
@@ -555,11 +558,12 @@ const Products = () => {
                           onChange={(e) => handleMaxPriceInput(e.target.value)}
                           className="text-sm"
                         />
-                        <span className="text-xs text-slate-500">ج.م</span>
+                          <span className="text-xs text-slate-500">ج.م</span>
                       </div>
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Visibility is handled automatically: hidden products are excluded */}
 

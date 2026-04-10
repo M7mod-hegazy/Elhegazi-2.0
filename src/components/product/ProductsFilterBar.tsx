@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
 
 interface ProductsFilterBarProps {
   // Search
@@ -67,6 +68,7 @@ const ProductsFilterBar = ({
   resultsCount,
   onClearFilters
 }: ProductsFilterBarProps) => {
+  const { hidePrices } = usePricingSettings();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Check if any filters are active
@@ -81,6 +83,7 @@ const ProductsFilterBar = ({
   const FilterContent = () => (
     <div className="space-y-6">
       {/* Price Range Section */}
+      {!hidePrices && (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-sm font-bold text-slate-800">نطاق السعر</label>
@@ -136,6 +139,7 @@ const ProductsFilterBar = ({
           </div>
         </div>
       </div>
+      )}
 
       {/* Rating Filter Section */}
       <div className="space-y-3">
@@ -209,7 +213,7 @@ const ProductsFilterBar = ({
                   <SelectContent>
                     <SelectItem value="newest">الأحدث</SelectItem>
                     <SelectItem value="name">الاسم</SelectItem>
-                    <SelectItem value="price">السعر</SelectItem>
+                    {!hidePrices && <SelectItem value="price">السعر</SelectItem>}
                     <SelectItem value="rating">التقييم</SelectItem>
                   </SelectContent>
                 </Select>
@@ -289,7 +293,7 @@ const ProductsFilterBar = ({
                 <SelectContent>
                   <SelectItem value="newest">الأحدث</SelectItem>
                   <SelectItem value="name">الاسم</SelectItem>
-                  <SelectItem value="price">السعر</SelectItem>
+                  {!hidePrices && <SelectItem value="price">السعر</SelectItem>}
                   <SelectItem value="rating">التقييم</SelectItem>
                 </SelectContent>
               </Select>
@@ -316,6 +320,7 @@ const ProductsFilterBar = ({
             <div className="hidden lg:block mt-6 p-6 bg-gradient-to-bl from-slate-50 to-white rounded-2xl border border-slate-200 shadow-inner animate-in slide-in-from-top-2 duration-300">
               <div className="grid grid-cols-3 gap-8">
                 {/* Price Range */}
+                {!hidePrices && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-slate-800">نطاق السعر</label>
@@ -364,6 +369,7 @@ const ProductsFilterBar = ({
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Rating Filter */}
                 <div className="space-y-4">
