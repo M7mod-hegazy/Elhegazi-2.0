@@ -941,6 +941,7 @@ const DesktopProductDetail = ({
   social: any;
   hidePrices: boolean;
 }) => {
+  const { canPurchase, showPrices } = usePricingSettings();
   const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
