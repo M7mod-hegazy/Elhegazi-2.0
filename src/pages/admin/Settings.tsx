@@ -26,7 +26,7 @@ type SettingsDoc = {
   social?: { facebookUrl?: string; messengerUrl?: string; whatsappUrl?: string; phoneCallLink?: string };
   logo?: { url?: string; altText?: string; publicId?: string; width?: number; height?: number };
   theme?: { primaryColor?: string; secondaryColor?: string };
-  pricingSettings?: { hidePrices?: boolean; viewOnlyPrices?: boolean };
+  pricingSettings?: { hidePrices?: boolean };
   checkoutEnabled?: boolean;
   shippingCost?: number;
   expressShippingCost?: number;
@@ -71,7 +71,6 @@ const AdminSettings: React.FC = () => {
   const [primaryColor, setPrimaryColor] = useState('#3B82F6');
   const [secondaryColor, setSecondaryColor] = useState('#8B5CF6');
   const [hidePrices, setHidePrices] = useState(false);
-  const [viewOnlyPrices, setViewOnlyPrices] = useState(false);
   const [checkoutEnabled, setCheckoutEnabled] = useState(true);
   const [shippingCost, setShippingCost] = useState(25);
   const [expressShippingCost, setExpressShippingCost] = useState(50);
@@ -168,7 +167,6 @@ const AdminSettings: React.FC = () => {
     setPrimaryColor(item.theme?.primaryColor || '#3B82F6');
     setSecondaryColor(item.theme?.secondaryColor || '#8B5CF6');
     setHidePrices(Boolean(item.pricingSettings?.hidePrices));
-    setViewOnlyPrices(Boolean(item.pricingSettings?.viewOnlyPrices));
     setCheckoutEnabled(item.checkoutEnabled ?? true);
     setShippingCost(item.shippingCost ?? 25);
     setExpressShippingCost(item.expressShippingCost ?? 50);
@@ -344,7 +342,7 @@ const AdminSettings: React.FC = () => {
     setControlCenterBusy(true);
     try {
       const res = await apiPutJson('/api/settings', {
-        pricingSettings: { hidePrices, viewOnlyPrices },
+        pricingSettings: { hidePrices },
         checkoutEnabled,
         shippingCost,
         expressShippingCost,
@@ -365,7 +363,7 @@ const AdminSettings: React.FC = () => {
   const loginControlCenter = async () => {
     setControlCenterBusy(true);
     try {
-      const res = await apiPostJson<{ token: string }, { password: string }>('/api/owner-vault/login', { password: controlCenterPassword });
+      const res = await apiPostJson<{ token: string }>('/api/owner-vault/login', { password: controlCenterPassword });
       if (!res.ok || !res.item?.token) throw new Error('كلمة المرور غير صحيحة');
       setControlCenterToken(res.item.token);
       setControlCenterAuthed(true);
@@ -763,52 +761,10 @@ const AdminSettings: React.FC = () => {
                       <div className="space-y-3 rounded-lg border p-4">
                         <div className="flex items-center justify-between rounded-md border p-3">
                           <div>
-                            <p className="font-medium">إظهار العادي</p>
-                            <p className="text-sm text-slate-500">إظهار الأسعار مع إمكانية الشراء.</p>
-                          </div>
-                          <Switch 
-                            checked={!hidePrices && !viewOnlyPrices} 
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setHidePrices(false);
-                                setViewOnlyPrices(false);
-                              }
-                            }} 
-                          />
-                        </div>
-                        <div className="flex items-center justify-between rounded-md border p-3">
-                          <div>
-                            <p className="font-medium">عرض السعر فقط</p>
-                            <p className="text-sm text-slate-500">إظهار الأسعار بدون إمكانية الشراء.</p>
-                          </div>
-                          <Switch 
-                            checked={viewOnlyPrices} 
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setViewOnlyPrices(true);
-                                setHidePrices(false);
-                              } else {
-                                setViewOnlyPrices(false);
-                              }
-                            }} 
-                          />
-                        </div>
-                        <div className="flex items-center justify-between rounded-md border p-3">
-                          <div>
                             <p className="font-medium">إخفاء الأسعار</p>
                             <p className="text-sm text-slate-500">إظهار "اتصل للحصول على السعر" بدلاً من الأسعار.</p>
                           </div>
-                          <Switch 
-                            checked={hidePrices} 
-                            onCheckedChange={(checked) => {
-                              if (checked) {
-                                setHidePrices(true);
-                                setViewOnlyPrices(false);
-                              } else {
-                                setHidePrices(false);
-                              }
-                            }} 
-                          />
+                          <Switch checked={hidePrices} onCheckedChange={setHidePrices} />
                         </div>
                         <Button onClick={saveControlCenterSettings} disabled={controlCenterBusy}>{controlCenterBusy ? 'جارٍ الحفظ...' : 'حفظ إعدادات الأسعار'}</Button>
                       </div>

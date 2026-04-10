@@ -32,7 +32,7 @@ interface ProductsMobileProps {
 
 const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<ProductsMobileProps, 'hidePrices'>) => {
   const navigate = useNavigate();
-  const { hidePrices, canPurchase, showPrices } = usePricingSettings();
+  const { hidePrices } = usePricingSettings();
   const { addItem, isInCart: checkIsInCart, getItemByProductId } = useCart();
   const { isAuthenticated } = useDualAuth();
   const { showAuthModal: favoritesAuthModal, setShowAuthModal: setFavoritesAuthModal } = useFavorites();
@@ -117,7 +117,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
               <div className="flex-1 text-right min-w-0">
                 <p className="font-bold text-sm text-slate-900 line-clamp-2">{product.nameAr}</p>
                 <div className="flex items-center gap-2 mt-1 flex-wrap">
-                  {showPrices && <p className="text-sm font-semibold text-primary">{product.price ? product.price.toLocaleString() : 'N/A'} ج.م</p>}
+                  {!hidePrices && <p className="text-sm font-semibold text-primary">{product.price ? product.price.toLocaleString() : 'N/A'} ج.م</p>}
                   {product.category && (
                     <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded">
                       {product.categoryAr || product.category}
@@ -129,7 +129,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                     <p className="text-xs font-semibold text-green-600">
                       الكمية: {newQuantity} قطعة
                     </p>
-                    {showPrices && (
+                    {!hidePrices && (
                       <>
                         <span className="text-xs text-slate-500">•</span>
                         <p className="text-xs font-semibold text-slate-700">
@@ -332,7 +332,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                     {/* Price and Rating on same line */}
                     <div className="flex items-center justify-between gap-1">
                       <div className="flex items-baseline gap-0.5">
-                        {showPrices && (
+                        {!hidePrices && (
                           <>
                             <span className="text-sm font-black text-primary">{product.price ? product.price.toLocaleString() : 'N/A'}</span>
                             <span className="text-[9px] text-slate-600">ج.م</span>
@@ -385,15 +385,6 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                         >
                           <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3 ml-0.5" />
                           لمعرفة السعر
-                        </Button>
-                      ) : !canPurchase ? (
-                        <Button
-                          disabled
-                          size="sm"
-                          className="flex-1 h-8 rounded-lg text-[10px] font-semibold bg-slate-200 text-slate-500 cursor-not-allowed"
-                        >
-                          <Eye className="w-3 h-3 ml-0.5" />
-                          عرض فقط
                         </Button>
                       ) : (
                         <Button

@@ -10,7 +10,7 @@ import { buildProductPath } from '@/lib/product-link';
 import type { Product } from '@/types';
 
 const HeroSection = () => {
-  const { hidePrices, showPrices } = usePricingSettings();
+  const { hidePrices } = usePricingSettings();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -227,7 +227,7 @@ const HeroSection = () => {
                       <h3 className="font-semibold text-primary-foreground">
                         {currentSlideData.product.nameAr}
                       </h3>
-                      {showPrices && (
+                      {!hidePrices && (
                         <div className="flex items-center space-x-2 space-x-reverse">
                           <span className="font-bold text-primary-foreground">
                             {currentSlideData.product.price ? currentSlideData.product.price.toLocaleString() : 'N/A'} ج.م
@@ -273,7 +273,7 @@ const HeroSection = () => {
                   <h3 className="heading-3 mb-2">{currentSlideData.product.nameAr}</h3>
                   <p className="body-text mb-4 line-clamp-2">{currentSlideData.product.descriptionAr}</p>
                   <div className="flex items-center justify-between">
-                    {showPrices && (
+                    {!hidePrices && (
                       <div>
                         <span className="font-bold text-xl text-primary">
                           {currentSlideData.product.price ? currentSlideData.product.price.toLocaleString() : 'N/A'} ج.م

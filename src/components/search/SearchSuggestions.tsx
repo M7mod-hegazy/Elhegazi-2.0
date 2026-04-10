@@ -29,7 +29,7 @@ const SearchSuggestions = ({
   const [popularSearches, setPopularSearches] = useState<string[]>([]);
   const searchRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const { hidePrices, showPrices } = usePricingSettings();
+  const { hidePrices } = usePricingSettings();
 
   type ApiProduct = {
     _id: string;
@@ -192,7 +192,7 @@ const SearchSuggestions = ({
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-slate-900 truncate">{product.nameAr}</p>
                         <p className="text-sm text-slate-500 truncate">{product.categoryAr}</p>
-                        {showPrices && <p className="text-sm font-semibold text-primary">{product.price.toLocaleString()} ج.م</p>}
+                        {!hidePrices && <p className="text-sm font-semibold text-primary">{product.price.toLocaleString()} ج.م</p>}
                       </div>
                     </Link>
                   ))}

@@ -47,7 +47,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
   const { addItem, isInCart } = useCart();
   const { isAuthenticated, isAdmin } = useDualAuth();
   const { toast } = useToast();
-  const { hidePrices, canPurchase, showPrices, loading: pricingLoading } = usePricingSettings();
+  const { hidePrices, loading: pricingLoading } = usePricingSettings();
   const { favorites, toggleFavorite: toggleFavoriteHook } = useFavorites();
 
   const categoryPath = (() => {
@@ -332,7 +332,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
             {/* Price and Rating on same line */}
             <div className={`flex items-center gap-2 ${hidePrices ? 'justify-end' : 'justify-between'}`}>
               <div className="flex items-baseline gap-1">
-                {showPrices && (
+                {!hidePrices && (
                   <>
                     <span className="text-lg font-black text-primary">{product.price ? product.price.toLocaleString() : 'N/A'}</span>
                     <span className="text-xs text-slate-600">ج.م</span>
@@ -393,14 +393,6 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                 >
                   <img src={whatsappIcon} alt="WhatsApp" className={`${compactMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'}`} />
                   <span>لمعرفة السعر</span>
-                </Button>
-              ) : !canPurchase ? (
-                <Button
-                  disabled
-                  className={`flex-1 rounded-lg ${compactMobile ? 'h-8 text-[11px]' : 'h-10 text-xs'} font-semibold bg-slate-200 text-slate-500 cursor-not-allowed`}
-                >
-                  <Eye className={`${compactMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'}`} />
-                  <span>عرض فقط</span>
                 </Button>
               ) : (
                 <Button

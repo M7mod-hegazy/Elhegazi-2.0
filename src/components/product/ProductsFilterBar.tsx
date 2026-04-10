@@ -68,7 +68,7 @@ const ProductsFilterBar = ({
   resultsCount,
   onClearFilters
 }: ProductsFilterBarProps) => {
-  const { hidePrices, showPrices } = usePricingSettings();
+  const { hidePrices } = usePricingSettings();
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Check if any filters are active
@@ -83,7 +83,7 @@ const ProductsFilterBar = ({
   const FilterContent = () => (
     <div className="space-y-6">
       {/* Price Range Section */}
-      {showPrices && (
+      {!hidePrices && (
       <div className="space-y-4">
         <div className="flex items-center justify-between">
           <label className="text-sm font-bold text-slate-800">نطاق السعر</label>
@@ -213,7 +213,7 @@ const ProductsFilterBar = ({
                   <SelectContent>
                     <SelectItem value="newest">الأحدث</SelectItem>
                     <SelectItem value="name">الاسم</SelectItem>
-                    {showPrices && <SelectItem value="price">السعر</SelectItem>}
+                    {!hidePrices && <SelectItem value="price">السعر</SelectItem>}
                     <SelectItem value="rating">التقييم</SelectItem>
                   </SelectContent>
                 </Select>
@@ -293,7 +293,7 @@ const ProductsFilterBar = ({
                 <SelectContent>
                   <SelectItem value="newest">الأحدث</SelectItem>
                   <SelectItem value="name">الاسم</SelectItem>
-                  {showPrices && <SelectItem value="price">السعر</SelectItem>}
+                  {!hidePrices && <SelectItem value="price">السعر</SelectItem>}
                   <SelectItem value="rating">التقييم</SelectItem>
                 </SelectContent>
               </Select>
@@ -320,7 +320,7 @@ const ProductsFilterBar = ({
             <div className="hidden lg:block mt-6 p-6 bg-gradient-to-bl from-slate-50 to-white rounded-2xl border border-slate-200 shadow-inner animate-in slide-in-from-top-2 duration-300">
               <div className="grid grid-cols-3 gap-8">
                 {/* Price Range */}
-                {showPrices && (
+                {!hidePrices && (
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-slate-800">نطاق السعر</label>

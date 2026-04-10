@@ -567,7 +567,7 @@ const MobileProductDetail = ({
         </div>
 
         {/* Price and Discount - Only show when hidePrices is false */}
-        {showPrices && (
+        {!hidePrices && (
           <div className="flex items-center gap-3">
             <span className="text-2xl font-bold text-primary">
               {product.price.toLocaleString()} ج.م
@@ -603,7 +603,7 @@ const MobileProductDetail = ({
         </div>
 
         {/* Price and Quantity - Only show when hidePrices is false */}
-        {showPrices && (
+        {!hidePrices && (
           <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
             {/* Price Summary */}
             <div className="p-4 border-b border-slate-200">
@@ -661,13 +661,12 @@ const MobileProductDetail = ({
 
                 <Button
                   onClick={handleAddToCart}
-                  disabled={addingToCart || !canPurchase}
+                  disabled={addingToCart}
                   className={cn(
                     "flex-1 py-3 rounded-lg font-bold text-base",
-                    !canPurchase && "bg-slate-200 text-slate-500 cursor-not-allowed",
-                    canPurchase && (inCart
+                    inCart
                       ? "bg-green-500 hover:bg-green-600"
-                      : "bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary")
+                      : "bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary"
                   )}
                 >
                   {addingToCart ? (
@@ -675,11 +674,6 @@ const MobileProductDetail = ({
                       <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
                       جاري الإضافة...
                     </div>
-                  ) : !canPurchase ? (
-                    <>
-                      <Eye className="w-5 h-5 ml-2" />
-                      عرض فقط
-                    </>
                   ) : inCart ? (
                     <>
                       <CheckCircle className="w-5 h-5 ml-2" />
@@ -1128,7 +1122,7 @@ const DesktopProductDetail = ({
             )}
 
             {/* Price and Quantity - Only show when hidePrices is false */}
-            {showPrices && (
+            {!hidePrices && (
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
                 {/* Price Summary */}
                 <div className="p-4 border-b border-slate-200">
@@ -1433,7 +1427,7 @@ const ProductDetail = () => {
   const { isMobile } = useDeviceDetection();
   const { social } = useSettings();
   const { isAuthenticated } = useDualAuth();
-  const { hidePrices, canPurchase, showPrices, contactMessage } = usePricingSettings();
+  const { hidePrices, contactMessage } = usePricingSettings();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);

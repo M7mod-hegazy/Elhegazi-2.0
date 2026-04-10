@@ -104,7 +104,7 @@ const CategoryPage = () => {
   const { isAuthenticated } = useDualAuth();
   const { addItem, isInCart: checkIsInCart, getItemByProductId } = useCart();
   const { favorites, toggleFavorite } = useFavorites();
-  const { hidePrices, showPrices } = usePricingSettings();
+  const { hidePrices } = usePricingSettings();
   const { toast } = useToast();
 
   const handleToggleFavorite = (e: React.MouseEvent, productId: string) => {
@@ -786,7 +786,7 @@ const CategoryPage = () => {
                 <SelectContent>
                   <SelectItem value="newest">الأحدث</SelectItem>
                   <SelectItem value="name">الاسم</SelectItem>
-                  {showPrices && <SelectItem value="price">السعر</SelectItem>}
+                  {!hidePrices && <SelectItem value="price">السعر</SelectItem>}
                   <SelectItem value="rating">التقييم</SelectItem>
                 </SelectContent>
               </Select>
@@ -841,7 +841,7 @@ const CategoryPage = () => {
             <ScrollAnimation animation="slideUp" className="mt-6 p-6 bg-white rounded-2xl shadow-lg border border-slate-200">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Price Range */}
-                {showPrices && (
+                {!hidePrices && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">نطاق السعر</label>
                   <div className="space-y-2">
@@ -1072,7 +1072,7 @@ const CategoryPage = () => {
 
                         {/* Bottom: Price + Buttons */}
                         <div className="flex items-center justify-between gap-4">
-                          {showPrices && (
+                          {!hidePrices && (
                             <div className="flex items-baseline gap-2">
                               <span className="text-2xl font-black text-primary">{product.price.toLocaleString()}</span>
                               <span className="text-sm text-slate-600">ج.م</span>
@@ -1302,7 +1302,7 @@ const CategoryPage = () => {
                     )}
 
                     {/* Price Section - Only show if prices visible */}
-                    {showPrices && (
+                    {!hidePrices && (
                       <div className="space-y-2">
                         <div className="flex items-baseline gap-2 flex-wrap">
                           <span className="text-2xl md:text-3xl font-black text-primary drop-shadow-sm">{product.price.toLocaleString()}</span>
