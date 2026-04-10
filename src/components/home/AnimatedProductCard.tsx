@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Star, Heart, Eye, EyeOff, ShoppingCart, Phone, Mail } from 'lucide-react';
+import { Star, Heart, Eye, EyeOff, ShoppingCart } from 'lucide-react';
 import { AspectRatio } from '@radix-ui/react-aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Rating from '@/components/product/Rating';
+import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
 import whatsappIcon from '@/assets/whatsapp.png';
@@ -35,7 +36,7 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
   const { hidePrices } = usePricingSettings();
   const cardRef = useRef<HTMLDivElement>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
-  const [showContactModal, setShowContactModal] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [selectedRating, setSelectedRating] = useState(0);
 
@@ -184,8 +185,8 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
         <div className="flex gap-2 mt-3 opacity-0 group-hover:opacity-100 transition-all duration-300">
           {hidePrices ? (
             <button 
-              onClick={() => setShowContactModal(true)}
-              className="flex-1 p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all duration-300 flex items-center justify-center gap-2"
+              onClick={() => setShowWhatsAppModal(true)}
+              className="flex-1 p-2 bg-green-500 hover:bg-green-600 rounded-xl transition-all duration-300 flex items-center justify-center gap-2"
             >
               <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
               <span className="text-white text-xs font-medium">لمعرفة السعر</span>
@@ -245,49 +246,14 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
         </DialogContent>
       </Dialog>
 
-      {/* Contact Modal */}
-      <Dialog open={showContactModal} onOpenChange={setShowContactModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-bold text-center mb-4">
-              لمعرفة السعر
-            </DialogTitle>
-            <div className="text-center mb-4">
-              <img
-                src={optimizeImage(product.image, { w: 100 })}
-                alt={product.nameAr}
-                className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
-              />
-              <h4 className="font-semibold text-slate-900">{product.nameAr}</h4>
-            </div>
-          </DialogHeader>
-          <div className="space-y-3">
-            <a
-              href="https://wa.me/201000000000?text=السلام عليكم، أود الاستفسار عن المنتج"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 w-full p-3 bg-green-500 hover:bg-green-600 text-white rounded-lg transition-colors"
-            >
-              <img src={whatsappIcon} alt="WhatsApp" className="w-4 h-4" />
-              <span>تواصل عبر WhatsApp</span>
-            </a>
-            <a
-              href="tel:+201000000000"
-              className="flex items-center justify-center gap-2 w-full p-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
-            >
-              <Phone className="w-4 h-4" />
-              <span>اتصل بنا</span>
-            </a>
-            <a
-              href="mailto:info@example.com"
-              className="flex items-center justify-center gap-2 w-full p-3 bg-slate-500 hover:bg-slate-600 text-white rounded-lg transition-colors"
-            >
-              <Mail className="w-4 h-4" />
-              <span>أرسل بريد إلكتروني</span>
-            </a>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <WhatsAppContactModal
+        isOpen={showWhatsAppModal}
+        onClose={() => setShowWhatsAppModal(false)}
+        productName={product.nameAr || product.name || ''}
+        productId={product.id || ''}
+        productCode={(product as any).sku}
+        productImage={product.image}
+      />
     </div>
   );
 };

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Settings as SettingsIcon, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, apiPostJson, apiPutJson, uploadFile } from '@/lib/api';
 import { clearThemeCache } from '@/lib/themeInit';
@@ -533,10 +534,12 @@ const AdminSettings: React.FC = () => {
         </Card>
 
         <Tabs value={tab} onValueChange={(value) => setTab(value as typeof tab)}>
-          <TabsList className="grid grid-cols-3 w-full">
-            <TabsTrigger value="general">إعدادات عامة</TabsTrigger>
-            <TabsTrigger value="control">Control Center</TabsTrigger>
-            <TabsTrigger value="backup">Backup Center</TabsTrigger>
+          <TabsList className="grid grid-cols-[1fr_1fr_auto] w-full">
+            <TabsTrigger value="general" className="order-1">إعدادات عامة</TabsTrigger>
+            <TabsTrigger value="backup" className="order-2">Backup Center</TabsTrigger>
+            <TabsTrigger value="control" className="order-3 w-10 min-w-10 px-0 justify-center" aria-label="Control Center">
+              <SettingsIcon className="h-4 w-4" />
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="general" className="space-y-4">
@@ -619,12 +622,34 @@ const AdminSettings: React.FC = () => {
               </CardHeader>
               <CardContent className="space-y-4">
                 {!controlCenterAuthed ? (
-                  <div className="space-y-3">
-                    <Label>كلمة المرور</Label>
-                    <Input type="password" value={controlCenterPassword} onChange={(e) => setControlCenterPassword(e.target.value)} />
-                    <Button onClick={loginControlCenter} disabled={controlCenterBusy || !controlCenterPassword.trim()}>
-                      {controlCenterBusy ? 'جارٍ التحقق...' : 'فتح Control Center'}
-                    </Button>
+                  <div className="rounded-xl border border-dashed bg-slate-50 p-5">
+                    <div className="flex items-start gap-3 mb-4">
+                      <div className="inline-flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        <ShieldCheck className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-slate-900">توثيق Control Center</p>
+                        <p className="text-xs text-slate-600">أدخل كلمة المرور للوصول إلى الإعدادات الحساسة (الجلسة آمنة ومحدودة بالوقت).</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>كلمة المرور</Label>
+                      <Input
+                        type="password"
+                        autoComplete="current-password"
+                        placeholder="••••••••"
+                        value={controlCenterPassword}
+                        onChange={(e) => setControlCenterPassword(e.target.value)}
+                      />
+                    </div>
+                    <div className="mt-4 flex gap-2">
+                      <Button onClick={loginControlCenter} disabled={controlCenterBusy || !controlCenterPassword.trim()}>
+                        {controlCenterBusy ? 'جارٍ التحقق...' : 'فتح Control Center'}
+                      </Button>
+                      <Button variant="outline" onClick={() => setControlCenterPassword('')} disabled={controlCenterBusy}>
+                        مسح
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <div className="space-y-4">

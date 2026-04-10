@@ -4,6 +4,7 @@ import whatsappIcon from '@/assets/whatsapp.png';
 import { AspectRatio } from '@radix-ui/react-aspect-ratio';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import Rating from '@/components/product/Rating';
+import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
 
@@ -39,6 +40,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
 }) => {
   const { hidePrices } = usePricingSettings();
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [selectedRating, setSelectedRating] = useState(0);
 
@@ -75,8 +77,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   const handleContactWhatsApp = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    // This will be handled by parent component or modal
-    // For now, just prevent default
+    setShowWhatsAppModal(true);
   };
 
   const renderStars = (rating: number) => {
@@ -183,15 +184,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
               }`}>
                 {hidePrices ? (
                   // When prices hidden: Show animated contact button with slide transition
-                  <button onClick={handleContactWhatsApp} className="flex-1 p-1.5 bg-white/20 hover:bg-white/30 rounded-full transition-all duration-300 group/btn relative overflow-hidden flex items-center justify-center">
-                    <span className="absolute inset-0 flex items-center justify-center gap-1 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
-                      <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
-                      <span className="text-xs text-white font-medium">لمعرفة السعر</span>
-                    </span>
-                    <span className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
-                      <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
-                      <span className="text-xs text-white font-medium">اضغط هنا</span>
-                    </span>
+                  <button onClick={handleContactWhatsApp} className="flex-1 p-1.5 bg-green-500 hover:bg-green-600 rounded-full transition-all duration-300 flex items-center justify-center gap-1">
+                    <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
+                    <span className="text-xs text-white font-medium">لمعرفة السعر</span>
                   </button>
                 ) : (
                   <>
@@ -290,15 +285,9 @@ const ProductCard: React.FC<ProductCardProps> = ({
           }`}>
             {hidePrices ? (
               // When prices hidden: Show animated contact button with slide transition
-              <button onClick={handleContactWhatsApp} className="flex-1 p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all duration-300 group/btn relative overflow-hidden flex items-center justify-center">
-                <span className="absolute inset-0 flex items-center justify-center gap-2 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
-                  <img src={whatsappIcon} alt="WhatsApp" className="w-4 h-4" />
-                  <span className="text-white text-sm font-medium">لمعرفة السعر</span>
-                </span>
-                <span className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
-                  <img src={whatsappIcon} alt="WhatsApp" className="w-4 h-4" />
-                  <span className="text-white text-sm font-medium">اضغط هنا</span>
-                </span>
+              <button onClick={handleContactWhatsApp} className="flex-1 p-2 bg-green-500 hover:bg-green-600 rounded-xl transition-all duration-300 flex items-center justify-center gap-2">
+                <img src={whatsappIcon} alt="WhatsApp" className="w-4 h-4" />
+                <span className="text-white text-sm font-medium">لمعرفة السعر</span>
               </button>
             ) : (
               <button className="flex-1 p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all duration-300 flex items-center justify-center gap-2">
@@ -351,6 +340,15 @@ const ProductCard: React.FC<ProductCardProps> = ({
           />
         </DialogContent>
       </Dialog>
+
+      <WhatsAppContactModal
+        isOpen={showWhatsAppModal}
+        onClose={() => setShowWhatsAppModal(false)}
+        productName={product.nameAr || product.name || ''}
+        productId={product.id || ''}
+        productCode={(product as any).sku}
+        productImage={product.image}
+      />
     </div>
   );
 };

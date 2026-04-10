@@ -13,6 +13,7 @@ import { LoadingSpinner } from '@/components/ui/loading';
 import FavoriteButton from '@/components/ui/FavoriteButton';
 import AuthModal from '@/components/ui/auth-modal';
 import Rating from '@/components/product/Rating';
+import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal';
 import { useToast } from '@/hooks/use-toast';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
 import { buildCategoryPath } from '@/lib/category-link';
@@ -38,11 +39,12 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authAction, setAuthAction] = useState<'cart' | 'favorites'>('cart');
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
   const { addItem, isInCart } = useCart();
   const { isAuthenticated, isAdmin } = useDualAuth();
-  const { hidePrices, contactMessage } = usePricingSettings();
+  const { hidePrices } = usePricingSettings();
   const { toast } = useToast();
   const { favorites, toggleFavorite: toggleFavoriteHook } = useFavorites();
 
@@ -347,23 +349,12 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    const whatsappNumber = localStorage.getItem('WHATSAPP_URL') || '';
-                    const message = `${contactMessage}\n\nالمنتج: ${product.nameAr}`;
-                    const encodedMessage = encodeURIComponent(message);
-                    if (whatsappNumber) {
-                      window.open(`${whatsappNumber}?text=${encodedMessage}`, '_blank');
-                    }
+                    setShowWhatsAppModal(true);
                   }}
-                  className="flex-1 rounded-lg h-10 text-xs font-semibold transition-all duration-500 group/btn relative overflow-hidden bg-primary hover:bg-primary/90 text-white"
+                  className="flex-1 rounded-lg h-10 text-xs font-semibold bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-1.5"
                 >
-                  <span className="absolute inset-0 flex items-center justify-center gap-1 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
-                    <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
-                    <span>لمعرفة السعر</span>
-                  </span>
-                  <span className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
-                    <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
-                    <span>اضغط هنا</span>
-                  </span>
+                  <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
+                  <span>لمعرفة السعر</span>
                 </Button>
               ) : (
                 <Button
@@ -437,6 +428,15 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
         isOpen={showAuthModal}
         onClose={() => setShowAuthModal(false)}
         action={authAction}
+      />
+
+      <WhatsAppContactModal
+        isOpen={showWhatsAppModal}
+        onClose={() => setShowWhatsAppModal(false)}
+        productName={product.nameAr || product.name || ''}
+        productId={product.id || ''}
+        productCode={product.sku}
+        productImage={product.image}
       />
     </>
   );

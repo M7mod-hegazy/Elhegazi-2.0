@@ -34,9 +34,10 @@ interface ProductCardProps {
   showQuickView?: boolean;
   showFavorite?: boolean;
   className?: string;
+  compactMobile?: boolean;
 }
 
-const ProductCard = ({ product, showQuickView = true, showFavorite = true, className = "" }: ProductCardProps) => {
+const ProductCard = ({ product, showQuickView = true, showFavorite = true, className = "", compactMobile = false }: ProductCardProps) => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -46,7 +47,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
   const { addItem, isInCart } = useCart();
   const { isAuthenticated, isAdmin } = useDualAuth();
   const { toast } = useToast();
-  const { hidePrices, contactMessage, loading: pricingLoading } = usePricingSettings();
+  const { hidePrices, loading: pricingLoading } = usePricingSettings();
   const { favorites, toggleFavorite: toggleFavoriteHook } = useFavorites();
 
   const categoryPath = (() => {
@@ -127,20 +128,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
   const handleContactWhatsApp = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-
-    const whatsappNumber = localStorage.getItem('WHATSAPP_URL') || '';
-    const message = `${contactMessage}\n\nالمنتج: ${product.nameAr}`;
-    const encodedMessage = encodeURIComponent(message);
-
-    if (whatsappNumber) {
-      window.open(`${whatsappNumber}?text=${encodedMessage}`, '_blank');
-    } else {
-      toast({
-        title: 'خطأ',
-        description: 'رقم الواتس غير متوفر',
-        variant: 'destructive'
-      });
-    }
+    setShowWhatsAppModal(true);
   };
 
   const inCart = isInCart(product.id);
@@ -151,7 +139,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
   return (
     <>
       {/* Premium Card Design - Matching ProductsDesktop */}
-      <div className="relative group rounded-2xl overflow-hidden bg-white border-2 border-slate-200 hover:border-primary shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] cursor-pointer">
+      <div className={`relative group overflow-hidden bg-white border-2 border-slate-200 hover:border-primary shadow-md hover:shadow-2xl transition-all duration-500 hover:-translate-y-3 hover:scale-[1.02] cursor-pointer ${compactMobile ? 'rounded-xl' : 'rounded-2xl'} ${className}`}>
         <div className="relative h-full">
           {/* Interactive Overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/0 via-transparent to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 flex items-end p-4 pointer-events-none"></div>
@@ -166,7 +154,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
           </div>
 
           {/* Product Image Slider */}
-          <div className="relative aspect-[4/3] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100">
+          <div className={`relative overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 ${compactMobile ? 'aspect-[10/7]' : 'aspect-[4/3]'}`}>
             {!imageLoaded && (
               <div className="absolute inset-0 flex items-center justify-center z-10">
                 <LoadingSpinner />
@@ -318,20 +306,20 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
           </div>
 
           {/* Content */}
-          <div className="p-3 space-y-2 flex flex-col h-full">
+          <div className={`${compactMobile ? 'p-2 space-y-1.5' : 'p-3 space-y-2'} flex flex-col ${compactMobile ? '' : 'h-full'}`}>
             <Link to={productPath} className="block">
-              <h3 className="font-bold text-sm text-slate-900 line-clamp-2 group-hover:text-primary transition-colors min-h-[2.5rem]">
+              <h3 className={`font-bold text-slate-900 group-hover:text-primary transition-colors ${compactMobile ? 'text-[15px] line-clamp-1 min-h-[1.5rem]' : 'text-sm line-clamp-2 min-h-[2.5rem]'}`}>
                 {product.nameAr}
               </h3>
             </Link>
 
             {/* Modern Separation Line */}
-            <div className="relative h-0.5 bg-slate-100 rounded-full overflow-hidden">
+            <div className={`relative bg-slate-100 rounded-full overflow-hidden ${compactMobile ? 'h-px' : 'h-0.5'}`}>
               <div className="absolute inset-0 bg-gradient-to-r from-primary via-secondary to-primary transform -translate-x-full group-hover:translate-x-0 transition-transform duration-700 ease-out"></div>
             </div>
 
             {/* Price and Rating on same line */}
-            <div className="flex items-center justify-between gap-2">
+            <div className={`flex items-center gap-2 ${hidePrices ? 'justify-end' : 'justify-between'}`}>
               <div className="flex items-baseline gap-1">
                 {!hidePrices && (
                   <>
@@ -345,19 +333,17 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
               </div>
 
               <div
-                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                className={`flex items-center hover:opacity-80 transition-opacity ${compactMobile ? 'gap-1' : 'gap-2'}`}
                 onMouseLeave={() => setHoveredRating(0)}
               >
                 <div className="flex items-center gap-0.5">
                   {renderStars(product.rating || 0)}
-                  <span
-                    className="text-xs text-slate-500 cursor-pointer hover:text-primary transition-colors"
-                  >
+                  <span className={`text-slate-500 cursor-pointer hover:text-primary transition-colors ${compactMobile ? 'text-[11px]' : 'text-xs'}`}>
                     ({product.reviews || 0})
                   </span>
                 </div>
                 {product.sku && (
-                  <span className="text-xs font-semibold text-primary bg-primary/10 px-2.5 py-1 rounded-md border border-primary/30 hover:border-primary/60 transition-colors">
+                  <span className={`font-semibold text-primary bg-primary/10 rounded-md border border-primary/30 hover:border-primary/60 transition-colors ${compactMobile ? 'text-[10px] px-1.5 py-0.5' : 'text-xs px-2.5 py-1'}`}>
                     {product.sku}
                   </span>
                 )}
@@ -365,7 +351,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
             </div>
 
             {/* Bottom action buttons - Eye + Action button */}
-            <div className="flex gap-2 mt-auto pt-2">
+            <div className={`flex gap-2 ${compactMobile ? 'pt-1' : 'mt-auto pt-2'}`}>
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -374,9 +360,9 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                         e.stopPropagation();
                         window.location.href = productPath;
                       }}
-                      className="h-10 w-10 rounded-lg bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0 relative flex-shrink-0"
+                      className={`${compactMobile ? 'h-8 w-8' : 'h-10 w-10'} rounded-lg bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0 relative flex-shrink-0`}
                     >
-                      <Eye className="w-4 h-4 transition-all duration-300 group-hover/eye:scale-110" />
+                      <Eye className={`${compactMobile ? 'w-3.5 h-3.5' : 'w-4 h-4'} transition-all duration-300 group-hover/eye:scale-110`} />
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent side="top" sideOffset={5}>
@@ -392,16 +378,10 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                     e.stopPropagation();
                     handleContactWhatsApp(e);
                   }}
-                  className="flex-1 rounded-lg h-10 text-xs font-semibold transition-all duration-500 group/btn relative overflow-hidden bg-primary hover:bg-primary/90 text-white"
+                  className={`flex-1 rounded-lg ${compactMobile ? 'h-8 text-[11px]' : 'h-10 text-xs'} font-semibold bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-1.5`}
                 >
-                  <span className="absolute inset-0 flex items-center justify-center gap-1 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
-                    <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
-                    <span>لمعرفة السعر</span>
-                  </span>
-                  <span className="absolute inset-0 flex items-center justify-center gap-1 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
-                    <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
-                    <span>اضغط هنا</span>
-                  </span>
+                  <img src={whatsappIcon} alt="WhatsApp" className={`${compactMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'}`} />
+                  <span>لمعرفة السعر</span>
                 </Button>
               ) : (
                 <Button

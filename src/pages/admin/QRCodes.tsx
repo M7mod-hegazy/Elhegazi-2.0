@@ -49,7 +49,9 @@ import {
   X,
   Image,
   Search,
-  Package
+  Package,
+  Minus,
+  Plus
 } from 'lucide-react';
 
 // PDF Styles for react-pdf
@@ -117,7 +119,7 @@ const QRCodesPDFDocument = ({ products, settings }: { products: Product[]; setti
         <Text style={pdfStyles.header}>رموز QR للمنتجات</Text>
         <View style={pdfStyles.grid}>
           {products.map((product, index) => (
-            <View key={product.id} style={[
+            <View key={`${product.id}-${index}`} style={[
               pdfStyles.qrItem,
               { width: `${100 / settings.itemsPerRow}%` }
             ]}>
@@ -175,7 +177,7 @@ const AdminQRCodes = () => {
     pageFormat: 'A4',
     margin: 20
   });
-  const [selectedProducts, setSelectedProducts] = useState<Product[]>([]);
+  const [selectedProductQuantities, setSelectedProductQuantities] = useState<Record<string, number>>({});
   const [isGenerating, setIsGenerating] = useState(false);
   const [progress, setProgress] = useState(0);
   const [previewMode, setPreviewMode] = useState<'grid' | 'a4'>('grid');
@@ -244,11 +246,36 @@ const AdminQRCodes = () => {
     return () => { mounted = false; };
   }, []);
 
-  // Update selected products based on selection
+  // Keep quantity map in sync with current selection
   useEffect(() => {
-    const filtered = products.filter(p => selectedProductIds.includes(p.id));
-    setSelectedProducts(filtered);
-  }, [products, selectedProductIds]);
+    setSelectedProductQuantities((prev) => {
+      const next: Record<string, number> = {};
+      selectedProductIds.forEach((id) => {
+        next[id] = Math.max(1, Number(prev[id] || 1));
+      });
+      return next;
+    });
+  }, [selectedProductIds]);
+
+  // Build printable list (allows same product multiple times)
+  const selectedProducts = useMemo(() => {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const out: Product[] = [];
+    selectedProductIds.forEach((id) => {
+      const product = byId.get(id);
+      if (!product) return;
+      const qty = Math.max(1, Number(selectedProductQuantities[id] || 1));
+      for (let i = 0; i < qty; i += 1) out.push(product);
+    });
+    return out;
+  }, [products, selectedProductIds, selectedProductQuantities]);
+
+  const updateSelectedQuantity = (productId: string, nextQty: number) => {
+    setSelectedProductQuantities((prev) => ({
+      ...prev,
+      [productId]: Math.max(1, Math.min(999, Number(nextQty) || 1)),
+    }));
+  };
 
   // Reset to first page when layout settings change
   useEffect(() => {
@@ -457,34 +484,32 @@ const AdminQRCodes = () => {
   };
 
   // Calculate items per page for A4 layout - integrated with layout settings
+  const getPrintPagePaddingPx = () => 2 * 3.78; // 2mm to px
+
+  const getPrintQrSizePx = () => Math.min(settings.size / 2.5, 80);
+
+  const getPrintItemHeightPx = () => {
+    const qrPx = getPrintQrSizePx();
+    const codePt = Math.max(6, Math.round(7 * (settings.size / 200)));
+    const namePt = Math.max(5, Math.round(6 * (settings.size / 200)));
+    const pricePt = 8;
+    const codePx = settings.showProductCode ? (codePt * 1.333 + 4) : 0;
+    const namePx = settings.showProductName ? (namePt * 1.333 * 2 + 4) : 0;
+    const pricePx = settings.showPrice ? (pricePt * 1.333 + 4) : 0;
+    const textPx = codePx + namePx + pricePx;
+    const chromePx = settings.addBorder ? 8 : 6;
+    return qrPx + textPx + settings.margin + chromePx;
+  };
+
   const getItemsPerPage = () => {
-    // Use the user-defined itemsPerRow from layout settings
-    const itemsPerRow = settings.itemsPerRow;
-
-    // Calculate based on A4 page dimensions
-    const pageHeight = settings.pageFormat === 'A4' ? 297 : settings.pageFormat === 'A5' ? 210 : settings.pageFormat === 'A3' ? 420 : 279; // mm
-
-    // QR code size in pixels (use actual print size)
-    const actualQrSize = Math.min(settings.size / 2.5, 80); // Same as used in print
-
-    // Calculate text height in pixels (very compact sizes to match print)
-    const textHeight = (settings.showProductCode ? 8 : 0) +
-      (settings.showProductName ? 8 : 0) +
-      (settings.showPrice ? 8 : 0);
-
-    // Total item height including minimal margins (matching print layout)
-    const itemHeight = actualQrSize + textHeight + settings.margin;
-
-    // Account for new compact margins: 8mm page + 3mm padding + 3mm header = 14mm total
-    const usableHeight = (pageHeight * 3.78) - (14 * 3.78);
-
-    // Calculate how many rows fit on a page
-    const rowsPerPage = Math.max(1, Math.floor(usableHeight / itemHeight));
-
-    // Total items per page = user-defined items per row × calculated rows per page
-    const totalItemsPerPage = itemsPerRow * rowsPerPage;
-
-    return Math.max(1, totalItemsPerPage);
+    const itemsPerRow = Math.max(1, settings.itemsPerRow);
+    const pageHeightPx = parseInt(getPageHeightPx(), 10);
+    const pagePaddingPx = getPrintPagePaddingPx();
+    const gapPx = settings.margin;
+    const usableHeightPx = Math.max(100, pageHeightPx - pagePaddingPx * 2);
+    const itemHeightPx = getPrintItemHeightPx();
+    const rowsPerPage = Math.max(1, Math.floor((usableHeightPx + gapPx) / (itemHeightPx + gapPx)));
+    return Math.max(1, rowsPerPage * itemsPerRow);
   };
 
   const getPageWidthPx = () => {
@@ -515,11 +540,25 @@ const AdminQRCodes = () => {
   };
 
   // Get total pages
-  const getTotalPages = () => {
+  const getTotalPages = useCallback(() => {
     if (selectedProducts.length === 0) return 1;
     const itemsPerPage = getItemsPerPage();
     return Math.ceil(selectedProducts.length / itemsPerPage);
-  };
+  }, [selectedProducts.length, settings.itemsPerRow, settings.margin, settings.size, settings.pageFormat]);
+
+  // Stable pagination window
+  const getVisiblePages = useCallback(() => {
+    const total = getTotalPages();
+    const windowSize = 5;
+    if (total <= windowSize) return Array.from({ length: total }, (_, i) => i + 1);
+    let start = Math.max(1, currentPage - Math.floor(windowSize / 2));
+    let end = start + windowSize - 1;
+    if (end > total) {
+      end = total;
+      start = end - windowSize + 1;
+    }
+    return Array.from({ length: end - start + 1 }, (_, i) => start + i);
+  }, [currentPage, getTotalPages]);
 
   // Get optimal columns based on layout settings and container
   const getOptimalColumns = () => {
@@ -536,6 +575,13 @@ const AdminQRCodes = () => {
 
     return Math.max(1, Math.min(settings.itemsPerRow, Math.floor(usableWidth / itemWidth)));
   };
+
+  // Keep page index valid when selected items or layout changes
+  useEffect(() => {
+    const total = getTotalPages();
+    if (currentPage > total) setCurrentPage(total);
+    if (currentPage < 1) setCurrentPage(1);
+  }, [currentPage, getTotalPages]);
 
   // Handle QR generation
   const handleGenerateAll = async () => {
@@ -608,8 +654,11 @@ const AdminQRCodes = () => {
                 page-break-after: always;
                 display: flex;
                 flex-direction: column;
-                /* Remove extra inner padding to reclaim width */
-                padding: 0mm;
+                width: ${settings.pageFormat === 'A4' ? '210mm' : settings.pageFormat === 'A5' ? '148mm' : settings.pageFormat === 'A3' ? '297mm' : '216mm'};
+                height: ${settings.pageFormat === 'A4' ? '297mm' : settings.pageFormat === 'A5' ? '210mm' : settings.pageFormat === 'A3' ? '420mm' : '279mm'};
+                padding: 2mm;
+                box-sizing: border-box;
+                overflow: hidden;
               }
               .page:last-child {
                 break-after: auto;
@@ -647,8 +696,8 @@ const AdminQRCodes = () => {
                 box-sizing: border-box;
               }
               .qr-code {
-                width: 100%;
-                height: auto;
+                width: ${getPrintQrSizePx()}px;
+                height: ${getPrintQrSizePx()}px;
                 margin: 0 auto 2px;
                 display: block;
                 border: none;
@@ -1120,6 +1169,37 @@ const AdminQRCodes = () => {
               selectedProductIds={selectedProductIds}
               onSelectionChange={setSelectedProductIds}
             />
+            {selectedProductIds.length > 0 && (
+              <details className="rounded-lg border bg-white/95 shadow-sm">
+                <summary className="cursor-pointer list-none p-2 text-xs font-semibold flex items-center justify-between">
+                  <span>تكرار المنتجات (لاستهلاك مساحة أقل)</span>
+                  <span className="text-slate-500">{selectedProductIds.length} عنصر</span>
+                </summary>
+                <div className="max-h-40 overflow-auto p-2 space-y-1">
+                  {selectedProductIds.map((id) => {
+                    const product = products.find((p) => p.id === id);
+                    if (!product) return null;
+                    const qty = selectedProductQuantities[id] || 1;
+                    return (
+                      <div key={`mobile-qty-${id}`} className="flex items-center justify-between gap-2 rounded border px-2 py-1">
+                        <div className="min-w-0">
+                          <p className="text-[11px] font-semibold truncate">{product.nameAr}</p>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Button type="button" size="icon" variant="outline" className="h-6 w-6" onClick={() => updateSelectedQuantity(id, qty - 1)}>
+                            <Minus className="w-3 h-3" />
+                          </Button>
+                          <Input type="number" min={1} className="w-14 h-6 text-center text-xs px-1" value={qty} onChange={(e) => updateSelectedQuantity(id, Number(e.target.value))} />
+                          <Button type="button" size="icon" variant="outline" className="h-6 w-6" onClick={() => updateSelectedQuantity(id, qty + 1)}>
+                            <Plus className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </details>
+            )}
 
             {/* Mobile QR Settings Card */}
             <Card className="bg-white/95 backdrop-blur-xl border border-slate-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -1294,14 +1374,15 @@ const AdminQRCodes = () => {
                               alignContent: 'start',
                               justifyItems: 'stretch',
                               boxSizing: 'border-box',
-                              height: '100%'
+                              height: '100%',
+                              padding: `${getPrintPagePaddingPx()}px`
                             }}
                           >
                             {selectedProducts
                               .slice((currentPage - 1) * getItemsPerPage(), Math.min(currentPage * getItemsPerPage(), selectedProducts.length))
-                              .map((product) => (
+                              .map((product, idx) => (
                                 <div
-                                  key={product.id}
+                                  key={`${product.id}-m-${idx}`}
                                   className="text-center w-full flex flex-col items-center"
                                   style={{
                                     padding: `4px`,
@@ -1316,8 +1397,8 @@ const AdminQRCodes = () => {
                                   <div className="flex justify-center mb-1 w-full">
                                     <QRCodeImage
                                       product={product}
-                                      className="block w-full h-auto"
-                                      fitContainer
+                                      className="block"
+                                      size={getPrintQrSizePx()}
                                       imgStyle={{ imageRendering: 'crisp-edges', mixBlendMode: 'multiply' }}
                                     />
                                   </div>
@@ -1400,6 +1481,37 @@ const AdminQRCodes = () => {
                     selectedProductIds={selectedProductIds}
                     onSelectionChange={setSelectedProductIds}
                   />
+                  {selectedProductIds.length > 0 && (
+                    <details className="rounded-lg border bg-white/80 shadow-sm">
+                      <summary className="cursor-pointer list-none p-3 text-sm font-semibold flex items-center justify-between">
+                        <span>تكرار المنتجات</span>
+                        <span className="text-xs text-slate-500">{selectedProductIds.length} عنصر</span>
+                      </summary>
+                      <div className="max-h-44 overflow-auto p-3 space-y-2">
+                        {selectedProductIds.map((id) => {
+                          const product = products.find((p) => p.id === id);
+                          if (!product) return null;
+                          const qty = selectedProductQuantities[id] || 1;
+                          return (
+                            <div key={`desktop-qty-${id}`} className="flex items-center justify-between gap-3 rounded border px-2 py-1.5">
+                              <div className="min-w-0">
+                                <p className="text-xs font-semibold truncate">{product.nameAr}</p>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => updateSelectedQuantity(id, qty - 1)}>
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <Input type="number" min={1} className="w-16 h-7 text-center text-xs px-1" value={qty} onChange={(e) => updateSelectedQuantity(id, Number(e.target.value))} />
+                                <Button type="button" size="icon" variant="outline" className="h-7 w-7" onClick={() => updateSelectedQuantity(id, qty + 1)}>
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </details>
+                  )}
 
                   {/* Enhanced Layout Settings */}
                   <Card className="bg-white/80 backdrop-blur-xl border border-slate-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -1512,7 +1624,7 @@ const AdminQRCodes = () => {
                         <Slider
                           value={[settings.margin]}
                           onValueChange={(value) => setSettings({ ...settings, margin: value[0] })}
-                          min={10}
+                          min={0}
                           max={50}
                           step={5}
                           className="w-full"
@@ -1845,47 +1957,21 @@ const AdminQRCodes = () => {
                         </div>
                         <div className="flex gap-2">
                           {getTotalPages() > 1 && (
-                            <div className="flex items-center gap-2 bg-white/80 rounded-lg p-1 shadow-sm border border-slate-200">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                                disabled={currentPage === 1}
-                                className="disabled:opacity-50 hover:bg-slate-50 font-bold"
-                              >
-                                <ChevronLeft className="w-4 h-4 mr-1" />
-                                السابق
-                              </Button>
-                              <div className="flex items-center gap-1">
-                                {Array.from({ length: Math.min(getTotalPages(), 5) }, (_, i) => {
-                                  let pageNum = currentPage > 3 ? currentPage - 2 + i : i + 1;
-                                  if (pageNum > getTotalPages()) pageNum = getTotalPages() - (4 - i);
-                                  return Math.max(1, pageNum);
-                                }).filter((v, i, a) => a.indexOf(v) === i).map((page) => (
-                                  <Button
-                                    key={page}
-                                    variant={currentPage === page ? "default" : "ghost"}
-                                    size="sm"
-                                    onClick={() => setCurrentPage(page)}
-                                    className={`w-8 h-8 p-0 font-bold transition-all ${currentPage === page
-                                      ? 'bg-gradient-to-br from-primary to-blue-600 text-white shadow-md border-0'
-                                      : 'hover:bg-slate-100 text-slate-600'
-                                      }`}
-                                  >
-                                    {page}
-                                  </Button>
-                                ))}
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
-                                disabled={currentPage === getTotalPages()}
-                                className="disabled:opacity-50 hover:bg-slate-50 font-bold"
-                              >
-                                التالي
-                                <ChevronRight className="w-4 h-4 ml-1" />
-                              </Button>
+                            <div className="flex items-center gap-1 bg-white/80 rounded-lg p-1 shadow-sm border border-slate-200">
+                              {getVisiblePages().map((page) => (
+                                <Button
+                                  key={page}
+                                  variant={currentPage === page ? "default" : "ghost"}
+                                  size="sm"
+                                  onClick={() => setCurrentPage(page)}
+                                  className={`w-8 h-8 p-0 font-bold transition-all ${currentPage === page
+                                    ? 'bg-gradient-to-br from-primary to-blue-600 text-white shadow-md border-0'
+                                    : 'hover:bg-slate-100 text-slate-600'
+                                    }`}
+                                >
+                                  {page}
+                                </Button>
+                              ))}
                             </div>
                           )}
                           <Button
@@ -1898,6 +1984,15 @@ const AdminQRCodes = () => {
                             <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} />
                             تحديث
                           </Button>
+                          <Button
+                            onClick={handlePrintAll}
+                            disabled={selectedProducts.length === 0 || isGenerating}
+                            className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-bold"
+                            size="sm"
+                          >
+                            <Printer className="w-4 h-4 mr-2" />
+                            طباعة الصفحات
+                          </Button>
                         </div>
                       </CardTitle>
                       <CardDescription className="text-slate-600 font-medium mt-2">
@@ -1909,6 +2004,30 @@ const AdminQRCodes = () => {
                         {selectedProducts.length > 0 ? (
                           <>
                             <div className="relative w-full flex justify-center mb-6">
+                              {getTotalPages() > 1 && (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                                    disabled={currentPage === 1}
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/95 shadow"
+                                    aria-label="الصفحة السابقة"
+                                  >
+                                    <ChevronLeft className="w-5 h-5" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="icon"
+                                    onClick={() => setCurrentPage(Math.min(getTotalPages(), currentPage + 1))}
+                                    disabled={currentPage === getTotalPages()}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/95 shadow"
+                                    aria-label="الصفحة التالية"
+                                  >
+                                    <ChevronRight className="w-5 h-5" />
+                                  </Button>
+                                </>
+                              )}
                               <div
                                 style={{
                                   width: `${parseInt(getPageWidthPx()) * 0.55}px`,
@@ -1936,15 +2055,16 @@ const AdminQRCodes = () => {
                                       alignContent: 'start',
                                       justifyItems: 'stretch',
                                       boxSizing: 'border-box',
-                                      height: '100%'
+                                      height: '100%',
+                                      padding: `${getPrintPagePaddingPx()}px`
                                     }}
                                   >
                                     {/* Render actual page products only (no placeholders) */}
                                     {selectedProducts
                                       .slice((currentPage - 1) * getItemsPerPage(), Math.min(currentPage * getItemsPerPage(), selectedProducts.length))
-                                      .map((product) => (
+                                      .map((product, idx) => (
                                         <div
-                                          key={product.id}
+                                          key={`${product.id}-d-${idx}`}
                                           className="text-center w-full flex flex-col items-center"
                                           style={{
                                             padding: '4px',
@@ -1959,8 +2079,8 @@ const AdminQRCodes = () => {
                                           <div className="flex justify-center mb-1 w-full">
                                             <QRCodeImage
                                               product={product}
-                                              className="block w-full h-auto"
-                                              fitContainer
+                                              className="block"
+                                              size={getPrintQrSizePx()}
                                               imgStyle={{ imageRendering: 'crisp-edges', mixBlendMode: 'multiply' }}
                                             />
                                           </div>
@@ -2015,17 +2135,7 @@ const AdminQRCodes = () => {
                               </div>
                             </div>
 
-                            {/* A4 Preview Controls */}
-                            <div className="flex justify-center gap-3 w-full sticky bottom-0 z-10 p-2 pt-8">
-                              <Button
-                                onClick={handlePrintAll}
-                                disabled={selectedProducts.length === 0}
-                                className="bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white shadow-md font-bold transition-all duration-200 h-10 px-6 border-none"
-                              >
-                                <Printer className="w-4 h-4 mr-2" />
-                                طباعة جميع الصفحات
-                              </Button>
-                            </div>
+                            {/* Print action moved to header for clearer flow */}
                           </>
                         ) : (
                           <div className="text-center py-20 w-full flex flex-col items-center opacity-70">

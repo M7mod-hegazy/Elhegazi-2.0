@@ -737,7 +737,7 @@ const MobileProductDetail = ({
 
               return (
                 <div key={relatedProduct.id} className="w-full">
-                  <ProductCard product={productForCard} showQuickView={false} showFavorite={false} />
+                  <ProductCard product={productForCard} showQuickView={false} showFavorite={false} compactMobile />
                 </div>
               );
             })}

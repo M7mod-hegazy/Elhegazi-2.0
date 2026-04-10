@@ -582,16 +582,10 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                                     setContactProduct(product);
                                     setShowContactModal(true);
                                   }}
-                                  className="flex-1 rounded-xl h-10 text-sm font-semibold transition-all duration-500 group/btn relative overflow-hidden bg-primary hover:bg-primary/90 text-white"
+                                  className="flex-1 rounded-xl h-10 text-sm font-semibold bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-1.5"
                                 >
-                                  <span className="absolute inset-0 flex items-center justify-center gap-1.5 transition-all duration-500 ease-in-out group-hover/btn:opacity-0 group-hover/btn:translate-x-full">
-                                    <img src={whatsappIcon} alt="WhatsApp" className="w-4 h-4" />
-                                    <span>لمعرفة السعر</span>
-                                  </span>
-                                  <span className="absolute inset-0 flex items-center justify-center gap-1.5 opacity-0 -translate-x-full transition-all duration-500 ease-in-out group-hover/btn:opacity-100 group-hover/btn:translate-x-0">
-                                    <img src={whatsappIcon} alt="WhatsApp" className="w-4 h-4" />
-                                    <span>اضغط هنا</span>
-                                  </span>
+                                  <img src={whatsappIcon} alt="WhatsApp" className="w-4 h-4" />
+                                  <span>لمعرفة السعر</span>
                                 </Button>
                               ) : (
                                 <Button

@@ -384,7 +384,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                             setShowContactModal(true);
                           }}
                           size="sm"
-                          className="flex-1 h-8 rounded-lg text-[10px] font-semibold transition-all duration-300 bg-primary hover:bg-primary/90 text-white"
+                          className="flex-1 h-8 rounded-lg text-[10px] font-semibold bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-1"
                         >
                           <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3 ml-0.5" />
                           لمعرفة السعر

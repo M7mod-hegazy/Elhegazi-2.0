@@ -1,9 +1,8 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Bell,
   Menu,
-  User,
   LogOut,
   Settings,
   Activity,
@@ -470,11 +469,6 @@ const AdminHeader = ({ user, onToggleSidebar }: AdminHeaderProps) => {
             </DropdownMenuLabel>
 
             <DropdownMenuSeparator className="bg-border" />
-
-            <DropdownMenuItem className="p-3 cursor-pointer hover:bg-muted" onClick={() => navigate('/admin/profile')}>
-              <User className="mr-3 h-4 w-4 text-primary" />
-              <span className="font-bold text-sm">الملف الشخصي</span>
-            </DropdownMenuItem>
 
             <DropdownMenuItem className="p-3 cursor-pointer hover:bg-muted" onClick={() => navigate('/admin/settings')}>
               <Settings className="mr-3 h-4 w-4 text-primary" />
