@@ -30,6 +30,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Product, Category } from '@/types';
+import { applyProductImageFallback } from '@/lib/images';
 
 interface SmartProductSelectorProps {
   products: Product[];
@@ -311,7 +312,7 @@ const SmartProductSelector: React.FC<SmartProductSelectorProps> = ({
                     <span className="text-xs font-bold text-blue-600 w-4">{idx + 1}</span>
                     <div className="w-4 h-4 rounded-full bg-slate-100 overflow-hidden">
                       {product.image ? (
-                        <img src={product.image} alt="" className="w-full h-full object-cover" />
+                        <img src={product.image} alt="" className="w-full h-full object-cover" onError={applyProductImageFallback} />
                       ) : (
                         <Package className="w-3 h-3 text-slate-400" />
                       )}
@@ -409,6 +410,7 @@ const SmartProductSelector: React.FC<SmartProductSelectorProps> = ({
                           src={product.image}
                           alt={product.nameAr}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+                          onError={applyProductImageFallback}
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
@@ -488,7 +490,7 @@ const SmartProductSelector: React.FC<SmartProductSelectorProps> = ({
                     {/* Product Image */}
                     <div className="w-10 h-10 rounded-md overflow-hidden bg-slate-100 flex-shrink-0">
                       {product.image ? (
-                        <img src={product.image} alt="" className="w-full h-full object-cover" />
+                        <img src={product.image} alt="" className="w-full h-full object-cover" onError={applyProductImageFallback} />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
                           <Package className="w-4 h-4 text-slate-300" />

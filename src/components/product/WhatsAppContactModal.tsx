@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { apiGet } from '@/lib/api';
 import { buildProductPath } from '@/lib/product-link';
+import { applyProductImageFallback } from '@/lib/images';
 import whatsappIcon from '@/assets/whatsapp.png';
 import messengerIcon from '@/assets/messenger.png';
 
@@ -279,6 +280,7 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
                   src={productImage}
                   alt={productName}
                   className="w-20 h-20 object-cover rounded-lg"
+                  onError={applyProductImageFallback}
                 />
               )}
               <div className="flex-1">

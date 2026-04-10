@@ -57,7 +57,7 @@ import useDeviceDetection from '@/hooks/useDeviceDetection';
 import { cn } from '@/lib/utils';
 import { buildCategoryPath } from '@/lib/category-link';
 import { buildProductPath, isObjectId, resolveProductIdParam } from '@/lib/product-link';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, PRODUCT_IMAGE_FALLBACK, applyProductImageFallback } from '@/lib/images';
 import { useSettings } from '@/hooks/useSettings';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useDualAuth } from '@/hooks/useDualAuth';
@@ -138,6 +138,9 @@ const ImageGalleryModal = ({
   onNext: () => void;
   onPrev: () => void;
 }) => {
+  const safeImages = images.length > 0 ? images : [PRODUCT_IMAGE_FALLBACK];
+  const safeCurrentIndex = Math.min(Math.max(currentIndex, 0), safeImages.length - 1);
+
   return (
     <div className="fixed inset-0 bg-black/90 backdrop-blur-lg z-[100] flex items-center justify-center p-4">
       <button
@@ -163,18 +166,19 @@ const ImageGalleryModal = ({
 
       <div className="relative max-w-4xl max-h-[90vh] w-full">
         <img
-          src={images[currentIndex]}
-          alt={`Product image ${currentIndex + 1}`}
+          src={safeImages[safeCurrentIndex]}
+          alt={`Product image ${safeCurrentIndex + 1}`}
           className="w-full h-auto max-h-[90vh] object-contain"
+          onError={applyProductImageFallback}
         />
 
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-          {images.map((_, index) => (
+          {safeImages.map((_, index) => (
             <div
               key={index}
               className={cn(
                 "w-3 h-3 rounded-full transition-all",
-                index === currentIndex ? "bg-white w-6" : "bg-white/50"
+                index === safeCurrentIndex ? "bg-white w-6" : "bg-white/50"
               )}
             />
           ))}
@@ -236,13 +240,15 @@ const MobileProductDetail = ({
     name: product.category,
     id: product.category,
   });
+  const productImages = (product.images && product.images.length > 0 ? product.images : [product.image].filter(Boolean)) as string[];
+  const displayImages = productImages.length > 0 ? productImages : [PRODUCT_IMAGE_FALLBACK];
 
   const nextImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % product.images.length);
+    setCurrentImageIndex((prev) => (prev + 1) % displayImages.length);
   };
 
   const prevImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + product.images.length) % product.images.length);
+    setCurrentImageIndex((prev) => (prev - 1 + displayImages.length) % displayImages.length);
   };
 
   const handleImageClick = () => {
@@ -254,11 +260,11 @@ const MobileProductDetail = ({
   };
 
   const nextGalleryImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % product.images.length);
+    setCurrentImageIndex((prev) => (prev + 1) % displayImages.length);
   };
 
   const prevGalleryImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + product.images.length) % product.images.length);
+    setCurrentImageIndex((prev) => (prev - 1 + displayImages.length) % displayImages.length);
   };
 
   return (
@@ -312,7 +318,7 @@ const MobileProductDetail = ({
           className="flex transition-transform duration-300 ease-in-out h-full cursor-pointer"
           style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
         >
-          {(product.images || []).map((image, index) => (
+          {displayImages.map((image, index) => (
             <div key={index} className="w-full flex-shrink-0 h-full">
               <img
                 src={optimizeImage(image, { w: 800 })}
@@ -320,13 +326,14 @@ const MobileProductDetail = ({
                 className="w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"
+                onError={applyProductImageFallback}
               />
             </div>
           ))}
         </div>
 
         {/* Navigation Arrows */}
-        {(product.images?.length || 0) > 1 && (
+        {displayImages.length > 1 && (
           <>
             <Button
               variant="ghost"
@@ -349,7 +356,7 @@ const MobileProductDetail = ({
 
         {/* Image Indicators */}
         <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-          {(product.images || []).map((_, index) => (
+          {displayImages.map((_, index) => (
             <div
               key={index}
               className={cn(
@@ -800,9 +807,11 @@ const DesktopProductDetail = ({
     name: product.category,
     id: product.category,
   });
+  const productImages = (product.images && product.images.length > 0 ? product.images : [product.image].filter(Boolean)) as string[];
+  const displayImages = productImages.length > 0 ? productImages : [PRODUCT_IMAGE_FALLBACK];
 
   const handleImageClick = () => {
-    setCurrentImageIndex(selectedImage);
+    setCurrentImageIndex(Math.min(selectedImage, displayImages.length - 1));
     setShowGallery(true);
   };
 
@@ -811,11 +820,11 @@ const DesktopProductDetail = ({
   };
 
   const nextGalleryImage = () => {
-    setCurrentImageIndex((prev) => (prev + 1) % product.images.length);
+    setCurrentImageIndex((prev) => (prev + 1) % displayImages.length);
   };
 
   const prevGalleryImage = () => {
-    setCurrentImageIndex((prev) => (prev - 1 + product.images.length) % product.images.length);
+    setCurrentImageIndex((prev) => (prev - 1 + displayImages.length) % displayImages.length);
   };
 
   return (
@@ -823,7 +832,7 @@ const DesktopProductDetail = ({
       {/* Image Gallery Modal */}
       {showGallery && (
         <ImageGalleryModal
-          images={product.images || []}
+          images={displayImages}
           currentIndex={currentImageIndex}
           onClose={closeGallery}
           onNext={nextGalleryImage}
@@ -855,16 +864,17 @@ const DesktopProductDetail = ({
           <div className="space-y-3">
             <div className="aspect-square overflow-hidden rounded-xl bg-white shadow border border-slate-200 cursor-pointer" onClick={handleImageClick}>
               <img
-                src={optimizeImage((product.images || [])[selectedImage], { w: 800 })}
+                src={optimizeImage(displayImages[selectedImage] || displayImages[0], { w: 800 })}
                 alt={product.nameAr}
                 className="w-full h-full object-cover"
                 loading="lazy"
                 decoding="async"
+                onError={applyProductImageFallback}
               />
             </div>
 
             <div className="grid grid-cols-4 gap-2">
-              {(product.images || []).map((image, index) => (
+              {displayImages.map((image, index) => (
                 <button
                   key={index}
                   onClick={() => setSelectedImage(index)}
@@ -881,6 +891,7 @@ const DesktopProductDetail = ({
                     className="w-full h-full object-cover"
                     loading="lazy"
                     decoding="async"
+                    onError={applyProductImageFallback}
                   />
                 </button>
               ))}
@@ -1532,6 +1543,7 @@ const ProductDetail = () => {
                 src={optimizeImage(product.image || '', { w: 80 })}
                 alt={product.nameAr}
                 className="w-20 h-20 object-cover rounded-lg shadow-md flex-shrink-0"
+                onError={applyProductImageFallback}
               />
               <div className="flex-1 text-right min-w-0">
                 <p className="font-bold text-sm text-slate-900 line-clamp-2">{product.nameAr}</p>

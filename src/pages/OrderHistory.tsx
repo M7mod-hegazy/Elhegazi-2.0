@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { useToast } from '@/hooks/use-toast';
+import { applyProductImageFallback } from '@/lib/images';
 
 const OrderHistory = () => {
   const navigate = useNavigate();
@@ -528,10 +529,7 @@ const OrderHistory = () => {
                                 src={item.product.image || `/api/categories/${item.product.category}/image`} 
                                 alt={item.product.nameAr} 
                                 className="w-full h-full object-cover rounded-lg"
-                                onError={(e) => {
-                                  const target = e.target as HTMLImageElement;
-                                  target.src = 'https://via.placeholder.com/48x48?text=No+Image';
-                                }}
+                                onError={applyProductImageFallback}
                               />
                             ) : (
                               <Package className="w-5 h-5 text-slate-400" />

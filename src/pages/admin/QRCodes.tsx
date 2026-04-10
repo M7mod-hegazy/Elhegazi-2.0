@@ -20,6 +20,7 @@ import AdminLayout from '@/components/admin/AdminLayout';
 import SmartProductSelector from '@/components/admin/SmartProductSelector';
 import { apiGet } from '@/lib/api';
 import { buildProductPath } from '@/lib/product-link';
+import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 
 import { Product, Category } from '@/types';
 import { useToast } from '@/hooks/use-toast';
@@ -1794,9 +1795,10 @@ const AdminQRCodes = () => {
                             <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
                               <div className="flex-shrink-0">
                                 <img
-                                  src={logoPreview}
+                                  src={logoPreview || LOGO_IMAGE_FALLBACK}
                                   alt="Logo Preview"
                                   className="w-12 h-12 object-contain rounded border"
+                                  onError={applyLogoImageFallback}
                                 />
                               </div>
                               <div className="flex-1 min-w-0">

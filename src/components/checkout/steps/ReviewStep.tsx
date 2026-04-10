@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
+import { applyProductImageFallback } from '@/lib/images';
 
 interface CartItem {
   id: string;
@@ -179,6 +180,7 @@ const ReviewStep: React.FC<ReviewStepProps> = ({
                           src={item.product.image} 
                           alt={item.product.nameAr} 
                           className="w-full h-full object-cover rounded-lg"
+                          onError={applyProductImageFallback}
                         />
                       ) : (
                         <Package className="w-6 h-6 text-slate-400" />

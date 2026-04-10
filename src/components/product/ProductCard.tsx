@@ -13,7 +13,7 @@ import FavoriteButton from '@/components/ui/FavoriteButton';
 import AuthModal from '@/components/ui/auth-modal';
 import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal';
 import { useToast } from '@/hooks/use-toast';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyProductImageFallback } from '@/lib/images';
 import { buildCategoryPath } from '@/lib/category-link';
 import { buildProductPath } from '@/lib/product-link';
 import { Swiper, SwiperSlide } from 'swiper/react';
@@ -179,6 +179,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                     alt={product.nameAr}
                     className={`w-full h-full object-cover transition-all duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'} group-hover:scale-110`}
                     onLoad={() => setImageLoaded(true)}
+                    onError={applyProductImageFallback}
                     loading="lazy"
                     decoding="async"
                     srcSet={buildSrcSet(product.image, 320)}
@@ -195,6 +196,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                       src={optimizeImage(img, { w: 320 })}
                       alt={`${product.nameAr} - ${idx + 1}`}
                       className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
+                      onError={applyProductImageFallback}
                       loading="lazy"
                       decoding="async"
                     />

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useHomeConfig } from '@/hooks/useHomeConfig';
 import { Card, CardContent } from '@/components/ui/card';
+import { applyHeroImageFallback } from '@/lib/images';
 
 const About = () => {
   // Set page title
@@ -100,6 +101,7 @@ const About = () => {
                   src={image}
                   alt="رؤيتنا ورسالتنا"
                   className="relative w-full rounded-2xl shadow-2xl group-hover:shadow-2xl transition-all duration-300"
+                  onError={applyHeroImageFallback}
                 />
               </div>
             )}

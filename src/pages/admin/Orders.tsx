@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { applyProductImageFallback } from '@/lib/images';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -1408,7 +1409,7 @@ const AdminOrders = () => {
                                             <div className="flex items-center gap-2">
                                               <div className="w-10 h-10 bg-white rounded border border-slate-200 flex items-center justify-center">
                                                 {item.product?.image ? (
-                                                  <img src={item.product.image} alt="" className="w-full h-full object-cover rounded" />
+                                                  <img src={item.product.image} alt="" className="w-full h-full object-cover rounded" onError={applyProductImageFallback} />
                                                 ) : (
                                                   <Package className="w-4 h-4 text-slate-400" />
                                                 )}

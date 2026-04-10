@@ -35,6 +35,7 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading';
+import { applyProductImageFallback } from '@/lib/images';
 
 const AdminOrderTracking = () => {
   const { id } = useParams<{ id: string }>();
@@ -498,6 +499,7 @@ const AdminOrderTracking = () => {
                               src={item.product.image} 
                               alt={item.product.nameAr} 
                               className="w-full h-full object-cover rounded-lg"
+                              onError={applyProductImageFallback}
                             />
                           ) : (
                             <Package className="w-6 h-6 text-slate-400" />

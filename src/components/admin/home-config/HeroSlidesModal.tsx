@@ -13,6 +13,7 @@ import { SelectionModal } from '@/components/admin/home-config/SelectionModal';
 import { apiGet, apiPutJson } from '@/lib/api';
 import { buildCategoryPath } from '@/lib/category-link';
 import BackgroundPattern from '@/components/home/BackgroundPattern';
+import { applyProductImageFallback } from '@/lib/images';
 
 interface HeroSlidesModalProps {
   open: boolean;
@@ -1305,6 +1306,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                                           src={p.image}
                                           alt=""
                                           className="w-6 h-6 rounded object-cover"
+                                          onError={applyProductImageFallback}
                                         />
                                       </div>
                                     ) : null}

@@ -9,6 +9,7 @@ import { CheckCircle, Package, ShoppingCart, Home, User, Phone, MessageCircle, S
 import { LoadingSpinner } from '@/components/ui/loading';
 import { apiGet } from '@/lib/api';
 import { Order } from '@/types';
+import { applyProductImageFallback } from '@/lib/images';
 
 const OrderConfirmation = () => {
   const navigate = useNavigate();
@@ -106,10 +107,7 @@ const OrderConfirmation = () => {
                           src={item.product.image || `/api/categories/${item.product.category}/image`} 
                           alt={item.product.nameAr} 
                           className="w-full h-full object-cover rounded-lg"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = 'https://via.placeholder.com/64x64?text=No+Image';
-                          }}
+                          onError={applyProductImageFallback}
                         />
                       ) : (
                         <Package className="w-6 h-6 text-slate-400" />

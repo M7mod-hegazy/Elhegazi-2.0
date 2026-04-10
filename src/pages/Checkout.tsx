@@ -35,6 +35,7 @@ import CustomerInfoStep from '@/components/checkout/steps/CustomerInfoStep';
 import ShippingStep from '@/components/checkout/steps/ShippingStep';
 import PaymentStep from '@/components/checkout/steps/PaymentStep';
 import ReviewStep from '@/components/checkout/steps/ReviewStep';
+import { applyProductImageFallback } from '@/lib/images';
 
 const Checkout = () => {
   const [loading, setLoading] = useState(false);
@@ -414,10 +415,7 @@ const Checkout = () => {
                               src={item.product.image || `/api/categories/${item.product.category}/image`} 
                               alt={item.product.nameAr} 
                               className="w-full h-full object-cover rounded-lg"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = 'https://via.placeholder.com/48x48?text=No+Image';
-                              }}
+                              onError={applyProductImageFallback}
                             />
                           ) : (
                             <span className="text-xs text-slate-500">صورة</span>

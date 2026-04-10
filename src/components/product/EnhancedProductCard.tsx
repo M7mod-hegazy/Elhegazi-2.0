@@ -15,7 +15,7 @@ import AuthModal from '@/components/ui/auth-modal';
 import Rating from '@/components/product/Rating';
 import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal';
 import { useToast } from '@/hooks/use-toast';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyProductImageFallback } from '@/lib/images';
 import { buildCategoryPath } from '@/lib/category-link';
 import { buildProductPath } from '@/lib/product-link';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -182,6 +182,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                 className={`w-full h-full object-cover transition-all duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'
                   } ${isHovered ? 'scale-110 brightness-110' : 'scale-100'}`}
                 onLoad={() => setImageLoaded(true)}
+                onError={applyProductImageFallback}
                 loading="lazy"
                 decoding="async"
                 ref={(el) => { if (el) el.setAttribute('fetchpriority', 'low'); }}
@@ -411,6 +412,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                 src={optimizeImage(product.image, { w: 100 })}
                 alt={product.nameAr}
                 className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
+                onError={applyProductImageFallback}
               />
               <h4 className="font-semibold text-slate-900">{product.nameAr}</h4>
             </div>

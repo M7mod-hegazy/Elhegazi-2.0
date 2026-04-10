@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { LoadingButton } from '@/components/ui/loading';
 import { useToast } from '@/hooks/use-toast';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 
 const LoginNew = () => {
   // Set page title
@@ -113,9 +114,10 @@ const LoginNew = () => {
               <div className="relative bg-gradient-to-br from-primary via-secondary to-primary rounded-2xl p-4 shadow-xl">
                 {!logoLoading && (
                   <img 
-                    src={logo.url} 
-                    alt={logo.altText}
+                    src={logo?.url || LOGO_IMAGE_FALLBACK} 
+                    alt={logo?.altText || 'Store Logo'}
                     className="h-16 w-16 object-contain"
+                    onError={applyLogoImageFallback}
                   />
                 )}
                 {logoLoading && (

@@ -32,6 +32,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { ContactButtons } from '@/components/ui/ContactButtons';
+import { applyProductImageFallback } from '@/lib/images';
 
 interface OrderData {
   name: string;
@@ -698,10 +699,7 @@ const ModernCheckout: React.FC = () => {
                           src={item.product.image || `/api/categories/${item.product.category}/image`} 
                           alt={item.product.nameAr}
                           className="w-16 h-16 object-cover rounded-lg"
-                          onError={(e) => {
-                            const target = e.target as HTMLImageElement;
-                            target.src = 'https://via.placeholder.com/64x64?text=No+Image';
-                          }}
+                          onError={applyProductImageFallback}
                         />
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-sm truncate">{item.product.nameAr}</p>

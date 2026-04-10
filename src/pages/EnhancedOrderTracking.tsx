@@ -5,6 +5,7 @@ import { useDualAuth } from '@/hooks/useDualAuth';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, apiPostJson, apiPatchJson } from '@/lib/api';
+import { applyProductImageFallback } from '@/lib/images';
 import { Order } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -596,10 +597,7 @@ const EnhancedOrderTracking: React.FC = () => {
                               src={item.product.image || `/api/categories/${item.product.category}/image`} 
                               alt={item.product.nameAr} 
                               className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = 'https://via.placeholder.com/64x64?text=No+Image';
-                              }}
+                              onError={applyProductImageFallback}
                             />
                           ) : (
                             <Package className="w-6 h-6 text-slate-400" />

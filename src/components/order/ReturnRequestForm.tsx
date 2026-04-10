@@ -10,6 +10,7 @@ import { Order, CartItem } from '@/types';
 import { useToast } from '@/hooks/use-toast';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { apiPatchJson } from '@/lib/api';
+import { applyProductImageFallback } from '@/lib/images';
 import { 
   Package, 
   AlertCircle, 
@@ -181,6 +182,7 @@ const ReturnRequestForm: React.FC<ReturnRequestFormProps> = ({ order, onReturnRe
                       src={item.product.image} 
                       alt={item.product.nameAr} 
                       className="w-full h-full object-cover rounded-lg"
+                      onError={applyProductImageFallback}
                     />
                   ) : (
                     <Package className="w-6 h-6 text-gray-400" />
@@ -340,6 +342,7 @@ const ReturnRequestForm: React.FC<ReturnRequestFormProps> = ({ order, onReturnRe
                             src={item.product.image} 
                             alt={item.product.nameAr} 
                             className="w-full h-full object-cover rounded-lg"
+                            onError={applyProductImageFallback}
                           />
                         ) : (
                           <Package className="w-5 h-5 text-gray-400" />

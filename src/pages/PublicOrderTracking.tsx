@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { applyProductImageFallback } from '@/lib/images';
 
 interface PublicOrder {
   orderNumber: string;
@@ -279,10 +280,7 @@ const PublicOrderTracking: React.FC = () => {
                             src={item.product.image || `/api/categories/${item.product.category}/image`} 
                             alt={item.product.nameAr} 
                             className="w-full h-full object-cover"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = 'https://via.placeholder.com/64x64?text=No+Image';
-                            }}
+                            onError={applyProductImageFallback}
                           />
                         ) : (
                           <Package className="w-6 h-6 text-slate-400" />

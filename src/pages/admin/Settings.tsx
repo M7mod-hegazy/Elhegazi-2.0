@@ -13,6 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { apiGet, apiPostJson, apiPutJson, uploadFile } from '@/lib/api';
 import { clearThemeCache } from '@/lib/themeInit';
 import { defaultOwnerVisibility } from '@/hooks/useOwnerVisibility';
+import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 
 type OwnerVisibility = {
   publicPages: Record<string, boolean>;
@@ -711,7 +712,7 @@ const AdminSettings: React.FC = () => {
                           </div>
                         )}
                         <div className="rounded-lg border p-3 flex items-center gap-3">
-                          <img src={logoPreview || '/iconPng.png'} alt="Logo preview" className="w-20 h-20 rounded-md border object-contain" />
+                          <img src={logoPreview || LOGO_IMAGE_FALLBACK} alt="Logo preview" className="w-20 h-20 rounded-md border object-contain" onError={applyLogoImageFallback} />
                           <p className="text-sm text-slate-600">معاينة قبل الحفظ - لن يتم تغيير الشعار إلا بعد الضغط على حفظ.</p>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

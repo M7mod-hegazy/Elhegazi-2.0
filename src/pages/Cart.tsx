@@ -13,6 +13,7 @@ import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { ContactButtons } from '@/components/ui/ContactButtons';
 import AuthModal from '@/components/ui/auth-modal';
 import { buildProductPath } from '@/lib/product-link';
+import { applyProductImageFallback } from '@/lib/images';
 
 const Cart = () => {
   // Set page title
@@ -155,11 +156,7 @@ const Cart = () => {
                               src={item.product.image || `/api/categories/${item.product.category}/image`}
                               alt={item.product.nameAr}
                               className="w-full h-full object-cover"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.onerror = null;
-                                target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="96" height="96"%3E%3Crect fill="%23f1f5f9" width="96" height="96"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-size="12" fill="%2394a3b8"%3Eلا توجد %3C/text%3E%3C/svg%3E';
-                              }}
+                              onError={applyProductImageFallback}
                             />
                           </div>
 

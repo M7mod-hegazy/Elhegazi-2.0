@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { apiGet } from '@/lib/api';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyHeroImageFallback, applyProductImageFallback } from '@/lib/images';
 import { buildProductPath } from '@/lib/product-link';
 import type { Product } from '@/types';
 
@@ -153,6 +153,7 @@ const HeroSection = () => {
           decoding="async"
           srcSet={buildSrcSet(currentSlideData?.image || '', 1200)}
           sizes="100vw"
+          onError={applyHeroImageFallback}
         />
         <div className="absolute inset-0 bg-gradient-to-br from-blue-900/90 via-purple-900/80 to-blue-800/90" />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
@@ -220,6 +221,7 @@ const HeroSection = () => {
                       decoding="async"
                       srcSet={buildSrcSet(currentSlideData.product.image, 128)}
                       sizes="128px"
+                      onError={applyProductImageFallback}
                     />
                     <div className="flex-1 text-right">
                       <h3 className="font-semibold text-primary-foreground">
@@ -265,6 +267,7 @@ const HeroSection = () => {
                       decoding="async"
                       srcSet={buildSrcSet(currentSlideData.product.image, 600)}
                       sizes="(max-width: 1024px) 80vw, 600px"
+                      onError={applyProductImageFallback}
                     />
                   </div>
                   <h3 className="heading-3 mb-2">{currentSlideData.product.nameAr}</h3>

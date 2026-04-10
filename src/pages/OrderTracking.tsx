@@ -32,6 +32,7 @@ import {
 import { LoadingSpinner } from '@/components/ui/loading';
 import { useToast } from '@/hooks/use-toast';
 import OrderRating from '@/components/order/OrderRating';
+import { applyProductImageFallback } from '@/lib/images';
 
 const OrderTracking = () => {
   const { id } = useParams<{ id: string }>();
@@ -652,10 +653,7 @@ const OrderTracking = () => {
                             src={item.product.image || `/api/categories/${item.product.category}/image`} 
                             alt={item.product.nameAr} 
                             className="w-full h-full object-cover rounded-lg"
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = 'https://via.placeholder.com/64x64?text=No+Image';
-                            }}
+                            onError={applyProductImageFallback}
                           />
                         ) : (
                           <Package className="w-6 h-6 text-slate-400" />

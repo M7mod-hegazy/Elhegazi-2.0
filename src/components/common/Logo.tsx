@@ -1,4 +1,5 @@
 import { useLogo } from '@/hooks/useLogo';
+import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 
 interface LogoProps {
   className?: string;
@@ -17,9 +18,10 @@ export const Logo = ({ className = '', size = 'md' }: LogoProps) => {
   return (
     <div className={`bg-white rounded-xl flex items-center justify-center shadow-lg border border-slate-200/50 p-2 ${className}`}>
       <img 
-        src={logo?.url || '/iconPng.png'} 
+        src={logo?.url || LOGO_IMAGE_FALLBACK} 
         alt="Logo" 
         className={`${sizeClasses[size]} object-contain`}
+        onError={applyLogoImageFallback}
       />
     </div>
   );

@@ -6,6 +6,7 @@ import HeroSection from '@/components/ui/HeroSection';
 import HeroStats from '@/components/ui/HeroStats';
 import HeroCTA from '@/components/ui/HeroCTA';
 import { useSettings } from '@/hooks/useSettings';
+import { applyHeroImageFallback } from '@/lib/images';
 
 const Locations = () => {
   const [selectedLocation, setSelectedLocation] = useState(0);
@@ -302,6 +303,7 @@ const Locations = () => {
                     src={locations[selectedLocation].image}
                     alt={locations[selectedLocation].name}
                     className="w-full aspect-video object-cover rounded-button"
+                    onError={applyHeroImageFallback}
                   />
                 </div>
 

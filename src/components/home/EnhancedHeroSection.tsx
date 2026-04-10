@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { apiGet } from '@/lib/api';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyHeroImageFallback, applyProductImageFallback } from '@/lib/images';
 import { buildProductPath } from '@/lib/product-link';
 import type { Product } from '@/types';
 import type { Slide } from '@/types/home-config';
@@ -202,6 +202,7 @@ const EnhancedHeroSection = ({ slides, enabled = true }: EnhancedHeroSectionProp
               decoding="async"
               srcSet={buildSrcSet(slide.image || '', 1200)}
               sizes="100vw"
+              onError={applyHeroImageFallback}
             />
             <div className={`absolute inset-0 bg-gradient-to-br ${slide.bgGradient}`} />
           </div>
@@ -354,6 +355,7 @@ const EnhancedHeroSection = ({ slides, enabled = true }: EnhancedHeroSectionProp
                     decoding="async"
                     srcSet={buildSrcSet(currentSlideData.product.image, 600)}
                     sizes="(max-width: 1024px) 80vw, 600px"
+                    onError={applyProductImageFallback}
                   />
                   <h3 className="text-2xl font-bold text-white mb-3">
                     {currentSlideData.product.nameAr}

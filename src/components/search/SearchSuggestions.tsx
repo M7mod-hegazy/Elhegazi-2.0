@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Search, X, Clock, TrendingUp } from 'lucide-react';
 import { apiGet, type ApiResponse } from '@/lib/api';
@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Product } from '@/types';
 import { cn } from '@/lib/utils';
 import { buildProductPath } from '@/lib/product-link';
+import { applyProductImageFallback } from '@/lib/images';
 
 interface SearchSuggestionsProps {
   placeholder?: string;
@@ -186,6 +187,7 @@ const SearchSuggestions = ({
                         src={product.image}
                         alt={product.nameAr}
                         className="w-12 h-12 object-cover rounded-lg border border-slate-200"
+                        onError={applyProductImageFallback}
                       />
                       <div className="flex-1 min-w-0">
                         <p className="font-medium text-slate-900 truncate">{product.nameAr}</p>

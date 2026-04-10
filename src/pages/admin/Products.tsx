@@ -1,8 +1,8 @@
-﻿import { useState, useEffect, Fragment, useCallback, memo, useRef, useMemo } from 'react';
+import { useState, useEffect, Fragment, useCallback, memo, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyProductImageFallback } from '@/lib/images';
 import { buildProductPath } from '@/lib/product-link';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -2914,6 +2914,7 @@ const AdminProducts = () => {
                           src={optimizeImage(product.image, { w: 256 })}
                           alt={product.nameAr}
                           className="w-full h-full object-cover"
+                          onError={applyProductImageFallback}
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center">
@@ -3289,6 +3290,7 @@ const AdminProducts = () => {
                                       decoding="async"
                                       srcSet={buildSrcSet(getProductPrimaryImage(product) || '', 64)}
                                       sizes="64px"
+                                      onError={applyProductImageFallback}
                                       onClick={() => {
                                         const src = getProductPrimaryImage(product);
                                         if (src) setImagePreview(src);
@@ -3557,6 +3559,7 @@ const AdminProducts = () => {
                                                 decoding="async"
                                                 srcSet={buildSrcSet(image || '', 120)}
                                                 sizes="120px"
+                                                onError={applyProductImageFallback}
                                               />
                                             ))}
                                           </div>
@@ -3811,6 +3814,7 @@ const AdminProducts = () => {
                         decoding="async"
                         srcSet={buildSrcSet(deleteConfirmModal.product.image || '', 64)}
                         sizes="64px"
+                        onError={applyProductImageFallback}
                       />
                     )}
                     <div className="flex-1">
@@ -4034,6 +4038,7 @@ const AdminProducts = () => {
                                   className="w-10 h-10 rounded-md border border-slate-200 object-cover bg-slate-100 shrink-0"
                                   loading="lazy"
                                   decoding="async"
+                                  onError={applyProductImageFallback}
                                 />
                               ) : (
                                 <div className="w-10 h-10 rounded-md border border-slate-200 bg-slate-100 shrink-0" />
@@ -4946,7 +4951,7 @@ const AdminProducts = () => {
             </VisuallyHidden>
           </DialogHeader>
           <div className="w-full h-full flex items-center justify-center">
-            <img src={imagePreview ?? ''} alt="معاينة الصورة" className="max-h-[85vh] w-auto object-contain rounded-md" />
+            <img src={imagePreview ?? ''} alt="معاينة الصورة" className="max-h-[85vh] w-auto object-contain rounded-md" onError={applyProductImageFallback} />
           </div>
         </DialogContent>
       </Dialog>

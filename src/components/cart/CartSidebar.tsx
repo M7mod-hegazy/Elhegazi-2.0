@@ -7,6 +7,7 @@ import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import AuthModal from '@/components/ui/auth-modal';
+import { applyProductImageFallback } from '@/lib/images';
 import {
   Sheet,
   SheetContent,
@@ -100,6 +101,7 @@ const CartSidebar = () => {
                     src={item.product.image}
                     alt={item.product.nameAr}
                     className="w-16 h-16 object-cover rounded-button"
+                    onError={applyProductImageFallback}
                   />
                 </div>
 

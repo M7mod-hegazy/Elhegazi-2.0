@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import Rating from '@/components/product/Rating';
 import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyProductImageFallback } from '@/lib/images';
 import whatsappIcon from '@/assets/whatsapp.png';
 
 interface Product {
@@ -108,6 +108,7 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
                 src={optimizeImage(product.image, { w: 280 })}
                 alt={`${product.nameAr} - ${product.name}`}
                 className="w-full h-full object-cover pointer-events-none"
+                onError={applyProductImageFallback}
                 loading="lazy"
                 decoding="async"
                 ref={(el) => {
@@ -234,6 +235,7 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
                 src={optimizeImage(product.image, { w: 100 })}
                 alt={product.nameAr}
                 className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
+                onError={applyProductImageFallback}
               />
               <h4 className="font-semibold text-slate-900">{product.nameAr}</h4>
             </div>

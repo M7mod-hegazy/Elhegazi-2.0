@@ -10,7 +10,7 @@ import ImageUpload from '@/components/ui/image-upload';
 import { useToast } from '@/hooks/use-toast';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import useDeviceDetection from '@/hooks/useDeviceDetection';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyCategoryImageFallback, applyProductImageFallback } from '@/lib/images';
 import { apiGet, apiPostJson, apiPutJson, apiDelete } from '@/lib/api';
 import { logHistory } from '@/lib/history';
 import { useAutosave } from '@/hooks/useAutosave';
@@ -749,6 +749,7 @@ const Categories = () => {
                           alt={category.nameAr}
                           className="w-12 h-12 object-cover rounded-xl border-2 border-white shadow-lg"
                           loading="lazy"
+                          onError={applyCategoryImageFallback}
                         />
                       ) : (
                         <div className="w-12 h-12 bg-gradient-to-br from-slate-200 to-slate-300 rounded-xl flex items-center justify-center">
@@ -874,6 +875,7 @@ const Categories = () => {
                                   decoding="async"
                                   srcSet={buildSrcSet(category.image || '', 64)}
                                   sizes="64px"
+                                  onError={applyCategoryImageFallback}
                                 />
                               ) : (
                                 <div className="w-8 h-8 md:w-12 md:h-12 bg-slate-100 rounded-lg md:rounded-xl border-2 border-slate-200 flex items-center justify-center shadow-md">
@@ -953,6 +955,7 @@ const Categories = () => {
                         decoding="async"
                         srcSet={buildSrcSet(category.image || '', 640)}
                         sizes="(max-width: 1024px) 90vw, 640px"
+                        onError={applyCategoryImageFallback}
                       />
                     ) : (
                       <div className="w-full h-48 bg-gradient-to-br from-slate-100 to-slate-200 flex items-center justify-center">
@@ -1272,7 +1275,7 @@ const CategoryForm = memo(function CategoryForm({
                   >
                     <input type="checkbox" checked={selected} onChange={() => { }} className="w-4 h-4 text-primary rounded" />
                     {product.image && (
-                      <img src={product.image} alt="" className="w-8 h-8 object-cover rounded border border-slate-200" />
+                      <img src={product.image} alt="" className="w-8 h-8 object-cover rounded border border-slate-200" onError={applyProductImageFallback} />
                     )}
                     <span className="text-sm text-slate-800 truncate">{product.nameAr || product.name}</span>
                     {selected && <span className="ml-auto text-xs text-primary font-medium">مختار</span>}

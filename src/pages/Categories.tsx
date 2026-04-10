@@ -8,7 +8,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import ScrollAnimation from '@/components/ui/scroll-animation';
 import { apiGet } from '@/lib/api';
 import { buildCategoryPath } from '@/lib/category-link';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyCategoryImageFallback, applyProductImageFallback } from '@/lib/images';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import type { Category } from '@/types';
 
@@ -313,6 +313,7 @@ const Categories = () => {
                             src={optimizeImage(category.image || '', { w: 64 })}
                             alt={category.nameAr}
                             className="w-12 h-12 object-cover rounded-lg flex-shrink-0"
+                            onError={applyCategoryImageFallback}
                           />
                           <div className="flex-1 text-right">
                             <div className="font-medium text-slate-900">{category.nameAr}</div>
@@ -421,6 +422,7 @@ const Categories = () => {
                                 src={optimizeImage(category.image, { w: 600 })}
                                 alt={category.nameAr}
                                 className="w-full h-full object-cover"
+                                onError={applyCategoryImageFallback}
                               />
                               <div className="absolute inset-0 bg-gradient-to-br from-white/70 via-white/40 to-white/70" />
                             </div>
@@ -660,6 +662,7 @@ const Categories = () => {
                                                 alt={product.nameAr || product.name}
                                                 className="max-w-full max-h-full object-contain group-hover:brightness-110 group-hover:contrast-110 transition-all duration-300"
                                                 loading="lazy"
+                                                onError={applyProductImageFallback}
                                               />
                                             </div>
                                           </div>
@@ -796,6 +799,7 @@ const Categories = () => {
                                         alt={product.nameAr || product.name}
                                         className="w-full h-full object-cover"
                                         loading="lazy"
+                                        onError={applyProductImageFallback}
                                       />
                                     </div>
                                   ))}

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Search, X } from 'lucide-react';
+import { applyGenericImageFallback } from '@/lib/images';
 
 interface SelectionModalProps {
   open: boolean;
@@ -90,7 +91,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
                 className={`flex items-center gap-2 px-2 py-1 rounded border text-xs ${props.selected.includes(s.id) ? 'bg-emerald-50 border-emerald-200' : 'bg-white'}`} 
                 onClick={() => props.onToggle(s.id)}
               >
-                {s.image ? <img src={s.image} alt="" className="w-5 h-5 rounded object-cover" /> : null}
+                {s.image ? <img src={s.image} alt="" className="w-5 h-5 rounded object-cover" onError={applyGenericImageFallback} /> : null}
                 <span className="truncate max-w-[140px]">{s.label}</span>
               </button>
             ))}
@@ -135,7 +136,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
                   onMouseEnter={() => setFocusedIndex(idx)}
                 >
                   <div className="flex items-center gap-2 min-w-0">
-                    {item.image ? <img src={item.image} alt="" className="w-8 h-8 rounded object-cover flex-none" /> : null}
+                    {item.image ? <img src={item.image} alt="" className="w-8 h-8 rounded object-cover flex-none" onError={applyGenericImageFallback} /> : null}
                     <div className="truncate text-sm">{item.label}</div>
                   </div>
                   <div className="flex items-center gap-2">

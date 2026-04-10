@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import { useLogo } from '@/hooks/useLogo';
+import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 
 interface LogoProps {
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
@@ -34,10 +35,15 @@ const Logo = ({ size = 'md', showText = false, className = '', linkTo = '/' }: L
           src={logo.url} 
           alt={logo.altText || 'Store Logo'} 
           className={`${sizeClasses[size]} object-contain transition-transform duration-300 hover:scale-105`}
-          onError={(e) => {
-            console.error('Logo failed to load:', logo.url);
-            e.currentTarget.src = '/iconPng.png';
-          }}
+          onError={applyLogoImageFallback}
+        />
+      )}
+      {!isLoading && !logo?.url && (
+        <img
+          src={LOGO_IMAGE_FALLBACK}
+          alt="Store Logo"
+          className={`${sizeClasses[size]} object-contain`}
+          onError={applyLogoImageFallback}
         />
       )}
       {isLoading && (

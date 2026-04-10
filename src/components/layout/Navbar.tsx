@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Menu, X, ShoppingCart, User, LogOut, Settings, Package, Heart, ChevronDown, Search, ShieldCheck } from 'lucide-react';
 import { useDualAuth } from '@/hooks/useDualAuth';
@@ -21,6 +21,7 @@ import { apiGet, type ApiResponse } from '@/lib/api';
 import { buildCategoryPath } from '@/lib/category-link';
 import type { Category } from '@/types';
 import { useOwnerVisibility } from '@/hooks/useOwnerVisibility';
+import { applyCategoryImageFallback } from '@/lib/images';
 
 type ApiCategory = {
   _id: string;
@@ -271,6 +272,7 @@ const Navbar = () => {
                                       alt={cat.nameAr}
                                       className="w-full h-full object-cover transition-transform duration-700 ease-out will-change-transform"
                                       style={{ transform: hoveredCatId ? 'scale(1.06) rotate(0.5deg)' : 'scale(1.02)' }}
+                                      onError={applyCategoryImageFallback}
                                     />
                                     <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
                                     <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">

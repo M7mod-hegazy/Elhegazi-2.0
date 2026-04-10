@@ -27,6 +27,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { useLogo } from '@/hooks/useLogo';
+import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 import { apiGet } from '@/lib/api';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
@@ -151,7 +152,7 @@ const AdminSidebarEnhanced = ({ collapsed, onToggle, isMobile, mobileMenuOpen, o
             <div className="flex items-center gap-3">
               <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20 shadow-sm flex-shrink-0 transition-transform hover:scale-105 active:scale-95 cursor-pointer">
                 {!logoLoading ? (
-                  <img src={logo.url} alt={logo.altText} className="w-8 h-8 object-contain" />
+                  <img src={logo?.url || LOGO_IMAGE_FALLBACK} alt={logo?.altText || 'Store Logo'} className="w-8 h-8 object-contain" onError={applyLogoImageFallback} />
                 ) : (
                   <div className="w-8 h-8 bg-black/5 animate-pulse rounded" />
                 )}

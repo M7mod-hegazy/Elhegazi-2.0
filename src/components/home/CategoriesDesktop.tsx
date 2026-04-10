@@ -15,7 +15,7 @@ interface HomeProduct {
   image: string;
 }
 import { motion } from 'framer-motion';
-import { optimizeImage } from '@/lib/images';
+import { optimizeImage, applyCategoryImageFallback, applyProductImageFallback } from '@/lib/images';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Mousewheel } from 'swiper/modules';
 import 'swiper/css';
@@ -379,6 +379,7 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                       src={optimizeImage(category.image, { w: 400 })}
                       alt={category.nameAr}
                       className="w-full h-full object-cover"
+                      onError={applyCategoryImageFallback}
                     />
                     <div className="absolute inset-0 bg-gradient-to-br from-white/70 via-white/40 to-white/70" />
                   </div>
@@ -487,6 +488,7 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                                 alt={product.nameAr || product.name}
                                 className="w-full h-full object-cover group-hover:brightness-110 group-hover:scale-110 transition-all duration-500"
                                 loading="lazy"
+                                onError={applyProductImageFallback}
                               />
                               {/* Product name overlay - Always visible on top with theme color */}
                               <div className="absolute top-2 left-2 right-2 z-10">

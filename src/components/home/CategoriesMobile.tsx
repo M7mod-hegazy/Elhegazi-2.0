@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { apiGet, type ApiResponse } from '@/lib/api';
 import { buildCategoryPath } from '@/lib/category-link';
 import type { Category } from '@/types';
-import { optimizeImage } from '@/lib/images';
+import { optimizeImage, applyCategoryImageFallback, applyProductImageFallback } from '@/lib/images';
 import { motion } from 'framer-motion';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Mousewheel } from 'swiper/modules';
@@ -364,6 +364,7 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
                                 src={optimizeImage(category.image, { w: 300 })}
                                 alt={category.nameAr}
                                 className="w-full h-full object-cover"
+                                onError={applyCategoryImageFallback}
                               />
                               <div className="absolute inset-0 bg-gradient-to-br from-white/70 via-white/40 to-white/70" />
                             </div>
@@ -450,6 +451,7 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
                                           alt={product.nameAr || product.name}
                                           className="w-full h-full object-cover group-hover:brightness-110 group-hover:scale-110 transition-all duration-500"
                                           loading="lazy"
+                                          onError={applyProductImageFallback}
                                         />
                                         {/* Product name overlay - Always visible on top with theme color */}
                                         <div className="absolute top-1 left-1 right-1 z-10">

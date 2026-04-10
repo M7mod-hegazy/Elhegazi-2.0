@@ -29,7 +29,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import SocialLinks from '@/components/layout/SocialLinks';
-import { optimizeImage, buildSrcSet } from '@/lib/images';
+import { optimizeImage, buildSrcSet, applyProductImageFallback, applyCategoryImageFallback } from '@/lib/images';
 import { buildCategoryPath, getCategorySegment, normalizeCategorySegment } from '@/lib/category-link';
 import { buildProductPath } from '@/lib/product-link';
 import ScrollAnimation from '@/components/ui/scroll-animation';
@@ -159,6 +159,7 @@ const CategoryPage = () => {
                 src={optimizeImage(product.image, { w: 80 })}
                 alt={product.nameAr}
                 className="w-20 h-20 object-cover rounded-lg shadow-md flex-shrink-0"
+                onError={applyProductImageFallback}
               />
               <div className="flex-1 text-right min-w-0">
                 <p className="font-bold text-sm text-slate-900 line-clamp-2">{product.nameAr}</p>
@@ -584,6 +585,7 @@ const CategoryPage = () => {
                                   alt={product.nameAr || product.name}
                                   className="w-full h-full object-cover"
                                   loading="lazy"
+                                  onError={applyProductImageFallback}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                                 <div className="absolute bottom-1 lg:bottom-2 left-1 lg:left-2 right-1 lg:right-2">
@@ -623,6 +625,7 @@ const CategoryPage = () => {
                                   alt={product.nameAr || product.name}
                                   className="w-full h-full object-cover"
                                   loading="lazy"
+                                  onError={applyProductImageFallback}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                                 <div className="absolute bottom-1 lg:bottom-2 left-1 lg:left-2 right-1 lg:right-2">
@@ -662,6 +665,7 @@ const CategoryPage = () => {
                                   alt={product.nameAr || product.name}
                                   className="w-full h-full object-cover"
                                   loading="lazy"
+                                  onError={applyProductImageFallback}
                                 />
                                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
                                 <div className="absolute bottom-1 lg:bottom-2 left-1 lg:left-2 right-1 lg:right-2">
@@ -684,6 +688,7 @@ const CategoryPage = () => {
                         alt={category.nameAr}
                         className="w-full h-full object-cover"
                         loading="lazy"
+                        onError={applyCategoryImageFallback}
                       />
                       <div className="absolute inset-0 flex items-center justify-center bg-black/60">
                         <div className="text-center text-white">
@@ -741,6 +746,7 @@ const CategoryPage = () => {
                           src={optimizeImage(product.image || '', { w: 60 })}
                           alt={product.nameAr}
                           className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                          onError={applyProductImageFallback}
                         />
                         
                         {/* Product Info */}
@@ -953,6 +959,7 @@ const CategoryPage = () => {
                               alt={product.nameAr}
                               className={`w-full h-full object-cover transition-transform duration-700 ${hoveredProduct === product.id ? 'scale-110' : 'scale-100'}`}
                               loading="lazy"
+                              onError={applyProductImageFallback}
                             />
                           </Link>
                         </div>
@@ -1200,6 +1207,7 @@ const CategoryPage = () => {
                                   alt={`${product.nameAr} - ${idx + 1}`}
                                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                   loading="lazy"
+                                  onError={applyProductImageFallback}
                                 />
                               </Link>
                             </SwiperSlide>
@@ -1228,6 +1236,7 @@ const CategoryPage = () => {
                           alt={product.nameAr}
                           className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                           loading="lazy"
+                          onError={applyProductImageFallback}
                         />
                       </Link>
                     )}
@@ -1429,6 +1438,7 @@ const CategoryPage = () => {
                   src={optimizeImage(selectedProduct.image, { w: 100 })}
                   alt={selectedProduct.nameAr}
                   className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
+                  onError={applyProductImageFallback}
                 />
                 <h4 className="font-semibold text-slate-900">{selectedProduct.nameAr}</h4>
               </div>
