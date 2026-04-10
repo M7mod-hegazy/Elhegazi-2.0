@@ -209,7 +209,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
             <div className="absolute inset-0 bg-gradient-to-t from-black/0 via-transparent to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none z-10" />
 
             {/* Top bar controls */}
-            <div className="absolute top-0 left-0 right-0 p-3 flex justify-between items-start z-20">
+            <div className="absolute top-0 inset-x-0 p-3 flex justify-between items-start z-20">
               {/* Category Badge - Top Right */}
               <Link
                 to={categoryPath}
@@ -220,12 +220,13 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
               </Link>
 
               {/* Advanced 3D Heart Favorite Button - Top Left */}
-              <TooltipProvider>
+              <TooltipProvider delayDuration={400} skipDelayDuration={0}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
+                      type="button"
                       onClick={handleToggleFavorite}
-                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative heart-button ${favorites.includes(product.id) ? 'heart-active' : ''
+                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative z-30 heart-button ${favorites.includes(product.id) ? 'heart-active' : ''
                         }`}
                     >
                       {/* 3D Heart with State-Based Rendering */}
@@ -298,8 +299,16 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                       </div>
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent side="bottom">
-                    <p>{favorites.includes(product.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}</p>
+                  <TooltipContent
+                    side="left"
+                    align="center"
+                    sideOffset={10}
+                    collisionPadding={16}
+                    className="max-w-[13rem] whitespace-normal text-center leading-snug z-[200]"
+                  >
+                    <p className="text-sm">
+                      {favorites.includes(product.id) ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>

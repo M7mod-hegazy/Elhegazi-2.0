@@ -3152,7 +3152,15 @@ app.get('/api/products', async (req, res) => {
     let q = {};
     if (featured !== undefined) q.featured = featured === 'true';
     if (categorySlug) q.categorySlug = categorySlug;
-    if (search) q.name = { $regex: String(search), $options: 'i' };
+    if (search) {
+      const raw = String(search).trim();
+      const esc = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      q.$or = [
+        { name: { $regex: esc, $options: 'i' } },
+        { nameAr: { $regex: esc, $options: 'i' } },
+        { sku: { $regex: esc, $options: 'i' } },
+      ];
+    }
     
     // Apply RBAC read conditions only if user is authenticated
     if (req.user && req.user._id) {

@@ -31,7 +31,10 @@ import {
   Send,
   Check,
   ShoppingBag,
-  Eye
+  Eye,
+  ZoomIn,
+  ZoomOut,
+  Download
 } from 'lucide-react';
 import { Product } from '@/types';
 import { apiGet, type ApiResponse } from '@/lib/api';
@@ -69,6 +72,8 @@ type ApiProduct = {
   nameAr?: string;
   sku?: string;
   categorySlug?: string;
+  /** Present on API payloads from MongoDB; used when categorySlug is missing */
+  categoryId?: string;
   price: number;
   originalPrice?: number;
   description?: string;
@@ -114,6 +119,45 @@ type ApiCategory = {
   image?: string;
 };
 
+/** Resolve slug + display label from product fields and loaded categories (handles categoryId-only products). */
+function resolveProductCategory(
+  raw: { categorySlug?: string; category?: string; categoryId?: string },
+  catItems: ApiCategory[]
+): { slug: string; categoryAr: string } {
+  const catBySlug = new Map(catItems.map((c) => [c.slug, c]));
+  const catById = new Map(catItems.map((c) => [String(c._id), c]));
+
+  const cid =
+    raw.categoryId != null && String(raw.categoryId).length > 0
+      ? String(raw.categoryId)
+      : '';
+
+  let slug = (raw.categorySlug || '').trim();
+  if (!slug && typeof raw.category === 'string' && raw.category.trim()) {
+    slug = raw.category.trim();
+  }
+  if (!slug && cid) {
+    const byId = catById.get(cid);
+    if (byId?.slug) slug = byId.slug.trim();
+  }
+
+  const cat =
+    (slug ? catBySlug.get(slug) : undefined) ?? (cid ? catById.get(cid) : undefined);
+
+  const categoryAr =
+    cat?.nameAr?.trim() ||
+    cat?.name?.trim() ||
+    slug ||
+    '';
+
+  return { slug, categoryAr };
+}
+
+function categoryDisplayLabel(product: Pick<ApiProduct, 'categoryAr' | 'category'>): string {
+  const t = (product.categoryAr || product.category || '').trim();
+  return t || 'غير مصنّف';
+}
+
 // Helper function to format date
 const formatDate = (dateString: string) => {
   const date = new Date(dateString);
@@ -124,65 +168,191 @@ const formatDate = (dateString: string) => {
   });
 };
 
-// Add this new component for image gallery modal
 const ImageGalleryModal = ({
   images,
   currentIndex,
   onClose,
   onNext,
-  onPrev
+  onPrev,
+  productName = 'product',
 }: {
   images: string[];
   currentIndex: number;
   onClose: () => void;
   onNext: () => void;
   onPrev: () => void;
+  productName?: string;
 }) => {
   const safeImages = images.length > 0 ? images : [PRODUCT_IMAGE_FALLBACK];
   const safeCurrentIndex = Math.min(Math.max(currentIndex, 0), safeImages.length - 1);
+  const [zoom, setZoom] = useState(1);
+
+  useEffect(() => {
+    setZoom(1);
+  }, [safeCurrentIndex]);
+
+  const adjustZoom = (delta: number) => {
+    setZoom((z) => {
+      const next = Math.round((z + delta) * 100) / 100;
+      return Math.min(4, Math.max(1, next));
+    });
+  };
+
+  const handleDownload = async () => {
+    const url = safeImages[safeCurrentIndex];
+    const base = (productName || 'product')
+      .replace(/[^\w\u0600-\u06FF-]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 80) || 'product';
+    const filename = `${base}-${safeCurrentIndex + 1}.jpg`;
+    try {
+      const res = await fetch(url, { mode: 'cors' });
+      if (!res.ok) throw new Error('fetch failed');
+      const blob = await res.blob();
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = href;
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(href);
+    } catch {
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+  };
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-lg z-[100] flex items-center justify-center p-4">
-      <button
-        onClick={onClose}
-        className="absolute top-4 right-4 p-2 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-      >
-        <X className="w-6 h-6 text-white" />
-      </button>
-
-      <button
-        onClick={onPrev}
-        className="absolute left-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-      >
-        <ChevronLeftIcon className="w-6 h-6 text-white" />
-      </button>
-
-      <button
-        onClick={onNext}
-        className="absolute right-4 top-1/2 -translate-y-1/2 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors"
-      >
-        <ChevronRight className="w-6 h-6 text-white" />
-      </button>
-
-      <div className="relative max-w-4xl max-h-[90vh] w-full">
-        <img
-          src={safeImages[safeCurrentIndex]}
-          alt={`Product image ${safeCurrentIndex + 1}`}
-          className="w-full h-auto max-h-[90vh] object-contain"
-          onError={applyProductImageFallback}
-        />
-
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-          {safeImages.map((_, index) => (
-            <div
-              key={index}
-              className={cn(
-                "w-3 h-3 rounded-full transition-all",
-                index === safeCurrentIndex ? "bg-white w-6" : "bg-white/50"
-              )}
-            />
-          ))}
+    <div
+      className="fixed inset-0 bg-black/90 backdrop-blur-lg z-[100] flex flex-col"
+      role="dialog"
+      aria-modal="true"
+      aria-label="معرض الصور"
+    >
+      <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-3 sm:px-4 border-b border-white/10">
+        <span className="text-white/90 text-sm truncate max-w-[50%]">
+          {productName}
+        </span>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/20 rounded-full"
+            onClick={handleDownload}
+            aria-label="تحميل الصورة"
+          >
+            <Download className="w-5 h-5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/20 rounded-full"
+            onClick={onClose}
+            aria-label="إغلاق"
+          >
+            <X className="w-6 h-6" />
+          </Button>
         </div>
+      </div>
+
+      <div className="flex-1 min-h-0 flex items-stretch justify-center relative px-2 pb-20 sm:pb-24">
+        <button
+          type="button"
+          onClick={onPrev}
+          className="hidden sm:flex absolute start-2 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
+          aria-label="الصورة السابقة"
+        >
+          <ChevronLeftIcon className="w-6 h-6 text-white" />
+        </button>
+
+        <button
+          type="button"
+          onClick={onNext}
+          className="hidden sm:flex absolute end-2 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
+          aria-label="الصورة التالية"
+        >
+          <ChevronRight className="w-6 h-6 text-white" />
+        </button>
+
+        <div className="flex-1 overflow-auto flex items-center justify-center touch-pan-x touch-pan-y w-full max-w-5xl mx-auto py-4">
+          <img
+            src={safeImages[safeCurrentIndex]}
+            alt={`صورة المنتج ${safeCurrentIndex + 1}`}
+            className="max-w-none w-auto h-auto max-h-[min(72vh,100%)] object-contain select-none"
+            style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
+            onError={applyProductImageFallback}
+            draggable={false}
+          />
+        </div>
+      </div>
+
+      <div
+        className="fixed bottom-0 inset-x-0 z-[110] flex flex-col gap-2 bg-black/80 backdrop-blur-md border-t border-white/10 px-3 py-3"
+        style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
+      >
+        <div className="flex items-center justify-center gap-4">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/15 rounded-full sm:hidden"
+            onClick={onPrev}
+            disabled={safeImages.length <= 1}
+            aria-label="الصورة السابقة"
+          >
+            <ChevronLeftIcon className="w-6 h-6" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/15 rounded-full"
+            onClick={() => adjustZoom(-0.25)}
+            disabled={zoom <= 1}
+            aria-label="تصغير"
+          >
+            <ZoomOut className="w-5 h-5" />
+          </Button>
+          <span className="text-white text-sm tabular-nums min-w-[3.5rem] text-center">{Math.round(zoom * 100)}%</span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/15 rounded-full"
+            onClick={() => adjustZoom(0.25)}
+            disabled={zoom >= 4}
+            aria-label="تكبير"
+          >
+            <ZoomIn className="w-5 h-5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/15 rounded-full sm:hidden"
+            onClick={onNext}
+            disabled={safeImages.length <= 1}
+            aria-label="الصورة التالية"
+          >
+            <ChevronRight className="w-6 h-6" />
+          </Button>
+        </div>
+        {safeImages.length > 1 && (
+          <div className="flex justify-center gap-2 flex-wrap">
+            {safeImages.map((_, index) => (
+              <div
+                key={index}
+                className={cn(
+                  'h-2 rounded-full transition-all',
+                  index === safeCurrentIndex ? 'bg-white w-6' : 'bg-white/50 w-2'
+                )}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -228,7 +398,7 @@ const MobileProductDetail = ({
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
-  const [activeTab, setActiveTab] = useState<'details' | 'specs' | 'reviews'>('details');
+  const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
   const [showGallery, setShowGallery] = useState(false);
 
   const discountPercentage = product.discount || (product.originalPrice && product.originalPrice > product.price)
@@ -269,6 +439,17 @@ const MobileProductDetail = ({
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-primary/5 pb-24">
+      {showGallery && (
+        <ImageGalleryModal
+          images={displayImages}
+          currentIndex={currentImageIndex}
+          onClose={closeGallery}
+          onNext={nextGalleryImage}
+          onPrev={prevGalleryImage}
+          productName={product.nameAr || product.name}
+        />
+      )}
+
       {/* Header */}
       <div className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-slate-200">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
@@ -338,16 +519,22 @@ const MobileProductDetail = ({
             <Button
               variant="ghost"
               size="icon"
-              className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg hover:bg-white"
-              onClick={prevImage}
+              className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg hover:bg-white z-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                prevImage();
+              }}
             >
               <ChevronLeftIcon className="w-6 h-6" />
             </Button>
             <Button
               variant="ghost"
               size="icon"
-              className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg hover:bg-white"
-              onClick={nextImage}
+              className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 backdrop-blur-sm rounded-full shadow-lg hover:bg-white z-10"
+              onClick={(e) => {
+                e.stopPropagation();
+                nextImage();
+              }}
             >
               <ChevronRight className="w-6 h-6" />
             </Button>
@@ -374,8 +561,8 @@ const MobileProductDetail = ({
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             {/* Category alone on the far left */}
-            <Badge className="bg-gradient-to-r from-primary to-secondary text-white px-3 py-1 text-xs font-medium">
-              {product.categoryAr}
+            <Badge variant="default" className="max-w-[min(100%,16rem)] truncate px-3 py-1 text-xs font-medium">
+              {categoryDisplayLabel(product)}
             </Badge>
             {/* SKU on the far right */}
             {product.sku && (
@@ -547,31 +734,21 @@ const MobileProductDetail = ({
         )}
 
 
-        {/* Tabs - Keeping the existing tabs for التفاصيل والتقييمات */}
         <div className="flex border-b border-slate-200">
           <button
+            type="button"
             className={cn(
               "flex-1 py-3 text-center font-medium",
-              activeTab === 'details'
+              activeTab === 'info'
                 ? "text-primary border-b-2 border-primary"
                 : "text-slate-500"
             )}
-            onClick={() => setActiveTab('details')}
+            onClick={() => setActiveTab('info')}
           >
-            التفاصيل
+            التفاصيل والمواصفات
           </button>
           <button
-            className={cn(
-              "flex-1 py-3 text-center font-medium",
-              activeTab === 'specs'
-                ? "text-primary border-b-2 border-primary"
-                : "text-slate-500"
-            )}
-            onClick={() => setActiveTab('specs')}
-          >
-            المواصفات
-          </button>
-          <button
+            type="button"
             className={cn(
               "flex-1 py-3 text-center font-medium",
               activeTab === 'reviews'
@@ -584,53 +761,59 @@ const MobileProductDetail = ({
           </button>
         </div>
 
-        {/* Tab Content - Keeping the existing content for التفاصيل والمواصفات والتقييمات */}
         <div className="bg-white rounded-2xl p-4 border border-slate-200">
-          {activeTab === 'details' && (
-            <div>
-              <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
-              <p className="text-sm text-slate-700 leading-relaxed">
-                {showFullDescription
-                  ? (product.descriptionAr || product.description)
-                  : (product.descriptionAr || product.description)?.slice(0, 150) + '...'}
-              </p>
-              {(product.descriptionAr || product.description)?.length > 150 && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="p-0 h-auto text-primary font-medium mt-2"
-                  onClick={() => setShowFullDescription(!showFullDescription)}
-                >
-                  {showFullDescription ? 'عرض أقل' : 'عرض المزيد'}
-                </Button>
-              )}
-            </div>
-          )}
+          {activeTab === 'info' && (
+            <div className="space-y-5">
+              <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-100">
+                <span className="text-sm text-slate-600">التصنيف:</span>
+                <Badge variant="default" className="max-w-[min(100%,16rem)] truncate px-3 py-1 text-xs font-medium">
+                  {categoryDisplayLabel(product)}
+                </Badge>
+                {product.sku ? (
+                  <span className="text-xs text-slate-600 ms-auto">
+                    رقم المنتج:{' '}
+                    <span className="font-mono font-medium text-slate-800">{product.sku}</span>
+                  </span>
+                ) : null}
+              </div>
 
-          {activeTab === 'specs' && (
-            <div className="space-y-4">
-              <h3 className="font-bold text-slate-900 mb-3">تفاصيل المنتج</h3>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                  <span className="text-slate-600">رقم المنتج:</span>
-                  <span className="font-medium">{product.sku || 'N/A'}</span>
+              <div>
+                <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
+                <p className="text-sm text-slate-700 leading-relaxed">
+                  {showFullDescription
+                    ? (product.descriptionAr || product.description)
+                    : (product.descriptionAr || product.description)?.slice(0, 150) + '...'}
+                </p>
+                {(product.descriptionAr || product.description)?.length > 150 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="p-0 h-auto text-primary font-medium mt-2"
+                    onClick={() => setShowFullDescription(!showFullDescription)}
+                  >
+                    {showFullDescription ? 'عرض أقل' : 'عرض المزيد'}
+                  </Button>
+                )}
+              </div>
+
+              <div className="space-y-3 pt-2 border-t border-slate-100">
+                <h3 className="font-bold text-slate-900">مواصفات إضافية</h3>
+                <div className="space-y-3">
+                  {product.weight != null && product.weight > 0 && (
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                      <span className="text-slate-600">الوزن:</span>
+                      <span className="font-medium">{product.weight} كجم</span>
+                    </div>
+                  )}
+                  {product.dimensions && (
+                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                      <span className="text-slate-600">الأبعاد:</span>
+                      <span className="font-medium">
+                        {product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} سم
+                      </span>
+                    </div>
+                  )}
                 </div>
-
-                {product.weight && (
-                  <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">الوزن:</span>
-                    <span className="font-medium">{product.weight} كجم</span>
-                  </div>
-                )}
-
-                {product.dimensions && (
-                  <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                    <span className="text-slate-600">الأبعاد:</span>
-                    <span className="font-medium">
-                      {product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} سم
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -727,6 +910,7 @@ const MobileProductDetail = ({
                 image: relatedProduct.image || '',
                 images: relatedProduct.images || [],
                 category: relatedProduct.category,
+                categorySlug: relatedProduct.categorySlug ?? relatedProduct.category,
                 categoryAr: relatedProduct.categoryAr || '',
                 stock: relatedProduct.stock,
                 isHidden: relatedProduct.isHidden,
@@ -793,7 +977,7 @@ const DesktopProductDetail = ({
   social: any;
   hidePrices: boolean;
 }) => {
-  const [activeTab, setActiveTab] = useState<'details' | 'specs' | 'reviews'>('details');
+  const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -837,6 +1021,7 @@ const DesktopProductDetail = ({
           onClose={closeGallery}
           onNext={nextGalleryImage}
           onPrev={prevGalleryImage}
+          productName={product.nameAr || product.name}
         />
       )}
 
@@ -903,8 +1088,8 @@ const DesktopProductDetail = ({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 {/* Category alone on the far left */}
-                <Badge className="bg-gradient-to-r from-primary to-secondary text-white px-2 py-1 text-xs font-medium">
-                  {product.categoryAr}
+                <Badge variant="default" className="max-w-[min(100%,16rem)] truncate px-2 py-1 text-xs font-medium">
+                  {categoryDisplayLabel(product)}
                 </Badge>
                 {product.featured && (
                   <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white px-2 py-1 text-xs font-medium">
@@ -1066,31 +1251,21 @@ const DesktopProductDetail = ({
               </div>
             )}
 
-            {/* Tabs - Keeping the existing tabs for التفاصيل والتقييمات */}
             <div className="flex border-b border-slate-200">
               <button
+                type="button"
                 className={cn(
                   "flex-1 py-3 text-center font-medium",
-                  activeTab === 'details'
+                  activeTab === 'info'
                     ? "text-primary border-b-2 border-primary"
                     : "text-slate-500"
                 )}
-                onClick={() => setActiveTab('details')}
+                onClick={() => setActiveTab('info')}
               >
-                التفاصيل
+                التفاصيل والمواصفات
               </button>
               <button
-                className={cn(
-                  "flex-1 py-3 text-center font-medium",
-                  activeTab === 'specs'
-                    ? "text-primary border-b-2 border-primary"
-                    : "text-slate-500"
-                )}
-                onClick={() => setActiveTab('specs')}
-              >
-                المواصفات
-              </button>
-              <button
+                type="button"
                 className={cn(
                   "flex-1 py-3 text-center font-medium",
                   activeTab === 'reviews'
@@ -1103,53 +1278,59 @@ const DesktopProductDetail = ({
               </button>
             </div>
 
-            {/* Tab Content - Keeping the existing content for التفاصيل والمواصفات والتقييمات */}
             <div className="bg-white rounded-2xl p-4 border border-slate-200">
-              {activeTab === 'details' && (
-                <div>
-                  <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
-                  <p className="text-sm text-slate-700 leading-relaxed">
-                    {showFullDescription
-                      ? (product.descriptionAr || product.description)
-                      : (product.descriptionAr || product.description)?.slice(0, 150) + '...'}
-                  </p>
-                  {(product.descriptionAr || product.description)?.length > 150 && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="p-0 h-auto text-primary font-medium mt-2"
-                      onClick={() => setShowFullDescription(!showFullDescription)}
-                    >
-                      {showFullDescription ? 'عرض أقل' : 'عرض المزيد'}
-                    </Button>
-                  )}
-                </div>
-              )}
+              {activeTab === 'info' && (
+                <div className="space-y-5">
+                  <div className="flex flex-wrap items-center gap-2 pb-3 border-b border-slate-100">
+                    <span className="text-sm text-slate-600">التصنيف:</span>
+                    <Badge variant="default" className="max-w-[min(100%,16rem)] truncate px-3 py-1 text-xs font-medium">
+                      {categoryDisplayLabel(product)}
+                    </Badge>
+                    {product.sku ? (
+                      <span className="text-xs text-slate-600 ms-auto">
+                        رقم المنتج:{' '}
+                        <span className="font-mono font-medium text-slate-800">{product.sku}</span>
+                      </span>
+                    ) : null}
+                  </div>
 
-              {activeTab === 'specs' && (
-                <div className="space-y-4">
-                  <h3 className="font-bold text-slate-900 mb-3">تفاصيل المنتج</h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                      <span className="text-slate-600">رقم المنتج:</span>
-                      <span className="font-medium">{product.sku || 'N/A'}</span>
+                  <div>
+                    <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {showFullDescription
+                        ? (product.descriptionAr || product.description)
+                        : (product.descriptionAr || product.description)?.slice(0, 150) + '...'}
+                    </p>
+                    {(product.descriptionAr || product.description)?.length > 150 && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="p-0 h-auto text-primary font-medium mt-2"
+                        onClick={() => setShowFullDescription(!showFullDescription)}
+                      >
+                        {showFullDescription ? 'عرض أقل' : 'عرض المزيد'}
+                      </Button>
+                    )}
+                  </div>
+
+                  <div className="space-y-3 pt-2 border-t border-slate-100">
+                    <h3 className="font-bold text-slate-900">مواصفات إضافية</h3>
+                    <div className="space-y-3">
+                      {product.weight != null && product.weight > 0 && (
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                          <span className="text-slate-600">الوزن:</span>
+                          <span className="font-medium">{product.weight} كجم</span>
+                        </div>
+                      )}
+                      {product.dimensions && (
+                        <div className="flex items-center justify-between py-2 border-b border-slate-100">
+                          <span className="text-slate-600">الأبعاد:</span>
+                          <span className="font-medium">
+                            {product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} سم
+                          </span>
+                        </div>
+                      )}
                     </div>
-
-                    {product.weight && (
-                      <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                        <span className="text-slate-600">الوزن:</span>
-                        <span className="font-medium">{product.weight} كجم</span>
-                      </div>
-                    )}
-
-                    {product.dimensions && (
-                      <div className="flex items-center justify-between py-2 border-b border-slate-100">
-                        <span className="text-slate-600">الأبعاد:</span>
-                        <span className="font-medium">
-                          {product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} سم
-                        </span>
-                      </div>
-                    )}
                   </div>
                 </div>
               )}
@@ -1247,6 +1428,7 @@ const DesktopProductDetail = ({
                   image: relatedProduct.image || '',
                   images: relatedProduct.images || [],
                   category: relatedProduct.category,
+                  categorySlug: relatedProduct.categorySlug ?? relatedProduct.category,
                   categoryAr: relatedProduct.categoryAr || '',
                   stock: relatedProduct.stock,
                   isHidden: relatedProduct.isHidden,
@@ -1310,10 +1492,15 @@ const ProductDetail = () => {
       try {
         setLoading(true);
 
-        // Try to get product from location state first (passed from product list)
-        let item: ApiProduct | undefined = (location.state as any)?.product;
+        const stateProduct = (location.state as { product?: ApiProduct } | null)?.product;
+        const stateId = stateProduct?._id ?? stateProduct?.id;
+        const stateMatchesUrl =
+          !!stateProduct &&
+          !!resolvedProductId &&
+          String(stateId) === String(resolvedProductId);
 
-        // If not in state, fetch from API
+        let item: ApiProduct | undefined = stateMatchesUrl ? stateProduct : undefined;
+
         if (!item) {
           const res = await apiGet<ApiProduct>(`/api/products/${resolvedProductId}`);
           item = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).item as ApiProduct | undefined;
@@ -1321,24 +1508,54 @@ const ProductDetail = () => {
 
         if (!item) throw new Error('Product not found');
 
-        // Fetch categories to resolve Arabic name and fetch related products by category slug
-        const [catsRes, relRes] = await Promise.all([
-          apiGet<ApiCategory>('/api/categories'),
-          apiGet<ApiProduct>(item.categorySlug ? `/api/products?categorySlug=${encodeURIComponent(item.categorySlug)}` : '/api/products'),
-        ]);
+        const itemCategoryId =
+          item.categoryId != null && String(item.categoryId).trim() !== ''
+            ? String(item.categoryId)
+            : '';
+
+        const catsRes = await apiGet<ApiCategory>('/api/categories?limit=500&page=1');
         const catItems = (catsRes as Extract<ApiResponse<ApiCategory>, { ok: true }>).items ?? [];
-        const catBySlug = new Map(catItems.map((c) => [c.slug, c]));
+
+        let { slug, categoryAr } = resolveProductCategory(
+          {
+            categorySlug: item.categorySlug,
+            category: item.category,
+            categoryId: itemCategoryId,
+          },
+          catItems
+        );
+
+        if ((!slug || !categoryAr) && itemCategoryId) {
+          try {
+            const oneRes = await apiGet<ApiCategory>(`/api/categories/${encodeURIComponent(itemCategoryId)}`);
+            if (oneRes.ok && 'item' in oneRes && oneRes.item) {
+              const ext = oneRes.item;
+              if (!slug && ext.slug?.trim()) slug = ext.slug.trim();
+              if (!categoryAr) {
+                categoryAr = ext.nameAr?.trim() || ext.name?.trim() || categoryAr;
+              }
+            }
+          } catch {
+            /* single-category fetch is best-effort */
+          }
+        }
+
+        const relRes = await apiGet<ApiProduct>(
+          slug ? `/api/products?categorySlug=${encodeURIComponent(slug)}` : '/api/products'
+        );
 
         const mapped: ApiProduct = {
           ...item,
+          categoryId: itemCategoryId || item.categoryId,
+          categorySlug: slug,
           id: item._id,
           name: item.name,
           nameAr: item.nameAr ?? item.name,
           description: item.description ?? '',
           descriptionAr: item.descriptionAr ?? item.description ?? '',
           images: item.images || [],
-          category: item.categorySlug ?? '',
-          categoryAr: catBySlug.get(item.categorySlug ?? '')?.nameAr ?? (item.categorySlug ?? ''),
+          category: slug,
+          categoryAr: categoryAr || slug,
           rating: item.rating || 0,
           reviews: item.reviews || 0,
           discount: item.discount || 0,
@@ -1350,22 +1567,42 @@ const ProductDetail = () => {
         const relItems = (relRes as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
         const relatedProducts: ApiProduct[] = relItems
           .filter((p) => p._id !== item._id && p.active !== false)
-          .map((p) => ({
-            ...p,
-            id: p._id,
-            name: p.name,
-            nameAr: p.nameAr ?? p.name,
-            description: p.description ?? '',
-            descriptionAr: p.descriptionAr ?? p.description ?? '',
-            category: p.categorySlug ?? '',
-            categoryAr: catBySlug.get(p.categorySlug ?? '')?.nameAr ?? (p.categorySlug ?? ''),
-            rating: p.rating || 0,
-            reviews: p.reviews || 0,
-            discount: p.discount || 0,
-            isHidden: p.active === false,
-            inStock: p.inStock ?? (p.stock !== undefined ? p.stock > 0 : true),
-            tags: p.tags || []
-          }))
+          .map((p) => {
+            const pid =
+              p.categoryId != null && String(p.categoryId).length > 0
+                ? String(p.categoryId)
+                : (p as { categoryId?: unknown }).categoryId != null
+                  ? String((p as { categoryId?: unknown }).categoryId)
+                  : '';
+            const resolved = resolveProductCategory(
+              {
+                categorySlug: p.categorySlug,
+                category: p.category,
+                categoryId: pid,
+              },
+              catItems
+            );
+            const rSlug = resolved.slug || (p.categorySlug ?? '').trim();
+            const rAr = resolved.categoryAr || rSlug;
+            return {
+              ...p,
+              id: p._id,
+              categoryId: pid || p.categoryId,
+              categorySlug: rSlug,
+              name: p.name,
+              nameAr: p.nameAr ?? p.name,
+              description: p.description ?? '',
+              descriptionAr: p.descriptionAr ?? p.description ?? '',
+              category: rSlug,
+              categoryAr: rAr,
+              rating: p.rating || 0,
+              reviews: p.reviews || 0,
+              discount: p.discount || 0,
+              isHidden: p.active === false,
+              inStock: p.inStock ?? (p.stock !== undefined ? p.stock > 0 : true),
+              tags: p.tags || []
+            };
+          })
           .slice(0, 4);
 
         // Fetch real rating history from backend
@@ -1423,12 +1660,21 @@ const ProductDetail = () => {
       }
     })();
     return () => { isMounted = false; };
-  }, [id, resolvedProductId, navigate]);
+  }, [id, resolvedProductId, navigate, location.key]);
 
-  // Derived related products from fetched list
-  const relatedProducts = related
-    .filter(p => product ? p.categorySlug === product.categorySlug && p._id !== product._id && !p.isHidden : true)
-    .slice(0, 4);
+  const productCatKey = product
+    ? String(product.categorySlug ?? product.category ?? '').trim()
+    : '';
+  const relatedProducts = related.filter((p) => {
+    if (!product) return true;
+    const rid = String(p._id ?? (p as ApiProduct).id ?? '');
+    const cur = String(product._id ?? product.id ?? '');
+    if (rid === cur) return false;
+    if (p.isHidden) return false;
+    if (!productCatKey) return true;
+    const pCat = String(p.categorySlug ?? p.category ?? '').trim();
+    return pCat === productCatKey;
+  }).slice(0, 4);
 
   if (loading) {
     return (

@@ -23,6 +23,7 @@ server/.env.local
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
 .idea
 .DS_Store
 *.suo
@@ -41,7 +42,6 @@ build/
 out/
 
 # IDE
-.vscode/
 .idea/
 *.swp
 *.swo
