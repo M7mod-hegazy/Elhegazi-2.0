@@ -411,12 +411,14 @@ const Navbar = () => {
                           <span>الملف الشخصي</span>
                         </Link>
                       </DropdownMenuItem>
+                      {!hidePrices && (
                       <DropdownMenuItem asChild>
                         <Link to="/orders" className="flex items-center space-x-2 space-x-reverse">
                           <Package className="w-4 h-4" />
                           <span>طلباتي</span>
                         </Link>
                       </DropdownMenuItem>
+                      )}
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleLogout} className="text-destructive">
                         <LogOut className="w-4 h-4 ml-2" />
@@ -600,6 +602,7 @@ const Navbar = () => {
                       <User className="w-4 h-4" />
                       <span className="font-medium">الملف الشخصي</span>
                     </Link>
+                    {!hidePrices && (
                     <Link
                       to="/orders"
                       onClick={() => setIsMobileMenuOpen(false)}
@@ -608,6 +611,7 @@ const Navbar = () => {
                       <Package className="w-4 h-4" />
                       <span className="font-medium">طلباتي</span>
                     </Link>
+                    )}
                     <button
                       onClick={() => {
                         handleLogout();

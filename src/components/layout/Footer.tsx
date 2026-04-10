@@ -109,7 +109,6 @@ const Footer = () => {
 
   // Main navigation links
   const mainLinks = [
-    { path: '/shop-setup', label: 'مُخطط المتجر 3D', icon: Box },
     { path: '/about', label: 'من نحن', icon: Users },
     { path: '/locations', label: 'فروعنا', icon: Building2 },
   ];

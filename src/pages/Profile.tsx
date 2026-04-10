@@ -247,34 +247,6 @@ const Profile = () => {
             )}
           </CardContent>
         </Card>
-
-        {/* Navigation Links */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-8">
-          <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
-            <Link to="/order-history">
-              <Package className="w-6 h-6" />
-              <span>سجل الطلبات</span>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
-            <Link to="/orders">
-              <Truck className="w-6 h-6" />
-              <span>طلباتي</span>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
-            <Link to="/profile/address">
-              <MapPin className="w-6 h-6" />
-              <span>عناوين الشحن</span>
-            </Link>
-          </Button>
-          <Button asChild variant="outline" className="h-20 flex flex-col items-center justify-center gap-2">
-            <Link to="/profile/payment">
-              <CreditCard className="w-6 h-6" />
-              <span>طرق الدفع</span>
-            </Link>
-          </Button>
-        </div>
       </div>
     </div>
   );
