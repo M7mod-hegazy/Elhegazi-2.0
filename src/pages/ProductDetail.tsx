@@ -60,6 +60,11 @@ import useDeviceDetection from '@/hooks/useDeviceDetection';
 import { cn } from '@/lib/utils';
 import { buildCategoryPath } from '@/lib/category-link';
 import { buildProductPath, isObjectId, resolveProductIdParam } from '@/lib/product-link';
+import {
+  resolveProductCategory,
+  categoryDisplayLabel,
+  type CategoryListRecord,
+} from '@/lib/category-display';
 import { optimizeImage, buildSrcSet, PRODUCT_IMAGE_FALLBACK, applyProductImageFallback } from '@/lib/images';
 import { useSettings } from '@/hooks/useSettings';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -110,53 +115,6 @@ type RatingHistory = {
   review?: string;
   date: string;
 };
-
-type ApiCategory = {
-  _id: string;
-  name: string;
-  nameAr?: string;
-  slug: string;
-  image?: string;
-};
-
-/** Resolve slug + display label from product fields and loaded categories (handles categoryId-only products). */
-function resolveProductCategory(
-  raw: { categorySlug?: string; category?: string; categoryId?: string },
-  catItems: ApiCategory[]
-): { slug: string; categoryAr: string } {
-  const catBySlug = new Map(catItems.map((c) => [c.slug, c]));
-  const catById = new Map(catItems.map((c) => [String(c._id), c]));
-
-  const cid =
-    raw.categoryId != null && String(raw.categoryId).length > 0
-      ? String(raw.categoryId)
-      : '';
-
-  let slug = (raw.categorySlug || '').trim();
-  if (!slug && typeof raw.category === 'string' && raw.category.trim()) {
-    slug = raw.category.trim();
-  }
-  if (!slug && cid) {
-    const byId = catById.get(cid);
-    if (byId?.slug) slug = byId.slug.trim();
-  }
-
-  const cat =
-    (slug ? catBySlug.get(slug) : undefined) ?? (cid ? catById.get(cid) : undefined);
-
-  const categoryAr =
-    cat?.nameAr?.trim() ||
-    cat?.name?.trim() ||
-    slug ||
-    '';
-
-  return { slug, categoryAr };
-}
-
-function categoryDisplayLabel(product: Pick<ApiProduct, 'categoryAr' | 'category'>): string {
-  const t = (product.categoryAr || product.category || '').trim();
-  return t || 'غير مصنّف';
-}
 
 // Helper function to format date
 const formatDate = (dateString: string) => {
@@ -1513,8 +1471,8 @@ const ProductDetail = () => {
             ? String(item.categoryId)
             : '';
 
-        const catsRes = await apiGet<ApiCategory>('/api/categories?limit=500&page=1');
-        const catItems = (catsRes as Extract<ApiResponse<ApiCategory>, { ok: true }>).items ?? [];
+        const catsRes = await apiGet<CategoryListRecord>('/api/categories?limit=500&page=1');
+        const catItems = (catsRes as Extract<ApiResponse<CategoryListRecord>, { ok: true }>).items ?? [];
 
         let { slug, categoryAr } = resolveProductCategory(
           {
@@ -1527,7 +1485,7 @@ const ProductDetail = () => {
 
         if ((!slug || !categoryAr) && itemCategoryId) {
           try {
-            const oneRes = await apiGet<ApiCategory>(`/api/categories/${encodeURIComponent(itemCategoryId)}`);
+            const oneRes = await apiGet<CategoryListRecord>(`/api/categories/${encodeURIComponent(itemCategoryId)}`);
             if (oneRes.ok && 'item' in oneRes && oneRes.item) {
               const ext = oneRes.item;
               if (!slug && ext.slug?.trim()) slug = ext.slug.trim();
