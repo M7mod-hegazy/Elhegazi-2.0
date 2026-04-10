@@ -16,7 +16,7 @@ interface EnhancedHeroSectionProps {
 }
 
 const EnhancedHeroSection = ({ slides, enabled = true }: EnhancedHeroSectionProps) => {
-  const { hidePrices } = usePricingSettings();
+  const { hidePrices, showPrices } = usePricingSettings();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
   const [isTransitioning, setIsTransitioning] = useState(false);
@@ -364,7 +364,7 @@ const EnhancedHeroSection = ({ slides, enabled = true }: EnhancedHeroSectionProp
                     {currentSlideData.product.descriptionAr}
                   </p>
                   <div className="flex items-center justify-between">
-                    {!hidePrices && (
+                    {showPrices && (
                       <span className="text-3xl font-bold text-yellow-400">
                         {currentSlideData.product.price.toLocaleString()} ج.م
                       </span>

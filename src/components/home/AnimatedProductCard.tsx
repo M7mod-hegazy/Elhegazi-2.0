@@ -33,7 +33,7 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
   index, 
   className = ""
 }) => {
-  const { hidePrices } = usePricingSettings();
+  const { hidePrices, canPurchase, showPrices } = usePricingSettings();
   const cardRef = useRef<HTMLDivElement>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
@@ -165,7 +165,7 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
           )}
         </div>
         
-        {!hidePrices && (
+        {showPrices && (
           <div className="flex items-center gap-2 mb-2">
             <span 
               className="text-lg font-bold text-white"
@@ -192,6 +192,11 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
               <img src={whatsappIcon} alt="WhatsApp" className="w-3 h-3" />
               <span className="text-white text-xs font-medium">لمعرفة السعر</span>
             </button>
+          ) : !canPurchase ? (
+            <button className="flex-1 p-2 bg-slate-400 rounded-xl transition-all duration-300 flex items-center justify-center gap-2 cursor-not-allowed">
+              <Eye className="w-3 h-3 text-white" />
+              <span className="text-white text-xs font-medium">عرض فقط</span>
+            </button>
           ) : (
             <button className="flex-1 p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all duration-300 flex items-center justify-center gap-2">
               <ShoppingCart className="w-3 h-3 text-white" />
@@ -199,8 +204,8 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
             </button>
           )}
           
-          {!hidePrices && (
-            <>
+          {showPrices && (
+          <>
               {/* 3D Heart Button */}
               <button className="group/heart p-2 bg-white/20 hover:bg-white/30 rounded-xl transition-all duration-300 relative">
                 <Heart className="w-3 h-3 text-white transition-all duration-300" />

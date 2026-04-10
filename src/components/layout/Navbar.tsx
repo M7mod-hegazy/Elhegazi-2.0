@@ -53,7 +53,7 @@ const Navbar = () => {
   const { user, adminUser, isAuthenticated, isAdminAuthenticated, isAdmin, logout } = useDualAuth();
   const { itemCount } = useCart();
   const { favoritesCount } = useFavorites();
-  const { hidePrices } = usePricingSettings();
+  const { hidePrices, showPrices } = usePricingSettings();
   const { isVisible } = useOwnerVisibility();
 
   const isActivePath = (path: string) => location.pathname === path;
@@ -356,7 +356,7 @@ const Navbar = () => {
               )}
 
               {/* Cart Button - Hidden when prices are hidden */}
-              {!hidePrices && isVisible('publicPages', 'cart') && (
+              {showPrices && isVisible('publicPages', 'cart') && (
                 <Link
                   to="/cart"
                   className="hidden lg:inline-flex relative p-2 hover:bg-muted rounded-lg transition-all duration-300 ease-out group"
@@ -411,7 +411,7 @@ const Navbar = () => {
                           <span>الملف الشخصي</span>
                         </Link>
                       </DropdownMenuItem>
-                      {!hidePrices && (
+                      {showPrices && (
                       <DropdownMenuItem asChild>
                         <Link to="/orders" className="flex items-center space-x-2 space-x-reverse">
                           <Package className="w-4 h-4" />
@@ -472,7 +472,7 @@ const Navbar = () => {
                 )}
 
                 {/* Cart - Only show if prices are visible */}
-                {!hidePrices && isVisible('publicPages', 'cart') && (
+                {showPrices && isVisible('publicPages', 'cart') && (
                   <Link
                     to="/cart"
                     className="p-2 hover:bg-muted rounded-lg transition-all duration-300 relative"
@@ -602,7 +602,7 @@ const Navbar = () => {
                       <User className="w-4 h-4" />
                       <span className="font-medium">الملف الشخصي</span>
                     </Link>
-                    {!hidePrices && (
+                    {showPrices && (
                     <Link
                       to="/orders"
                       onClick={() => setIsMobileMenuOpen(false)}

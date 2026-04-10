@@ -75,7 +75,7 @@ const DEFAULT_MAX_PRICE = 10000;
 const Products = () => {
   // Set page title
   usePageTitle('المنتجات');
-  const { hidePrices } = usePricingSettings();
+  const { hidePrices, showPrices } = usePricingSettings();
   
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
@@ -463,7 +463,7 @@ const Products = () => {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {sortOptions.filter(opt => !hidePrices || (opt.value !== 'price-low' && opt.value !== 'price-high')).map((option) => (
+                    {sortOptions.filter(opt => showPrices || (opt.value !== 'price-low' && opt.value !== 'price-high')).map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.labelAr}
                       </SelectItem>
@@ -538,7 +538,7 @@ const Products = () => {
                 </div>
 
                 {/* Price Range */}
-                {!hidePrices && (
+                {showPrices && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">نطاق السعر</label>
                   <div className="space-y-2">

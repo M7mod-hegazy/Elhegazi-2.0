@@ -3,6 +3,7 @@ import { apiGet } from '@/lib/api';
 
 interface PricingSettings {
   hidePrices: boolean;
+  viewOnlyPrices: boolean;
   contactMessage: string;
 }
 
@@ -11,6 +12,7 @@ interface SettingsResponse {
   item?: {
     pricingSettings?: {
       hidePrices?: boolean;
+      viewOnlyPrices?: boolean;
       contactMessage?: string;
     };
   };
@@ -39,6 +41,7 @@ const getCachedSettings = (): PricingSettings | null => {
     
     return {
       hidePrices: data.hidePrices,
+      viewOnlyPrices: data.viewOnlyPrices,
       contactMessage: data.contactMessage,
     };
   } catch (error) {
@@ -65,6 +68,7 @@ export const usePricingSettings = () => {
   const [pricingSettings, setPricingSettings] = useState<PricingSettings>(
     cachedSettings || {
       hidePrices: false,
+      viewOnlyPrices: false,
       contactMessage: 'السلام عليكم، أود معرفة سعر المنتج',
     }
   );
@@ -79,6 +83,7 @@ export const usePricingSettings = () => {
       if (res.ok && res.item) {
         const newSettings: PricingSettings = {
           hidePrices: res.item.pricingSettings?.hidePrices === true,
+          viewOnlyPrices: res.item.pricingSettings?.viewOnlyPrices === true,
           contactMessage: res.item.pricingSettings?.contactMessage ?? 'السلام عليكم، أود معرفة سعر المنتج',
         };
         
@@ -116,8 +121,15 @@ export const usePricingSettings = () => {
     };
   }, [loadSettings]);
 
+  // Derived values for convenience
+  const showPrices = !pricingSettings.hidePrices;
+  const canPurchase = !pricingSettings.hidePrices && !pricingSettings.viewOnlyPrices;
+
   return {
     hidePrices: pricingSettings.hidePrices,
+    viewOnlyPrices: pricingSettings.viewOnlyPrices,
+    showPrices,
+    canPurchase,
     contactMessage: pricingSettings.contactMessage,
     loading,
     error,

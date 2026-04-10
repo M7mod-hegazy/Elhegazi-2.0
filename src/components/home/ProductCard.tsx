@@ -38,7 +38,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
   onHover, 
   isMobile 
 }) => {
-  const { hidePrices } = usePricingSettings();
+  const { hidePrices, canPurchase, showPrices } = usePricingSettings();
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
   const [hoveredRating, setHoveredRating] = useState(0);
@@ -167,7 +167,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
             </div>
             
             <div className="flex items-center justify-between">
-              {!hidePrices && (
+              {showPrices && (
                 <div className="flex items-center gap-2">
                   <span className="text-lg font-bold text-white">
                     {product.price ? product.price.toLocaleString() : 'N/A'} ج.م
@@ -268,7 +268,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
           </div>
           
           <div className="flex items-center justify-between mb-4">
-            {!hidePrices && (
+            {showPrices && (
               <div className="flex items-center gap-2">
                 <span className="text-2xl font-bold text-white">
                   {product.price ? product.price.toLocaleString() : 'N/A'} ج.م
