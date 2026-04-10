@@ -47,6 +47,8 @@ type ApiProduct = {
   nameAr?: string;
   sku?: string;
   categorySlug?: string;
+  categoryId?: string;
+  category?: string;
   price: number;
   description?: string;
   image?: string;
@@ -109,11 +111,25 @@ const Products = () => {
           order: typeof c.order === 'number' ? c.order : 0,
         }));
         const catBySlug = new Map(categories.map((c) => [c.slug, c]));
+        const catById = new Map(categories.map((c) => [String(c.id), c]));
 
         const prodItems = (prodRes as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
         const products: Product[] = prodItems.map((p) => {
           const slug = p.categorySlug ?? '';
-          const cat = catBySlug.get(slug);
+          const cid = p.categoryId != null && String(p.categoryId).trim() !== '' ? String(p.categoryId) : '';
+          
+          let resolvedSlug = slug;
+          if (!resolvedSlug && typeof p.category === 'string' && p.category.trim()) {
+            resolvedSlug = p.category.trim();
+          }
+          if (!resolvedSlug && cid) {
+            const byId = catById.get(cid);
+            if (byId?.slug) resolvedSlug = byId.slug.trim();
+          }
+          
+          const cat = (resolvedSlug ? catBySlug.get(resolvedSlug) : undefined) ?? (cid ? catById.get(cid) : undefined);
+          const categoryAr = cat?.nameAr?.trim() || cat?.name?.trim() || resolvedSlug || '';
+          
           return {
             id: p._id,
             name: p.name,
@@ -124,8 +140,9 @@ const Products = () => {
             originalPrice: undefined,
             image: p.image ?? '',
             images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
-            category: slug, // use slug for filtering
-            categoryAr: cat?.nameAr ?? slug,
+            category: resolvedSlug,
+            categoryId: cid || undefined,
+            categoryAr,
             stock: p.stock,
             isHidden: p.active === false,
             featured: !!p.featured,

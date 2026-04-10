@@ -45,12 +45,21 @@ const CreativeProductsSlider = ({
   const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
+  type ApiCategory = {
+    _id: string;
+    name: string;
+    nameAr?: string;
+    slug: string;
+  };
+
   type ApiProduct = {
     _id: string;
     name: string;
     nameAr?: string;
     sku?: string;
     categorySlug?: string;
+    categoryId?: string;
+    category?: string;
     price: number;
     description?: string;
     image?: string;
@@ -68,27 +77,104 @@ const CreativeProductsSlider = ({
     let mounted = true;
     (async () => {
       try {
+        // Fetch categories first
+        const catRes = await apiGet<ApiCategory>('/api/categories?limit=500');
+        const catItems = (catRes as Extract<ApiResponse<ApiCategory>, { ok: true }>).items ?? [];
+        const catBySlug = new Map(catItems.map((c) => [c.slug, c]));
+        const catById = new Map(catItems.map((c) => [String(c._id), c]));
+
         if (Array.isArray(selectedIds)) {
           if (selectedIds.length === 0) {
             if (mounted) setLiveProducts([]);
             return;
           }
           const idsParam = encodeURIComponent(selectedIds.join(','));
-          const fields = ['_id', 'name', 'nameAr', 'price', 'image', 'images', 'categorySlug', 'featured', 'active', 'createdAt', 'updatedAt', 'stock', 'sku', 'rating', 'reviews'].join(',');
+          const fields = ['_id', 'name', 'nameAr', 'price', 'image', 'images', 'categorySlug', 'categoryId', 'category', 'featured', 'active', 'createdAt', 'updatedAt', 'stock', 'sku', 'rating', 'reviews'].join(',');
           const res = await apiGet<ApiProduct>(`/api/products?ids=${idsParam}&fields=${fields}`);
           const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
-          const mapped: Product[] = items.map((p) => ({
+          const mapped: Product[] = items.map((p) => {
+            const slug = p.categorySlug ?? '';
+            const cid = p.categoryId != null && String(p.categoryId).trim() !== '' ? String(p.categoryId) : '';
+            
+            let resolvedSlug = slug;
+            if (!resolvedSlug && typeof p.category === 'string' && p.category.trim()) {
+              resolvedSlug = p.category.trim();
+            }
+            if (!resolvedSlug && cid) {
+              const byId = catById.get(cid);
+              if (byId?.slug) resolvedSlug = byId.slug.trim();
+            }
+            
+            const cat = (resolvedSlug ? catBySlug.get(resolvedSlug) : undefined) ?? (cid ? catById.get(cid) : undefined);
+            const categoryAr = cat?.nameAr?.trim() || cat?.name?.trim() || resolvedSlug || '';
+            
+            return {
+              id: p._id,
+              name: p.name,
+              nameAr: p.nameAr ?? p.name,
+              description: '',
+              descriptionAr: '',
+              price: p.price,
+              originalPrice: undefined,
+              image: p.image ?? '',
+              images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
+              category: resolvedSlug,
+              categoryId: cid || undefined,
+              categoryAr,
+              stock: p.stock,
+              isHidden: p.active === false,
+              featured: !!p.featured,
+              discount: undefined,
+              rating: p.rating ?? 0,
+              reviews: p.reviews ?? 0,
+              tags: [],
+              sku: p.sku ?? '',
+              weight: undefined,
+              dimensions: undefined,
+              createdAt: p.createdAt,
+              updatedAt: p.updatedAt,
+            };
+          });
+          if (mounted) setLiveProducts(mapped);
+          return;
+        }
+
+        const params = new URLSearchParams();
+        params.set('limit', '60');
+        if (filterType === 'featured') params.set('featured', 'true');
+        const fields = ['_id', 'name', 'nameAr', 'price', 'image', 'images', 'categorySlug', 'categoryId', 'category', 'featured', 'active', 'createdAt', 'updatedAt', 'stock', 'sku', 'rating', 'reviews'].join(',');
+        params.set('fields', fields);
+        const res = await apiGet<ApiProduct>(`/api/products?${params.toString()}`);
+        const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
+        const mapped: Product[] = items.map((p) => {
+          const slug = p.categorySlug ?? '';
+          const cid = p.categoryId != null && String(p.categoryId).trim() !== '' ? String(p.categoryId) : '';
+          
+          let resolvedSlug = slug;
+          if (!resolvedSlug && typeof p.category === 'string' && p.category.trim()) {
+            resolvedSlug = p.category.trim();
+          }
+          if (!resolvedSlug && cid) {
+            const byId = catById.get(cid);
+            if (byId?.slug) resolvedSlug = byId.slug.trim();
+          }
+          
+          const cat = (resolvedSlug ? catBySlug.get(resolvedSlug) : undefined) ?? (cid ? catById.get(cid) : undefined);
+          const categoryAr = cat?.nameAr?.trim() || cat?.name?.trim() || resolvedSlug || '';
+          
+          return {
             id: p._id,
             name: p.name,
             nameAr: p.nameAr ?? p.name,
-            description: '',
-            descriptionAr: '',
+            description: p.description ?? '',
+            descriptionAr: p.description ?? '',
             price: p.price,
             originalPrice: undefined,
             image: p.image ?? '',
             images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
-            category: p.categorySlug ?? '',
-            categoryAr: p.categorySlug ?? '',
+            category: resolvedSlug,
+            categoryId: cid || undefined,
+            categoryAr,
             stock: p.stock,
             isHidden: p.active === false,
             featured: !!p.featured,
@@ -101,43 +187,8 @@ const CreativeProductsSlider = ({
             dimensions: undefined,
             createdAt: p.createdAt,
             updatedAt: p.updatedAt,
-          }));
-          if (mounted) setLiveProducts(mapped);
-          return;
-        }
-
-        const params = new URLSearchParams();
-        params.set('limit', '60');
-        if (filterType === 'featured') params.set('featured', 'true');
-        const fields = ['_id', 'name', 'nameAr', 'price', 'image', 'images', 'categorySlug', 'featured', 'active', 'createdAt', 'updatedAt', 'stock', 'sku', 'rating', 'reviews'].join(',');
-        params.set('fields', fields);
-        const res = await apiGet<ApiProduct>(`/api/products?${params.toString()}`);
-        const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
-        const mapped: Product[] = items.map((p) => ({
-          id: p._id,
-          name: p.name,
-          nameAr: p.nameAr ?? p.name,
-          description: p.description ?? '',
-          descriptionAr: p.description ?? '',
-          price: p.price,
-          originalPrice: undefined,
-          image: p.image ?? '',
-          images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
-          category: p.categorySlug ?? '',
-          categoryAr: p.categorySlug ?? '',
-          stock: p.stock,
-          isHidden: p.active === false,
-          featured: !!p.featured,
-          discount: undefined,
-          rating: p.rating ?? 0,
-          reviews: p.reviews ?? 0,
-          tags: [],
-          sku: p.sku ?? '',
-          weight: undefined,
-          dimensions: undefined,
-          createdAt: p.createdAt,
-          updatedAt: p.updatedAt,
-        }));
+          };
+        });
         if (mounted) setLiveProducts(mapped);
       } catch (e) {
         console.error('Failed to fetch products for slider:', e);
