@@ -80,46 +80,31 @@ const Footer = () => {
   useEffect(() => {
     const fetchFooterSettings = async () => {
       try {
-        // Use the main settings endpoint; some backends don't expose /api/settings/footer.
         const res = await fetch('/api/settings');
         if (!res.ok) return;
         const data = await res.json();
         if (data.ok) {
           const item = data.item || {};
+          const storeInfo = item.storeInfo || {};
+          const socialLinks = item.social || {};
           setFooterSettings({
-            storeName: item.storeName,
-            storeDescription: item.storeDescription,
-            phone: item.phone,
-            email: item.email,
+            storeName: storeInfo.name,
+            storeDescription: storeInfo.description,
+            phone: storeInfo.phone,
+            email: storeInfo.email,
             address: item.address,
             developerName: item.developerName,
             developerUrl: item.developerUrl,
-            socialLinks: item.social,
+            socialLinks,
           });
+          setWhatsappUrl(socialLinks.whatsappUrl || '');
+          setMessengerUrl(socialLinks.messengerUrl || '');
         }
-      } catch (error) {
+      } catch {
         // Silently fail
       }
     };
     fetchFooterSettings();
-  }, []);
-
-  // Fetch social settings for WhatsApp and Messenger
-  useEffect(() => {
-    const fetchSocialSettings = async () => {
-      try {
-        const res = await fetch('/api/settings');
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data.ok && data.item?.social) {
-          setWhatsappUrl(data.item.social.whatsappUrl || '');
-          setMessengerUrl(data.item.social.messengerUrl || '');
-        }
-      } catch (error) {
-        // Silently fail
-      }
-    };
-    fetchSocialSettings();
   }, []);
 
   // Main navigation links

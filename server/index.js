@@ -80,6 +80,8 @@ import Rating from './models/Rating.js';
 import BuilderPricingConfig from './models/BuilderPricingConfig.js';
 import BuilderAccessSession from './models/BuilderAccessSession.js';
 import BuilderProject from './models/BuilderProject.js';
+import Product3D from './models/Product3D.js';
+import BackupJob from './models/BackupJob.js';
 
 // Services
 import orderAutomationService from './services/orderAutomationService.js';
@@ -94,7 +96,8 @@ const app = express();
 app.use(cors());
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 app.use(compression());
-app.use(express.json({ limit: '2mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ extended: true, limit: '25mb' }));
 
 // Attach minimal auth user from headers (to be replaced by real auth)
 // Also validates user exists in DB. Dev admin fallback is restricted to admin-mode requests only.
@@ -192,6 +195,23 @@ async function getBuilderPricingConfig() {
 }
 
 const OWNER_VAULT_SESSION_MINUTES = 15;
+const BACKUP_SCHEMA_VERSION = 1;
+const BACKUP_MODULES = [
+  'settings',
+  'homeConfig',
+  'shopSetup',
+  'categories',
+  'products',
+  'products3d',
+  'builderProjects',
+  'orders',
+  'users',
+  'history',
+  'profitSettings',
+  'mediaManifest',
+];
+const SETTINGS_BACKUP_EXCLUDED_MODULES = new Set(['products']);
+const SETTINGS_BACKUP_MODULES = BACKUP_MODULES.filter((m) => !SETTINGS_BACKUP_EXCLUDED_MODULES.has(m));
 
 const DEFAULT_OWNER_VISIBILITY = {
   publicPages: {
@@ -231,6 +251,288 @@ const DEFAULT_OWNER_VISIBILITY = {
     prices: true,
   },
 };
+
+function deepClone(obj) {
+  return JSON.parse(JSON.stringify(obj));
+}
+
+function stripCommonMeta(doc) {
+  const out = deepClone(doc || {});
+  delete out._id;
+  delete out.__v;
+  delete out.createdAt;
+  delete out.updatedAt;
+  return out;
+}
+
+function sanitizeUserForBackup(userDoc) {
+  const out = stripCommonMeta(userDoc);
+  delete out.password;
+  return out;
+}
+
+function sanitizeSettingsForBackup(settingsDoc) {
+  const out = stripCommonMeta(settingsDoc);
+  if (out.ownerVault) {
+    delete out.ownerVault.passwordHash;
+    delete out.ownerVault.session;
+  }
+  return out;
+}
+
+function normalizeBackupModules(inputModules) {
+  if (!Array.isArray(inputModules) || !inputModules.length) return BACKUP_MODULES.filter((m) => m !== 'mediaManifest');
+  const unique = [...new Set(inputModules.map((m) => String(m || '').trim()).filter(Boolean))];
+  return unique.filter((m) => BACKUP_MODULES.includes(m));
+}
+
+async function collectMediaManifest() {
+  const [products, categories, settings, home] = await Promise.all([
+    Product.find({}, { images: 1, image: 1, name: 1 }).lean(),
+    Category.find({}, { image: 1, slug: 1, nameAr: 1 }).lean(),
+    Settings.findOne().lean(),
+    HomeConfig.findOne().lean(),
+  ]);
+
+  const manifest = [];
+  const pushAsset = (source, url) => {
+    const safe = String(url || '').trim();
+    if (!safe) return;
+    manifest.push({ source, url: safe });
+  };
+
+  products.forEach((p) => {
+    pushAsset(`product:${p.name || 'unknown'}:image`, p.image);
+    (Array.isArray(p.images) ? p.images : []).forEach((img, i) => pushAsset(`product:${p.name || 'unknown'}:images:${i}`, img));
+  });
+  categories.forEach((c) => pushAsset(`category:${c.slug || c.nameAr || 'unknown'}`, c.image));
+  if (settings?.logo?.url) pushAsset('settings:logo', settings.logo.url);
+  if (settings?.favicon?.url) pushAsset('settings:favicon', settings.favicon.url);
+  const slides = Array.isArray(home?.slides) ? home.slides : [];
+  slides.forEach((slide, i) => pushAsset(`home:slide:${i}`, slide?.image));
+
+  return manifest;
+}
+
+async function buildBackupData(selectedModules) {
+  const out = {};
+  if (selectedModules.includes('settings')) {
+    const settings = await Settings.findOne().lean();
+    out.settings = settings ? sanitizeSettingsForBackup(settings) : null;
+  }
+  if (selectedModules.includes('homeConfig')) {
+    const home = await HomeConfig.findOne().lean();
+    out.homeConfig = home ? stripCommonMeta(home) : null;
+  }
+  if (selectedModules.includes('shopSetup')) {
+    const items = await ShopSetup.find({}).lean();
+    out.shopSetup = items.map(stripCommonMeta);
+  }
+  if (selectedModules.includes('categories')) {
+    const items = await Category.find({}).lean();
+    out.categories = items.map(stripCommonMeta);
+  }
+  if (selectedModules.includes('products')) {
+    const items = await Product.find({}).lean();
+    out.products = items.map(stripCommonMeta);
+  }
+  if (selectedModules.includes('products3d')) {
+    const items = await Product3D.find({}).lean();
+    out.products3d = items.map(stripCommonMeta);
+  }
+  if (selectedModules.includes('builderProjects')) {
+    const items = await BuilderProject.find({}).lean();
+    out.builderProjects = items.map(stripCommonMeta);
+  }
+  if (selectedModules.includes('orders')) {
+    const items = await Order.find({}).lean();
+    out.orders = items.map(stripCommonMeta);
+  }
+  if (selectedModules.includes('users')) {
+    const items = await User.find({}).lean();
+    out.users = items.map(sanitizeUserForBackup);
+  }
+  if (selectedModules.includes('history')) {
+    const items = await History.find({}).lean();
+    out.history = items.map(stripCommonMeta);
+  }
+  if (selectedModules.includes('profitSettings')) {
+    const item = await ProfitSettings.findOne().lean();
+    out.profitSettings = item ? stripCommonMeta(item) : null;
+  }
+  if (selectedModules.includes('mediaManifest')) {
+    out.mediaManifest = await collectMediaManifest();
+  }
+  return out;
+}
+
+function countModuleRecords(moduleName, value) {
+  if (value == null) return 0;
+  if (Array.isArray(value)) return value.length;
+  if (typeof value === 'object') return 1;
+  return 0;
+}
+
+function humanModuleName(moduleName) {
+  const map = {
+    settings: 'إعدادات المتجر',
+    homeConfig: 'إعدادات الصفحة الرئيسية',
+    shopSetup: 'إعدادات منشئ المتجر',
+    categories: 'الأقسام',
+    products: 'المنتجات',
+    products3d: 'منتجات ثلاثية الأبعاد',
+    builderProjects: 'مشاريع منشئ المتجر',
+    orders: 'الطلبات',
+    users: 'المستخدمون',
+    history: 'السجل',
+    profitSettings: 'إعدادات الأرباح',
+    mediaManifest: 'روابط الوسائط',
+  };
+  return map[moduleName] || moduleName;
+}
+
+function previewRows(moduleName, incomingData) {
+  const rows = Array.isArray(incomingData) ? incomingData : (incomingData ? [incomingData] : []);
+  return rows.slice(0, 5).map((item) => {
+    const row = item && typeof item === 'object' ? item : {};
+    switch (moduleName) {
+      case 'categories':
+        return { key: String(row.slug || ''), title: row.nameAr || row.name || row.slug || 'category' };
+      case 'users':
+        return { key: String(row.email || ''), title: row.email || row.firstName || 'user' };
+      case 'orders':
+        return { key: String(row.orderNumber || row._id || ''), title: row.orderNumber || row.status || 'order' };
+      case 'products3d':
+        return { key: String(row.name || row.title || ''), title: row.title || row.name || '3d product' };
+      case 'builderProjects':
+        return { key: String(row.title || ''), title: row.title || 'project' };
+      case 'shopSetup':
+        return { key: String(row.shopName || row.actorKey || ''), title: row.shopName || row.actorKey || 'shop setup' };
+      case 'history':
+        return { key: String(row.section || ''), title: `${row.section || ''} / ${row.action || ''}`.trim() || 'history' };
+      case 'settings':
+      case 'homeConfig':
+      case 'profitSettings':
+        return { key: moduleName, title: humanModuleName(moduleName) };
+      default:
+        return { key: backupKey(moduleName, row), title: String(row.name || row.title || row.slug || row.email || 'item') };
+    }
+  });
+}
+
+function stableSortObject(value) {
+  if (Array.isArray(value)) return value.map(stableSortObject);
+  if (value && typeof value === 'object') {
+    const out = {};
+    Object.keys(value).sort().forEach((k) => {
+      out[k] = stableSortObject(value[k]);
+    });
+    return out;
+  }
+  return value;
+}
+
+function stableStringify(value) {
+  return JSON.stringify(stableSortObject(value));
+}
+
+async function existingRowsForModule(moduleName) {
+  switch (moduleName) {
+    case 'categories': return (await Category.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
+    case 'users': return (await User.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
+    case 'orders': return (await Order.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
+    case 'products3d': return (await Product3D.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
+    case 'builderProjects': return (await BuilderProject.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
+    case 'shopSetup': return (await ShopSetup.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
+    case 'history': return (await History.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
+    default: return [];
+  }
+}
+
+async function exactMatchStats(moduleName, incomingData) {
+  const incomingItems = Array.isArray(incomingData) ? incomingData : (incomingData ? [incomingData] : []);
+  if (!incomingItems.length) return { exactMatches: 0, comparedItems: 0 };
+
+  if (['settings', 'homeConfig', 'profitSettings'].includes(moduleName)) {
+    const existingSingleton = await (async () => {
+      if (moduleName === 'settings') return sanitizeIncomingForApply(moduleName, await Settings.findOne({}).lean());
+      if (moduleName === 'homeConfig') return sanitizeIncomingForApply(moduleName, await HomeConfig.findOne({}).lean());
+      if (moduleName === 'profitSettings') return sanitizeIncomingForApply(moduleName, await ProfitSettings.findOne({}).lean());
+      return null;
+    })();
+    const incomingOne = sanitizeIncomingForApply(moduleName, incomingItems[0] || {});
+    return {
+      exactMatches: existingSingleton && stableStringify(existingSingleton) === stableStringify(incomingOne) ? 1 : 0,
+      comparedItems: 1,
+    };
+  }
+
+  const existingRows = await existingRowsForModule(moduleName);
+  const existingByKey = new Map();
+  existingRows.forEach((row) => {
+    const k = backupKey(moduleName, row);
+    if (k) existingByKey.set(k, row);
+  });
+  let exactMatches = 0;
+  let comparedItems = 0;
+  incomingItems.forEach((raw) => {
+    const row = sanitizeIncomingForApply(moduleName, raw);
+    const k = backupKey(moduleName, row);
+    if (!k) return;
+    const existing = existingByKey.get(k);
+    if (!existing) return;
+    comparedItems += 1;
+    if (stableStringify(existing) === stableStringify(row)) exactMatches += 1;
+  });
+  return { exactMatches, comparedItems };
+}
+
+function backupKey(moduleName, item) {
+  if (!item || typeof item !== 'object') return '';
+  switch (moduleName) {
+    case 'categories': return String(item.slug || '').trim().toLowerCase();
+    case 'products': return String(item.sku || item.nameAr || item.name || '').trim().toLowerCase();
+    case 'users': return String(item.email || '').trim().toLowerCase();
+    case 'orders': return String(item.orderNumber || item._id || '').trim().toLowerCase();
+    case 'products3d': return String(item.name || item.title || item._id || '').trim().toLowerCase();
+    case 'builderProjects': return `${String(item.title || '').trim().toLowerCase()}::${String(item.ownerEmailSnapshot || '').trim().toLowerCase()}`;
+    case 'shopSetup': return `${String(item.userId || item.actorKey || '').trim().toLowerCase()}::${String(item.shopName || '').trim().toLowerCase()}`;
+    case 'history': return `${String(item.section || '').trim().toLowerCase()}::${String(item.action || '').trim().toLowerCase()}::${String(item.createdAt || '').trim()}`;
+    default: return '';
+  }
+}
+
+async function existingKeySet(moduleName) {
+  let rows = [];
+  switch (moduleName) {
+    case 'categories': rows = await Category.find({}, { slug: 1 }).lean(); break;
+    case 'products': rows = await Product.find({}, { sku: 1, nameAr: 1, name: 1 }).lean(); break;
+    case 'users': rows = await User.find({}, { email: 1 }).lean(); break;
+    case 'orders': rows = await Order.find({}, { orderNumber: 1 }).lean(); break;
+    case 'products3d': rows = await Product3D.find({}, { name: 1, title: 1 }).lean(); break;
+    case 'builderProjects': rows = await BuilderProject.find({}, { title: 1, ownerEmailSnapshot: 1 }).lean(); break;
+    case 'shopSetup': rows = await ShopSetup.find({}, { userId: 1, actorKey: 1, shopName: 1 }).lean(); break;
+    case 'history': rows = await History.find({}, { section: 1, action: 1, createdAt: 1 }).lean(); break;
+    default: return new Set();
+  }
+  const set = new Set();
+  rows.forEach((r) => {
+    const key = backupKey(moduleName, r);
+    if (key) set.add(key);
+  });
+  return set;
+}
+
+function sanitizeIncomingForApply(moduleName, item) {
+  const base = stripCommonMeta(item);
+  if (moduleName === 'users') delete base.password;
+  if (moduleName === 'settings' && base.ownerVault) {
+    delete base.ownerVault.passwordHash;
+    delete base.ownerVault.session;
+  }
+  return base;
+}
+
 
 function mergeVisibility(visibility = {}) {
   return {
@@ -2417,9 +2719,17 @@ app.post('/api/cloudinary/upload-url', async (req, res) => {
       return res.json({ ok: true, item: { url: safeUrl, valid: true } });
     }
 
+    const resolvedFolder = typeof folder === 'string' && folder.trim() ? folder.trim() : 'products';
+    if (!/^[a-zA-Z0-9/_-]+$/.test(resolvedFolder)) {
+      return res.status(400).json({ ok: false, error: 'Invalid folder format' });
+    }
+
     const uploadOptions = {
-      folder: typeof folder === 'string' && folder.trim() ? folder.trim() : 'products',
+      folder: resolvedFolder,
       resource_type: 'image',
+      format: 'webp',
+      quality: 'auto:good',
+      transformation: [{ width: 1280, height: 1280, crop: 'limit' }],
     };
 
     if (typeof public_id === 'string' && public_id.trim()) {
@@ -2499,9 +2809,18 @@ app.post('/api/cloudinary/upload-file', (req, res, next) => {
     if (!String(req.file.mimetype || '').startsWith('image/')) {
       return res.status(400).json({ ok: false, error: 'Only image files are allowed' });
     }
+    const folder = typeof req.body?.folder === 'string' && req.body.folder.trim() ? req.body.folder.trim() : 'products';
+    if (!/^[a-zA-Z0-9/_-]+$/.test(folder)) {
+      return res.status(400).json({ ok: false, error: 'Invalid folder format' });
+    }
+    const publicId = typeof req.body?.public_id === 'string' ? req.body.public_id.trim() : '';
+    if (publicId && !/^[a-zA-Z0-9/_-]+$/.test(publicId)) {
+      return res.status(400).json({ ok: false, error: 'Invalid public_id format' });
+    }
     const result = await new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream({
-        folder: 'products',
+        folder,
+        ...(publicId ? { public_id: publicId } : {}),
         format: 'webp',
         quality: 'auto:good',
         transformation: [
@@ -3691,7 +4010,6 @@ app.get('/api/orders/:id/email/status', requirePermission('orders', 'read', { at
 
 // Return Management API Endpoints
 import Return from './models/Return.js';
-import Product3D from './models/Product3D.js';
 
 // Get all returns (admin)
 app.get('/api/returns', requirePermission('returns', 'read', { attach: true }), async (req, res) => {
@@ -4216,10 +4534,18 @@ app.post('/api/auth/login', async (req, res) => {
     if (!email || !password) return res.status(400).json({ ok: false, error: 'email and password required' });
     const user = await User.findOne({ email }).lean();
     if (!user || user.password !== password || !user.isActive) {
-      return res.status(401).json({ ok: false, error: 'Invalid credentials' });
+      return res.status(401).json({ ok: false, error: 'Invalid credentials', reason: 'invalid_credentials' });
     }
     await User.updateOne({ _id: user._id }, { $set: { lastLogin: new Date() } });
-    return res.json({ ok: true, user: { id: String(user._id), email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone, role: user.role, isActive: user.isActive } });
+    const sessionTimeoutMinutes = 15;
+    return res.json({
+      ok: true,
+      user: { id: String(user._id), email: user.email, firstName: user.firstName, lastName: user.lastName, phone: user.phone, role: user.role, isActive: user.isActive },
+      session: {
+        timeoutMinutes: sessionTimeoutMinutes,
+        expiresAt: new Date(Date.now() + sessionTimeoutMinutes * 60 * 1000).toISOString(),
+      },
+    });
   } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }
@@ -4318,6 +4644,399 @@ app.delete('/api/users/:id/cart', async (req, res) => {
   user.cart = [];
   await user.save();
   return res.json({ ok: true, items: [] });
+});
+
+// --- Backups (admin-only, no Owner Vault requirement) ---
+app.get('/api/backups/capabilities', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    return res.json({
+      ok: true,
+      item: {
+        schemaVersion: BACKUP_SCHEMA_VERSION,
+        modules: BACKUP_MODULES,
+        settingsModules: SETTINGS_BACKUP_MODULES,
+        defaults: {
+          mode: 'merge',
+          selectedModules: SETTINGS_BACKUP_MODULES.filter((m) => m !== 'mediaManifest'),
+        },
+        importModes: ['merge', 'replace'],
+      },
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message || 'Failed to load backup capabilities' });
+  }
+});
+
+app.get('/api/backups/jobs', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit || 15)));
+    const jobs = await BackupJob.find({}).sort({ createdAt: -1 }).limit(limit).lean();
+    return res.json({ ok: true, items: jobs });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message || 'Failed to load backup jobs' });
+  }
+});
+
+app.get('/api/backups/jobs/:id', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    const job = await BackupJob.findById(req.params.id).lean();
+    if (!job) return res.status(404).json({ ok: false, error: 'Backup job not found' });
+    return res.json({ ok: true, item: job });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to load backup job' });
+  }
+});
+
+app.post('/api/backups/export', async (req, res) => {
+  let job = null;
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+
+    const mode = String(req.body?.mode || 'full').toLowerCase();
+    const selectedModules = normalizeBackupModules(req.body?.selectedModules);
+    const modules = mode === 'custom' ? selectedModules : BACKUP_MODULES.filter((m) => m !== 'mediaManifest');
+
+    job = await BackupJob.create({
+      type: 'export',
+      status: 'running',
+      mode,
+      selectedModules: modules,
+      actorUserId: req.user?._id ? String(req.user._id) : '',
+      actorEmail: req.user?.email || '',
+    });
+
+    const data = await buildBackupData(modules);
+    const counts = {};
+    modules.forEach((m) => {
+      counts[m] = countModuleRecords(m, data[m]);
+    });
+
+    const payload = {
+      schemaVersion: BACKUP_SCHEMA_VERSION,
+      createdAt: new Date().toISOString(),
+      createdBy: req.user?.email || req.user?._id || 'admin',
+      mode,
+      modules,
+      counts,
+      data,
+    };
+    payload.checksum = crypto.createHash('sha256').update(JSON.stringify(payload.data || {})).digest('hex');
+
+    job.status = 'done';
+    job.summary = { mode, modules, counts };
+    await job.save();
+
+    return res.json({ ok: true, item: payload, jobId: String(job._id) });
+  } catch (err) {
+    if (job) {
+      job.status = 'failed';
+      job.error = err.message || 'Export failed';
+      await job.save().catch(() => null);
+    }
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to export backup' });
+  }
+});
+
+app.post('/api/backups/export/preview', async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    const selectedModules = normalizeBackupModules(req.body?.selectedModules).filter((m) => !SETTINGS_BACKUP_EXCLUDED_MODULES.has(m));
+    const data = await buildBackupData(selectedModules);
+    const typeSummaries = [];
+    const itemPreview = {};
+    selectedModules.forEach((moduleName) => {
+      const moduleData = data?.[moduleName];
+      const count = countModuleRecords(moduleName, moduleData);
+      typeSummaries.push({
+        module: moduleName,
+        moduleLabel: humanModuleName(moduleName),
+        records: count,
+        recommendation: count === 0 ? 'فارغ - يمكن تجاهله' : 'جاهز للتصدير',
+      });
+      itemPreview[moduleName] = previewRows(moduleName, moduleData);
+    });
+    return res.json({ ok: true, item: { selectedModules, typeSummaries, itemPreview } });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to preview export' });
+  }
+});
+
+app.post('/api/backups/import/preview', async (req, res) => {
+  let job = null;
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+
+    const backup = req.body?.backup;
+    if (!backup || typeof backup !== 'object') {
+      return res.status(400).json({ ok: false, error: 'backup payload is required' });
+    }
+    if (Number(backup.schemaVersion || 0) !== BACKUP_SCHEMA_VERSION) {
+      return res.status(400).json({ ok: false, error: `Unsupported backup schema version: ${backup.schemaVersion}` });
+    }
+
+    const mode = String(req.body?.mode || 'merge').toLowerCase();
+    if (!['merge', 'replace'].includes(mode)) {
+      return res.status(400).json({ ok: false, error: 'Invalid import mode' });
+    }
+
+    const selectedModules = normalizeBackupModules(req.body?.selectedModules?.length ? req.body.selectedModules : backup.modules);
+    const moduleDecisions = (req.body?.moduleDecisions && typeof req.body.moduleDecisions === 'object') ? req.body.moduleDecisions : {};
+    const moduleSummaries = [];
+    const conflicts = {};
+    const typeSummaries = [];
+    const itemPreview = {};
+    for (const moduleName of selectedModules) {
+      const incomingData = backup?.data?.[moduleName];
+      const incomingItems = Array.isArray(incomingData) ? incomingData : (incomingData ? [incomingData] : []);
+      const existingCount = await (async () => {
+        switch (moduleName) {
+          case 'settings': return (await Settings.countDocuments({}));
+          case 'homeConfig': return (await HomeConfig.countDocuments({}));
+          case 'shopSetup': return (await ShopSetup.countDocuments({}));
+          case 'categories': return (await Category.countDocuments({}));
+          case 'products': return (await Product.countDocuments({}));
+          case 'products3d': return (await Product3D.countDocuments({}));
+          case 'builderProjects': return (await BuilderProject.countDocuments({}));
+          case 'orders': return (await Order.countDocuments({}));
+          case 'users': return (await User.countDocuments({}));
+          case 'history': return (await History.countDocuments({}));
+          case 'profitSettings': return (await ProfitSettings.countDocuments({}));
+          case 'mediaManifest': return incomingItems.length;
+          default: return 0;
+        }
+      })();
+
+      let duplicateCount = 0;
+      const duplicateKeys = [];
+      if (Array.isArray(incomingData) && mode === 'merge' && !['mediaManifest'].includes(moduleName)) {
+        const keys = await existingKeySet(moduleName);
+        incomingItems.forEach((it) => {
+          const k = backupKey(moduleName, it);
+          if (k && keys.has(k)) {
+            duplicateCount += 1;
+            if (duplicateKeys.length < 25) duplicateKeys.push(k);
+          }
+        });
+        conflicts[moduleName] = duplicateKeys;
+      }
+
+      itemPreview[moduleName] = previewRows(moduleName, incomingData);
+      const { exactMatches } = await exactMatchStats(moduleName, incomingData);
+      const decisionHint = exactMatches > 0 && exactMatches === incomingItems.length
+        ? 'suggest-skip'
+        : (duplicateCount > 0 ? 'suggest-merge' : 'suggest-merge');
+      const suggestionText = decisionHint === 'suggest-skip'
+        ? 'البيانات مطابقة تماماً للنظام الحالي. التوصية: Skip'
+        : (duplicateCount > 0
+          ? 'تم اكتشاف تكرارات جزئية. التوصية: Merge'
+          : 'لا يوجد تعارض واضح. التوصية: Merge');
+      const toCreate = mode === 'replace' ? incomingItems.length : Math.max(0, incomingItems.length - duplicateCount);
+      const toUpdate = mode === 'merge' ? duplicateCount : 0;
+      moduleSummaries.push({
+        module: moduleName,
+        incoming: incomingItems.length,
+        existing: existingCount,
+        duplicates: duplicateCount,
+      });
+      typeSummaries.push({
+        module: moduleName,
+        moduleLabel: humanModuleName(moduleName),
+        incoming: incomingItems.length,
+        existing: existingCount,
+        duplicates: duplicateCount,
+        exactMatches,
+        duplicateKeys,
+        suggestion: {
+          key: decisionHint,
+          text: suggestionText,
+        },
+        forecast: {
+          action: mode,
+          toCreate,
+          toUpdate,
+          toSkip: mode === 'merge' ? 0 : 0,
+          notes: mode === 'replace'
+            ? 'سيتم استبدال البيانات الحالية لهذا النوع.'
+            : (duplicateCount > 0 ? 'سيتم دمج العناصر المتكررة وتحديثها.' : 'لا يوجد تعارضات متوقعة.'),
+        },
+      });
+    }
+
+    job = await BackupJob.create({
+      type: 'import-preview',
+      status: 'done',
+      mode,
+      selectedModules,
+      actorUserId: req.user?._id ? String(req.user._id) : '',
+      actorEmail: req.user?.email || '',
+      summary: { modules: moduleSummaries, conflicts, typeSummaries },
+    });
+
+    return res.json({
+      ok: true,
+      item: {
+        mode,
+        selectedModules,
+        modules: moduleSummaries,
+        typeSummaries,
+        itemPreview,
+        conflicts,
+        warnings: mode === 'replace' ? ['وضع الاستبدال سيحذف البيانات الحالية في الوحدات المحددة قبل الاستيراد.'] : [],
+      },
+      jobId: String(job._id),
+    });
+  } catch (err) {
+    if (job) {
+      job.status = 'failed';
+      job.error = err.message || 'Import preview failed';
+      await job.save().catch(() => null);
+    }
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to preview import' });
+  }
+});
+
+app.post('/api/backups/import/apply', async (req, res) => {
+  let job = null;
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+
+    const backup = req.body?.backup;
+    if (!backup || typeof backup !== 'object') {
+      return res.status(400).json({ ok: false, error: 'backup payload is required' });
+    }
+    if (Number(backup.schemaVersion || 0) !== BACKUP_SCHEMA_VERSION) {
+      return res.status(400).json({ ok: false, error: `Unsupported backup schema version: ${backup.schemaVersion}` });
+    }
+
+    const mode = String(req.body?.mode || 'merge').toLowerCase();
+    if (!['merge', 'replace'].includes(mode)) {
+      return res.status(400).json({ ok: false, error: 'Invalid import mode' });
+    }
+    if (mode === 'replace' && String(req.body?.confirmText || '').trim() !== 'REPLACE') {
+      return res.status(400).json({ ok: false, error: 'Replace mode requires confirmText=REPLACE' });
+    }
+
+    const selectedModules = normalizeBackupModules(req.body?.selectedModules?.length ? req.body.selectedModules : backup.modules);
+    job = await BackupJob.create({
+      type: 'import-apply',
+      status: 'running',
+      mode,
+      selectedModules,
+      actorUserId: req.user?._id ? String(req.user._id) : '',
+      actorEmail: req.user?.email || '',
+    });
+
+    const summary = {};
+    const upsertBy = async (Model, query, patch) => Model.findOneAndUpdate(query, { $set: patch }, { upsert: true, new: true, setDefaultsOnInsert: true });
+    const applyCollection = async (moduleName, Model, dataArray, moduleMode) => {
+      const rows = Array.isArray(dataArray) ? dataArray.map((x) => sanitizeIncomingForApply(moduleName, x)) : [];
+      if (moduleMode === 'replace') {
+        await Model.deleteMany({});
+        if (rows.length) await Model.insertMany(rows, { ordered: false });
+        summary[moduleName] = { inserted: rows.length, updated: 0, deletedBeforeInsert: true, mode: moduleMode };
+        return;
+      }
+      let inserted = 0;
+      let updated = 0;
+      for (const row of rows) {
+        const key = backupKey(moduleName, row);
+        if (!key) {
+          await Model.create(row);
+          inserted += 1;
+          continue;
+        }
+        let query = null;
+        switch (moduleName) {
+          case 'categories': query = { slug: row.slug }; break;
+          case 'products': query = row.sku ? { sku: row.sku } : { nameAr: row.nameAr, name: row.name }; break;
+          case 'users': query = { email: row.email }; break;
+          case 'orders': query = row.orderNumber ? { orderNumber: row.orderNumber } : null; break;
+          case 'products3d': query = row.name ? { name: row.name } : (row.title ? { title: row.title } : null); break;
+          case 'builderProjects': query = { title: row.title || 'Project', ownerEmailSnapshot: row.ownerEmailSnapshot || '' }; break;
+          case 'shopSetup': query = row.userId ? { userId: row.userId } : { actorKey: row.actorKey, shopName: row.shopName }; break;
+          case 'history': query = null; break;
+          default: query = null;
+        }
+        if (!query) {
+          await Model.create(row);
+          inserted += 1;
+          continue;
+        }
+        const exists = await Model.findOne(query).lean();
+        await upsertBy(Model, query, row);
+        if (exists) updated += 1; else inserted += 1;
+      }
+      summary[moduleName] = { inserted, updated, deletedBeforeInsert: false, mode: moduleMode };
+    };
+
+    for (const moduleName of selectedModules) {
+      const moduleMode = ['merge', 'replace', 'skip'].includes(String(moduleDecisions?.[moduleName] || ''))
+        ? String(moduleDecisions[moduleName])
+        : mode;
+      if (moduleMode === 'skip') {
+        summary[moduleName] = { skipped: true, mode: 'skip' };
+        continue;
+      }
+      const data = backup?.data?.[moduleName];
+      if (moduleName === 'settings') {
+        const patch = sanitizeIncomingForApply('settings', data || {});
+        if (moduleMode === 'replace') await Settings.deleteMany({});
+        await Settings.findOneAndUpdate({}, patch, { upsert: true, new: true, setDefaultsOnInsert: true });
+        summary.settings = { applied: true, mode: moduleMode };
+      } else if (moduleName === 'homeConfig') {
+        const patch = sanitizeIncomingForApply('homeConfig', data || {});
+        if (moduleMode === 'replace') await HomeConfig.deleteMany({});
+        await HomeConfig.findOneAndUpdate({}, patch, { upsert: true, new: true, setDefaultsOnInsert: true });
+        summary.homeConfig = { applied: true, mode: moduleMode };
+      } else if (moduleName === 'profitSettings') {
+        const patch = sanitizeIncomingForApply('profitSettings', data || {});
+        if (moduleMode === 'replace') await ProfitSettings.deleteMany({});
+        await ProfitSettings.findOneAndUpdate({}, patch, { upsert: true, new: true, setDefaultsOnInsert: true });
+        summary.profitSettings = { applied: true, mode: moduleMode };
+      } else if (moduleName === 'shopSetup') {
+        await applyCollection(moduleName, ShopSetup, data, moduleMode);
+      } else if (moduleName === 'categories') {
+        await applyCollection(moduleName, Category, data, moduleMode);
+      } else if (moduleName === 'products') {
+        await applyCollection(moduleName, Product, data, moduleMode);
+      } else if (moduleName === 'products3d') {
+        await applyCollection(moduleName, Product3D, data, moduleMode);
+      } else if (moduleName === 'builderProjects') {
+        await applyCollection(moduleName, BuilderProject, data, moduleMode);
+      } else if (moduleName === 'orders') {
+        await applyCollection(moduleName, Order, data, moduleMode);
+      } else if (moduleName === 'users') {
+        await applyCollection(moduleName, User, data, moduleMode);
+      } else if (moduleName === 'history') {
+        await applyCollection(moduleName, History, data, moduleMode);
+      } else if (moduleName === 'mediaManifest') {
+        summary.mediaManifest = { references: Array.isArray(data) ? data.length : 0, applied: false, mode: moduleMode };
+      }
+    }
+
+    job.status = 'done';
+    job.summary = summary;
+    await job.save();
+
+    return res.json({ ok: true, item: { mode, selectedModules, summary }, jobId: String(job._id) });
+  } catch (err) {
+    if (job) {
+      job.status = 'failed';
+      job.error = err.message || 'Import apply failed';
+      await job.save().catch(() => null);
+    }
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to apply import' });
+  }
 });
 
 // --- Settings (persistent single document) ---

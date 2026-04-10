@@ -1,31 +1,32 @@
-import { useState, useEffect } from 'react';
-import { useSettings } from '@/hooks/useSettings';
+import { useBranding } from '@/hooks/useBranding';
 
-// HARDCODED SITE NAME - DO NOT CHANGE
-const HARDCODED_SITE_NAME = 'الحجازي لتجهيز المحلات';
+const DEFAULT_SITE_NAME = 'متجر إلكتروني';
+const SITE_NAME_CACHE_KEY = 'cached_site_name';
+
+function readCachedSiteName(): string {
+  try {
+    const cached = localStorage.getItem(SITE_NAME_CACHE_KEY);
+    if (cached && cached.trim()) return cached.trim();
+  } catch {
+    // ignore storage access issues
+  }
+  return DEFAULT_SITE_NAME;
+}
 
 /**
  * Custom hook to get the site name from centralized settings
  * Returns site name for use in page titles and meta tags
  */
 export function useSiteName() {
-  const { storeInfo, loading } = useSettings();
-  const [siteName, setSiteName] = useState<string>(HARDCODED_SITE_NAME);
-
-  useEffect(() => {
-    // Always use hardcoded name, never from API
-    setSiteName(HARDCODED_SITE_NAME);
-  }, [loading]);
-
-  return { siteName, loading };
+  const { branding, loading } = useBranding();
+  return { siteName: branding.siteName || readCachedSiteName(), loading };
 }
 
 /**
- * Get site name synchronously from settings
- * Always returns hardcoded name
+ * Get site name synchronously from settings cache
  */
 export function getSiteName(): string {
-  return HARDCODED_SITE_NAME;
+  return readCachedSiteName();
 }
 
 /**
@@ -39,12 +40,12 @@ export function updatePageTitle(pageTitle: string, siteName?: string): void {
 
 /**
  * Cache site name in localStorage for immediate access
- * Always caches the hardcoded name
  */
-export function cacheSiteName(): void {
+export function cacheSiteName(siteName?: string): void {
   try {
-    localStorage.setItem('cached_site_name', HARDCODED_SITE_NAME);
-  } catch (error) {
+    const value = (siteName || '').trim();
+    if (value) localStorage.setItem(SITE_NAME_CACHE_KEY, value);
+  } catch {
     console.warn('Could not cache site name in localStorage');
   }
 }

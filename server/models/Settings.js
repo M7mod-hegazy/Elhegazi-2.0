@@ -16,7 +16,7 @@ const SettingsSchema = new mongoose.Schema(
       height: { type: Number, default: 150 },
     },
     favicon: {
-      url: { type: String, default: '/favicon.ico' },
+      url: { type: String, default: '/iconPng.png' },
       publicId: { type: String, default: '' },
     },
     aboutUsContent: {

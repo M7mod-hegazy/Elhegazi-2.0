@@ -1,4 +1,4 @@
-import { useTheme } from '@/context/ThemeContext';
+import { useLogo } from '@/hooks/useLogo';
 
 interface LogoProps {
   className?: string;
@@ -12,12 +12,12 @@ const sizeClasses = {
 };
 
 export const Logo = ({ className = '', size = 'md' }: LogoProps) => {
-  const { logo } = useTheme();
+  const { logo } = useLogo();
   
   return (
     <div className={`bg-white rounded-xl flex items-center justify-center shadow-lg border border-slate-200/50 p-2 ${className}`}>
       <img 
-        src={logo || 'https://api.dicebear.com/7.x/shapes/svg?seed=store&backgroundColor=3B82F6'} 
+        src={logo?.url || '/iconPng.png'} 
         alt="Logo" 
         className={`${sizeClasses[size]} object-contain`}
       />

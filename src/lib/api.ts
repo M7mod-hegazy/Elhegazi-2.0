@@ -2,8 +2,47 @@ export type ApiResponse<T> = { ok: true; item?: T; items?: T[]; total?: number; 
 import { auth } from '@/lib/firebase';
 
 const base = '';
+const ADMIN_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+
+function clearAdminAuthStorage() {
+  if (typeof window === 'undefined') return;
+  const keys = [
+    'admin.auth.userId',
+    'admin.auth.userEmail',
+    'admin.auth.role',
+    'admin.auth.firstName',
+    'admin.auth.lastName',
+    'admin.auth.isActive',
+    'admin.auth.token',
+    'admin.auth.lastActivityAt',
+  ];
+  keys.forEach((key) => localStorage.removeItem(key));
+}
+
+function checkAdminIdleLock() {
+  if (typeof window === 'undefined') return false;
+  const mode = localStorage.getItem('AUTH_MODE');
+  if (mode !== 'admin') return false;
+  const adminId = localStorage.getItem('admin.auth.userId');
+  if (!adminId) return false;
+  const lastActivityAt = Number(localStorage.getItem('admin.auth.lastActivityAt') || '0');
+  if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) return false;
+  if (Date.now() - lastActivityAt <= ADMIN_IDLE_TIMEOUT_MS) return false;
+
+  localStorage.setItem('admin.auth.lockReason', 'idle_timeout');
+  localStorage.setItem('admin.auth.lockedAt', String(Date.now()));
+  clearAdminAuthStorage();
+  const evt = new CustomEvent('permission-denied', {
+    detail: { status: 401, error: 'Admin session expired due to inactivity', reason: 'idle_timeout' },
+  });
+  window.dispatchEvent(evt);
+  return true;
+}
 
 async function request(input: RequestInfo, init?: RequestInit): Promise<unknown> {
+  if (checkAdminIdleLock()) {
+    throw new Error('انتهت جلسة الإدارة بسبب عدم النشاط');
+  }
   // Inject user headers from localStorage when available to identify the actor on the server
   const mergedInit: RequestInit = { ...(init || {}) };
   try {
@@ -57,6 +96,9 @@ async function request(input: RequestInfo, init?: RequestInit): Promise<unknown>
     try {
       if (res.status === 401 || res.status === 403) {
         const detail = typeof data === 'string' ? { error: data } : (data || {});
+        if (res.status === 401 && detail?.reason === 'idle_timeout') {
+          clearAdminAuthStorage();
+        }
         const evt = new CustomEvent('permission-denied', { detail: { status: res.status, ...detail, url: input } });
         window.dispatchEvent(evt);
       }
@@ -99,9 +141,14 @@ export async function apiDelete(path: string): Promise<ApiResponse<unknown>> {
   return request(base + path, { method: 'DELETE' }) as Promise<ApiResponse<unknown>>;
 }
 
-export async function uploadFile(file: File): Promise<{ secure_url: string; public_id: string }>{
+export async function uploadFile(
+  file: File,
+  options?: { folder?: string; publicId?: string }
+): Promise<{ secure_url: string; public_id: string }>{
   const fd = new FormData();
   fd.append('file', file);
+  if (options?.folder) fd.append('folder', options.folder);
+  if (options?.publicId) fd.append('public_id', options.publicId);
   const data = await request('/api/cloudinary/upload-file', {
     method: 'POST',
     body: fd,

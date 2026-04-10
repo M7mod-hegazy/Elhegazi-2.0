@@ -196,8 +196,8 @@ export const useSettings = () => {
         if (ok.item) {
           if (ok.item.storeInfo) {
             setStoreInfo(ok.item.storeInfo);
-            // Cache hardcoded site name for immediate access
-            cacheSiteName();
+            // Cache current site name for immediate access
+            cacheSiteName(ok.item.storeInfo.name);
           }
           if (ok.item.aboutUsContent) setAboutUsContent(ok.item.aboutUsContent);
           if (ok.item.workHours) {

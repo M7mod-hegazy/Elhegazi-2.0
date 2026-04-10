@@ -29,7 +29,7 @@ const CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
 
 // Default fallback theme
 const DEFAULT_THEME: ThemeData = {
-  logo: 'https://api.dicebear.com/7.x/shapes/svg?seed=store&backgroundColor=3B82F6',
+  logo: '/iconPng.png',
   primaryColor: '#3B82F6',
   secondaryColor: '#8B5CF6',
   timestamp: 0

@@ -5,6 +5,51 @@ import { auth, googleProvider } from '@/lib/firebase';
 import { onAuthStateChanged, signInWithEmailAndPassword, signInWithPopup, signOut, createUserWithEmailAndPassword, updateProfile as fbUpdateProfile } from 'firebase/auth';
 import { AuthContext, type AuthContextValue, type LoginCredentials, type RegisterData } from '@/context/AuthContextBase';
 
+const ADMIN_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
+const ADMIN_LAST_ACTIVITY_KEY = 'admin.auth.lastActivityAt';
+const ADMIN_LOCK_REASON_KEY = 'admin.auth.lockReason';
+const ADMIN_LOCKED_AT_KEY = 'admin.auth.lockedAt';
+
+function nowMs() {
+  return Date.now();
+}
+
+function readLastAdminActivity(): number {
+  try {
+    const raw = localStorage.getItem(ADMIN_LAST_ACTIVITY_KEY);
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : 0;
+  } catch {
+    return 0;
+  }
+}
+
+function markAdminActivity() {
+  try {
+    localStorage.setItem(ADMIN_LAST_ACTIVITY_KEY, String(nowMs()));
+  } catch {
+    // ignore
+  }
+}
+
+function markAdminLocked(reason: 'idle_timeout' | 'manual_logout' | 'expired_session') {
+  try {
+    localStorage.setItem(ADMIN_LOCK_REASON_KEY, reason);
+    localStorage.setItem(ADMIN_LOCKED_AT_KEY, String(nowMs()));
+  } catch {
+    // ignore
+  }
+}
+
+function clearAdminLockState() {
+  try {
+    localStorage.removeItem(ADMIN_LOCK_REASON_KEY);
+    localStorage.removeItem(ADMIN_LOCKED_AT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 // Extended context for dual authentication
 export interface DualAuthState {
   user: User | null;
@@ -155,6 +200,19 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const adminToken = localStorage.getItem('admin.auth.token') || '';
       
       if (adminUserId) {
+        const lastActivity = readLastAdminActivity();
+        const idleDuration = lastActivity > 0 ? nowMs() - lastActivity : Number.MAX_SAFE_INTEGER;
+        if (idleDuration > ADMIN_IDLE_TIMEOUT_MS) {
+          markAdminLocked('idle_timeout');
+          localStorage.removeItem('admin.auth.userId');
+          localStorage.removeItem('admin.auth.userEmail');
+          localStorage.removeItem('admin.auth.role');
+          localStorage.removeItem('admin.auth.firstName');
+          localStorage.removeItem('admin.auth.lastName');
+          localStorage.removeItem('admin.auth.isActive');
+          localStorage.removeItem('admin.auth.token');
+          return;
+        }
         const u: User = { 
           id: adminUserId, 
           email: adminEmail, 
@@ -170,12 +228,53 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           isAdminAuthenticated: true,
           adminToken: adminToken
         }));
+        markAdminActivity();
       }
     } catch {
       // ignore
     } finally {
       setLoading(false);
     }
+  }, []);
+
+  useEffect(() => {
+    if (!authState.isAdminAuthenticated) return;
+    let timer: number | null = null;
+    const resetTimer = () => {
+      markAdminActivity();
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        markAdminLocked('idle_timeout');
+        setAuthState(prev => ({
+          ...prev,
+          adminUser: null,
+          isAdminAuthenticated: false,
+          adminToken: ''
+        }));
+      }, ADMIN_IDLE_TIMEOUT_MS);
+    };
+    const events: Array<keyof WindowEventMap> = ['mousemove', 'keydown', 'click', 'scroll', 'touchstart'];
+    events.forEach((evt) => window.addEventListener(evt, resetTimer, { passive: true }));
+    resetTimer();
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      events.forEach((evt) => window.removeEventListener(evt, resetTimer));
+    };
+  }, [authState.isAdminAuthenticated]);
+
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== ADMIN_LOCKED_AT_KEY) return;
+      if (!event.newValue) return;
+      setAuthState(prev => ({
+        ...prev,
+        adminUser: null,
+        isAdminAuthenticated: false,
+        adminToken: ''
+      }));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
   }, []);
 
   // Persist basic identity for server-side audit headers and reload restore
@@ -311,6 +410,8 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         isAdminAuthenticated: true,
         adminToken: token
       }));
+      clearAdminLockState();
+      markAdminActivity();
       try { localStorage.setItem('AUTH_MODE', 'admin'); } catch { /* ignore */ }
       return { success: true, user: u, isAdmin: u.role === 'admin' };
     } catch (err) {
@@ -464,12 +565,25 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, []);
 
   const adminLogout = useCallback(async () => {
+    markAdminLocked('manual_logout');
     setAuthState(prev => ({
       ...prev,
       adminUser: null,
       isAdminAuthenticated: false,
       adminToken: ''
     }));
+    try {
+      localStorage.removeItem('admin.auth.userId');
+      localStorage.removeItem('admin.auth.userEmail');
+      localStorage.removeItem('admin.auth.role');
+      localStorage.removeItem('admin.auth.firstName');
+      localStorage.removeItem('admin.auth.lastName');
+      localStorage.removeItem('admin.auth.isActive');
+      localStorage.removeItem('admin.auth.token');
+      localStorage.removeItem(ADMIN_LAST_ACTIVITY_KEY);
+    } catch {
+      // ignore
+    }
     setError(null);
   }, []);
 

@@ -1,7 +1,8 @@
-import nodemailer from 'nodemailer';
+﻿import nodemailer from 'nodemailer';
 import path from 'path';
 import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
+import Settings from '../models/Settings.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -10,6 +11,7 @@ class EmailService {
   constructor() {
     this.transporter = null;
     this.isConfigured = false;
+    this.brandingCache = { name: '', expiresAt: 0 };
     this.init();
   }
 
@@ -41,12 +43,12 @@ class EmailService {
       if (this.transporter && process.env.EMAIL_USER) {
         await this.transporter.verify();
         this.isConfigured = true;
-        console.log('✅ Email service configured successfully');
+        console.log('âœ… Email service configured successfully');
       } else {
-        console.log('⚠️ Email service not configured - missing credentials');
+        console.log('âš ï¸ Email service not configured - missing credentials');
       }
     } catch (error) {
-      console.error('❌ Email service configuration failed:', error.message);
+      console.error('âŒ Email service configuration failed:', error.message);
       this.isConfigured = false;
     }
   }
@@ -74,34 +76,50 @@ class EmailService {
     }
   }
 
+  async getStoreBranding() {
+    const now = Date.now();
+    if (this.brandingCache.name && this.brandingCache.expiresAt > now) {
+      return this.brandingCache.name;
+    }
+    try {
+      const settings = await Settings.findOne({}, { storeInfo: 1 }).lean();
+      const fromDb = String(settings?.storeInfo?.name || '').trim();
+      const name = fromDb || 'Ù…ØªØ¬Ø± Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ';
+      this.brandingCache = { name, expiresAt: now + 5 * 60 * 1000 };
+      return name;
+    } catch {
+      return this.brandingCache.name || 'Ù…ØªØ¬Ø± Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ';
+    }
+  }
+
   getFallbackTemplate(templateName, variables) {
-    const { customerName = 'عزيزي العميل', orderNumber = 'N/A', orderTotal = '0', orderItems = [], refundAmount = '0' } = variables;
+    const { customerName = 'عزيزي العميل', orderNumber = 'N/A', orderTotal = '0', orderItems = [], refundAmount = '0', storeName = 'متجر إلكتروني' } = variables;
     
     const fallbackTemplates = {
       'order-confirmation': `
         <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
           <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h1 style="color: #2563eb; text-align: center; margin-bottom: 30px;">تأكيد الطلب</h1>
-            <p style="font-size: 16px; line-height: 1.6;">مرحباً ${customerName}،</p>
-            <p style="font-size: 16px; line-height: 1.6;">شكراً لك على طلبك. تم استلام طلبك بنجاح وسيتم معالجته قريباً.</p>
+            <h1 style="color: #2563eb; text-align: center; margin-bottom: 30px;">ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨</h1>
+            <p style="font-size: 16px; line-height: 1.6;">Ù…Ø±Ø­Ø¨Ø§Ù‹ ${customerName}ØŒ</p>
+            <p style="font-size: 16px; line-height: 1.6;">Ø´ÙƒØ±Ø§Ù‹ Ù„Ùƒ Ø¹Ù„Ù‰ Ø·Ù„Ø¨Ùƒ. ØªÙ… Ø§Ø³ØªÙ„Ø§Ù… Ø·Ù„Ø¨Ùƒ Ø¨Ù†Ø¬Ø§Ø­ ÙˆØ³ÙŠØªÙ… Ù…Ø¹Ø§Ù„Ø¬ØªÙ‡ Ù‚Ø±ÙŠØ¨Ø§Ù‹.</p>
             
             <div style="background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin: 20px 0;">
-              <h3 style="color: #374151; margin-top: 0;">تفاصيل الطلب</h3>
-              <p><strong>رقم الطلب:</strong> ${orderNumber}</p>
-              <p><strong>إجمالي المبلغ:</strong> ${orderTotal} ريال</p>
+              <h3 style="color: #374151; margin-top: 0;">ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø·Ù„Ø¨</h3>
+              <p><strong>Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨:</strong> ${orderNumber}</p>
+              <p><strong>Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ø¨Ù„Øº:</strong> ${orderTotal} Ø±ÙŠØ§Ù„</p>
             </div>
             
-            <p style="font-size: 16px; line-height: 1.6;">سنرسل لك تحديثات عن حالة طلبك عبر البريد الإلكتروني.</p>
+            <p style="font-size: 16px; line-height: 1.6;">Ø³Ù†Ø±Ø³Ù„ Ù„Ùƒ ØªØ­Ø¯ÙŠØ«Ø§Øª Ø¹Ù† Ø­Ø§Ù„Ø© Ø·Ù„Ø¨Ùƒ Ø¹Ø¨Ø± Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ.</p>
             
             <div style="text-align: center; margin-top: 30px;">
               <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders" 
                  style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                تتبع الطلب
+                ØªØªØ¨Ø¹ Ø§Ù„Ø·Ù„Ø¨
               </a>
             </div>
             
             <p style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px;">
-              شكراً لاختيارك الحجازي لتجهيز المحلات
+              Ø´ÙƒØ±Ø§Ù‹ Ù„Ø§Ø®ØªÙŠØ§Ø±Ùƒ ${storeName}
             </p>
           </div>
         </div>
@@ -109,26 +127,26 @@ class EmailService {
       'order-shipped': `
         <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
           <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h1 style="color: #059669; text-align: center; margin-bottom: 30px;">تم شحن طلبك! 📦</h1>
-            <p style="font-size: 16px; line-height: 1.6;">مرحباً ${customerName}،</p>
-            <p style="font-size: 16px; line-height: 1.6;">أخبار رائعة! تم شحن طلبك وهو في طريقه إليك.</p>
+            <h1 style="color: #059669; text-align: center; margin-bottom: 30px;">ØªÙ… Ø´Ø­Ù† Ø·Ù„Ø¨Ùƒ! ðŸ“¦</h1>
+            <p style="font-size: 16px; line-height: 1.6;">Ù…Ø±Ø­Ø¨Ø§Ù‹ ${customerName}ØŒ</p>
+            <p style="font-size: 16px; line-height: 1.6;">Ø£Ø®Ø¨Ø§Ø± Ø±Ø§Ø¦Ø¹Ø©! ØªÙ… Ø´Ø­Ù† Ø·Ù„Ø¨Ùƒ ÙˆÙ‡Ùˆ ÙÙŠ Ø·Ø±ÙŠÙ‚Ù‡ Ø¥Ù„ÙŠÙƒ.</p>
             
             <div style="background-color: #ecfdf5; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #059669;">
-              <h3 style="color: #374151; margin-top: 0;">معلومات الشحن</h3>
-              <p><strong>رقم الطلب:</strong> ${orderNumber}</p>
-              <p><strong>رقم التتبع:</strong> ${variables.trackingNumber || 'سيتم إرساله قريباً'}</p>
-              <p><strong>التوصيل المتوقع:</strong> ${variables.estimatedDelivery || '2-3 أيام عمل'}</p>
+              <h3 style="color: #374151; margin-top: 0;">Ù…Ø¹Ù„ÙˆÙ…Ø§Øª Ø§Ù„Ø´Ø­Ù†</h3>
+              <p><strong>Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨:</strong> ${orderNumber}</p>
+              <p><strong>Ø±Ù‚Ù… Ø§Ù„ØªØªØ¨Ø¹:</strong> ${variables.trackingNumber || 'Ø³ÙŠØªÙ… Ø¥Ø±Ø³Ø§Ù„Ù‡ Ù‚Ø±ÙŠØ¨Ø§Ù‹'}</p>
+              <p><strong>Ø§Ù„ØªÙˆØµÙŠÙ„ Ø§Ù„Ù…ØªÙˆÙ‚Ø¹:</strong> ${variables.estimatedDelivery || '2-3 Ø£ÙŠØ§Ù… Ø¹Ù…Ù„'}</p>
             </div>
             
             <div style="text-align: center; margin-top: 30px;">
               <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders/${orderNumber}" 
                  style="background-color: #059669; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                تتبع الشحنة
+                ØªØªØ¨Ø¹ Ø§Ù„Ø´Ø­Ù†Ø©
               </a>
             </div>
             
             <p style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px;">
-              شكراً لاختيارك الحجازي لتجهيز المحلات
+              Ø´ÙƒØ±Ø§Ù‹ Ù„Ø§Ø®ØªÙŠØ§Ø±Ùƒ ${storeName}
             </p>
           </div>
         </div>
@@ -136,27 +154,27 @@ class EmailService {
       'order-delivered': `
         <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
           <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h1 style="color: #7c3aed; text-align: center; margin-bottom: 30px;">تم توصيل طلبك! 🎉</h1>
-            <p style="font-size: 16px; line-height: 1.6;">مرحباً ${customerName}،</p>
-            <p style="font-size: 16px; line-height: 1.6;">تم توصيل طلبك بنجاح! نأمل أن تكون راضياً عن مشترياتك.</p>
+            <h1 style="color: #7c3aed; text-align: center; margin-bottom: 30px;">ØªÙ… ØªÙˆØµÙŠÙ„ Ø·Ù„Ø¨Ùƒ! ðŸŽ‰</h1>
+            <p style="font-size: 16px; line-height: 1.6;">Ù…Ø±Ø­Ø¨Ø§Ù‹ ${customerName}ØŒ</p>
+            <p style="font-size: 16px; line-height: 1.6;">ØªÙ… ØªÙˆØµÙŠÙ„ Ø·Ù„Ø¨Ùƒ Ø¨Ù†Ø¬Ø§Ø­! Ù†Ø£Ù…Ù„ Ø£Ù† ØªÙƒÙˆÙ† Ø±Ø§Ø¶ÙŠØ§Ù‹ Ø¹Ù† Ù…Ø´ØªØ±ÙŠØ§ØªÙƒ.</p>
             
             <div style="background-color: #faf5ff; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #7c3aed;">
-              <h3 style="color: #374151; margin-top: 0;">تفاصيل التوصيل</h3>
-              <p><strong>رقم الطلب:</strong> ${orderNumber}</p>
-              <p><strong>تاريخ التوصيل:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
+              <h3 style="color: #374151; margin-top: 0;">ØªÙØ§ØµÙŠÙ„ Ø§Ù„ØªÙˆØµÙŠÙ„</h3>
+              <p><strong>Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨:</strong> ${orderNumber}</p>
+              <p><strong>ØªØ§Ø±ÙŠØ® Ø§Ù„ØªÙˆØµÙŠÙ„:</strong> ${new Date().toLocaleDateString('ar-SA')}</p>
             </div>
             
-            <p style="font-size: 16px; line-height: 1.6;">إذا كان لديك أي استفسار أو مشكلة مع طلبك، لا تتردد في التواصل معنا.</p>
+            <p style="font-size: 16px; line-height: 1.6;">Ø¥Ø°Ø§ ÙƒØ§Ù† Ù„Ø¯ÙŠÙƒ Ø£ÙŠ Ø§Ø³ØªÙØ³Ø§Ø± Ø£Ùˆ Ù…Ø´ÙƒÙ„Ø© Ù…Ø¹ Ø·Ù„Ø¨ÙƒØŒ Ù„Ø§ ØªØªØ±Ø¯Ø¯ ÙÙŠ Ø§Ù„ØªÙˆØ§ØµÙ„ Ù…Ø¹Ù†Ø§.</p>
             
             <div style="text-align: center; margin-top: 30px;">
               <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders/${orderNumber}/review" 
                  style="background-color: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                قيم تجربتك
+                Ù‚ÙŠÙ… ØªØ¬Ø±Ø¨ØªÙƒ
               </a>
             </div>
             
             <p style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px;">
-              شكراً لاختيارك الحجازي لتجهيز المحلات
+              Ø´ÙƒØ±Ø§Ù‹ Ù„Ø§Ø®ØªÙŠØ§Ø±Ùƒ ${storeName}
             </p>
           </div>
         </div>
@@ -164,28 +182,28 @@ class EmailService {
       'order-cancelled': `
         <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f9f9f9;">
           <div style="background-color: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
-            <h1 style="color: #ef4444; text-align: center; margin-bottom: 30px;">تم إلغاء طلبك</h1>
-            <p style="font-size: 16px; line-height: 1.6;">مرحباً ${customerName}،</p>
-            <p style="font-size: 16px; line-height: 1.6;">نأسف لإبلاغك بأنه تم إلغاء طلبك بنجاح.</p>
+            <h1 style="color: #ef4444; text-align: center; margin-bottom: 30px;">ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø·Ù„Ø¨Ùƒ</h1>
+            <p style="font-size: 16px; line-height: 1.6;">Ù…Ø±Ø­Ø¨Ø§Ù‹ ${customerName}ØŒ</p>
+            <p style="font-size: 16px; line-height: 1.6;">Ù†Ø£Ø³Ù Ù„Ø¥Ø¨Ù„Ø§ØºÙƒ Ø¨Ø£Ù†Ù‡ ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø·Ù„Ø¨Ùƒ Ø¨Ù†Ø¬Ø§Ø­.</p>
             
             <div style="background-color: #fef2f2; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #ef4444;">
-              <h3 style="color: #b91c1c; margin-top: 0;">تفاصيل الإلغاء</h3>
-              <p><strong>رقم الطلب:</strong> ${orderNumber}</p>
-              <p><strong>المبلغ المسترد:</strong> ${refundAmount} ريال</p>
-              ${variables.cancellationReason ? `<p><strong>سبب الإلغاء:</strong> ${variables.cancellationReason}</p>` : ''}
+              <h3 style="color: #b91c1c; margin-top: 0;">ØªÙØ§ØµÙŠÙ„ Ø§Ù„Ø¥Ù„ØºØ§Ø¡</h3>
+              <p><strong>Ø±Ù‚Ù… Ø§Ù„Ø·Ù„Ø¨:</strong> ${orderNumber}</p>
+              <p><strong>Ø§Ù„Ù…Ø¨Ù„Øº Ø§Ù„Ù…Ø³ØªØ±Ø¯:</strong> ${refundAmount} Ø±ÙŠØ§Ù„</p>
+              ${variables.cancellationReason ? `<p><strong>Ø³Ø¨Ø¨ Ø§Ù„Ø¥Ù„ØºØ§Ø¡:</strong> ${variables.cancellationReason}</p>` : ''}
             </div>
             
-            <p style="font-size: 16px; line-height: 1.6;">سيتم استرداد المبلغ إلى طريقة الدفع الأصلية خلال 5-7 أيام عمل.</p>
+            <p style="font-size: 16px; line-height: 1.6;">Ø³ÙŠØªÙ… Ø§Ø³ØªØ±Ø¯Ø§Ø¯ Ø§Ù„Ù…Ø¨Ù„Øº Ø¥Ù„Ù‰ Ø·Ø±ÙŠÙ‚Ø© Ø§Ù„Ø¯ÙØ¹ Ø§Ù„Ø£ØµÙ„ÙŠØ© Ø®Ù„Ø§Ù„ 5-7 Ø£ÙŠØ§Ù… Ø¹Ù…Ù„.</p>
             
             <div style="text-align: center; margin-top: 30px;">
               <a href="${process.env.FRONTEND_URL || 'http://localhost:3000'}/products" 
                  style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                استمر في التسوق
+                Ø§Ø³ØªÙ…Ø± ÙÙŠ Ø§Ù„ØªØ³ÙˆÙ‚
               </a>
             </div>
             
             <p style="text-align: center; margin-top: 30px; color: #6b7280; font-size: 14px;">
-              شكراً لاختيارك الحجازي لتجهيز المحلات
+              Ø´ÙƒØ±Ø§Ù‹ Ù„Ø§Ø®ØªÙŠØ§Ø±Ùƒ ${storeName}
             </p>
           </div>
         </div>
@@ -203,9 +221,11 @@ class EmailService {
 
     try {
       const { customer, order, items = [] } = orderData;
+      const storeName = await this.getStoreBranding();
       
       const emailContent = await this.loadTemplate('order-confirmation', {
         customerName: customer.name || customer.email,
+        storeName,
         orderNumber: order.orderNumber || order._id,
         orderTotal: order.total,
         orderItems: items,
@@ -214,18 +234,18 @@ class EmailService {
       });
 
       const mailOptions = {
-        from: `"الحجازي لتجهيز المحلات" <${process.env.EMAIL_USER}>`,
+        from: `"${storeName}" <${process.env.EMAIL_USER}>`,
         to: customer.email,
-        subject: `تأكيد الطلب #${order.orderNumber || order._id}`,
+        subject: `ØªØ£ÙƒÙŠØ¯ Ø§Ù„Ø·Ù„Ø¨ #${order.orderNumber || order._id}`,
         html: emailContent,
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Order confirmation email sent:', result.messageId);
+      console.log('âœ… Order confirmation email sent:', result.messageId);
       
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('❌ Failed to send order confirmation email:', error);
+      console.error('âŒ Failed to send order confirmation email:', error);
       return { success: false, error: error.message };
     }
   }
@@ -238,24 +258,26 @@ class EmailService {
 
     try {
       const { customer, order } = orderData;
+      const storeName = await this.getStoreBranding();
       let templateName = 'order-status-update';
-      let subject = `تحديث حالة الطلب #${order.orderNumber || order._id}`;
+      let subject = `ØªØ­Ø¯ÙŠØ« Ø­Ø§Ù„Ø© Ø§Ù„Ø·Ù„Ø¨ #${order.orderNumber || order._id}`;
 
       // Use specific templates for certain statuses
       if (newStatus === 'shipped') {
         templateName = 'order-shipped';
-        subject = `تم شحن طلبك #${order.orderNumber || order._id}`;
+        subject = `ØªÙ… Ø´Ø­Ù† Ø·Ù„Ø¨Ùƒ #${order.orderNumber || order._id}`;
       } else if (newStatus === 'delivered') {
         templateName = 'order-delivered';
-        subject = `تم توصيل طلبك #${order.orderNumber || order._id}`;
+        subject = `ØªÙ… ØªÙˆØµÙŠÙ„ Ø·Ù„Ø¨Ùƒ #${order.orderNumber || order._id}`;
       } else if (newStatus === 'cancelled') {
         templateName = 'order-cancelled';
-        subject = `تم إلغاء طلبك #${order.orderNumber || order._id}`;
+        subject = `ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø·Ù„Ø¨Ùƒ #${order.orderNumber || order._id}`;
       }
 
       // Prepare variables based on status
       const variables = {
         customerName: customer.name || customer.email,
+        storeName,
         orderNumber: order.orderNumber || order._id,
         orderStatus: this.getStatusInArabic(newStatus),
         trackingNumber: order.trackingNumber,
@@ -266,29 +288,29 @@ class EmailService {
       // Add status-specific variables
       if (newStatus === 'shipped') {
         variables.shippingDate = new Date().toLocaleDateString('ar-SA');
-        variables.carrier = order.carrier || 'الشركة العامة للنقل';
+        variables.carrier = order.carrier || 'Ø§Ù„Ø´Ø±ÙƒØ© Ø§Ù„Ø¹Ø§Ù…Ø© Ù„Ù„Ù†Ù‚Ù„';
         variables.trackingUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/orders/${order.orderNumber || order._id}/track`;
       } else if (newStatus === 'cancelled') {
         variables.cancellationDate = new Date().toLocaleDateString('ar-SA');
         variables.refundAmount = order.total || '0';
-        variables.cancellationReason = order.cancellationReason || 'لم يتم تحديد سبب الإلغاء';
+        variables.cancellationReason = order.cancellationReason || 'Ù„Ù… ÙŠØªÙ… ØªØ­Ø¯ÙŠØ¯ Ø³Ø¨Ø¨ Ø§Ù„Ø¥Ù„ØºØ§Ø¡';
       }
 
       const emailContent = await this.loadTemplate(templateName, variables);
 
       const mailOptions = {
-        from: `"الحجازي لتجهيز المحلات" <${process.env.EMAIL_USER}>`,
+        from: `"${storeName}" <${process.env.EMAIL_USER}>`,
         to: customer.email,
         subject: subject,
         html: emailContent,
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log(`✅ Order status update email sent (${newStatus}):`, result.messageId);
+      console.log(`âœ… Order status update email sent (${newStatus}):`, result.messageId);
       
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('❌ Failed to send order status update email:', error);
+      console.error('âŒ Failed to send order status update email:', error);
       return { success: false, error: error.message };
     }
   }
@@ -301,41 +323,43 @@ class EmailService {
 
     try {
       const { customer, order } = orderData;
+      const storeName = await this.getStoreBranding();
       
       const emailContent = await this.loadTemplate('order-cancelled', {
         customerName: customer.name || customer.email,
+        storeName,
         orderNumber: order.orderNumber || order._id,
         refundAmount: order.total || '0',
         cancellationDate: new Date().toLocaleDateString('ar-SA'),
-        cancellationReason: order.cancellationReason || 'لم يتم تحديد سبب الإلغاء',
+        cancellationReason: order.cancellationReason || 'Ù„Ù… ÙŠØªÙ… ØªØ­Ø¯ÙŠØ¯ Ø³Ø¨Ø¨ Ø§Ù„Ø¥Ù„ØºØ§Ø¡',
         frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3000'
       });
 
       const mailOptions = {
-        from: `"الحجازي لتجهيز المحلات" <${process.env.EMAIL_USER}>`,
+        from: `"${storeName}" <${process.env.EMAIL_USER}>`,
         to: customer.email,
-        subject: `تم إلغاء طلبك #${order.orderNumber || order._id}`,
+        subject: `ØªÙ… Ø¥Ù„ØºØ§Ø¡ Ø·Ù„Ø¨Ùƒ #${order.orderNumber || order._id}`,
         html: emailContent,
       };
 
       const result = await this.transporter.sendMail(mailOptions);
-      console.log('✅ Order cancelled email sent:', result.messageId);
+      console.log('âœ… Order cancelled email sent:', result.messageId);
       
       return { success: true, messageId: result.messageId };
     } catch (error) {
-      console.error('❌ Failed to send order cancelled email:', error);
+      console.error('âŒ Failed to send order cancelled email:', error);
       return { success: false, error: error.message };
     }
   }
 
   getStatusInArabic(status) {
     const statusMap = {
-      'pending': 'قيد الانتظار',
-      'confirmed': 'مؤكد',
-      'processing': 'قيد المعالجة',
-      'shipped': 'تم الشحن',
-      'delivered': 'تم التوصيل',
-      'cancelled': 'ملغي'
+      'pending': 'Ù‚ÙŠØ¯ Ø§Ù„Ø§Ù†ØªØ¸Ø§Ø±',
+      'confirmed': 'Ù…Ø¤ÙƒØ¯',
+      'processing': 'Ù‚ÙŠØ¯ Ø§Ù„Ù…Ø¹Ø§Ù„Ø¬Ø©',
+      'shipped': 'ØªÙ… Ø§Ù„Ø´Ø­Ù†',
+      'delivered': 'ØªÙ… Ø§Ù„ØªÙˆØµÙŠÙ„',
+      'cancelled': 'Ù…Ù„ØºÙŠ'
     };
     return statusMap[status] || status;
   }
@@ -346,15 +370,16 @@ class EmailService {
     }
 
     try {
+      const storeName = await this.getStoreBranding();
       const mailOptions = {
-        from: `"الحجازي لتجهيز المحلات" <${process.env.EMAIL_USER}>`,
+        from: `"${storeName}" <${process.env.EMAIL_USER}>`,
         to: toEmail,
-        subject: 'اختبار خدمة البريد الإلكتروني',
+        subject: 'Ø§Ø®ØªØ¨Ø§Ø± Ø®Ø¯Ù…Ø© Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ',
         html: `
           <div dir="rtl" style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px;">
-            <h2>اختبار خدمة البريد الإلكتروني</h2>
-            <p>هذه رسالة اختبار للتأكد من عمل خدمة البريد الإلكتروني بشكل صحيح.</p>
-            <p>التاريخ والوقت: ${new Date().toLocaleString('ar-SA')}</p>
+            <h2>Ø§Ø®ØªØ¨Ø§Ø± Ø®Ø¯Ù…Ø© Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ</h2>
+            <p>Ù‡Ø°Ù‡ Ø±Ø³Ø§Ù„Ø© Ø§Ø®ØªØ¨Ø§Ø± Ù„Ù„ØªØ£ÙƒØ¯ Ù…Ù† Ø¹Ù…Ù„ Ø®Ø¯Ù…Ø© Ø§Ù„Ø¨Ø±ÙŠØ¯ Ø§Ù„Ø¥Ù„ÙƒØªØ±ÙˆÙ†ÙŠ Ø¨Ø´ÙƒÙ„ ØµØ­ÙŠØ­.</p>
+            <p>Ø§Ù„ØªØ§Ø±ÙŠØ® ÙˆØ§Ù„ÙˆÙ‚Øª: ${new Date().toLocaleString('ar-SA')}</p>
           </div>
         `,
       };
@@ -371,3 +396,5 @@ class EmailService {
 const emailService = new EmailService();
 
 export default emailService;
+
+

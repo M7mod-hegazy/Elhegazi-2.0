@@ -57,7 +57,7 @@ const setCachedTheme = (theme: { logo: string; primaryColor: string; secondaryCo
 };
 
 const ThemeContext = createContext<ThemeContextType>({
-  logo: 'https://api.dicebear.com/7.x/shapes/svg?seed=store&backgroundColor=3B82F6',
+  logo: '/iconPng.png',
   primaryColor: '#3B82F6',
   secondaryColor: '#8B5CF6',
   isLoading: false,

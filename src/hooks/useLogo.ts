@@ -1,61 +1,94 @@
 import { useState, useEffect } from 'react';
-import { useSiteName } from '@/hooks/useSiteName';
+import { useBranding } from '@/hooks/useBranding';
 
 interface LogoData {
   url: string;
+  publicId?: string;
   altText: string;
   width: number;
   height: number;
 }
 
+const DEFAULT_LOGO: LogoData = {
+  url: '/iconPng.png',
+  publicId: '',
+  altText: 'Store Logo',
+  width: 150,
+  height: 150,
+};
+
+const LOGO_CACHE_KEY = 'cached_site_logo';
+
+function readCachedLogo(): LogoData {
+  try {
+    const raw = localStorage.getItem(LOGO_CACHE_KEY);
+    if (!raw) return DEFAULT_LOGO;
+    const parsed = JSON.parse(raw);
+    const url = String(parsed?.url || '').trim();
+    if (!url) return DEFAULT_LOGO;
+    return {
+      url,
+      publicId: String(parsed?.publicId || ''),
+      altText: String(parsed?.altText || DEFAULT_LOGO.altText),
+      width: Number(parsed?.width || DEFAULT_LOGO.width),
+      height: Number(parsed?.height || DEFAULT_LOGO.height),
+    };
+  } catch {
+    return DEFAULT_LOGO;
+  }
+}
+
+function cacheLogo(logo: LogoData) {
+  try {
+    localStorage.setItem(LOGO_CACHE_KEY, JSON.stringify(logo));
+  } catch {
+    // ignore cache failures
+  }
+}
+
 /**
- * Custom hook to get the site logo - now uses fixed iconPng.png
- * Returns logo URL, alt text, and dimensions
+ * Custom hook to get site logo from settings with safe cache fallback.
  */
 export function useLogo() {
-  const { siteName } = useSiteName();
-  const [logo, setLogo] = useState<LogoData>({
-    url: '/iconPng.png',
-    altText: siteName || 'Store Logo',
-    width: 150,
-    height: 150
-  });
-  const [isLoading, setIsLoading] = useState(false); // No loading needed for fixed logo
+  const { branding, loading } = useBranding();
+  const [logo, setLogo] = useState<LogoData>(readCachedLogo());
 
   useEffect(() => {
-    setLogo({
-      url: '/iconPng.png',
-      altText: siteName || 'Store Logo',
-      width: 150,
-      height: 150
-    });
-  }, [siteName]);
+    const next: LogoData = {
+      url: branding.logo.url || DEFAULT_LOGO.url,
+      publicId: String(branding.logo.publicId || ''),
+      altText: String(branding.logo.altText || DEFAULT_LOGO.altText),
+      width: Number(branding.logo.width || DEFAULT_LOGO.width),
+      height: Number(branding.logo.height || DEFAULT_LOGO.height),
+    };
+    setLogo(next);
+    cacheLogo(next);
+  }, [branding]);
 
-  return { logo, isLoading };
+  return { logo, isLoading: loading };
 }
 
 /**
- * Get logo URL synchronously - now returns fixed iconPng.png path
+ * Get logo URL synchronously from cache.
  */
 export function getLogoUrl(): string {
-  return '/iconPng.png';
+  return readCachedLogo().url;
 }
 
 /**
- * Legacy compatibility - now returns fixed logo data
+ * Legacy compatibility.
  */
 export async function preloadLogo(): Promise<LogoData> {
-  return {
-    url: '/iconPng.png',
-    altText: 'Store Logo',
-    width: 150,
-    height: 150
-  };
+  return readCachedLogo();
 }
 
 /**
- * Legacy compatibility - no longer needed with fixed logo system
+ * Legacy compatibility.
  */
 export function clearLogoCache() {
-
+  try {
+    localStorage.removeItem(LOGO_CACHE_KEY);
+  } catch {
+    // ignore
+  }
 }

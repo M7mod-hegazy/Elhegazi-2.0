@@ -23,6 +23,14 @@ const DualProtectedRoute = ({
 
     // Check if user is authenticated
     if (requireAdmin) {
+      const lockReason = localStorage.getItem('admin.auth.lockReason');
+      if (lockReason === 'idle_timeout') {
+        navigate(redirectTo || '/admin/login', {
+          replace: true,
+          state: { from: location, reason: lockReason }
+        });
+        return;
+      }
       // For admin routes, check admin authentication
       if (!isAdminAuthenticated) {
         navigate(redirectTo || '/admin/login', {

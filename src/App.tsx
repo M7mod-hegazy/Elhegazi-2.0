@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import React, { useEffect, useState } from "react";
 import { AuthProvider } from "@/context/AuthContext";
 import { DualAuthProvider } from "@/context/DualAuthContext";
-import { ThemeProvider, useTheme } from "@/context/ThemeContext";
+import { ThemeProvider } from "@/context/ThemeContext";
 import { useFavicon } from "@/hooks/useFavicon";
 import { useSiteName, cacheSiteName } from "@/hooks/useSiteName";
 import { useLoadingCoordinator } from "@/hooks/useLoadingCoordinator";
@@ -111,7 +111,6 @@ const NotFound = lazy(() => import("./pages/NotFound"));
 const queryClient = new QueryClient();
 
 const AppInner = () => {
-  const { logo } = useTheme();
   const { siteName } = useSiteName();
   const { toast } = useToast();
   const [docLoaded, setDocLoaded] = useState(false);
@@ -119,7 +118,6 @@ const AppInner = () => {
 
   // Update favicon and loading screen logo dynamically
   useFavicon();
-  const [showSplash, setShowSplash] = useState(true);
   const location = useLocation();
 
   // Use loading coordinator to wait for all critical data
@@ -140,7 +138,7 @@ const AppInner = () => {
   // Cache site name for immediate access
   useEffect(() => {
     if (siteName) {
-      cacheSiteName();
+      cacheSiteName(siteName);
       // Update page title and meta tags
       document.title = siteName;
       const ogTitle = document.getElementById('og-title') as HTMLMetaElement;
@@ -233,22 +231,11 @@ const AppInner = () => {
 
     document.addEventListener('click', handleClickCapture, true);
 
-    // Faster fallback to avoid long waits (max 5 seconds)
-    const fallback = setTimeout(() => setShowSplash(false), 5000);
     return () => {
       document.removeEventListener('DOMContentLoaded', onDomReady);
       document.removeEventListener('click', handleClickCapture, true);
-      clearTimeout(fallback);
     };
   }, []);
-
-  // Hide splash when all critical data is ready
-  useEffect(() => {
-    if (docLoaded && allReady) {
-      const id = requestAnimationFrame(() => setShowSplash(false));
-      return () => cancelAnimationFrame(id);
-    }
-  }, [docLoaded, allReady]);
 
   // Global permission-denied toast (Arabic)
   useEffect(() => {
@@ -271,73 +258,6 @@ const AppInner = () => {
     <>
       {/* Scroll Progress Bar */}
       <ScrollProgressBar />
-
-      {/* Global Splash overlay (desktop + mobile) */}
-      {showSplash && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-background overflow-hidden transition-opacity duration-700">
-          {/* Immersive Deep Space Background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[hsl(var(--background))] via-[hsl(var(--muted)/0.55)] to-[hsl(var(--background))]"></div>
-          
-          {/* Dynamic Light Rays / Orbs */}
-          <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[60%] bg-primary/20 blur-[150px] rounded-full animate-splash-blob mix-blend-screen opacity-50"></div>
-          <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[60%] bg-secondary/20 blur-[150px] rounded-full animate-splash-blob mix-blend-screen opacity-50" style={{ animationDelay: '-4s' }}></div>
-          
-          <div className="text-center relative z-10 flex flex-col items-center scale-110">
-            {/* Orbital Logo System */}
-            <div className="relative mb-16 group">
-              {/* Outer Orbital Ring 1 */}
-              <div className="absolute inset-[-40px] border border-primary/10 rounded-full animate-[spin_8s_linear_infinite] scale-100 opacity-60">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-primary rounded-full" style={{ boxShadow: '0 0 12px hsl(var(--primary) / 0.8)' }}></div>
-              </div>
-              
-              {/* Outer Orbital Ring 2 */}
-              <div className="absolute inset-[-40px] border border-secondary/15 rounded-full animate-[spin_12s_linear_infinite_reverse] scale-90 opacity-40">
-                <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-1.5 h-1.5 bg-secondary rounded-full" style={{ boxShadow: '0 0 10px hsl(var(--secondary) / 0.8)' }}></div>
-              </div>
-
-              {/* Inner Glowing Aura */}
-              <div className="absolute inset-[-10px] bg-primary/10 blur-3xl rounded-full scale-110 animate-pulse"></div>
-              
-              {/* Main Logo Container */}
-              <div className="relative w-40 h-40 flex items-center justify-center bg-card/30 backdrop-blur-3xl rounded-[2.5rem] border border-border/50 shadow-[0_35px_60px_-15px_hsl(var(--foreground)/0.35)] animate-splash-pulse">
-                <img src="/iconPng.png" alt="Logo" className="w-24 h-24 object-contain" style={{ filter: 'drop-shadow(0 0 20px hsl(var(--primary) / 0.65))' }} />
-                
-                {/* Micro-Interaction Highlight */}
-                <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent rounded-[2.5rem]"></div>
-              </div>
-            </div>
-
-            {/* Typography Section */}
-            <div className="space-y-8 max-w-sm">
-              <div className="flex flex-col items-center gap-3">
-                <h2 className="text-foreground text-3xl font-black tracking-[0.25em] uppercase animate-splash-text bg-clip-text text-transparent bg-gradient-to-b from-foreground to-foreground/40 drop-shadow-sm font-cairo">
-                  {siteName || 'جاري التحميل'}
-                </h2>
-                <div className="h-1 w-20 bg-gradient-to-r from-transparent via-primary to-transparent rounded-full opacity-50"></div>
-              </div>
-              
-              {/* High-End Progress Section */}
-              <div className="relative w-64">
-                <p className="text-primary/40 font-black text-[10px] uppercase tracking-[0.5em] mb-4 animate-pulse">
-                  SYSTEM INITIALIZING
-                </p>
-                <div className="h-[2px] w-full bg-foreground/10 rounded-full overflow-hidden">
-                  <div className="h-full bg-primary w-2/3 rounded-full animate-[shimmer_2.5s_infinite]" style={{ boxShadow: '0 0 15px hsl(var(--primary) / 0.75)' }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          {/* Footer Detail */}
-          <div className="fixed bottom-12 left-0 right-0 flex justify-center opacity-20 hover:opacity-100 transition-opacity duration-1000">
-             <div className="flex items-center gap-4 text-[9px] font-black tracking-[0.4em] text-foreground/50 uppercase">
-                <span>Secure Console</span>
-                <span className="w-1 h-1 bg-primary rounded-full"></span>
-                <span>Powered by Al-Hegazi v2.0</span>
-             </div>
-          </div>
-        </div>
-      )}
       <Layout>
         <Suspense fallback={<div className="p-6 text-center text-white/90">جارٍ تحميل الصفحة...</div>}>
           {ownerVisibilityLoading ? (

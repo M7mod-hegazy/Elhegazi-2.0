@@ -38,53 +38,53 @@ const DEFAULT_ORDER = ['hero', 'promoStrip', 'categories', 'featuredProducts', '
 
 const SECTION_META: Record<string, SectionMeta> = {
   hero: {
-    title: '??? ?????? ???????',
-    subtitle: '?????? ??????? ?? ???? ??????',
+    title: 'قسم الهيرو',
+    subtitle: 'الشريط الترويجي في أعلى الصفحة',
     icon: Home,
   },
   promoStrip: {
-    title: '?????? ????????',
-    subtitle: '???? ????????? ???????',
+    title: 'شريط العروض',
+    subtitle: 'عرض عروض خاصة ومميزة',
     icon: Megaphone,
   },
   categories: {
-    title: '?????? ???????',
-    subtitle: '??? ?????? ?? ??????',
+    title: 'الفئات',
+    subtitle: 'استعراض الفئات في الصفحة',
     icon: FolderKanban,
   },
   featuredProducts: {
-    title: '???????? ???????',
-    subtitle: '???????? ???????? ??????',
+    title: 'المنتجات المميزة',
+    subtitle: 'إبراز المنتجات الأكثر تميزاً',
     icon: Star,
   },
   bestSellers: {
-    title: '?????? ??????',
-    subtitle: '???????? ?????? ??????',
+    title: 'الأكثر مبيعاً',
+    subtitle: 'عرض المنتجات الأعلى مبيعاً',
     icon: Flame,
   },
   sale: {
-    title: '?????? ?????????',
-    subtitle: '?????? ?????? ?????????',
+    title: 'الخصومات',
+    subtitle: 'خصومات حصرية ومميزة',
     icon: BadgePercent,
   },
   newArrivals: {
-    title: '???????? ???????',
-    subtitle: '???? ???????? ???????',
+    title: 'وصل حديثاً',
+    subtitle: 'أحدث الإضافات للمتجر',
     icon: Sparkles,
   },
   about: {
-    title: '??? ?? ???',
-    subtitle: '??????? ??????',
+    title: 'من نحن',
+    subtitle: 'عرض معلومات المتجر',
     icon: Info,
   },
   locations: {
-    title: '??????? ???????',
-    subtitle: '????? ????? ??????',
+    title: 'المواقع',
+    subtitle: 'فروع المتجر على الخريطة',
     icon: MapPin,
   },
   workHours: {
-    title: '????? ?????',
-    subtitle: '????? ??? ??????',
+    title: 'ساعات العمل',
+    subtitle: 'أوقات عمل المتجر',
     icon: Clock3,
   },
 };
@@ -139,17 +139,17 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
               <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Grid3X3 className="h-4 w-4" />
               </span>
-              ????? ????? ???????
+              إدارة الأقسام
             </DialogTitle>
             <DialogDescription className="text-muted-foreground">
-              ???? ??????? ???? ?? ???? ?? ?????? ???????? ?????? ???? ?????.
+              إدارة أقسام الصفحة الرئيسية. يمكن تفعيل أو تعطيل كل قسم.
             </DialogDescription>
           </DialogHeader>
         </div>
 
         <div className="px-6 py-5 space-y-4">
           <div className="rounded-xl border border-border bg-muted/20 p-3 sm:p-4 flex items-center justify-between gap-3">
-            <div className="text-sm text-foreground font-semibold">??????? ????????</div>
+            <div className="text-sm text-foreground font-semibold">الأقسام المفعلة</div>
             <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-sm">
               <span className="text-primary font-bold">{enabledCount}</span>
               <span className="text-muted-foreground">/ {order.length}</span>
@@ -160,7 +160,7 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
             {order.map((key, idx) => {
               const meta = SECTION_META[key] || {
                 title: key,
-                subtitle: '??? ????',
+                subtitle: 'معاينة',
                 icon: Grid3X3,
               };
               const Icon = meta.icon;
@@ -189,8 +189,8 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
                         className="h-8 w-8"
                         onClick={() => move(idx, -1)}
                         disabled={idx === 0}
-                        title="????? ??????"
-                        aria-label="????? ??????"
+                        title="تحريك لأعلى"
+                        aria-label="تحريك لأعلى"
                       >
                         <ChevronUp className="h-4 w-4" />
                       </Button>
@@ -201,8 +201,8 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
                         className="h-8 w-8"
                         onClick={() => move(idx, 1)}
                         disabled={idx === order.length - 1}
-                        title="????? ??????"
-                        aria-label="????? ??????"
+                        title="تحريك لأسفل"
+                        aria-label="تحريك لأسفل"
                       >
                         <ChevronDown className="h-4 w-4" />
                       </Button>
@@ -216,10 +216,10 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
                             : 'bg-muted text-muted-foreground border-border'
                         }`}
                       >
-                        {enabled ? '?????' : '?????'}
+                        {enabled ? 'مفعّل' : 'معطّل'}
                       </div>
                       <div className="flex items-center gap-2">
-                        <Label className="text-xs sm:text-sm text-muted-foreground">?????</Label>
+                        <Label className="text-xs sm:text-sm text-muted-foreground">الحالة</Label>
                         <Switch checked={enabled} onCheckedChange={(val) => setEnabled(key, val)} />
                       </div>
                     </div>
@@ -233,8 +233,8 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
                       className="h-8 w-8"
                       onClick={() => move(idx, -1)}
                       disabled={idx === 0}
-                      title="????? ??????"
-                      aria-label="????? ??????"
+                      title="تحريك لأعلى"
+                      aria-label="تحريك لأعلى"
                     >
                       <ChevronUp className="h-4 w-4" />
                     </Button>
@@ -245,8 +245,8 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
                       className="h-8 w-8"
                       onClick={() => move(idx, 1)}
                       disabled={idx === order.length - 1}
-                      title="????? ??????"
-                      aria-label="????? ??????"
+                      title="تحريك لأسفل"
+                      aria-label="تحريك لأسفل"
                     >
                       <ChevronDown className="h-4 w-4" />
                     </Button>
@@ -262,7 +262,7 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
               variant="outline"
               onClick={() => setCfg({ ...cfg, sectionsOrder: DEFAULT_ORDER })}
             >
-              ??????? ??????? ?????????
+              إعادة ترتيب افتراضي
             </Button>
           </div>
         </div>

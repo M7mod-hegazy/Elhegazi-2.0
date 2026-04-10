@@ -36,7 +36,7 @@ const Logo = ({ size = 'md', showText = false, className = '', linkTo = '/' }: L
           className={`${sizeClasses[size]} object-contain transition-transform duration-300 hover:scale-105`}
           onError={(e) => {
             console.error('Logo failed to load:', logo.url);
-            e.currentTarget.src = 'https://api.dicebear.com/7.x/shapes/svg?seed=store&backgroundColor=3B82F6';
+            e.currentTarget.src = '/iconPng.png';
           }}
         />
       )}
