@@ -24,7 +24,29 @@ import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 
 import { Product, Category } from '@/types';
 import { useToast } from '@/hooks/use-toast';
-import { Document, Page, Text, View, StyleSheet, PDFViewer, Image as PDFImage } from '@react-pdf/renderer';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import {
+  Document as DocxDocument,
+  Packer,
+  Paragraph,
+  Table,
+  TableRow,
+  TableCell,
+  WidthType,
+  AlignmentType,
+  ImageRun,
+  TextRun,
+  HeadingLevel,
+  PageOrientation,
+  convertMillimetersToTwip,
+} from 'docx';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   QrCode,
   Download,
@@ -55,91 +77,6 @@ import {
   Plus
 } from 'lucide-react';
 
-// PDF Styles for react-pdf
-const pdfStyles = StyleSheet.create({
-  page: {
-    flexDirection: 'column',
-    backgroundColor: '#ffffff',
-    padding: 20,
-  },
-  header: {
-    fontSize: 16,
-    marginBottom: 20,
-    textAlign: 'center',
-    fontWeight: 'bold',
-  },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  qrItem: {
-    marginBottom: 15,
-    alignItems: 'center',
-    textAlign: 'center',
-  },
-  qrCode: {
-    width: 80,
-    height: 80,
-    marginBottom: 5,
-  },
-  productCode: {
-    fontSize: 8,
-    fontWeight: 'bold',
-    marginBottom: 2,
-  },
-  productName: {
-    fontSize: 6,
-    color: '#666666',
-  },
-});
-
-// PDF Document Component
-const QRCodesPDFDocument = ({ products, settings }: { products: Product[]; settings: QRSettings }) => {
-  // Generate QR codes as base64 for PDF
-  const generateQRForPDF = async (product: Product) => {
-    try {
-      const qrData = `${window.location.origin}${buildProductPath(product.id)}`;
-      return await QRCode.toDataURL(qrData, {
-        width: 200,
-        margin: 1,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      });
-    } catch (error) {
-      console.error('Error generating QR code:', error);
-      return '';
-    }
-  };
-
-  return (
-    <Document>
-      <Page size="A4" style={pdfStyles.page}>
-        <Text style={pdfStyles.header}>رموز QR للمنتجات</Text>
-        <View style={pdfStyles.grid}>
-          {products.map((product, index) => (
-            <View key={`${product.id}-${index}`} style={[
-              pdfStyles.qrItem,
-              { width: `${100 / settings.itemsPerRow}%` }
-            ]}>
-              {/* QR Code placeholder - will be enhanced */}
-              <View style={{ width: 80, height: 80, backgroundColor: '#f0f0f0', marginBottom: 5 }} />
-              {settings.showProductCode && (
-                <Text style={pdfStyles.productCode}>{product.sku}</Text>
-              )}
-              {settings.showProductName && (
-                <Text style={pdfStyles.productName}>{product.nameAr}</Text>
-              )}
-            </View>
-          ))}
-        </View>
-      </Page>
-    </Document>
-  );
-};
-
 interface QRSettings {
   size: number;
   showProductCode: boolean;
@@ -153,7 +90,50 @@ interface QRSettings {
   layout: 'grid' | 'list' | 'compact';
   itemsPerRow: number;
   pageFormat: 'A4' | 'A5' | 'A3' | 'Letter';
+  /** Uniform margin from each physical page edge (print + preview), in mm. */
+  pageEdgeMarginMm: number;
+  /** Gap between QR cells on the sheet, in px. */
   margin: number;
+}
+
+function dataUrlToUint8Array(dataUrl: string): Uint8Array {
+  const comma = dataUrl.indexOf(',');
+  const base64 = comma >= 0 ? dataUrl.slice(comma + 1) : dataUrl;
+  const binary = atob(base64);
+  const len = binary.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
+function getJsPdfFormat(fmt: QRSettings['pageFormat']): 'a4' | 'a5' | 'a3' | 'letter' {
+  switch (fmt) {
+    case 'A5': return 'a5';
+    case 'A3': return 'a3';
+    case 'Letter': return 'letter';
+    default: return 'a4';
+  }
+}
+
+function getPageDimensionsMm(fmt: QRSettings['pageFormat']): { w: number; h: number } {
+  switch (fmt) {
+    case 'A4': return { w: 210, h: 297 };
+    case 'A5': return { w: 148, h: 210 };
+    case 'A3': return { w: 297, h: 420 };
+    case 'Letter': return { w: 216, h: 279 };
+    default: return { w: 210, h: 297 };
+  }
+}
+
+/** Printable content box inside @page margins (matches preview inner area). */
+function getInnerPageDimensionsMm(
+  pageFormat: QRSettings['pageFormat'],
+  pageEdgeMarginMm: number
+): { w: number; h: number } {
+  const { w, h } = getPageDimensionsMm(pageFormat);
+  const innerW = Math.max(10, w - 2 * pageEdgeMarginMm);
+  const innerH = Math.max(10, h - 2 * pageEdgeMarginMm);
+  return { w: innerW, h: innerH };
 }
 
 const AdminQRCodes = () => {
@@ -176,6 +156,7 @@ const AdminQRCodes = () => {
     layout: 'grid',
     itemsPerRow: 3,
     pageFormat: 'A4',
+    pageEdgeMarginMm: 0,
     margin: 20
   });
   const [selectedProductQuantities, setSelectedProductQuantities] = useState<Record<string, number>>({});
@@ -189,14 +170,14 @@ const AdminQRCodes = () => {
   const [qrCache, setQrCache] = useState<{ [key: string]: string }>({});
   const qrCacheRef = useRef<{ [key: string]: string }>({});
 
-  // Auto-adjust itemsPerRow when margin or QR size changes
+  // Auto-adjust itemsPerRow when margins, page size, or QR size changes
   useEffect(() => {
-    // Calculate max items inline to avoid dependency issues
-    const availableWidth = 200; // mm (approximate usable width)
-    const qrSizeMm = (settings.size / 4) / 3.78; // Reduced effect
-    const marginEffectMm = settings.margin / 3.78; // Convert px to mm
+    const { w } = getPageDimensionsMm(settings.pageFormat);
+    const usableWidthMm = Math.max(20, w - 2 * settings.pageEdgeMarginMm);
+    const qrSizeMm = (settings.size / 4) / 3.78;
+    const marginEffectMm = settings.margin / 3.78;
     const effectiveItemWidth = qrSizeMm + marginEffectMm;
-    const maxAllowed = Math.max(1, Math.min(Math.floor(availableWidth / effectiveItemWidth), 15));
+    const maxAllowed = Math.max(1, Math.min(Math.floor(usableWidthMm / effectiveItemWidth), 15));
 
     if (settings.itemsPerRow > maxAllowed) {
       setSettings(prev => ({
@@ -204,7 +185,7 @@ const AdminQRCodes = () => {
         itemsPerRow: maxAllowed
       }));
     }
-  }, [settings.margin, settings.size, settings.itemsPerRow]);
+  }, [settings.margin, settings.size, settings.itemsPerRow, settings.pageFormat, settings.pageEdgeMarginMm]);
 
   // Load data from API
   useEffect(() => {
@@ -282,13 +263,124 @@ const AdminQRCodes = () => {
   // Reset to first page when layout settings change
   useEffect(() => {
     setCurrentPage(1);
-  }, [settings.itemsPerRow, settings.margin, settings.size, settings.pageFormat]);
+  }, [settings.itemsPerRow, settings.margin, settings.size, settings.pageFormat, settings.pageEdgeMarginMm]);
 
   // Clear QR cache when settings change to force regeneration
   useEffect(() => {
     qrCacheRef.current = {};
     setQrCache({});
   }, [settings.size, settings.foregroundColor, settings.backgroundColor, settings.includeLogo, logoPreview]);
+
+  const generateQRCodeWithLogo = useCallback(async (product: Product, customSize?: number): Promise<string> => {
+    const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
+    const size = customSize || settings.size;
+    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}-${settings.foregroundColor}-${settings.backgroundColor}`;
+
+    const hit = qrCacheRef.current[cacheKey];
+    if (hit) return hit;
+
+    const ecc: 'L' | 'M' | 'Q' | 'H' = settings.includeLogo && logoPreview ? 'H' : 'M';
+
+    try {
+      const qrDataURL = await QRCode.toDataURL(productURL, {
+        width: size,
+        margin: 2,
+        color: {
+          dark: settings.foregroundColor,
+          light: settings.backgroundColor,
+        },
+        errorCorrectionLevel: ecc,
+      });
+
+      if (!settings.includeLogo || !logoPreview) {
+        qrCacheRef.current[cacheKey] = qrDataURL;
+        setQrCache((prev) => ({ ...prev, [cacheKey]: qrDataURL }));
+        return qrDataURL;
+      }
+
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas context not available');
+
+      canvas.width = size;
+      canvas.height = size;
+
+      const qrImage = document.createElement('img');
+      await new Promise<void>((resolve, reject) => {
+        qrImage.onload = () => resolve();
+        qrImage.onerror = () => reject(new Error('Failed to load QR image'));
+        qrImage.src = qrDataURL;
+      });
+
+      ctx.drawImage(qrImage, 0, 0, size, size);
+
+      const logoImage = document.createElement('img');
+      await new Promise<void>((resolve, reject) => {
+        logoImage.onload = () => resolve();
+        logoImage.onerror = () => reject(new Error('Failed to load logo image'));
+        logoImage.src = logoPreview;
+      });
+
+      const logoSize = Math.max(8, size * 0.22);
+      const logoX = (size - logoSize) / 2;
+      const logoY = (size - logoSize) / 2;
+
+      ctx.fillStyle = settings.backgroundColor || '#ffffff';
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, logoSize / 2 + 3, 0, 2 * Math.PI);
+      ctx.fill();
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, logoSize / 2, 0, 2 * Math.PI);
+      ctx.clip();
+      ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+      ctx.restore();
+
+      const finalDataURL = canvas.toDataURL('image/png');
+      qrCacheRef.current[cacheKey] = finalDataURL;
+      setQrCache((prev) => ({ ...prev, [cacheKey]: finalDataURL }));
+      return finalDataURL;
+    } catch (error) {
+      console.error('Error generating QR code with logo:', error);
+      const fallbackQR = await QRCode.toDataURL(productURL, {
+        width: size,
+        margin: 2,
+        color: {
+          dark: settings.foregroundColor,
+          light: settings.backgroundColor,
+        },
+        errorCorrectionLevel: 'M',
+      });
+      qrCacheRef.current[cacheKey] = fallbackQR;
+      setQrCache((prev) => ({ ...prev, [cacheKey]: fallbackQR }));
+      return fallbackQR;
+    }
+  }, [settings.size, settings.foregroundColor, settings.backgroundColor, settings.includeLogo, logoPreview]);
+
+  const generateQRCodeURL = (product: Product, customSize?: number) => {
+    const size = customSize || settings.size;
+    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}-${settings.foregroundColor}-${settings.backgroundColor}`;
+
+    const sync = qrCacheRef.current[cacheKey];
+    if (sync) return sync;
+
+    generateQRCodeWithLogo(product, customSize).then((dataURL) => {
+      setQrCache((prev) => ({ ...prev, [cacheKey]: dataURL }));
+    });
+
+    const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
+    const params = new URLSearchParams({
+      size: `${size}x${size}`,
+      data: productURL,
+      bgcolor: settings.backgroundColor.replace('#', ''),
+      color: settings.foregroundColor.replace('#', ''),
+      qzone: '1',
+      format: 'png',
+    });
+
+    return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`;
+  };
 
   // QR Code Image Component with logo support
   const QRCodeImage = ({ product, size, className, fitContainer, imgStyle }: { product: Product; size?: number; className?: string; fitContainer?: boolean; imgStyle?: React.CSSProperties }) => {
@@ -350,121 +442,6 @@ const AdminQRCodes = () => {
     );
   };
 
-  // Generate QR code with logo overlay using canvas (ref cache — stable deps, ECC H when logo)
-  const generateQRCodeWithLogo = useCallback(async (product: Product, customSize?: number): Promise<string> => {
-    const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
-    const size = customSize || settings.size;
-    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}-${settings.foregroundColor}-${settings.backgroundColor}`;
-
-    const hit = qrCacheRef.current[cacheKey];
-    if (hit) return hit;
-
-    const ecc: 'L' | 'M' | 'Q' | 'H' = settings.includeLogo && logoPreview ? 'H' : 'M';
-
-    try {
-      const qrDataURL = await QRCode.toDataURL(productURL, {
-        width: size,
-        margin: 2,
-        color: {
-          dark: settings.foregroundColor,
-          light: settings.backgroundColor,
-        },
-        errorCorrectionLevel: ecc,
-      });
-
-      if (!settings.includeLogo || !logoPreview) {
-        qrCacheRef.current[cacheKey] = qrDataURL;
-        setQrCache((prev) => ({ ...prev, [cacheKey]: qrDataURL }));
-        return qrDataURL;
-      }
-
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      if (!ctx) throw new Error('Canvas context not available');
-
-      canvas.width = size;
-      canvas.height = size;
-
-      const qrImage = document.createElement('img');
-      await new Promise<void>((resolve, reject) => {
-        qrImage.onload = () => resolve();
-        qrImage.onerror = () => reject(new Error('Failed to load QR image'));
-        qrImage.src = qrDataURL;
-      });
-
-      ctx.drawImage(qrImage, 0, 0, size, size);
-
-      const logoImage = document.createElement('img');
-      logoImage.crossOrigin = 'anonymous';
-      await new Promise<void>((resolve, reject) => {
-        logoImage.onload = () => resolve();
-        logoImage.onerror = () => reject(new Error('Failed to load logo image'));
-        logoImage.src = logoPreview;
-      });
-
-      const logoSize = Math.max(8, size * 0.22);
-      const logoX = (size - logoSize) / 2;
-      const logoY = (size - logoSize) / 2;
-
-      ctx.fillStyle = settings.backgroundColor || '#ffffff';
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, logoSize / 2 + 3, 0, 2 * Math.PI);
-      ctx.fill();
-
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(size / 2, size / 2, logoSize / 2, 0, 2 * Math.PI);
-      ctx.clip();
-      ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
-      ctx.restore();
-
-      const finalDataURL = canvas.toDataURL('image/png');
-      qrCacheRef.current[cacheKey] = finalDataURL;
-      setQrCache((prev) => ({ ...prev, [cacheKey]: finalDataURL }));
-      return finalDataURL;
-    } catch (error) {
-      console.error('Error generating QR code with logo:', error);
-      const fallbackQR = await QRCode.toDataURL(productURL, {
-        width: size,
-        margin: 2,
-        color: {
-          dark: settings.foregroundColor,
-          light: settings.backgroundColor,
-        },
-        errorCorrectionLevel: 'M',
-      });
-      qrCacheRef.current[cacheKey] = fallbackQR;
-      setQrCache((prev) => ({ ...prev, [cacheKey]: fallbackQR }));
-      return fallbackQR;
-    }
-  }, [settings.size, settings.foregroundColor, settings.backgroundColor, settings.includeLogo, logoPreview]);
-
-  // Legacy function for compatibility - now uses the new logo-enabled function
-  const generateQRCodeURL = (product: Product, customSize?: number) => {
-    const size = customSize || settings.size;
-    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}-${settings.foregroundColor}-${settings.backgroundColor}`;
-
-    const sync = qrCacheRef.current[cacheKey];
-    if (sync) return sync;
-
-    generateQRCodeWithLogo(product, customSize).then((dataURL) => {
-      setQrCache((prev) => ({ ...prev, [cacheKey]: dataURL }));
-    });
-
-    // Return fallback URL while generating
-    const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
-    const params = new URLSearchParams({
-      size: `${size}x${size}`,
-      data: productURL,
-      bgcolor: settings.backgroundColor.replace('#', ''),
-      color: settings.foregroundColor.replace('#', ''),
-      qzone: '1',
-      format: 'png'
-    });
-
-    return `https://api.qrserver.com/v1/create-qr-code/?${params.toString()}`;
-  };
-
   // Calculate text sizes based on QR size
   const getTextSizes = () => {
     const baseSize = settings.size;
@@ -477,48 +454,15 @@ const AdminQRCodes = () => {
     };
   };
 
-  // Calculate maximum items per row based on margin and QR size
+  // Calculate maximum items per row from usable sheet width (page minus edge margins)
   const getMaxItemsPerRow = () => {
-    // Base calculation: reduce QR size effect to allow more items per line
-    const availableWidth = 200; // mm (approximate usable width)
-
-    // Reduce QR size effect by using smaller factor
-    const qrSizeMm = (settings.size / 4) / 3.78; // Reduced from /2.5 to /4
-    const marginEffectMm = settings.margin / 3.78; // Convert px to mm
-
+    const { w } = getPageDimensionsMm(settings.pageFormat);
+    const usableWidthMm = Math.max(20, w - 2 * settings.pageEdgeMarginMm);
+    const qrSizeMm = (settings.size / 4) / 3.78;
+    const marginEffectMm = settings.margin / 3.78;
     const effectiveItemWidth = qrSizeMm + marginEffectMm;
-    const maxItems = Math.floor(availableWidth / effectiveItemWidth);
-
-    return Math.max(1, Math.min(maxItems, 15)); // Increased max from 12 to 15
-  };
-
-  // Calculate items per page for A4 layout - integrated with layout settings
-  const getPrintPagePaddingPx = () => 2 * 3.78; // 2mm to px
-
-  const getPrintQrSizePx = () => Math.min(settings.size / 2.5, 80);
-
-  const getPrintItemHeightPx = () => {
-    const qrPx = getPrintQrSizePx();
-    const codePt = Math.max(6, Math.round(7 * (settings.size / 200)));
-    const namePt = Math.max(5, Math.round(6 * (settings.size / 200)));
-    const pricePt = 8;
-    const codePx = settings.showProductCode ? (codePt * 1.333 + 4) : 0;
-    const namePx = settings.showProductName ? (namePt * 1.333 * 2 + 4) : 0;
-    const pricePx = settings.showPrice ? (pricePt * 1.333 + 4) : 0;
-    const textPx = codePx + namePx + pricePx;
-    const chromePx = settings.addBorder ? 8 : 6;
-    return qrPx + textPx + settings.margin + chromePx;
-  };
-
-  const getItemsPerPage = () => {
-    const itemsPerRow = Math.max(1, settings.itemsPerRow);
-    const pageHeightPx = parseInt(getPageHeightPx(), 10);
-    const pagePaddingPx = getPrintPagePaddingPx();
-    const gapPx = settings.margin;
-    const usableHeightPx = Math.max(100, pageHeightPx - pagePaddingPx * 2);
-    const itemHeightPx = getPrintItemHeightPx();
-    const rowsPerPage = Math.max(1, Math.floor((usableHeightPx + gapPx) / (itemHeightPx + gapPx)));
-    return Math.max(1, rowsPerPage * itemsPerRow);
+    const maxItems = Math.floor(usableWidthMm / effectiveItemWidth);
+    return Math.max(1, Math.min(maxItems, 15));
   };
 
   const getPageWidthPx = () => {
@@ -540,6 +484,40 @@ const AdminQRCodes = () => {
     }
   };
 
+  /** One page edge inset in CSS px (matches print @page margin for this format). */
+  const getPageEdgePaddingPx = () => {
+    const pageWPx = parseInt(getPageWidthPx(), 10);
+    const { w: pageWmm } = getPageDimensionsMm(settings.pageFormat);
+    if (pageWmm <= 0) return 0;
+    return (settings.pageEdgeMarginMm / pageWmm) * pageWPx;
+  };
+
+  const getPrintQrSizePx = () => Math.min(settings.size / 2.5, 80);
+
+  const getPrintItemHeightPx = () => {
+    const qrPx = getPrintQrSizePx();
+    const codePt = Math.max(6, Math.round(7 * (settings.size / 200)));
+    const namePt = Math.max(5, Math.round(6 * (settings.size / 200)));
+    const pricePt = 8;
+    const codePx = settings.showProductCode ? (codePt * 1.333 + 4) : 0;
+    const namePx = settings.showProductName ? (namePt * 1.333 * 2 + 4) : 0;
+    const pricePx = settings.showPrice ? (pricePt * 1.333 + 4) : 0;
+    const textPx = codePx + namePx + pricePx;
+    const chromePx = settings.addBorder ? 8 : 6;
+    return qrPx + textPx + settings.margin + chromePx;
+  };
+
+  const getItemsPerPage = () => {
+    const itemsPerRow = Math.max(1, settings.itemsPerRow);
+    const pageHeightPx = parseInt(getPageHeightPx(), 10);
+    const edgePx = getPageEdgePaddingPx();
+    const gapPx = settings.margin;
+    const usableHeightPx = Math.max(100, pageHeightPx - edgePx * 2);
+    const itemHeightPx = getPrintItemHeightPx();
+    const rowsPerPage = Math.max(1, Math.floor((usableHeightPx + gapPx) / (itemHeightPx + gapPx)));
+    return Math.max(1, rowsPerPage * itemsPerRow);
+  };
+
   // Get paginated products for A4 preview
   const getPaginatedProducts = () => {
     const itemsPerPage = getItemsPerPage();
@@ -553,7 +531,7 @@ const AdminQRCodes = () => {
     if (selectedProducts.length === 0) return 1;
     const itemsPerPage = getItemsPerPage();
     return Math.ceil(selectedProducts.length / itemsPerPage);
-  }, [selectedProducts.length, settings.itemsPerRow, settings.margin, settings.size, settings.pageFormat]);
+  }, [selectedProducts.length, settings.itemsPerRow, settings.margin, settings.size, settings.pageFormat, settings.pageEdgeMarginMm]);
 
   // Stable pagination window
   const getVisiblePages = useCallback(() => {
@@ -610,44 +588,43 @@ const AdminQRCodes = () => {
     });
   };
 
-  // Handle print all with enhanced A4 layout - Fixed QR Loading
-  const handlePrintAll = async () => {
+  /** Builds the same RTL HTML used for print, PDF export, and PDF rasterization. */
+  const preparePrintSheetHtml = async (onProgress?: (pct: number) => void): Promise<string> => {
     const itemsPerPage = getItemsPerPage();
     const totalPages = getTotalPages();
+    const totalProducts = selectedProducts.length;
+    const qrImageList: string[] = [];
 
-    setIsGenerating(true);
-    setProgress(0);
-
-    try {
-      // Pre-load all QR code images as base64 to ensure they print correctly
-      const qrImages: { [key: string]: string } = {};
-      const totalProducts = selectedProducts.length;
-
-      for (let i = 0; i < totalProducts; i++) {
-        const product = selectedProducts[i];
-
-        try {
-          // Generate QR with logo using the new function
-          const qrDataURL = await generateQRCodeWithLogo(product);
-          qrImages[product.id] = qrDataURL;
-          setProgress(Math.round(((i + 1) / totalProducts) * 100));
-        } catch (error) {
-          console.error(`Failed to generate QR for product ${product.sku}:`, error);
-          // Fallback to simple QR
-          const fallbackUrl = generateQRCodeURL(product);
-          qrImages[product.id] = fallbackUrl;
-        }
+    for (let i = 0; i < totalProducts; i++) {
+      const product = selectedProducts[i]!;
+      try {
+        qrImageList.push(await generateQRCodeWithLogo(product));
+      } catch (error) {
+        console.error(`Failed to generate QR for product ${product.sku}:`, error);
+        const fallback = await QRCode.toDataURL(`${window.location.origin}${buildProductPath(product.id)}`, {
+          width: settings.size,
+          margin: 2,
+          color: {
+            dark: settings.foregroundColor,
+            light: settings.backgroundColor,
+          },
+          errorCorrectionLevel: 'M',
+        });
+        qrImageList.push(fallback);
       }
+      onProgress?.(Math.round(((i + 1) / totalProducts) * 100));
+    }
 
-      let printContent = `
+    const innerPageMm = getInnerPageDimensionsMm(settings.pageFormat, settings.pageEdgeMarginMm);
+
+    let printContent = `
         <html dir="rtl">
           <head>
             <title>رموز QR للمنتجات</title>
             <style>
               @page {
                 size: ${settings.pageFormat};
-                /* Use minimal margins to utilize full width */
-                margin: 0mm;
+                margin: ${settings.pageEdgeMarginMm}mm;
               }
               body {
                 font-family: 'Arial', sans-serif;
@@ -663,9 +640,9 @@ const AdminQRCodes = () => {
                 page-break-after: always;
                 display: flex;
                 flex-direction: column;
-                width: ${settings.pageFormat === 'A4' ? '210mm' : settings.pageFormat === 'A5' ? '148mm' : settings.pageFormat === 'A3' ? '297mm' : '216mm'};
-                height: ${settings.pageFormat === 'A4' ? '297mm' : settings.pageFormat === 'A5' ? '210mm' : settings.pageFormat === 'A3' ? '420mm' : '279mm'};
-                padding: 2mm;
+                width: ${innerPageMm.w}mm;
+                height: ${innerPageMm.h}mm;
+                padding: 0;
                 box-sizing: border-box;
                 overflow: hidden;
               }
@@ -758,25 +735,248 @@ const AdminQRCodes = () => {
         printContent += `
           <div class="page">
             <div class="qr-grid">
-              ${pageProducts.map(product => `
+              ${pageProducts.map((product, idx) => {
+                const globalIndex = startIndex + idx;
+                const src = qrImageList[globalIndex] || '';
+                return `
                 <div class="qr-item">
-                  <img src="${qrImages[product.id]}" alt="QR ${product.sku}" class="qr-code" crossorigin="anonymous">
+                  <img src="${src}" alt="QR ${product.sku}" class="qr-code" />
                   ${settings.showProductCode ? `<div class="product-code">${product.sku}</div>` : ''}
                   ${settings.showProductName ? `<div class="product-name">${product.nameAr}</div>` : ''}
                   ${settings.showPrice ? `<div class="product-price">${product.price.toLocaleString()} ج.م</div>` : ''}
                 </div>
-              `).join('')}
+              `;
+              }).join('')}
             </div>
           </div>
         `;
       }
 
-      printContent += `
+    printContent += `
           </body>
         </html>
       `;
 
-      // Print using a hidden iframe in the same tab (no new window)
+    return printContent;
+  };
+
+  const renderSheetPdfBlob = async (
+    html: string,
+    onPageProgress?: (pct: number) => void
+  ): Promise<Blob> => {
+    const iframe = document.createElement('iframe');
+    iframe.setAttribute('aria-hidden', 'true');
+    iframe.title = 'qr-print-export';
+    iframe.style.cssText =
+      'position:fixed;left:-9999px;top:0;width:1px;height:1px;border:0;opacity:0;pointer-events:none';
+    document.body.appendChild(iframe);
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) {
+      document.body.removeChild(iframe);
+      throw new Error('تعذر إنشاء مستند الطباعة');
+    }
+    iframeDoc.open();
+    iframeDoc.write(html);
+    iframeDoc.close();
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => setTimeout(resolve, 450));
+    });
+    const pageEls = iframeDoc.querySelectorAll('.page');
+    if (pageEls.length === 0) {
+      document.body.removeChild(iframe);
+      throw new Error('لا توجد صفحات للتصدير');
+    }
+    const format = getJsPdfFormat(settings.pageFormat);
+    const pdf = new jsPDF({ unit: 'mm', format, orientation: 'portrait' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const n = pageEls.length;
+    for (let i = 0; i < n; i++) {
+      const el = pageEls[i] as HTMLElement;
+      const canvas = await html2canvas(el, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        backgroundColor: settings.backgroundColor || '#ffffff',
+        logging: false,
+      });
+      const imgData = canvas.toDataURL('image/png', 1.0);
+      if (i > 0) pdf.addPage(format, 'portrait');
+      pdf.addImage(imgData, 'PNG', 0, 0, pageW, pageH, undefined, 'FAST');
+      onPageProgress?.(Math.round(((i + 1) / n) * 100));
+    }
+    document.body.removeChild(iframe);
+    return pdf.output('blob');
+  };
+
+  const buildWordBlob = async (onProgress?: (pct: number) => void): Promise<Blob> => {
+    const n = selectedProducts.length;
+    const qrImageList: string[] = [];
+    for (let i = 0; i < n; i++) {
+      const product = selectedProducts[i]!;
+      try {
+        qrImageList.push(await generateQRCodeWithLogo(product));
+      } catch {
+        const fallback = await QRCode.toDataURL(`${window.location.origin}${buildProductPath(product.id)}`, {
+          width: settings.size,
+          margin: 2,
+          color: {
+            dark: settings.foregroundColor,
+            light: settings.backgroundColor,
+          },
+          errorCorrectionLevel: 'M',
+        });
+        qrImageList.push(fallback);
+      }
+      onProgress?.(Math.round(((i + 1) / n) * 70));
+    }
+
+    const cols = Math.max(1, settings.itemsPerRow);
+    const imgPx = Math.min(140, Math.round(getPrintQrSizePx() * 1.6));
+    const rows: TableRow[] = [];
+    const rowCount = Math.ceil(selectedProducts.length / cols);
+    for (let r = 0; r < rowCount; r++) {
+      const cells: TableCell[] = [];
+      for (let c = 0; c < cols; c++) {
+        const idx = r * cols + c;
+        if (idx >= selectedProducts.length) {
+          cells.push(new TableCell({ children: [new Paragraph('')] }));
+          continue;
+        }
+        const product = selectedProducts[idx]!;
+        const src = qrImageList[idx]!;
+        const cellChildren: Paragraph[] = [
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            bidirectional: true,
+            children: [
+              new ImageRun({
+                type: 'png',
+                data: dataUrlToUint8Array(src),
+                transformation: { width: imgPx, height: imgPx },
+              }),
+            ],
+          }),
+        ];
+        if (settings.showProductCode) {
+          cellChildren.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              bidirectional: true,
+              children: [new TextRun({ text: product.sku, bold: true, size: 18 })],
+            })
+          );
+        }
+        if (settings.showProductName) {
+          cellChildren.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              bidirectional: true,
+              children: [new TextRun({ text: product.nameAr, size: 16 })],
+            })
+          );
+        }
+        if (settings.showPrice) {
+          cellChildren.push(
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              bidirectional: true,
+              children: [new TextRun({ text: `${product.price.toLocaleString('ar-EG')} ج.م`, size: 18 })],
+            })
+          );
+        }
+        cells.push(new TableCell({ children: cellChildren }));
+      }
+      rows.push(new TableRow({ children: cells }));
+    }
+
+    const { w: pageWmm, h: pageHmm } = getPageDimensionsMm(settings.pageFormat);
+    const doc = new DocxDocument({
+      sections: [
+        {
+          properties: {
+            page: {
+              size: {
+                width: convertMillimetersToTwip(pageWmm),
+                height: convertMillimetersToTwip(pageHmm),
+                orientation: PageOrientation.PORTRAIT,
+              },
+              margin: {
+                top: convertMillimetersToTwip(settings.pageEdgeMarginMm),
+                right: convertMillimetersToTwip(settings.pageEdgeMarginMm),
+                bottom: convertMillimetersToTwip(settings.pageEdgeMarginMm),
+                left: convertMillimetersToTwip(settings.pageEdgeMarginMm),
+              },
+            },
+          },
+          children: [
+            new Paragraph({
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              bidirectional: true,
+              children: [new TextRun({ text: 'رموز QR للمنتجات', bold: true, size: 32 })],
+            }),
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              rows,
+            }),
+          ],
+        },
+      ],
+    });
+    onProgress?.(90);
+    const blob = await Packer.toBlob(doc);
+    onProgress?.(100);
+    return blob;
+  };
+
+  const triggerFileDownload = (blob: Blob, filename: string) => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const shareBlobWithFallback = async (blob: Blob, filename: string, successTitle: string) => {
+    const file = new File([blob], filename, {
+      type: blob.type || 'application/octet-stream',
+    });
+    try {
+      if (navigator.share && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'رموز QR للمنتجات',
+          text: filename,
+        });
+        toast({ title: successTitle, description: 'يمكنك الآن فتح الملف من تطبيق المشاركة.' });
+        return;
+      }
+    } catch (e) {
+      if ((e as Error).name === 'AbortError') return;
+      console.warn('Share failed, falling back to download', e);
+    }
+    triggerFileDownload(blob, filename);
+    toast({
+      title: 'تم التحميل',
+      description: 'المشاركة غير متاحة على هذا الجهاز؛ تم تنزيل الملف.',
+    });
+  };
+
+  const handlePrintAll = async () => {
+    const itemsPerPage = getItemsPerPage();
+    const totalPages = getTotalPages();
+
+    setIsGenerating(true);
+    setProgress(0);
+
+    try {
+      const printContent = await preparePrintSheetHtml((p) => setProgress(p));
+
       const iframe = document.createElement('iframe');
       iframe.style.position = 'fixed';
       iframe.style.right = '0';
@@ -791,30 +991,115 @@ const AdminQRCodes = () => {
         iframeDoc.open();
         iframeDoc.write(printContent);
         iframeDoc.close();
-
-        iframe.onload = () => {
+        requestAnimationFrame(() => {
           setTimeout(() => {
             iframe.contentWindow?.focus();
             iframe.contentWindow?.print();
-            // Clean up after a short delay
             setTimeout(() => {
               document.body.removeChild(iframe);
             }, 500);
-          }, 600);
-        };
+          }, 400);
+        });
       }
 
       toast({
         title: "تم تحضير الطباعة",
         description: `${totalPages} صفحة جاهزة للطباعة • ${settings.itemsPerRow} عنصر/صف • ${itemsPerPage} عنصر/صفحة`,
       });
-
     } catch (error) {
       console.error('Print preparation failed:', error);
       toast({
         title: "خطأ في التحضير",
         description: "حدث خطأ أثناء تحضير الطباعة",
         variant: "destructive"
+      });
+    } finally {
+      setIsGenerating(false);
+      setProgress(0);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (selectedProducts.length === 0) return;
+    setIsGenerating(true);
+    setProgress(0);
+    try {
+      const html = await preparePrintSheetHtml((p) => setProgress(Math.round(p * 0.55)));
+      const blob = await renderSheetPdfBlob(html, (p) => setProgress(55 + Math.round(p * 0.45)));
+      const stamp = new Date().toISOString().split('T')[0];
+      triggerFileDownload(blob, `qr-codes-${stamp}.pdf`);
+      toast({ title: 'تم التحميل', description: 'تم حفظ ملف PDF' });
+    } catch (error) {
+      console.error('PDF export failed:', error);
+      toast({
+        title: 'خطأ في PDF',
+        description: 'تعذر إنشاء ملف PDF',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+      setProgress(0);
+    }
+  };
+
+  const handleDownloadWord = async () => {
+    if (selectedProducts.length === 0) return;
+    setIsGenerating(true);
+    setProgress(0);
+    try {
+      const blob = await buildWordBlob((p) => setProgress(p));
+      const stamp = new Date().toISOString().split('T')[0];
+      triggerFileDownload(blob, `qr-codes-${stamp}.docx`);
+      toast({ title: 'تم التحميل', description: 'تم حفظ ملف Word (.docx)' });
+    } catch (error) {
+      console.error('Word export failed:', error);
+      toast({
+        title: 'خطأ في Word',
+        description: 'تعذر إنشاء ملف Word',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+      setProgress(0);
+    }
+  };
+
+  const handleSharePdf = async () => {
+    if (selectedProducts.length === 0) return;
+    setIsGenerating(true);
+    setProgress(0);
+    try {
+      const html = await preparePrintSheetHtml((p) => setProgress(Math.round(p * 0.55)));
+      const blob = await renderSheetPdfBlob(html, (p) => setProgress(55 + Math.round(p * 0.45)));
+      const stamp = new Date().toISOString().split('T')[0];
+      await shareBlobWithFallback(blob, `qr-codes-${stamp}.pdf`, 'تمت مشاركة PDF');
+    } catch (error) {
+      console.error('Share PDF failed:', error);
+      toast({
+        title: 'خطأ',
+        description: 'تعذر مشاركة PDF',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsGenerating(false);
+      setProgress(0);
+    }
+  };
+
+  const handleShareWord = async () => {
+    if (selectedProducts.length === 0) return;
+    setIsGenerating(true);
+    setProgress(0);
+    try {
+      const blob = await buildWordBlob((p) => setProgress(p));
+      const stamp = new Date().toISOString().split('T')[0];
+      await shareBlobWithFallback(blob, `qr-codes-${stamp}.docx`, 'تمت مشاركة Word');
+    } catch (error) {
+      console.error('Share Word failed:', error);
+      toast({
+        title: 'خطأ',
+        description: 'تعذر مشاركة ملف Word',
+        variant: 'destructive',
       });
     } finally {
       setIsGenerating(false);
@@ -987,12 +1272,13 @@ const AdminQRCodes = () => {
       const reader = new FileReader();
       reader.onload = (e) => {
         setLogoPreview(e.target?.result as string);
+        setSettings((prev) => ({ ...prev, includeLogo: true }));
       };
       reader.readAsDataURL(file);
 
       toast({
         title: "تم رفع الشعار",
-        description: "تم رفع الشعار بنجاح",
+        description: "تم تفعيل «إضافة الشعار» في وسط الرمز تلقائياً",
       });
     }
   };
@@ -1134,6 +1420,77 @@ const AdminQRCodes = () => {
                   طباعة الكل
                 </Button>
               </div>
+
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDownloadPdf}
+                  disabled={selectedProducts.length === 0 || isGenerating}
+                  className="h-11 rounded-xl font-semibold text-xs border-slate-200"
+                >
+                  <FileDown className="w-4 h-4 ml-1" />
+                  PDF
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDownloadWord}
+                  disabled={selectedProducts.length === 0 || isGenerating}
+                  className="h-11 rounded-xl font-semibold text-xs border-slate-200"
+                >
+                  <FileText className="w-4 h-4 ml-1" />
+                  Word
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-3 mt-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDownloadZIP}
+                  disabled={selectedProducts.length === 0 || isGenerating}
+                  className="h-11 rounded-xl font-semibold text-xs border-orange-200 text-orange-800"
+                >
+                  <Download className="w-4 h-4 ml-1" />
+                  ZIP
+                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={selectedProducts.length === 0 || isGenerating}
+                      className="h-11 rounded-xl font-semibold text-xs w-full flex items-center justify-between gap-1 px-2"
+                    >
+                      <span className="inline-flex items-center gap-1">
+                        <Share2 className="w-4 h-4" />
+                        مشاركة
+                      </span>
+                      <ChevronDown className="w-3 h-3 opacity-70 shrink-0" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="min-w-[11rem]">
+                    <DropdownMenuItem
+                      disabled={isGenerating}
+                      onSelect={() => {
+                        void handleSharePdf();
+                      }}
+                    >
+                      <FileDown className="w-4 h-4 ml-2" />
+                      مشاركة PDF
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      disabled={isGenerating}
+                      onSelect={() => {
+                        void handleShareWord();
+                      }}
+                    >
+                      <FileText className="w-4 h-4 ml-2" />
+                      مشاركة Word
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </div>
 
@@ -1209,6 +1566,85 @@ const AdminQRCodes = () => {
                 </div>
               </details>
             )}
+
+            <details className="rounded-lg border bg-white/95 shadow-sm">
+              <summary className="cursor-pointer list-none p-3 text-sm font-semibold flex items-center gap-2">
+                <Layout className="w-4 h-4 text-emerald-600" />
+                إعدادات التخطيط
+                <span className="text-xs font-normal text-slate-500 mr-auto">
+                  {getItemsPerPage()} عنصر/صفحة
+                </span>
+              </summary>
+              <div className="px-3 pb-3 space-y-3 border-t pt-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">تنسيق الصفحة</Label>
+                  <Select
+                    value={settings.pageFormat}
+                    onValueChange={(value: QRSettings['pageFormat']) =>
+                      setSettings({ ...settings, pageFormat: value })
+                    }
+                  >
+                    <SelectTrigger className="h-9 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="A4">A4</SelectItem>
+                      <SelectItem value="A5">A5</SelectItem>
+                      <SelectItem value="A3">A3</SelectItem>
+                      <SelectItem value="Letter">Letter</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">هامش الحواف: {settings.pageEdgeMarginMm}mm</Label>
+                  <Slider
+                    value={[settings.pageEdgeMarginMm]}
+                    onValueChange={(value) =>
+                      setSettings({ ...settings, pageEdgeMarginMm: value[0] })
+                    }
+                    min={0}
+                    max={30}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">
+                    عناصر/صف (حد {getMaxItemsPerRow()}): {Math.min(settings.itemsPerRow, getMaxItemsPerRow())}
+                  </Label>
+                  <Slider
+                    value={[Math.min(settings.itemsPerRow, getMaxItemsPerRow())]}
+                    onValueChange={(value) => setSettings({ ...settings, itemsPerRow: value[0] })}
+                    min={1}
+                    max={getMaxItemsPerRow()}
+                    step={1}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">بين الرموز: {settings.margin}px</Label>
+                  <Slider
+                    value={[settings.margin]}
+                    onValueChange={(value) => setSettings({ ...settings, margin: value[0] })}
+                    min={0}
+                    max={50}
+                    step={5}
+                    className="w-full"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">حجم الرمز: {settings.size}px</Label>
+                  <Slider
+                    value={[settings.size]}
+                    onValueChange={(value) => setSettings({ ...settings, size: value[0] })}
+                    min={100}
+                    max={300}
+                    step={25}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+            </details>
 
             {/* Mobile QR Settings Card */}
             <Card className="bg-white/95 backdrop-blur-xl border border-slate-200/50 shadow-lg hover:shadow-xl transition-all duration-300">
@@ -1384,7 +1820,7 @@ const AdminQRCodes = () => {
                               justifyItems: 'stretch',
                               boxSizing: 'border-box',
                               height: '100%',
-                              padding: `${getPrintPagePaddingPx()}px`
+                              padding: `${getPageEdgePaddingPx()}px`
                             }}
                           >
                             {selectedProducts
@@ -1554,6 +1990,29 @@ const AdminQRCodes = () => {
                         </Select>
                       </div>
 
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <Label>هامش حواف الصفحة: {settings.pageEdgeMarginMm}mm</Label>
+                          <div className="text-xs text-slate-500 text-left">
+                            يحدّ العرض والارتفاع المتاحين للرموز
+                          </div>
+                        </div>
+                        <Slider
+                          value={[settings.pageEdgeMarginMm]}
+                          onValueChange={(value) =>
+                            setSettings({ ...settings, pageEdgeMarginMm: value[0] })
+                          }
+                          min={0}
+                          max={30}
+                          step={1}
+                          className="w-full"
+                        />
+                        <div className="flex justify-between text-xs text-slate-500">
+                          <span>0 — بدون هامش</span>
+                          <span>30mm</span>
+                        </div>
+                      </div>
+
                       {/* QR Size Settings */}
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
@@ -1625,9 +2084,9 @@ const AdminQRCodes = () => {
 
                       <div className="space-y-3">
                         <div className="flex items-center justify-between">
-                          <Label>الهامش: {settings.margin}px</Label>
+                          <Label>المسافة بين الرموز: {settings.margin}px</Label>
                           <div className="text-xs text-slate-500">
-                            المسافة بين العناصر
+                            داخل منطقة الطباعة
                           </div>
                         </div>
                         <Slider
@@ -1893,7 +2352,7 @@ const AdminQRCodes = () => {
                           <Button
                             onClick={handlePrintAll}
                             variant="outline"
-                            disabled={selectedProducts.length === 0}
+                            disabled={selectedProducts.length === 0 || isGenerating}
                             className="border-green-200 text-green-700 hover:bg-green-50 hover:border-green-300 disabled:opacity-50 transition-all duration-200 shadow-sm hover:shadow-md"
                           >
                             <Printer className="w-4 h-4 mr-2" />
@@ -1903,11 +2362,34 @@ const AdminQRCodes = () => {
                           <Button
                             onClick={handleDownloadZIP}
                             variant="outline"
-                            disabled={selectedProducts.length === 0}
+                            disabled={selectedProducts.length === 0 || isGenerating}
                             className="border-orange-200 text-orange-700 hover:bg-orange-50 hover:border-orange-300 disabled:opacity-50 transition-all duration-200 shadow-sm hover:shadow-md"
                           >
                             <Download className="w-4 h-4 mr-2" />
                             تحميل ZIP
+                          </Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <Button
+                            type="button"
+                            onClick={handleDownloadPdf}
+                            variant="outline"
+                            disabled={selectedProducts.length === 0 || isGenerating}
+                            className="border-slate-200 text-slate-800 hover:bg-slate-50 disabled:opacity-50 transition-all duration-200 shadow-sm"
+                          >
+                            <FileDown className="w-4 h-4 mr-2" />
+                            تحميل PDF
+                          </Button>
+                          <Button
+                            type="button"
+                            onClick={handleDownloadWord}
+                            variant="outline"
+                            disabled={selectedProducts.length === 0 || isGenerating}
+                            className="border-slate-200 text-slate-800 hover:bg-slate-50 disabled:opacity-50 transition-all duration-200 shadow-sm"
+                          >
+                            <FileText className="w-4 h-4 mr-2" />
+                            تحميل Word
                           </Button>
                         </div>
 
@@ -1917,7 +2399,7 @@ const AdminQRCodes = () => {
                             <Button
                               variant="ghost"
                               size="sm"
-                              disabled={selectedProducts.length === 0}
+                              disabled={selectedProducts.length === 0 || isGenerating}
                               onClick={() => {
                                 const urls = selectedProducts.map(p => generateQRCodeURL(p)).join('\n');
                                 navigator.clipboard.writeText(urls);
@@ -1929,23 +2411,42 @@ const AdminQRCodes = () => {
                               نسخ الروابط
                             </Button>
 
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={selectedProducts.length === 0}
-                              onClick={() => {
-                                if (navigator.share) {
-                                  navigator.share({
-                                    title: 'رموز QR للمنتجات',
-                                    text: `${selectedProducts.length} رمز QR للمنتجات`
-                                  });
-                                }
-                              }}
-                              className="border border-slate-200 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition-all duration-200"
-                            >
-                              <Share2 className="w-4 h-4 mr-2" />
-                              مشاركة
-                            </Button>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  disabled={selectedProducts.length === 0 || isGenerating}
+                                  className="border border-slate-200 hover:bg-slate-50 hover:border-slate-300 disabled:opacity-50 transition-all duration-200 w-full flex items-center justify-between gap-2"
+                                >
+                                  <span className="inline-flex items-center gap-2">
+                                    <Share2 className="w-4 h-4" />
+                                    مشاركة
+                                  </span>
+                                  <ChevronDown className="w-3 h-3 shrink-0 opacity-70" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="min-w-[12rem]">
+                                <DropdownMenuItem
+                                  disabled={isGenerating}
+                                  onSelect={() => {
+                                    void handleSharePdf();
+                                  }}
+                                >
+                                  <FileDown className="w-4 h-4 ml-2" />
+                                  مشاركة PDF
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  disabled={isGenerating}
+                                  onSelect={() => {
+                                    void handleShareWord();
+                                  }}
+                                >
+                                  <FileText className="w-4 h-4 ml-2" />
+                                  مشاركة Word
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       </div>
@@ -2066,7 +2567,7 @@ const AdminQRCodes = () => {
                                       justifyItems: 'stretch',
                                       boxSizing: 'border-box',
                                       height: '100%',
-                                      padding: `${getPrintPagePaddingPx()}px`
+                                      padding: `${getPageEdgePaddingPx()}px`
                                     }}
                                   >
                                     {/* Render actual page products only (no placeholders) */}
