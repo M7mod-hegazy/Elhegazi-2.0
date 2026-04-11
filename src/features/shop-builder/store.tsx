@@ -6,6 +6,7 @@ import {
   type ShopBuilderColumn,
   type ShopBuilderCameraState,
 } from './types';
+import { findShopEnclosurePolygon } from './utils/enclosedShopPolygon';
 import { apiGet } from '@/lib/api';
 
 const STORAGE_KEY = 'shop-builder-design';
@@ -28,6 +29,10 @@ interface ShopBuilderContextValue {
   setCamera: (camera: ShopBuilderCameraState) => void;
   setFloorTexture: (texture: string) => void;
   setFloorSize: (size: number) => void;
+  /** Set tint for enclosed shop floor; pass fromUser: true when the user picks a color. */
+  setInteriorFloorTint: (color: string | undefined, options?: { fromUser?: boolean }) => void;
+  /** Allow auto-detection to set interior floor tint again. */
+  resetInteriorFloorTintAuto: () => void;
   setGlobalWallTexture: (texture: string) => void;
   upsertWall: (wall: Partial<ShopBuilderWall> & { id?: string }) => string;
   removeWall: (id: string) => void;
@@ -73,6 +78,7 @@ const defaultLayout: ShopBuilderLayout = {
 const ShopBuilderContext = createContext<ShopBuilderContextValue | undefined>(undefined);
 
 const now = () => new Date().toISOString();
+const AUTO_INTERIOR_FLOOR_HEX = '#dbeafe';
 const normalizeColumnSide = (side: unknown): 'front' | 'back' => {
   if (side === 'back' || side === 'right') return 'back';
   return 'front';
@@ -218,6 +224,22 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     saveToStorage(layout);
   }, [layout]);
 
+  // When walls form a closed loop containing the layout centroid, apply a default interior floor tint
+  // unless the user has pinned their own color.
+  useEffect(() => {
+    const hit = findShopEnclosurePolygon(layout.walls);
+    setLayout((prev) => {
+      if (hit) {
+        if (prev.interiorFloorColorUserOverride) return prev;
+        if (prev.interiorFloorColor !== undefined && prev.interiorFloorColor !== '') return prev;
+        return { ...prev, interiorFloorColor: AUTO_INTERIOR_FLOOR_HEX, updatedAt: now() };
+      }
+      if (prev.interiorFloorColorUserOverride) return prev;
+      if (prev.interiorFloorColor === undefined) return prev;
+      return { ...prev, interiorFloorColor: undefined, updatedAt: now() };
+    });
+  }, [layout.walls]);
+
   const setWalls = useCallback((walls: ShopBuilderWall[]) => {
     setLayout((prev) => ({ ...prev, walls, updatedAt: now() }));
   }, []);
@@ -236,6 +258,27 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
 
   const setFloorSize = useCallback((size: number) => {
     setLayout((prev) => ({ ...prev, floorSize: size, updatedAt: now() }));
+  }, []);
+
+  const setInteriorFloorTint = useCallback((color: string | undefined, options?: { fromUser?: boolean }) => {
+    setLayout((prev) => ({
+      ...prev,
+      interiorFloorColor: color,
+      ...(options?.fromUser ? { interiorFloorColorUserOverride: true } : {}),
+      updatedAt: now(),
+    }));
+  }, []);
+
+  const resetInteriorFloorTintAuto = useCallback(() => {
+    setLayout((prev) => {
+      const hit = findShopEnclosurePolygon(prev.walls);
+      return {
+        ...prev,
+        interiorFloorColorUserOverride: false,
+        interiorFloorColor: hit ? AUTO_INTERIOR_FLOOR_HEX : undefined,
+        updatedAt: now(),
+      };
+    });
   }, []);
 
   const setGlobalWallTexture = useCallback((texture: string) => {
@@ -969,6 +1012,8 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     setCamera,
     setFloorTexture,
     setFloorSize,
+    setInteriorFloorTint,
+    resetInteriorFloorTintAuto,
     setGlobalWallTexture,
     upsertWall,
     removeWall,
@@ -1054,6 +1099,8 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
     setCamera,
     setFloorTexture,
     setFloorSize,
+    setInteriorFloorTint,
+    resetInteriorFloorTintAuto,
     setGlobalWallTexture,
     setProducts,
     setWalls,

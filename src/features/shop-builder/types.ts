@@ -47,6 +47,10 @@ export interface ShopBuilderLayout {
   camera?: ShopBuilderCameraState;
   floorTexture?: string; // Floor texture type
   floorSize?: number; // Floor size in meters (default: 24)
+  /** Tint for floor area inside a detected closed wall loop (2D + 3D overlay). */
+  interiorFloorColor?: string;
+  /** When true, auto-enclosure logic does not overwrite interiorFloorColor. */
+  interiorFloorColorUserOverride?: boolean;
   defaultWallTexture?: string; // Default wall texture for new walls
   defaultWallColor?: string; // Default wall color for new walls
   shopName?: string; // Shop display name

@@ -10,6 +10,8 @@ import { useTheme } from '@/context/ThemeContext';
 import { useShopBuilder, useShopBuilderLayout } from '../store';
 import type { TransformMode } from '../three/ThreeScene';
 import { WALL_TEXTURES, FLOOR_TEXTURES } from '../three/ThreeScene';
+import { createDoorWallDraft, type DoorMaterial } from '../utils/wallKind';
+import { findShopEnclosurePolygon } from '../utils/enclosedShopPolygon';
 import { generateAutoHungProductsList, MAX_AUTO_HUNG_PRODUCTS } from '../three/proceduralProducts';
 
 // Wall texture options - mapped from WALL_TEXTURES
@@ -119,6 +121,8 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     importLayout,
     setFloorTexture,
     setFloorSize,
+    setInteriorFloorTint,
+    resetInteriorFloorTintAuto,
     setGlobalWallTexture,
   } = useShopBuilder();
   const [wallColor, setWallColor] = useState<string>('#ffffff');
@@ -164,6 +168,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   );
   const floorSideMeters = layout.floorSize || 24;
   const floorAreaSquareMeters = Number((floorSideMeters * floorSideMeters).toFixed(2));
+  const shopEnclosure = useMemo(() => findShopEnclosurePolygon(layout.walls), [layout.walls]);
 
   const formatProductDims = useCallback(
     (product: Product3D) =>
@@ -352,19 +357,17 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     toast({ title: 'تم إضافة جدار جديد', description: 'يمكنك سحب أطرافه لتغيير الأبعاد.' });
   }, [layout.walls.length, layout.defaultWallColor, selectWall, toast, upsertWall]);
 
-  const handleAddDoor = useCallback((material: string) => {
-    const offset = (layout.walls.length % 4) * 0.5;
-    const id = upsertWall({
-      start: { x: -0.5 + offset, y: offset },
-      end: { x: 0.5 + offset, y: offset },
-      height: 2.2,
-      thickness: 0.1,
-      color: '#ffffff',
-      texture: `door_${material}`
-    });
-    selectWall(id);
-    toast({ title: 'تم إدراج الباب', description: 'تم إدراج الباب بنجاح في مساحة العمل. يمكنك تعديله مثل الجدار.' });
-  }, [layout.walls.length, selectWall, toast, upsertWall]);
+  const handleAddDoor = useCallback(
+    (material: DoorMaterial) => {
+      const id = upsertWall(createDoorWallDraft(material, layout.walls));
+      selectWall(id);
+      toast({
+        title: 'تم إدراج الباب',
+        description: 'يُوضع الباب في وسط المخطط الحالي. عدّل العرض والسمك من شريط التحديد.',
+      });
+    },
+    [layout.walls, selectWall, toast, upsertWall]
+  );
 
   const handleWallColorChange = useCallback(
     (value: string) => {
@@ -1551,6 +1554,29 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                   </p>
                 </div>
               </div>
+
+              {shopEnclosure && (
+                <div className="rounded-xl border border-sky-200 bg-sky-50/80 p-4 space-y-3">
+                  <Label className="text-base font-semibold text-slate-900 block">
+                    أرضية داخل المحل (مغلق بالجدران)
+                  </Label>
+                  <p className="text-xs text-slate-600 leading-relaxed">
+                    يظهر لون مختلف داخل حدود المخطط المغلق في 2D و3D. غيّر اللون هنا؛ استخدم «إعادة اللون التلقائي» لمزامنة اللون الافتراضي مع الكشف التلقائي.
+                  </p>
+                  <div className="flex flex-wrap items-center gap-3">
+                    <input
+                      type="color"
+                      value={layout.interiorFloorColor || '#dbeafe'}
+                      onChange={(e) => setInteriorFloorTint(e.target.value, { fromUser: true })}
+                      className="h-10 w-14 cursor-pointer rounded-lg border border-slate-300"
+                      title="لون أرضية داخل المحل"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => resetInteriorFloorTintAuto()}>
+                      إعادة اللون التلقائي
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Floor Texture Selector */}
               <div>

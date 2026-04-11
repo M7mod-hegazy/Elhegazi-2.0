@@ -813,6 +813,7 @@ const AdminProducts = () => {
   const [quarantineReviewIds, setQuarantineReviewIds] = useState<Set<string>>(new Set());
   const [quarantineCheckingIds, setQuarantineCheckingIds] = useState<Set<string>>(new Set());
   const [quarantineAcceptedRows, setQuarantineAcceptedRows] = useState<Array<{ row: ImportPreviewRow; fading: boolean }>>([]);
+  const [importPreviewLiveSearch, setImportPreviewLiveSearch] = useState('');
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isExportSubmitting, setIsExportSubmitting] = useState(false);
   const [exportStep, setExportStep] = useState<'fields' | 'products'>('fields');
@@ -1278,18 +1279,36 @@ const AdminProducts = () => {
   };
 
   const importPreviewValidation = useMemo(() => {
+    const categoryOk = (row: ImportPreviewRow) => {
+      const id = String(row.category || '').trim();
+      return id !== '' && categories.some((c) => String(c.id) === id);
+    };
     const readyRows = importPreview.filter((row) => row.__meta.status === 'ready').length;
     const quarantinedDuplicate = importPreview.filter((row) => row.__meta.status === 'quarantined_duplicate').length;
+    const skippedFileDuplicate = importPreview.filter((row) => row.__meta.status === 'skipped_file_duplicate').length;
     const invalidRows = importPreview.filter((row) => row.__meta.status === 'invalid').length;
+    const readyMissingCategory = importPreview.filter(
+      (row) => row.__meta.status === 'ready' && !categoryOk(row)
+    ).length;
+
+    /** No invalid rows and nothing left in quarantine (file-only duplicate skips are OK). */
+    const isValid =
+      importPreview.length > 0 && invalidRows === 0 && quarantinedDuplicate === 0 && readyMissingCategory === 0;
+    /** Import at least one ready row; rows with missing name/sku/price still block; every ready row must have a real category. */
+    const canImportReadySubset =
+      importPreview.length > 0 && readyRows > 0 && invalidRows === 0 && readyMissingCategory === 0;
 
     return {
-      isValid: importPreview.length > 0 && readyRows === importPreview.length,
+      isValid,
+      canImportReadySubset,
       readyRows,
       quarantinedDuplicate,
+      skippedFileDuplicate,
       invalidRowsCount: invalidRows,
+      readyMissingCategory,
       blockedRowsCount: quarantinedDuplicate + invalidRows,
     };
-  }, [importPreview]);
+  }, [importPreview, categories]);
 
   // Auto-generate SKU
   const generateSKU = () => {
@@ -1932,6 +1951,49 @@ const AdminProducts = () => {
     const rows = rowsInput.map(ensureImportRowIdentity);
     const prevMetaMap = new Map((previousRows || []).map((r) => [r.__rowId, r.__meta]));
 
+    const n = rows.length;
+    const parent = Array.from({ length: n }, (_, i) => i);
+    const findRoot = (i: number): number => {
+      if (parent[i] !== i) parent[i] = findRoot(parent[i]);
+      return parent[i];
+    };
+    const unionIdx = (a: number, b: number) => {
+      const ra = findRoot(a);
+      const rb = findRoot(b);
+      if (ra !== rb) parent[ra] = rb;
+    };
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        if (isSameProduct(rows[i], rows[j])) unionIdx(i, j);
+      }
+    }
+    const rootToMembers = new Map<number, number[]>();
+    for (let i = 0; i < n; i++) {
+      const r = findRoot(i);
+      const list = rootToMembers.get(r) || [];
+      list.push(i);
+      rootToMembers.set(r, list);
+    }
+    rootToMembers.forEach((members) => {
+      members.sort((a, b) => a - b);
+    });
+    const componentHasDb = new Map<number, boolean>();
+    rootToMembers.forEach((members, root) => {
+      const hasDb = members.some((idx) => products.some((p) => isSameProduct(p, rows[idx])));
+      componentHasDb.set(root, hasDb);
+    });
+    const fileLoserIndex = new Set<number>();
+    rootToMembers.forEach((members, root) => {
+      if (componentHasDb.get(root) || members.length < 2) return;
+      const [, ...rest] = members;
+      rest.forEach((idx) => fileLoserIndex.add(idx));
+    });
+    const indexToSameComponentIds = new Map<number, Set<string>>();
+    rootToMembers.forEach((members) => {
+      const ids = new Set(members.map((idx) => rows[idx].__rowId));
+      members.forEach((idx) => indexToSameComponentIds.set(idx, ids));
+    });
+
     const skuToRows = new Map<string, string[]>();
     const nameToRows = new Map<string, string[]>();
     const nameArToRows = new Map<string, string[]>();
@@ -1997,6 +2059,37 @@ const AdminProducts = () => {
         resolvedCategoryId = categoryCandidates[0].id;
       }
 
+      const hasValidationErrorsEarly = !hasName || !hasSku || !hasPrice;
+      if (fileLoserIndex.has(index) && !hasValidationErrorsEarly) {
+        const resolvedCategorySkipped = categories.find((c) => String(c.id) === resolvedCategoryId);
+        return {
+          ...row,
+          category: resolvedCategorySkipped ? String(resolvedCategorySkipped.id) : row.category,
+          categoryAr: resolvedCategorySkipped
+            ? (resolvedCategorySkipped.nameAr || resolvedCategorySkipped.name)
+            : row.categoryAr,
+          __meta: {
+            ...meta,
+            status: 'skipped_file_duplicate',
+            reasons: [
+              createRowReason(
+                'file_duplicate_ignored',
+                'تكرار داخل الملف — يُستورد أول صف فقط عند عدم وجود نفس المنتج في المتجر.'
+              ),
+            ],
+            matchTargets: [],
+            categoryCandidates,
+            categoryState,
+            categoryResolution,
+            editedName: nameValue,
+            editedSku: skuValue,
+            hasRequiredEdits: false,
+            isConflictFreeNow: true,
+            wasQuarantinedDuplicate: false,
+          },
+        };
+      }
+
       const dbMatches = products.filter((p) => isSameProduct(p, row));
       dbMatches.slice(0, 4).forEach((p) => {
         matchTargets.push({
@@ -2013,6 +2106,19 @@ const AdminProducts = () => {
       if (skuKey) (skuToRows.get(skuKey) || []).forEach((id) => { if (id !== row.__rowId) fileMatchIds.add(id); });
       if (nameKey) (nameToRows.get(nameKey) || []).forEach((id) => { if (id !== row.__rowId) fileMatchIds.add(id); });
       if (nameArKey) (nameArToRows.get(nameArKey) || []).forEach((id) => { if (id !== row.__rowId) fileMatchIds.add(id); });
+
+      const dupRoot = findRoot(index);
+      const dupCompHasDb = componentHasDb.get(dupRoot) ?? false;
+      const dupCompSize = (rootToMembers.get(dupRoot) || [index]).length;
+      const sameComponentRowIds = indexToSameComponentIds.get(index) ?? new Set([row.__rowId]);
+      if (!dupCompHasDb && dupCompSize > 1) {
+        const filteredFile = new Set<string>();
+        fileMatchIds.forEach((id) => {
+          if (!sameComponentRowIds.has(id)) filteredFile.add(id);
+        });
+        fileMatchIds.clear();
+        filteredFile.forEach((id) => fileMatchIds.add(id));
+      }
 
       rows.forEach((r) => {
         if (fileMatchIds.has(r.__rowId)) {
@@ -2237,18 +2343,38 @@ const AdminProducts = () => {
     const finalPreflight = runImportPreflight(importPreview, importPreview);
     setImportPreview(finalPreflight);
 
-    const blockedRows = finalPreflight.filter((row) => row.__meta.status !== 'ready');
-    if (blockedRows.length > 0) {
+    const invalidCount = finalPreflight.filter((row) => row.__meta.status === 'invalid').length;
+    if (invalidCount > 0) {
       toast({
-        title: 'لا يمكن الاستيراد قبل حل الصفوف المعزولة',
-        description: `يوجد ${blockedRows.length} صف يحتاج معالجة في التكرار أو البيانات الأساسية.`,
+        title: 'لا يمكن الاستيراد',
+        description: `يوجد ${invalidCount} صف غير صالح (اسم/كود/سعر). عالجها أو احذفها قبل الاستيراد.`,
         variant: 'destructive',
       });
-      setIsQuarantineModalOpen(true);
       return;
     }
 
-    const incoming = finalPreflight;
+    const incoming = finalPreflight.filter((row) => row.__meta.status === 'ready');
+    if (incoming.length === 0) {
+      toast({
+        title: 'لا توجد صفوف جاهزة',
+        description: 'لا يوجد أي منتج بحالة جاهز للاستيراد.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const missingCategoryIncoming = incoming.filter((row) => {
+      const id = String(row.category || '').trim();
+      return !id || !categories.some((c) => String(c.id) === id);
+    });
+    if (missingCategoryIncoming.length > 0) {
+      toast({
+        title: 'لا يمكن الاستيراد',
+        description: `اختر فئةً صالحة لكل المنتجات الجاهزة (${missingCategoryIncoming.length} بدون فئة).`,
+        variant: 'destructive',
+      });
+      return;
+    }
 
     setIsImportSubmitting(true);
     try {
@@ -2331,6 +2457,7 @@ const AdminProducts = () => {
     setQuarantineReviewIds(new Set());
     setQuarantineCheckingIds(new Set());
     setQuarantineAcceptedRows([]);
+    setImportPreviewLiveSearch('');
   };
 
   useEffect(() => {
@@ -2341,7 +2468,7 @@ const AdminProducts = () => {
         if (rowsById.has(id)) next.add(id);
       });
       importPreview.forEach((row) => {
-        if (row.__meta.status !== 'ready') {
+        if (row.__meta.status !== 'ready' && row.__meta.status !== 'skipped_file_duplicate') {
           next.add(row.__rowId);
         }
       });
@@ -2356,6 +2483,38 @@ const AdminProducts = () => {
     () => importPreview.filter((row) => quarantineReviewIds.has(row.__rowId)),
     [importPreview, quarantineReviewIds]
   );
+
+  const quarantineModalGroups = useMemo(() => {
+    const dedupeKey = (row: ImportPreviewRow) => {
+      const sk = normalizeSku(String(row.sku || ''));
+      if (sk) return `s:${sk}`;
+      const nk = normalizeKey(String(row.nameAr || row.name || ''));
+      return nk ? `n:${nk}` : `id:${row.__rowId}`;
+    };
+    const ordered = [...quarantinedRows].sort(
+      (a, b) =>
+        importPreview.findIndex((r) => r.__rowId === a.__rowId) -
+        importPreview.findIndex((r) => r.__rowId === b.__rowId)
+    );
+    const keyToRep = new Map<string, ImportPreviewRow>();
+    const keyToExtra = new Map<string, number>();
+    for (const row of ordered) {
+      const k = dedupeKey(row);
+      if (!keyToRep.has(k)) {
+        keyToRep.set(k, row);
+        keyToExtra.set(k, 0);
+      } else {
+        keyToExtra.set(k, (keyToExtra.get(k) || 0) + 1);
+      }
+    }
+    return Array.from(keyToRep.entries()).map(([key, row]) => ({
+      key,
+      row,
+      extraSameProductRows: keyToExtra.get(key) || 0,
+    }));
+  }, [quarantinedRows, importPreview]);
+
+  const quarantineDistinctCount = quarantineModalGroups.length;
 
   const setQuarantinedRowField = (rowId: string, field: 'name' | 'nameAr' | 'sku' | 'price', value: string) => {
     setImportPreview((prev) => {
@@ -2445,7 +2604,7 @@ const AdminProducts = () => {
 
   const [columnWidths, setColumnWidths] = useState({
     image: 90,
-    name: 240,
+    name: 300,
     sku: 120,
     category: 180,
     price: 120,
@@ -3310,8 +3469,11 @@ const AdminProducts = () => {
                                 </div>
                               </TableCell>
 
-                              <TableCell className="text-center" style={{ width: columnWidths.name }}>
-                                <div className="space-y-1">
+                              <TableCell
+                                className="min-w-0 overflow-hidden text-center align-top"
+                                style={{ width: columnWidths.name }}
+                              >
+                                <div className="mx-auto w-full min-w-0 max-w-full space-y-1 px-0.5">
                                   {editingField && editingField.id === product.id && editingField.field === 'name' ? (
                                     <Input
                                       autoFocus
@@ -3322,18 +3484,21 @@ const AdminProducts = () => {
                                         if (e.key === 'Enter') commitInlineEdit();
                                         if (e.key === 'Escape') cancelInlineEdit();
                                       }}
-                                      className="h-8 text-center"
+                                      className="h-8 w-full min-w-0 text-center"
                                     />
                                   ) : (
                                     <div
-                                      className="group inline-flex items-center justify-center gap-1 cursor-text"
+                                      className="group flex w-full min-w-0 cursor-text flex-col items-center gap-1"
                                       onClick={() => startInlineEdit(product, 'name')}
                                       title="انقر للتعديل"
                                     >
-                                      <p className="font-medium text-slate-900 whitespace-nowrap overflow-hidden text-ellipsis">
+                                      <p
+                                        className="w-full min-w-0 max-w-full break-words text-center font-medium leading-snug text-slate-900 line-clamp-2"
+                                        title={product.nameAr || product.name}
+                                      >
                                         {product.nameAr || product.name}
                                       </p>
-                                      <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                      <Edit className="w-3 h-3 shrink-0 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </div>
                                   )}
                                   {product.tags && product.tags.length > 0 && (
@@ -3353,7 +3518,7 @@ const AdminProducts = () => {
                                 </div>
                               </TableCell>
 
-                              <TableCell className="text-center" style={{ width: columnWidths.sku }}>
+                              <TableCell className="min-w-0 text-center align-top" style={{ width: columnWidths.sku }}>
                                 {editingField && editingField.id === product.id && editingField.field === 'sku' ? (
                                   <Input
                                     autoFocus
@@ -3367,25 +3532,25 @@ const AdminProducts = () => {
                                     className="h-8 text-center font-mono"
                                   />
                                 ) : (
-                                  <div className="group inline-flex items-center justify-center gap-1 cursor-text" onClick={() => startInlineEdit(product, 'sku')} title="انقر للتعديل">
-                                    <Badge variant="outline" className="font-mono">
+                                  <div className="group flex min-w-0 w-full cursor-text items-center justify-center gap-1" onClick={() => startInlineEdit(product, 'sku')} title="انقر للتعديل">
+                                    <Badge variant="outline" className="max-w-full shrink truncate font-mono" title={product.sku}>
                                       {product.sku}
                                     </Badge>
-                                    <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    <Edit className="h-3 w-3 shrink-0 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" />
                                   </div>
                                 )}
                               </TableCell>
 
-                              <TableCell className="text-center" style={{ width: columnWidths.category }}>
-                                <div className="space-y-1">
+                              <TableCell className="min-w-0 text-center align-top" style={{ width: columnWidths.category }}>
+                                <div className="min-w-0 space-y-1 px-0.5">
                                   {(() => {
                                     const cat = categories.find(c => String(c.id) === String(product.category) || c.slug === product.category);
                                     const displayName = cat ? (cat.nameAr || cat.name) : (product.categoryAr || 'â€”');
                                     const displayCode = cat ? (cat.slug || String(cat.id)) : String(product.category || '');
                                     return (
                                       <>
-                                        <p className="text-sm font-medium whitespace-nowrap overflow-hidden text-ellipsis">{displayName}</p>
-                                        <p className="text-xs text-slate-500 whitespace-nowrap overflow-hidden text-ellipsis">{displayCode}</p>
+                                        <p className="line-clamp-2 break-words text-sm font-medium leading-snug text-slate-900">{displayName}</p>
+                                        <p className="truncate text-xs text-slate-500">{displayCode}</p>
                                       </>
                                     );
                                   })()}
@@ -4303,9 +4468,66 @@ const AdminProducts = () => {
                       onClick={() => setIsQuarantineModalOpen(true)}
                       disabled={quarantinedRows.length === 0}
                     >
-                      {`مراجعة الصفوف المعزولة (${quarantinedRows.length})`}
+                      {quarantineDistinctCount !== quarantinedRows.length
+                        ? `مراجعة المعزول (${quarantineDistinctCount} مجموعة · ${quarantinedRows.length} صف)`
+                        : `مراجعة الصفوف المعزولة (${quarantinedRows.length})`}
                     </Button>
                   </div>
+                </div>
+
+                {importPreview.length > 0 ? (
+                  <div
+                    className="rounded-lg border border-slate-200 bg-slate-50/90 px-4 py-3 text-sm text-slate-700 space-y-2"
+                    dir="rtl"
+                  >
+                    <div className="font-semibold text-slate-900">ملخص الاستيراد</div>
+                    <ul className="grid gap-1.5 sm:grid-cols-2 text-xs sm:text-sm list-none p-0 m-0">
+                      <li>
+                        إجمالي الصفوف: <strong>{importPreview.length}</strong>
+                      </li>
+                      <li>
+                        جاهز للاستيراد:{' '}
+                        <strong className="text-emerald-700">{importPreviewValidation.readyRows}</strong>
+                      </li>
+                      {importPreviewValidation.skippedFileDuplicate > 0 ? (
+                        <li className="sm:col-span-2">
+                          تكرار داخل الملف (يُحتفظ بأول صف فقط إن لم يكن المنتج في المتجر):{' '}
+                          <strong className="text-slate-700">{importPreviewValidation.skippedFileDuplicate}</strong>{' '}
+                          صفًا تم تخطّيها
+                        </li>
+                      ) : null}
+                      {importPreviewValidation.quarantinedDuplicate > 0 ? (
+                        <li>
+                          يحتاج مراجعة (تعارض مع المتجر أو تكرار لم يُحل):{' '}
+                          <strong className="text-red-700">{importPreviewValidation.quarantinedDuplicate}</strong>
+                        </li>
+                      ) : null}
+                      {importPreviewValidation.invalidRowsCount > 0 ? (
+                        <li>
+                          غير صالح (اسم/كود/سعر):{' '}
+                          <strong className="text-red-700">{importPreviewValidation.invalidRowsCount}</strong>
+                        </li>
+                      ) : null}
+                      {importPreviewValidation.readyMissingCategory > 0 ? (
+                        <li className="sm:col-span-2">
+                          جاهز لكن بلا فئة محددة:{' '}
+                          <strong className="text-amber-800">{importPreviewValidation.readyMissingCategory}</strong>
+                          {' — '}اختر الفئة من العمود أو التعيين الجماعي.
+                        </li>
+                      ) : null}
+                    </ul>
+                  </div>
+                ) : null}
+
+                <div className="relative" dir="rtl">
+                  <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden />
+                  <Input
+                    className="ps-10"
+                    placeholder="بحث مباشر بالاسم أو الكود (المنتجات الجاهزة فقط)…"
+                    value={importPreviewLiveSearch}
+                    onChange={(e) => setImportPreviewLiveSearch(e.target.value)}
+                    aria-label="بحث في معاينة الاستيراد"
+                  />
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -4330,32 +4552,56 @@ const AdminProducts = () => {
                 </div>
 
                 {(() => {
+                  const searchTrim = importPreviewLiveSearch.trim();
+                  const searchKey = searchTrim ? normalizeKey(searchTrim) : '';
+                  const searchSkuKey = searchTrim ? normalizeSku(searchTrim) : '';
+                  const matchesImportSearch = (p: ImportPreviewRow) => {
+                    if (!searchTrim) return true;
+                    const label = normalizeKey(String(p.nameAr || p.name || ''));
+                    const nameEn = normalizeKey(String(p.name || ''));
+                    const skuRaw = String(p.sku || '').toLowerCase();
+                    const skuNorm = normalizeSku(String(p.sku || ''));
+                    if (searchKey && (label.includes(searchKey) || nameEn.includes(searchKey))) return true;
+                    if (searchSkuKey && skuNorm.includes(searchSkuKey)) return true;
+                    if (searchTrim && skuRaw.includes(searchTrim.toLowerCase())) return true;
+                    return false;
+                  };
+                  const readyAll = importPreview.filter((p) => p.__meta.status === 'ready');
                   const rows = importPreview
                     .map((product, absoluteIndex) => ({ product, absoluteIndex }))
-                    .filter(({ product }) => product.__meta.status === 'ready');
+                    .filter(
+                      ({ product }) => product.__meta.status === 'ready' && matchesImportSearch(product)
+                    );
                   return (
                     <>
-                      <div className="max-h-96 overflow-y-auto border rounded-lg">
-                        <Table>
+                      <div className="max-h-96 overflow-x-auto overflow-y-auto rounded-lg border">
+                        <Table className="table-fixed min-w-[760px] w-full">
                           <TableHeader>
                             <TableRow>
-                              <TableHead>اسم المنتج</TableHead>
-                              <TableHead>السعر</TableHead>
-                              <TableHead>الكود</TableHead>
-                              <TableHead>المخزون</TableHead>
-                              <TableHead>الفئة</TableHead>
-                              <TableHead>الحالة</TableHead>
-                              <TableHead className="w-20 text-center">إزالة</TableHead>
+                              <TableHead className="w-[32%] min-w-[160px] align-top">اسم المنتج</TableHead>
+                              <TableHead className="w-24 whitespace-nowrap align-top">السعر</TableHead>
+                              <TableHead className="w-28 whitespace-nowrap align-top">الكود</TableHead>
+                              <TableHead className="w-24 whitespace-nowrap align-top">المخزون</TableHead>
+                              <TableHead className="w-44 min-w-[11rem] align-top">الفئة</TableHead>
+                              <TableHead className="w-36 whitespace-nowrap align-top">الحالة</TableHead>
+                              <TableHead className="w-14 text-center align-top">إزالة</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {rows.map(({ product, absoluteIndex }) => {
                               const catMatch = categories.find(c => String(c.id) === String(product.category) || c.nameAr === product.categoryAr || c.name === product.category);
                               const catId = catMatch ? String(catMatch.id) : '';
+                              const hasImportCategory =
+                                catId !== '' && categories.some((c) => String(c.id) === catId);
+                              const nameTitle = String(product.nameAr ?? product.name ?? '');
                               return (
                                 <TableRow key={product.__rowId}>
-                                  <TableCell>
-                                    <Input value={String(product.nameAr ?? product.name ?? '')} onChange={(e) => {
+                                  <TableCell className="min-w-0 align-top">
+                                    <Input
+                                      className="h-auto min-w-0 w-full max-w-full py-2 text-sm [word-break:break-word]"
+                                      value={nameTitle}
+                                      title={nameTitle}
+                                      onChange={(e) => {
                                       const v = e.target.value;
                                       setImportPreview(prev => {
                                         const next = prev.map((it, i) => i === absoluteIndex ? { ...it, name: v, nameAr: v } : it);
@@ -4363,16 +4609,16 @@ const AdminProducts = () => {
                                       });
                                     }} placeholder="اسم المنتج" />
                                   </TableCell>
-                                  <TableCell>
-                                    <Input type="number" value={String(product.price ?? '')} onChange={(e) => updateImportItem(absoluteIndex, 'price', e.target.value)} placeholder="السعر" />
+                                  <TableCell className="min-w-0 align-top">
+                                    <Input className="min-w-0 w-full font-mono text-sm tabular-nums" type="number" value={String(product.price ?? '')} onChange={(e) => updateImportItem(absoluteIndex, 'price', e.target.value)} placeholder="السعر" />
                                   </TableCell>
-                                  <TableCell>
-                                    <Input value={String(product.sku ?? '')} onChange={(e) => updateImportItem(absoluteIndex, 'sku', e.target.value)} placeholder="الكود" />
+                                  <TableCell className="min-w-0 align-top">
+                                    <Input className="min-w-0 w-full font-mono text-sm" value={String(product.sku ?? '')} onChange={(e) => updateImportItem(absoluteIndex, 'sku', e.target.value)} placeholder="الكود" />
                                   </TableCell>
-                                  <TableCell>
-                                    <Input type="number" value={String(product.stock ?? '')} onChange={(e) => updateImportItem(absoluteIndex, 'stock', e.target.value)} placeholder="المخزون" />
+                                  <TableCell className="min-w-0 align-top">
+                                    <Input className="min-w-0 w-full text-sm tabular-nums" type="number" value={String(product.stock ?? '')} onChange={(e) => updateImportItem(absoluteIndex, 'stock', e.target.value)} placeholder="المخزون" />
                                   </TableCell>
-                                  <TableCell>
+                                  <TableCell className="min-w-0 align-top">
                                     <Select value={catId} onOpenChange={(open) => open ? toast({ title: 'فتح قائمة الفئات' }) : undefined} onValueChange={(val) => {
                                       const cat = categories.find(c => String(c.id) === String(val));
                                       setImportPreview(prev => {
@@ -4388,8 +4634,8 @@ const AdminProducts = () => {
                                         return runImportPreflight(next, prev);
                                       });
                                     }}>
-                                      <SelectTrigger className="w-44 pointer-events-auto relative z-[1]">
-                                        <SelectValue placeholder="الفئة" />
+                                      <SelectTrigger className={`pointer-events-auto relative z-[1] h-auto min-h-9 w-full min-w-0 max-w-full whitespace-normal text-start text-sm ${!hasImportCategory ? 'border-amber-500 ring-1 ring-amber-200' : ''}`}>
+                                        <SelectValue placeholder="اختر الفئة" />
                                       </SelectTrigger>
                                       <SelectContent position="popper" side="bottom" align="start" className="z-[99999]" sideOffset={6}>
                                         {categories.map(c => (
@@ -4398,17 +4644,22 @@ const AdminProducts = () => {
                                       </SelectContent>
                                     </Select>
                                   </TableCell>
-                                  <TableCell>
-                                    <div className="space-y-1">
+                                  <TableCell className="min-w-0 align-top">
+                                    <div className="flex flex-col gap-1">
                                       <Badge variant={product.__meta.status === 'ready' ? 'default' : 'destructive'}>
                                         {product.__meta.status === 'ready' ? 'جاهز' : product.__meta.status === 'quarantined_duplicate' ? 'معزول: تكرار' : 'غير صالح'}
                                       </Badge>
+                                      {product.__meta.status === 'ready' && !hasImportCategory ? (
+                                        <Badge variant="outline" className="border-amber-600 text-amber-900 whitespace-normal text-[10px] leading-tight">
+                                          اختر الفئة للاستيراد
+                                        </Badge>
+                                      ) : null}
                                       {product.__meta.reasons[0] ? (
                                         <div className="text-[11px] text-slate-600">{product.__meta.reasons[0].message}</div>
                                       ) : null}
                                     </div>
                                   </TableCell>
-                                  <TableCell className="text-center">
+                                  <TableCell className="text-center align-top">
                                     <Button
                                       type="button"
                                       variant="outline"
@@ -4426,9 +4677,19 @@ const AdminProducts = () => {
                           </TableBody>
                         </Table>
                       </div>
-                      <div className="flex items-center justify-between text-sm text-slate-600 mt-2">
-                        <span>عرض {rows.length} منتج جاهز من أصل {importPreview.length}</span>
-                        <span>الصفوف غير الجاهزة متاحة من زر المراجعة</span>
+                      <div className="flex flex-col gap-1 text-sm text-slate-600 mt-2 sm:flex-row sm:items-center sm:justify-between">
+                        <span>
+                          عرض {rows.length}
+                          {searchTrim ? ` من ${readyAll.length}` : ''} منتج جاهز
+                          {searchTrim ? ' مطابقة للبحث' : ''}
+                          {' — '}إجمالي صفوف الملف {importPreview.length}
+                        </span>
+                        <span className="text-xs sm:text-sm">
+                          {importPreviewValidation.skippedFileDuplicate > 0
+                            ? `تخطّي تلقائي لتكرار داخل الملف: ${importPreviewValidation.skippedFileDuplicate} صف. `
+                            : ''}
+                          الصفوف التي تحتاج مراجعة من زر «مراجعة الصفوف المعزولة».
+                        </span>
                       </div>
                     </>
                   );
@@ -4440,7 +4701,7 @@ const AdminProducts = () => {
                   </Button>
                   <Button
                     onClick={() => setIsImportConfirmOpen(true)}
-                    disabled={!importPreviewValidation.isValid || isImportSubmitting}
+                    disabled={!importPreviewValidation.canImportReadySubset || isImportSubmitting}
                     className="bg-green-600 hover:bg-green-700 disabled:bg-slate-300 disabled:text-slate-600"
                   >
                     {isImportSubmitting ? (
@@ -4449,15 +4710,41 @@ const AdminProducts = () => {
                         {'\u062c\u0627\u0631\u064a \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f...'}
                       </>
                     ) : (
-                      <>{`\u0627\u0633\u062a\u064a\u0631\u0627\u062f ${importPreview.length} \u0645\u0646\u062a\u062c`}</>
+                      <>{`\u0627\u0633\u062a\u064a\u0631\u0627\u062f ${importPreviewValidation.readyRows} \u0645\u0646\u062a\u062c`}</>
                     )}
                   </Button>
                 </div>
-                {!importPreviewValidation.isValid && importPreview.length > 0 && (
-                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
-                    لا يمكن الاستيراد الآن. الصفوف الجاهزة: {importPreviewValidation.readyRows} من {importPreview.length}.
-                    {importPreviewValidation.quarantinedDuplicate > 0 ? ` يوجد ${importPreviewValidation.quarantinedDuplicate} صف معزول بسبب التكرار.` : ''}
-                    {importPreviewValidation.invalidRowsCount > 0 ? ` يوجد ${importPreviewValidation.invalidRowsCount} صف غير صالح.` : ''}
+                {importPreview.length > 0 &&
+                  !importPreviewValidation.canImportReadySubset &&
+                  importPreviewValidation.readyMissingCategory > 0 &&
+                  importPreviewValidation.invalidRowsCount === 0 && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-950">
+                      لا يمكن الاستيراد حتى تختار فئةً لكل منتج جاهز:{' '}
+                      <strong>{importPreviewValidation.readyMissingCategory}</strong> صف بدون فئة. استخدم عمود «الفئة» أو «تعيين الفئة لكل العناصر».
+                    </div>
+                  )}
+                {importPreview.length > 0 &&
+                  !importPreviewValidation.canImportReadySubset &&
+                  (importPreviewValidation.invalidRowsCount > 0 || importPreviewValidation.readyRows === 0) && (
+                    <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                      لا يمكن الاستيراد الآن.
+                      {importPreviewValidation.readyRows > 0 ? (
+                        <> الصفوف الجاهزة: {importPreviewValidation.readyRows} من {importPreview.length}.</>
+                      ) : (
+                        <> لا توجد صفوف جاهزة من أصل {importPreview.length}.</>
+                      )}
+                      {importPreviewValidation.invalidRowsCount > 0
+                        ? ` يوجد ${importPreviewValidation.invalidRowsCount} صف غير صالح (بيانات ناقصة). عالجها أو احذفها أولاً.`
+                        : ''}
+                    </div>
+                  )}
+                {importPreviewValidation.canImportReadySubset && !importPreviewValidation.isValid && importPreviewValidation.quarantinedDuplicate > 0 && (
+                  <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    يمكن استيراد {importPreviewValidation.readyRows} منتجًا جاهزًا.
+                    {importPreviewValidation.skippedFileDuplicate > 0
+                      ? ` تم تخطّي ${importPreviewValidation.skippedFileDuplicate} صفًا مكررًا داخل الملف تلقائيًا.`
+                      : ''}
+                    {` ما زال ${importPreviewValidation.quarantinedDuplicate} صفًا يحتاج مراجعة (تعارض مع المتجر). اضغط «استيراد» للتحذير والتأكيد.`}
                   </div>
                 )}
                 <Dialog
@@ -4473,19 +4760,30 @@ const AdminProducts = () => {
                         {'\u062a\u0623\u0643\u064a\u062f \u0627\u0644\u0627\u0633\u062a\u064a\u0631\u0627\u062f'}
                       </DialogTitle>
                       <DialogDescription>
-                        {`\u0633\u064a\u062a\u0645 \u0627\u0633\u062a\u064a\u0631\u0627\u062f ${importPreview.length} \u0645\u0646\u062a\u062c \u0625\u0644\u0649 \u0642\u0627\u0639\u062f\u0629 \u0627\u0644\u0628\u064a\u0627\u0646\u0627\u062a. \u0647\u0644 \u062a\u0631\u064a\u062f \u0627\u0644\u0645\u062a\u0627\u0628\u0639\u0629\u061f`}
+                        {importPreviewValidation.quarantinedDuplicate > 0
+                          ? `سيتم استيراد ${importPreviewValidation.readyRows} منتجًا جاهزًا فقط إلى قاعدة البيانات. لن تُستورد الصفوف المعزولة. هل تريد المتابعة؟`
+                          : `سيتم استيراد ${importPreviewValidation.readyRows} منتجًا إلى قاعدة البيانات. هل تريد المتابعة؟`}
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                      {'\u062a\u0646\u0628\u064a\u0647: \u0644\u0646 \u064a\u062a\u0645 \u062a\u062e\u0637\u064a \u0623\u064a \u0635\u0641 \u062a\u0644\u0642\u0627\u0626\u064a\u064b\u0627. \u064a\u062c\u0628 \u062d\u0644 \u0643\u0644 \u0627\u0644\u0635\u0641\u0648\u0641 \u0627\u0644\u0645\u0639\u0632\u0648\u0644\u0629 \u0623\u0648\u0644\u064b\u0627.'}
-                    </div>
+                    {importPreviewValidation.quarantinedDuplicate > 0 ? (
+                      <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 space-y-1">
+                        <div className="font-semibold">تحذير: صفوف لن تُستورد</div>
+                        <div>
+                          {`ما زال لديك ${importPreviewValidation.quarantinedDuplicate} صفًا معزولًا (تكرار داخل الملف أو تطابق مع منتج موجود). هذه الصفوف لن تُضاف إلا إذا عدّلتها من «مراجعة الصفوف المعزولة».`}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                        تنبيه: تأكد من مراجعة الأسعار والأكواد قبل التأكيد.
+                      </div>
+                    )}
                     <DialogFooter>
                       <Button
                         variant="outline"
                         onClick={() => setIsImportConfirmOpen(false)}
                         disabled={isImportSubmitting}
                       >
-                        {'\u0625\u0644\u063a\u0627\u0621'}
+                        رجوع
                       </Button>
                       <Button
                         onClick={executeImport}
@@ -4510,7 +4808,7 @@ const AdminProducts = () => {
                     <DialogHeader>
                       <DialogTitle>مراجعة الصفوف المعزولة</DialogTitle>
                       <DialogDescription>
-                        عالج التكرارات والبيانات الأساسية قبل الاستيراد. لا يُقبل أي صف حتى يصبح جاهزًا بالكامل.
+                        يُجمَّع المنتج المكرر (نفس الكود أو الاسم) في بطاقة واحدة لتفادي التكرار في العرض. عالج التكرار هنا أو استورد الجاهز فقط من المعاينة.
                       </DialogDescription>
                     </DialogHeader>
 
@@ -4520,10 +4818,20 @@ const AdminProducts = () => {
                       </div>
                       {(() => {
                         const rowsForDisplay = [
-                          ...quarantinedRows.map((row) => ({ row, accepted: false, fading: false })),
+                          ...quarantineModalGroups.map(({ row, extraSameProductRows }) => ({
+                            row,
+                            accepted: false,
+                            fading: false,
+                            extraSameProductRows,
+                          })),
                           ...quarantineAcceptedRows
-                            .filter((item) => !quarantinedRows.some((row) => row.__rowId === item.row.__rowId))
-                            .map((item) => ({ row: item.row, accepted: true, fading: item.fading })),
+                            .filter((item) => !quarantinedRows.some((r) => r.__rowId === item.row.__rowId))
+                            .map((item) => ({
+                              row: item.row,
+                              accepted: true,
+                              fading: item.fading,
+                              extraSameProductRows: 0,
+                            })),
                         ];
                         if (rowsForDisplay.length === 0) {
                           return (
@@ -4532,7 +4840,7 @@ const AdminProducts = () => {
                             </div>
                           );
                         }
-                        return rowsForDisplay.map(({ row, accepted, fading }) => {
+                        return rowsForDisplay.map(({ row, accepted, fading, extraSameProductRows }) => {
                           const rowIndex = importPreview.findIndex((r) => r.__rowId === row.__rowId) + 1;
                           const isChecking = quarantineCheckingIds.has(row.__rowId);
                           const isDisabledCard = isChecking || accepted;
@@ -4600,6 +4908,12 @@ const AdminProducts = () => {
                                   </div>
                                 </div>
 
+                                {extraSameProductRows > 0 ? (
+                                  <div className="rounded-md border border-slate-200 bg-slate-100/80 px-3 py-2 text-xs text-slate-700">
+                                    {`يوجد ${extraSameProductRows} صفًا إضافيًا في الملف بنفس الكود/الاسم — عُرض صف واحد للتعديل، وسيُحدَّث تقييم التكرار للجميع بعد حفظ التغييرات.`}
+                                  </div>
+                                ) : null}
+
                                 <div className="flex items-center justify-end">
                                   <Button
                                     size="sm"
@@ -4657,9 +4971,13 @@ const AdminProducts = () => {
                                     ) : null}
 
                                     {row.__meta.matchTargets.length > 0 ? (
-                                      <div className="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1">
+                                      <div className="rounded-md border border-slate-200 px-3 py-2 text-xs text-slate-700 space-y-1 break-words">
                                         <div className="font-medium">التطابقات الحالية:</div>
-                                        {row.__meta.matchTargets.map((target) => (
+                                        {Array.from(
+                                          new Map(
+                                            row.__meta.matchTargets.map((t) => [`${t.type}-${t.id}`, t] as const)
+                                          ).values()
+                                        ).map((target) => (
                                           <div key={`${row.__rowId}-${target.type}-${target.id}`}>{`• ${target.type === 'database' ? 'قاعدة البيانات' : 'داخل الملف'}: ${target.label}`}</div>
                                         ))}
                                       </div>

@@ -9,14 +9,26 @@ import ThreeScene, { type ThreeSceneHandle, type TransformMode, WALL_TEXTURES } 
 import BuilderToolbar from './ui/BuilderToolbar';
 import { SceneItemsList } from './ui/SceneItemsList';
 import { cloneSlatSystemForSide, copySourceWallSystemsToTargets } from './utils/fastCopySystems';
+import {
+  createDoorWallDraft,
+  isDoorWall,
+  wallSegmentWithLength,
+  type DoorMaterial,
+} from './utils/wallKind';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock, Plus, ChevronUp, Grid3x3, Info, Save, ArrowRight, CheckCircle2, AlertTriangle, Loader2, Copy } from 'lucide-react';
+import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock, Plus, ChevronUp, Grid3x3, Info, Save, ArrowRight, CheckCircle2, AlertTriangle, Loader2, Copy, Package } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useShopSetup } from '@/hooks/useShopSetup';
 import { useTheme } from '@/context/ThemeContext';
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 const DEFAULT_TRANSFORM_MODE: TransformMode = 'translate';
 type DisplaySystemType = 'slat' | 'supermarket_shelves' | 'primo';
@@ -1707,6 +1719,7 @@ const ShopBuilderContent = () => {
     importLayout,
     selectedSlatWallId,
     selectSlatWall,
+    selectPrimoStand,
     isDrawingMode,
     setDrawingMode
   } = useShopBuilder();
@@ -2012,10 +2025,22 @@ const ShopBuilderContent = () => {
   const [is3DFullscreen, setIs3DFullscreen] = useState(false);
   const floorplan2DRef = useRef<HTMLDivElement | null>(null);
   const three3DRef = useRef<HTMLDivElement | null>(null);
+  const lastFullscreenElementRef = useRef<Element | null>(null);
 
   const handleResetCamera = useCallback(() => {
     threeRef.current?.resetCamera();
   }, []);
+
+  const handleInsertDoor = useCallback(
+    (material: DoorMaterial) => {
+      upsertWall(createDoorWallDraft(material, layout.walls));
+      toast({
+        title: 'تم إدراج الباب',
+        description: 'يُوضع في وسط المخطط. اضبط العرض والارتفاع والسمك من شريط الباب.',
+      });
+    },
+    [layout.walls, toast, upsertWall]
+  );
 
   // Scrubby slider handlers
   const handleScrubbyStart = useCallback((e: React.MouseEvent, startValue: number, step: number, callback: (value: number) => void) => {
@@ -2379,6 +2404,14 @@ const ShopBuilderContent = () => {
     selectWall(null);
   }, [selectProduct, selectWall]);
 
+  const clearFloorplanSelection = useCallback(() => {
+    selectWall(null);
+    selectColumn(null);
+    selectProduct(null);
+    selectSlatWall(null);
+    selectPrimoStand(null);
+  }, [selectWall, selectColumn, selectProduct, selectSlatWall, selectPrimoStand]);
+
   const toggle2DFullscreen = useCallback(() => {
     if (!floorplan2DRef.current) return;
     if (!is2DFullscreen) {
@@ -2387,8 +2420,9 @@ const ShopBuilderContent = () => {
     } else {
       document.exitFullscreen?.();
       setIs2DFullscreen(false);
+      clearFloorplanSelection();
     }
-  }, [is2DFullscreen]);
+  }, [is2DFullscreen, clearFloorplanSelection]);
 
   const toggle3DFullscreen = useCallback(() => {
     if (!three3DRef.current) return;
@@ -2403,14 +2437,20 @@ const ShopBuilderContent = () => {
 
   useEffect(() => {
     const handleFullscreenChange = () => {
-      if (!document.fullscreenElement) {
-        setIs2DFullscreen(false);
-        setIs3DFullscreen(false);
+      const el = document.fullscreenElement;
+      if (el) {
+        lastFullscreenElementRef.current = el;
+        return;
       }
+      const was2d = lastFullscreenElementRef.current === floorplan2DRef.current;
+      lastFullscreenElementRef.current = null;
+      setIs2DFullscreen(false);
+      setIs3DFullscreen(false);
+      if (was2d) clearFloorplanSelection();
     };
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
-  }, []);
+  }, [clearFloorplanSelection]);
 
   // Function to focus camera on selected product
   const handleFocusOnProduct = useCallback((productId: string) => {
@@ -2636,12 +2676,12 @@ const ShopBuilderContent = () => {
               </Button>
             </div>
             <div className="flex-1 min-h-0">
-              <FloorplanCanvas />
+              <FloorplanCanvas showMapNavigation={is2DFullscreen || hasEnteredFullscreen} />
             </div>
 
             {/* Fullscreen Controls Overlay - Visible when fullscreen is active */}
             {(is2DFullscreen || hasEnteredFullscreen) && (
-              <div className="absolute top-16 right-4 flex items-center gap-2 z-50 pointer-events-auto">
+              <div className="absolute top-16 right-4 flex flex-wrap items-center justify-end gap-2 z-50 pointer-events-auto">
                 {/* Edit Mode Toggle */}
                 <Button
                   onClick={() => {
@@ -2655,6 +2695,30 @@ const ShopBuilderContent = () => {
                   <Edit2 className="h-4 w-4" />
                   {isDrawingMode ? 'وضع التحرير' : 'وضع الرسم'}
                 </Button>
+
+                <DropdownMenu dir="rtl">
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-10 gap-2 border border-zinc-200 bg-white shadow-md hover:bg-zinc-50"
+                    >
+                      <Package className="h-4 w-4" />
+                      إدراج باب
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-52">
+                    <DropdownMenuItem className="font-semibold cursor-pointer" onClick={() => handleInsertDoor('glass')}>
+                      باب زجاجي
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="font-semibold cursor-pointer" onClick={() => handleInsertDoor('wood')}>
+                      باب خشبي
+                    </DropdownMenuItem>
+                    <DropdownMenuItem className="font-semibold cursor-pointer" onClick={() => handleInsertDoor('metal')}>
+                      باب معدني
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             )}
 
@@ -2662,6 +2726,101 @@ const ShopBuilderContent = () => {
             {(is2DFullscreen || hasEnteredFullscreen) && selectedWallId && !selectedColumnId && !selectedProductId && (() => {
               const wall = layout.walls.find(w => w.id === selectedWallId);
               if (!wall) return null;
+
+              const segLenFs = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+
+              if (isDoorWall(wall)) {
+                return (
+                  <div className="absolute bottom-4 left-1/2 z-50 w-full max-w-2xl -translate-x-1/2 pointer-events-auto px-4">
+                    <div className="rounded-xl bg-white shadow-2xl overflow-visible" style={{ border: `2px solid ${primaryColor}` }}>
+                      <div className="flex flex-col items-center justify-center gap-3 px-4 py-3 sm:flex-row sm:flex-wrap" dir="rtl">
+                        <div
+                          className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold text-white shadow-sm"
+                          style={{ background: `linear-gradient(135deg, ${primaryColor} 0%, ${secondaryColor} 100%)` }}
+                        >
+                          باب محل
+                        </div>
+                        <div className="hidden h-8 w-px sm:block" style={{ backgroundColor: primaryColor }} />
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-semibold text-zinc-900">
+                            عرض الباب (م)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.05"
+                            min="0.2"
+                            value={segLenFs.toFixed(2)}
+                            onChange={(e) => {
+                              const L = Number(e.target.value);
+                              if (!Number.isFinite(L) || L <= 0) return;
+                              const { start, end } = wallSegmentWithLength(wall, L);
+                              upsertWall({ id: wall.id, start, end });
+                            }}
+                            className="h-9 w-20 rounded-md border border-zinc-300 bg-white text-center text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                          />
+                        </div>
+                        <div className="hidden h-8 w-px bg-zinc-200 sm:block" />
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-semibold text-zinc-900">
+                            الارتفاع (م)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.1"
+                            min="2"
+                            max="5.5"
+                            value={(wall.height ?? 3).toFixed(1)}
+                            onChange={(e) => {
+                              const height = Number(e.target.value);
+                              if (!Number.isFinite(height)) return;
+                              upsertWall({ id: wall.id, height: Math.min(5.5, Math.max(2, height)) });
+                            }}
+                            className="h-9 w-20 rounded-md border border-zinc-300 bg-white text-center text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                          />
+                        </div>
+                        <div className="hidden h-8 w-px bg-zinc-200 sm:block" />
+                        <div className="flex flex-col gap-1">
+                          <label className="text-[10px] font-semibold text-zinc-900">
+                            سمك (م)
+                          </label>
+                          <input
+                            type="number"
+                            step="0.02"
+                            min="0.04"
+                            value={(wall.thickness ?? 0.1).toFixed(2)}
+                            onChange={(e) => {
+                              const thickness = Number(e.target.value);
+                              upsertWall({ id: wall.id, thickness });
+                            }}
+                            className="h-9 w-16 rounded-md border border-zinc-300 bg-white text-center text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                          />
+                        </div>
+                        <div className="hidden h-8 w-px sm:block" style={{ backgroundColor: primaryColor }} />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            removeWall(wall.id);
+                            selectWall(null);
+                          }}
+                          className="flex h-9 items-center gap-2 rounded-lg px-3 text-xs font-semibold text-white shadow-md transition-all hover:shadow-lg"
+                          style={{ background: `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)` }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                          حذف
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => selectWall(null)}
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border-2 border-zinc-600 bg-zinc-200 text-zinc-900 shadow-sm transition-colors hover:bg-zinc-300"
+                          title="إغلاق"
+                        >
+                          <X className="h-4 w-4" strokeWidth={2.25} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
 
               return (
                 <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 z-50 pointer-events-auto w-full max-w-3xl px-4">
@@ -2676,7 +2835,7 @@ const ShopBuilderContent = () => {
 
                       {/* Height Control */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>ارتفاع (م)</label>
+                        <label className="text-[10px] font-semibold text-zinc-900">ارتفاع (م)</label>
                         <input
                           type="number"
                           step="0.5"
@@ -2686,16 +2845,15 @@ const ShopBuilderContent = () => {
                             const height = Number(e.target.value);
                             upsertWall({ id: wall.id, height });
                           }}
-                          className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
-                          style={{ border: `1px solid ${primaryColor}40` }}
+                          className="h-9 w-16 rounded-md border border-zinc-300 bg-white text-center text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                         />
                       </div>
 
-                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="hidden h-8 w-px bg-zinc-200 sm:block" />
 
                       {/* Thickness Control */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>سمك (م)</label>
+                        <label className="text-[10px] font-semibold text-zinc-900">سمك (م)</label>
                         <input
                           type="number"
                           step="0.05"
@@ -2705,26 +2863,24 @@ const ShopBuilderContent = () => {
                             const thickness = Number(e.target.value);
                             upsertWall({ id: wall.id, thickness });
                           }}
-                          className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
-                          style={{ border: `1px solid ${primaryColor}40` }}
+                          className="h-9 w-16 rounded-md border border-zinc-300 bg-white text-center text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
                         />
                       </div>
 
-                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="hidden h-8 w-px bg-zinc-200 sm:block" />
 
                       {/* Color Picker */}
                       <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>اللون</label>
+                        <label className="text-[10px] font-semibold text-zinc-900">اللون</label>
                         <input
                           type="color"
                           value={wall.color || '#64748b'}
                           onChange={(e) => upsertWall({ id: wall.id, color: e.target.value })}
-                          className="w-12 h-9 rounded-lg cursor-pointer shadow-sm"
-                          style={{ border: `1px solid ${primaryColor}40` }}
+                          className="h-9 w-12 cursor-pointer rounded-lg border border-zinc-300 shadow-sm"
                         />
                       </div>
 
-                      <div className="hidden sm:block h-8 w-px" style={{ backgroundColor: primaryColor }} />
+                      <div className="hidden h-8 w-px bg-zinc-200 sm:block" />
 
 
 
@@ -3212,10 +3368,10 @@ const ShopBuilderContent = () => {
                 {/* Close Button */}
                 <button
                   onClick={() => selectProduct(null)}
-                  className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-zinc-600 bg-zinc-200 text-zinc-900 shadow-sm transition-colors hover:bg-zinc-300"
                   title="إغلاق"
                 >
-                  <X className="h-4 w-4 text-gray-600" />
+                  <X className="h-4 w-4" strokeWidth={2.25} />
                 </button>
               </div>
             </div>
@@ -3226,6 +3382,123 @@ const ShopBuilderContent = () => {
         {selectedWallId && !selectedColumnId && !selectedProductId && (() => {
           const wall = layout.walls.find(w => w.id === selectedWallId);
           if (!wall) return null;
+
+          const segLenBar = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+
+          if (isDoorWall(wall)) {
+            return (
+              <div className="fixed bottom-6 left-1/2 z-50 max-w-[min(100vw-2rem,42rem)] -translate-x-1/2 transform rounded-2xl border border-zinc-200/60 bg-white/90 shadow-2xl backdrop-blur-xl transition-all hover:shadow-primary/5 overflow-visible">
+                <div className="flex min-w-0 flex-wrap items-center justify-center gap-3 px-4 py-3" dir="rtl">
+                  <div className="flex items-center gap-2 rounded-xl border border-zinc-200 bg-zinc-100 px-3 py-2">
+                    <span className="text-sm font-bold text-zinc-900">باب محل</span>
+                  </div>
+                  <div className="h-8 w-px bg-zinc-200" />
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="cursor-ew-resize select-none rounded px-1 py-0.5 text-[10px] font-semibold text-zinc-900"
+                      onMouseDown={(e) =>
+                        handleScrubbyStart(e, segLenBar, 0.05, (L) => {
+                          const len = Math.max(0.2, L);
+                          const { start, end } = wallSegmentWithLength(wall, len);
+                          upsertWall({ id: wall.id, start, end });
+                        })
+                      }
+                      title="اسحب لتغيير القيمة"
+                    >
+                      عرض الباب (م)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.05"
+                      min="0.2"
+                      value={segLenBar.toFixed(2)}
+                      onChange={(e) => {
+                        const L = Number(e.target.value);
+                        if (!Number.isFinite(L) || L <= 0) return;
+                        const { start, end } = wallSegmentWithLength(wall, L);
+                        upsertWall({ id: wall.id, start, end });
+                      }}
+                      className="h-9 w-16 rounded-xl border border-zinc-300 bg-white text-center text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    />
+                  </div>
+                  <div className="h-8 w-px bg-zinc-200" />
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="cursor-ew-resize select-none rounded px-1 py-0.5 text-[10px] font-semibold text-zinc-900"
+                      onMouseDown={(e) =>
+                        handleScrubbyStart(e, wall.height ?? 3, 0.1, (h) => {
+                          upsertWall({ id: wall.id, height: Math.min(5.5, Math.max(2, h)) });
+                        })
+                      }
+                      title="اسحب لتغيير القيمة"
+                    >
+                      الارتفاع (م)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.1"
+                      min="2"
+                      max="5.5"
+                      value={(wall.height ?? 3).toFixed(1)}
+                      onChange={(e) => {
+                        const height = Number(e.target.value);
+                        if (!Number.isFinite(height)) return;
+                        upsertWall({ id: wall.id, height: Math.min(5.5, Math.max(2, height)) });
+                      }}
+                      className="h-9 w-16 rounded-xl border border-zinc-300 bg-white text-center text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    />
+                  </div>
+                  <div className="h-8 w-px bg-zinc-200" />
+                  <div className="flex flex-col gap-1">
+                    <label
+                      className="cursor-ew-resize select-none rounded px-1 py-0.5 text-[10px] font-semibold text-zinc-900"
+                      onMouseDown={(e) =>
+                        handleScrubbyStart(e, wall.thickness ?? 0.1, 0.02, (t) => {
+                          upsertWall({ id: wall.id, thickness: Math.max(0.04, t) });
+                        })
+                      }
+                      title="اسحب لتغيير القيمة"
+                    >
+                      سمك (م)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.02"
+                      min="0.04"
+                      value={(wall.thickness ?? 0.1).toFixed(2)}
+                      onChange={(e) => {
+                        const thickness = Number(e.target.value);
+                        upsertWall({ id: wall.id, thickness });
+                      }}
+                      className="h-9 w-16 rounded-xl border border-zinc-300 bg-white text-center text-xs font-semibold text-zinc-900 focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    />
+                  </div>
+                  <div className="h-8 w-px bg-zinc-200" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm('هل تريد حذف هذا الباب؟')) {
+                        removeWall(wall.id);
+                        selectWall(null);
+                      }
+                    }}
+                    className="flex h-9 items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 text-xs font-semibold text-red-600 shadow-sm transition-colors hover:bg-red-500 hover:text-white"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    حذف
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => selectWall(null)}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-zinc-600 bg-zinc-200 text-zinc-900 shadow-sm transition-colors hover:bg-zinc-300"
+                    title="إغلاق"
+                  >
+                    <X className="h-4 w-4" strokeWidth={2.25} />
+                  </button>
+                </div>
+              </div>
+            );
+          }
 
           return (
             <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 bg-white/90 backdrop-blur-xl border border-zinc-200/60 rounded-2xl shadow-2xl overflow-visible hover:shadow-primary/5 transition-all">
@@ -3512,10 +3785,10 @@ const ShopBuilderContent = () => {
                 {/* Close Button */}
                 <button
                   onClick={() => selectWall(null)}
-                  className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-zinc-600 bg-zinc-200 text-zinc-900 shadow-sm transition-colors hover:bg-zinc-300"
                   title="إغلاق"
                 >
-                  <X className="h-4 w-4 text-gray-600" />
+                  <X className="h-4 w-4" strokeWidth={2.25} />
                 </button>
               </div>
             </div>
@@ -3748,10 +4021,10 @@ const ShopBuilderContent = () => {
                      selectColumn(null);
                      selectWall(null);
                   }}
-                  className="h-9 w-9 flex items-center justify-center bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                  className="flex h-9 w-9 items-center justify-center rounded-lg border-2 border-zinc-600 bg-zinc-200 text-zinc-900 shadow-sm transition-colors hover:bg-zinc-300"
                   title="إغلاق"
                 >
-                  <X className="h-4 w-4 text-gray-600" />
+                  <X className="h-4 w-4" strokeWidth={2.25} />
                 </button>
               </div>
             </div>

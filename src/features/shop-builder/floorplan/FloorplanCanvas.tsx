@@ -4,8 +4,9 @@ import { useTheme } from '@/context/ThemeContext';
 import { useShopBuilder } from '../store';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { X, Trash2, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Trash2, Maximize2, Minimize2, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { loadFloorplan } from './loadFloorplan';
+import { findShopEnclosurePolygon } from '../utils/enclosedShopPolygon';
 import { cn } from '@/lib/utils';
 
 // Helper function for distance calculation
@@ -22,11 +23,33 @@ function distancePointToSegment(point: { x: number; y: number }, start: { x: num
   return Math.hypot(point.x - projX, point.y - projY);
 }
 
+function parseWallColorRgb(hex: string | undefined): { r: number; g: number; b: number } {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return { r: 71, g: 85, b: 105 };
+  const h = hex.slice(1);
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  if (!/^[0-9a-fA-F]{6}$/.test(full)) return { r: 71, g: 85, b: 105 };
+  const n = parseInt(full, 16);
+  return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+/** Keep wall strokes readable on the light floor without forcing manual color picks. */
+function floorplanWallStrokeColor(hex: string | undefined): string {
+  const { r, g, b } = parseWallColorRgb(hex);
+  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const floorLum = 0.2126 * 248 + 0.7152 * 250 + 0.0722 * 252;
+  if (lum > 215 || Math.abs(lum - floorLum) < 32) return '#1e293b';
+  return hex || '#334155';
+}
+
 const MIN_ZOOM = 0.5;
 const MAX_ZOOM = 3;
-const SNAP_THRESHOLD = 0.3; // meters - snap when within 30cm
-const ENDPOINT_RADIUS = 10;
+const SNAP_THRESHOLD = 0.55; // meters — magnetic connect radius
 const CANVAS_PADDING = 50; // pixels
+
+export interface FloorplanCanvasProps {
+  /** Zoom / pan / reset controls (e.g. 2D fullscreen). */
+  showMapNavigation?: boolean;
+}
 
 interface DragState {
   wallId: string;
@@ -54,7 +77,7 @@ interface MarqueeSelectionRect {
 
 type FloorplanPointerTool = 'default' | 'marquee';
 
-const FloorplanCanvas: React.FC = () => {
+const FloorplanCanvas: React.FC<FloorplanCanvasProps> = ({ showMapNavigation = false }) => {
   const { primaryColor, secondaryColor } = useTheme();
   const { 
     layout, 
@@ -153,6 +176,12 @@ const FloorplanCanvas: React.FC = () => {
     return Math.min(availableWidth, availableHeight) / floorSize * zoom;
   }, [canvasSize.width, canvasSize.height, zoom, layout.floorSize]);
 
+  /** Endpoint handle size in CSS pixels; scales with zoom so handles stay proportional to the plan. */
+  const endpointHitRadiusPx = useMemo(
+    () => Math.min(19, Math.max(5, 0.15 * pixelsPerMeter)),
+    [pixelsPerMeter]
+  );
+
   const getNormalizedRect = useCallback((rect: MarqueeSelectionRect) => {
     const left = Math.min(rect.startX, rect.currentX);
     const right = Math.max(rect.startX, rect.currentX);
@@ -175,6 +204,8 @@ const FloorplanCanvas: React.FC = () => {
     ctx.scale(dpr, dpr);
 
     ctx.clearRect(0, 0, canvasSize.width, canvasSize.height);
+
+    const er = endpointHitRadiusPx;
 
     // Background - Light theme
     ctx.fillStyle = '#f8fafc';
@@ -219,6 +250,25 @@ const FloorplanCanvas: React.FC = () => {
       y: centerY + point.y * pixelsPerMeter,
     });
 
+    const interiorTint = layout.interiorFloorColor;
+    if (interiorTint) {
+      const enc = findShopEnclosurePolygon(worldWalls);
+      if (enc && enc.vertices.length >= 3) {
+        ctx.beginPath();
+        const p0 = toScreen(enc.vertices[0]);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < enc.vertices.length; i++) {
+          const p = toScreen(enc.vertices[i]);
+          ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = interiorTint;
+        ctx.globalAlpha = 0.5;
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
     worldWalls.forEach((wall) => {
       const start = toScreen(wall.start);
       const end = toScreen(wall.end);
@@ -227,8 +277,13 @@ const FloorplanCanvas: React.FC = () => {
       // wall line - Increased width, reduced visual height representation
       ctx.beginPath();
       const isDoor = wall.texture?.startsWith('door_');
-      ctx.strokeStyle = isWallSelected ? primaryColor : (isDoor ? '#8b5a2b' : wall.color);
-      ctx.lineWidth = isWallSelected ? 12 : (isDoor ? 4 : 10);
+      const strokeColor = isWallSelected
+        ? primaryColor
+        : isDoor
+          ? '#92400e'
+          : floorplanWallStrokeColor(wall.color);
+      ctx.strokeStyle = strokeColor;
+      ctx.lineWidth = isWallSelected ? 12 : isDoor ? 5 : 9;
       ctx.moveTo(start.x, start.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
@@ -258,12 +313,12 @@ const FloorplanCanvas: React.FC = () => {
       }
 
       // endpoints
-      ctx.fillStyle = isWallSelected ? primaryColor : (isDoor ? '#8b5a2b' : '#64748b');
+      ctx.fillStyle = isWallSelected ? primaryColor : isDoor ? '#b45309' : '#475569';
       ctx.beginPath();
-      ctx.arc(start.x, start.y, ENDPOINT_RADIUS, 0, Math.PI * 2);
+      ctx.arc(start.x, start.y, er, 0, Math.PI * 2);
       ctx.fill();
       ctx.beginPath();
-      ctx.arc(end.x, end.y, ENDPOINT_RADIUS, 0, Math.PI * 2);
+      ctx.arc(end.x, end.y, er, 0, Math.PI * 2);
       ctx.fill();
 
       // Snap indicators (green glow when connected)
@@ -290,14 +345,14 @@ const FloorplanCanvas: React.FC = () => {
             ctx.strokeStyle = '#10b981';
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.arc(start.x, start.y, ENDPOINT_RADIUS + 8, 0, Math.PI * 2);
+            ctx.arc(start.x, start.y, er + 7, 0, Math.PI * 2);
             ctx.stroke();
             
             // Inner green fill to show connection
             ctx.fillStyle = '#10b981';
             ctx.globalAlpha = 0.4;
             ctx.beginPath();
-            ctx.arc(start.x, start.y, ENDPOINT_RADIUS + 5, 0, Math.PI * 2);
+            ctx.arc(start.x, start.y, er + 4, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1.0;
           }
@@ -319,14 +374,14 @@ const FloorplanCanvas: React.FC = () => {
             ctx.strokeStyle = '#10b981';
             ctx.lineWidth = 4;
             ctx.beginPath();
-            ctx.arc(end.x, end.y, ENDPOINT_RADIUS + 8, 0, Math.PI * 2);
+            ctx.arc(end.x, end.y, er + 7, 0, Math.PI * 2);
             ctx.stroke();
             
             // Inner green fill to show connection
             ctx.fillStyle = '#10b981';
             ctx.globalAlpha = 0.4;
             ctx.beginPath();
-            ctx.arc(end.x, end.y, ENDPOINT_RADIUS + 5, 0, Math.PI * 2);
+            ctx.arc(end.x, end.y, er + 4, 0, Math.PI * 2);
             ctx.fill();
             ctx.globalAlpha = 1.0;
           }
@@ -483,7 +538,7 @@ const FloorplanCanvas: React.FC = () => {
         ctx.fillStyle = primaryColor;
         ctx.globalAlpha = 0.6;
         ctx.beginPath();
-        ctx.arc(previewScreen.x, previewScreen.y, ENDPOINT_RADIUS + 3, 0, Math.PI * 2);
+        ctx.arc(previewScreen.x, previewScreen.y, er + 3, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalAlpha = 1;
         
@@ -500,7 +555,7 @@ const FloorplanCanvas: React.FC = () => {
         // Draw start point indicator
         ctx.fillStyle = primaryColor;
         ctx.beginPath();
-        ctx.arc(startScreen.x, startScreen.y, ENDPOINT_RADIUS + 2, 0, Math.PI * 2);
+        ctx.arc(startScreen.x, startScreen.y, er + 2, 0, Math.PI * 2);
         ctx.fill();
         
         // Outer glow
@@ -508,7 +563,7 @@ const FloorplanCanvas: React.FC = () => {
         ctx.lineWidth = 3;
         ctx.globalAlpha = 0.5;
         ctx.beginPath();
-        ctx.arc(startScreen.x, startScreen.y, ENDPOINT_RADIUS + 8, 0, Math.PI * 2);
+        ctx.arc(startScreen.x, startScreen.y, er + 8, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
       
@@ -533,7 +588,7 @@ const FloorplanCanvas: React.FC = () => {
         // End point preview
         ctx.fillStyle = snappedPoint ? secondaryColor : primaryColor;
         ctx.beginPath();
-        ctx.arc(finalScreen.x, finalScreen.y, ENDPOINT_RADIUS, 0, Math.PI * 2);
+        ctx.arc(finalScreen.x, finalScreen.y, er, 0, Math.PI * 2);
         ctx.fill();
         
         // Calculate length and angle
@@ -589,10 +644,10 @@ const FloorplanCanvas: React.FC = () => {
         ctx.lineWidth = 2;
         ctx.globalAlpha = 0.5;
         ctx.beginPath();
-        ctx.arc(startScreen.x, startScreen.y, ENDPOINT_RADIUS + 5, 0, Math.PI * 2);
+        ctx.arc(startScreen.x, startScreen.y, er + 5, 0, Math.PI * 2);
         ctx.stroke();
         ctx.beginPath();
-        ctx.arc(endScreen.x, endScreen.y, ENDPOINT_RADIUS + 5, 0, Math.PI * 2);
+        ctx.arc(endScreen.x, endScreen.y, er + 5, 0, Math.PI * 2);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
       });
@@ -608,7 +663,7 @@ const FloorplanCanvas: React.FC = () => {
       ctx.strokeRect(rect.left, rect.top, rect.width, rect.height);
       ctx.setLineDash([]);
     }
-  }, [canvasSize.width, canvasSize.height, worldWalls, selectedWallId, selectedColumnId, selectedProductId, interactiveProducts, pixelsPerMeter, pan.x, pan.y, isDrawingMode, drawingStartPoint, drawingPreviewPoint, snappedPoint, marqueeRect, getNormalizedRect, multiSelectedWallsSet, multiSelectedColumnsSet, multiSelectedProductsSet]);
+  }, [canvasSize.width, canvasSize.height, worldWalls, layout.interiorFloorColor, selectedWallId, selectedColumnId, selectedProductId, interactiveProducts, pixelsPerMeter, pan.x, pan.y, isDrawingMode, drawingStartPoint, drawingPreviewPoint, snappedPoint, marqueeRect, getNormalizedRect, multiSelectedWallsSet, multiSelectedColumnsSet, multiSelectedProductsSet, primaryColor, secondaryColor, endpointHitRadiusPx]);
 
   useEffect(() => {
     draw();
@@ -629,16 +684,16 @@ const FloorplanCanvas: React.FC = () => {
         const end = toScreen(wall.end);
         const distStart = Math.hypot(start.x - pos.x, start.y - pos.y);
         const distEnd = Math.hypot(end.x - pos.x, end.y - pos.y);
-        if (distStart <= ENDPOINT_RADIUS + 4) {
+        if (distStart <= endpointHitRadiusPx + 3) {
           return { wallId: wall.id, handle: 'start' };
         }
-        if (distEnd <= ENDPOINT_RADIUS + 4) {
+        if (distEnd <= endpointHitRadiusPx + 3) {
           return { wallId: wall.id, handle: 'end' };
         }
       }
       return null;
     },
-    [worldWalls, pixelsPerMeter, canvasSize.width, canvasSize.height, pan.x, pan.y]
+    [worldWalls, pixelsPerMeter, canvasSize.width, canvasSize.height, pan.x, pan.y, endpointHitRadiusPx]
   );
 
   const screenToWorld = useCallback(
@@ -653,38 +708,27 @@ const FloorplanCanvas: React.FC = () => {
     [pixelsPerMeter, canvasSize.width, canvasSize.height, pan.x, pan.y]
   );
 
-  // Find nearest snap point
+  // Nearest vertex snap within threshold (magnetic connect).
   const findSnapPoint = useCallback((point: { x: number; y: number }, excludeWallId?: string) => {
     let nearestPoint: { x: number; y: number } | null = null;
-    let nearestDistance = SNAP_THRESHOLD;
+    let nearestDistance = Infinity;
+    const threshold = SNAP_THRESHOLD;
 
+    worldWalls.forEach((wall) => {
+      if (wall.id === excludeWallId) return;
 
-
-    worldWalls.forEach(wall => {
-      if (wall.id === excludeWallId) {
-
-        return; // Don't snap to self
-      }
-
-      // Check start point
       const distToStart = Math.hypot(point.x - wall.start.x, point.y - wall.start.y);
-      console.log('📏 Distance to wall', wall.id, 'start:', distToStart.toFixed(3), 'm');
-      if (distToStart < nearestDistance) {
+      if (distToStart <= threshold && distToStart < nearestDistance) {
         nearestDistance = distToStart;
         nearestPoint = { x: wall.start.x, y: wall.start.y };
-
       }
 
-      // Check end point
       const distToEnd = Math.hypot(point.x - wall.end.x, point.y - wall.end.y);
-      console.log('📏 Distance to wall', wall.id, 'end:', distToEnd.toFixed(3), 'm');
-      if (distToEnd < nearestDistance) {
+      if (distToEnd <= threshold && distToEnd < nearestDistance) {
         nearestDistance = distToEnd;
         nearestPoint = { x: wall.end.x, y: wall.end.y };
-
       }
     });
-
 
     return nearestPoint;
   }, [worldWalls]);
@@ -971,19 +1015,11 @@ const FloorplanCanvas: React.FC = () => {
         
         const worldPos = screenToWorld(pos);
         
-        // Check for snap to existing endpoints (but only if we have a start point)
-        // Don't snap on first click OR if snapping is disabled (after right-click)
+        // Magnetic snap to existing vertices (first click + each segment end).
         let finalPos = worldPos;
-
-        if (drawingStartPoint && !disableSnappingRef.current) {
-
-          const snapPoint = findSnapPoint(worldPos, null);
-          if (snapPoint) {
-
-            finalPos = snapPoint;
-          }
-        } else {
-
+        if (!disableSnappingRef.current) {
+          const snapPoint = findSnapPoint(worldPos, undefined);
+          if (snapPoint) finalPos = snapPoint;
         }
         
         // Apply length snapping if Ctrl is pressed
@@ -1414,15 +1450,27 @@ const FloorplanCanvas: React.FC = () => {
       applyMarqueeSelection(marqueeRect);
       setMarqueeRect(null);
     }
-    // Clear all drag states
+
+    const drag = dragState.current;
+    if (drag && (drag.handle === 'start' || drag.handle === 'end')) {
+      const target = layout.walls.find((w) => w.id === drag.wallId);
+      if (target) {
+        const pt = drag.handle === 'start' ? { ...target.start } : { ...target.end };
+        const snapPoint = findSnapPoint(pt, drag.wallId);
+        if (snapPoint) {
+          upsertWall({
+            ...target,
+            [drag.handle]: snapPoint,
+          });
+        }
+      }
+    }
+
     dragState.current = null;
     productDragState.current = null;
     bulkDragState.current = null;
     panState.current = null;
-    
-    // In drawing mode, don't clear drawing preview
-    // This allows the preview line to stay visible
-  }, [pointerTool, marqueeRect, applyMarqueeSelection]);
+  }, [pointerTool, marqueeRect, applyMarqueeSelection, layout.walls, findSnapPoint, upsertWall]);
 
   const onWheel = useCallback((event: WheelEvent) => {
     // In drawing mode, only zoom if mouse is over the canvas
@@ -1611,10 +1659,12 @@ const FloorplanCanvas: React.FC = () => {
           const dx = drawingPreviewPoint.x - drawingStartPoint.x;
           const dy = drawingPreviewPoint.y - drawingStartPoint.y;
           const angle = Math.atan2(dy, dx);
-          const endPoint = {
+          let endPoint = {
             x: drawingStartPoint.x + length * Math.cos(angle),
             y: drawingStartPoint.y + length * Math.sin(angle)
           };
+          const snapped = findSnapPoint(endPoint, undefined);
+          if (snapped) endPoint = snapped;
 
           const defaultTexture = layout.defaultWallTexture ||
             (layout.walls.length > 0 ? layout.walls[layout.walls.length - 1].texture : undefined) ||
@@ -1685,7 +1735,8 @@ const FloorplanCanvas: React.FC = () => {
     selectWall,
     applySelectedWallLength,
     hasMultiSelection,
-    deleteMultiSelection
+    deleteMultiSelection,
+    findSnapPoint
   ]);
 
   // Reset drawing state when entering/exiting drawing mode
@@ -1747,6 +1798,52 @@ const FloorplanCanvas: React.FC = () => {
             >
               تحديد جماعي
             </button>
+          </div>
+        )}
+        {showMapNavigation && (
+          <div
+            className="pointer-events-auto absolute bottom-3 left-3 z-30 flex flex-col gap-2 rounded-xl border border-slate-200 bg-white/95 p-2.5 shadow-lg"
+            dir="rtl"
+          >
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 w-9 border-slate-300 p-0 text-slate-800 hover:bg-slate-50"
+                onClick={() => setZoom((z) => Math.min(MAX_ZOOM, z * 1.12))}
+                title="تكبير"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 w-9 border-slate-300 p-0 text-slate-800 hover:bg-slate-50"
+                onClick={() => setZoom((z) => Math.max(MIN_ZOOM, z / 1.12))}
+                title="تصغير"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="h-9 gap-1 border-slate-300 px-2.5 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+                onClick={() => {
+                  setZoom(1);
+                  setPan({ x: 0, y: 0 });
+                }}
+                title="إعادة ضبط العرض والموضع"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                ضبط العرض
+              </Button>
+            </div>
+            <p className="max-w-[220px] text-[10px] font-medium leading-snug text-slate-700">
+              تحريك: زر الفأرة الأيمن أو الوسط. تكبير: عجلة الماوس فوق المخطط.
+            </p>
           </div>
         )}
         <canvas
@@ -1817,10 +1914,12 @@ const FloorplanCanvas: React.FC = () => {
                         const dx = drawingPreviewPoint.x - drawingStartPoint.x;
                         const dy = drawingPreviewPoint.y - drawingStartPoint.y;
                         const angle = Math.atan2(dy, dx);
-                        const endPoint = {
+                        let endPoint = {
                           x: drawingStartPoint.x + length * Math.cos(angle),
                           y: drawingStartPoint.y + length * Math.sin(angle)
                         };
+                        const snapped = findSnapPoint(endPoint, undefined);
+                        if (snapped) endPoint = snapped;
                         const defaultTexture = layout.defaultWallTexture ||
                           (layout.walls.length > 0 ? layout.walls[layout.walls.length - 1].texture : undefined) ||
                           'painted_white';
@@ -1855,10 +1954,12 @@ const FloorplanCanvas: React.FC = () => {
                       const dx = drawingPreviewPoint.x - drawingStartPoint.x;
                       const dy = drawingPreviewPoint.y - drawingStartPoint.y;
                       const angle = Math.atan2(dy, dx);
-                      const endPoint = {
+                      let endPoint = {
                         x: drawingStartPoint.x + length * Math.cos(angle),
                         y: drawingStartPoint.y + length * Math.sin(angle)
                       };
+                      const snapped = findSnapPoint(endPoint, undefined);
+                      if (snapped) endPoint = snapped;
                       // Use global default texture
                       const defaultTexture = layout.defaultWallTexture || 
                         (layout.walls.length > 0 ? layout.walls[layout.walls.length - 1].texture : undefined) || 

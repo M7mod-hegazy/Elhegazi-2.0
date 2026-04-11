@@ -19,6 +19,7 @@ import { useShopBuilder } from '../store';
 import type { ShopBuilderProduct, ShopBuilderWall, ShopBuilderColumn, ShopBuilderSlatWall } from '../types';
 import type { CameraMode } from '../store';
 import { createProceduralHangGroup } from './proceduralProducts';
+import { findShopEnclosurePolygon } from '../utils/enclosedShopPolygon';
 
 
 // Texture loader
@@ -166,20 +167,45 @@ export const FLOOR_TEXTURES = {
     normalMap: null,
     preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjMzM0MTU1Ii8+PHBhdGggZD0iTTAgMEwxMCAxMCBNMTAgMEwwIDEwIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC41Ii8+PC9zdmc+',
   },
+  // Embedded SVG so TextureLoader works without CORS (external URLs often failed → white doors).
   door_metal: {
-    map: 'https://upload.wikimedia.org/wikipedia/commons/7/77/Galvanized_steel_surface.jpg',
+    map:
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><defs><linearGradient id="m" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#d1d5db"/><stop offset="0.45" stop-color="#9ca3af"/><stop offset="1" stop-color="#6b7280"/></linearGradient></defs><rect width="512" height="512" fill="url(#m)"/><g stroke="#f9fafb" stroke-width="1" opacity="0.35"><path d="M0 48h512M0 96h512M0 144h512M0 192h512M0 240h512M0 288h512M0 336h512M0 384h512M0 432h512"/></g><rect x="168" y="64" width="176" height="384" rx="10" fill="#111827" opacity="0.12"/><rect x="188" y="220" width="36" height="36" rx="4" fill="#374151" opacity="0.5"/></svg>'
+      ),
     normalMap: null,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/7/77/Galvanized_steel_surface.jpg',
+    preview:
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#9ca3af"/></svg>'
+      ),
   },
   door_wood: {
-    map: 'https://upload.wikimedia.org/wikipedia/commons/4/4e/Wood_texture_with_natural_pattern.jpg',
+    map:
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><defs><linearGradient id="w" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a16207"/><stop offset="1" stop-color="#422006"/></linearGradient></defs><rect width="512" height="512" fill="url(#w)"/><g stroke="#292524" stroke-width="2" opacity="0.5"><path d="M0 56h512M0 112h512M0 168h512M0 224h512M0 280h512M0 336h512M0 392h512M0 448h512"/></g><rect x="176" y="72" width="160" height="368" rx="8" fill="#1c1917" opacity="0.25"/><circle cx="300" cy="256" r="8" fill="#44403c"/></svg>'
+      ),
     normalMap: null,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/4/4e/Wood_texture_with_natural_pattern.jpg',
+    preview:
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#92400e"/></svg>'
+      ),
   },
   door_glass: {
-    map: 'https://upload.wikimedia.org/wikipedia/commons/d/df/Blue_Glass_Texture.jpg',
+    map:
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#7dd3fc"/><stop offset="0.5" stop-color="#38bdf8"/><stop offset="1" stop-color="#0369a1"/></linearGradient></defs><rect width="512" height="512" fill="url(#g)"/><rect x="96" y="64" width="320" height="384" rx="12" fill="rgba(255,255,255,0.15)" stroke="rgba(255,255,255,0.55)" stroke-width="6"/><path d="M120 100 L392 140" stroke="rgba(255,255,255,0.45)" stroke-width="4"/></svg>'
+      ),
     normalMap: null,
-    preview: 'https://upload.wikimedia.org/wikipedia/commons/d/df/Blue_Glass_Texture.jpg',
+    preview:
+      'data:image/svg+xml;charset=utf-8,' +
+      encodeURIComponent(
+        '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64"><rect width="64" height="64" fill="#0ea5e9"/></svg>'
+      ),
   },
 };
 
@@ -220,7 +246,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
   const objLoaderRef = useRef<OBJLoader | null>(null);
   const fbxLoaderRef = useRef<FBXLoader | null>(null);
   const productMapRef = useRef<Map<string, ProductEntry>>(new Map());
-  const wallMeshRef = useRef<Map<string, THREE.Mesh>>(new Map());
+  const wallMeshRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const columnMeshRef = useRef<Map<string, THREE.Mesh>>(new Map());
   const slatWallMeshRef = useRef<Map<string, THREE.Object3D>>(new Map());
   const primoStandMeshRef = useRef<Map<string, THREE.Object3D>>(new Map());
@@ -228,6 +254,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
   const mixersRef = useRef<THREE.AnimationMixer[]>([]);
   const texturesCache = useRef<Map<string, THREE.Texture>>(new Map());
   const floorMeshRef = useRef<THREE.Mesh | null>(null);
+  const interiorFloorMeshRef = useRef<THREE.Mesh | null>(null);
   
   // First-person movement state
   const velocityRef = useRef(new THREE.Vector3());
@@ -890,11 +917,13 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     }
     
     const center = start.clone().lerp(end, 0.5);
-    center.y = wall.height / 2;
+    const isDoorWall = wall.texture?.startsWith('door_');
+    const wallH = wall.height || (isDoorWall ? 3 : 2.4);
+    center.y = wallH / 2;
     
     const wallLength = start.distanceTo(end);
     const fov = camera.fov * (Math.PI / 180);
-    const dist = Math.max(wallLength, wall.height) / (2 * Math.tan(fov / 2)) * 1.5; // 1.5 padding to see comfortably
+    const dist = Math.max(wallLength, wallH) / (2 * Math.tan(fov / 2)) * 1.5; // 1.5 padding to see comfortably
     
     // Position straight out from the wall
     const newCameraPosition = center.clone().add(normal.multiplyScalar(dist));
@@ -1154,15 +1183,11 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
     const activeIds = new Set(layout.walls.map((wall) => wall.id));
 
     // Remove stale walls
-    wallMeshMap.forEach((mesh, id) => {
+    wallMeshMap.forEach((obj, id) => {
       if (!activeIds.has(id)) {
-        scene.remove(mesh);
-        mesh.geometry.dispose();
-        if (Array.isArray(mesh.material)) {
-          mesh.material.forEach((material) => material.dispose());
-        } else {
-          mesh.material.dispose();
-        }
+        scene.remove(obj);
+        disposeWallSceneObject(obj);
+        wallMeshMap.delete(id);
       }
     });
     const disposeGroup = (group: THREE.Object3D) => {
@@ -1195,13 +1220,27 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       });
 
     layout.walls.forEach((wall) => {
-      const existing = wallMeshMap.get(wall.id);
-      if (existing) {
-        updateWallMesh(existing, wall, texturesCache.current);
+      const isDoor = wall.texture?.startsWith('door_');
+      const visualKind = isDoor ? 'door' : 'wall';
+      let existing = wallMeshMap.get(wall.id);
+      const existingKind = existing?.userData?.sbWallVisualKind as string | undefined;
+
+      if (existing && existingKind !== visualKind) {
+        scene.remove(existing);
+        disposeWallSceneObject(existing);
+        wallMeshMap.delete(wall.id);
+        existing = undefined;
+      }
+
+      if (!existing) {
+        const obj = isDoor ? createDoorProceduralGroup(wall) : createWallMesh(wall, texturesCache.current);
+        obj.userData = { ...obj.userData, sbWallVisualKind: visualKind, sbWallId: wall.id };
+        wallMeshMap.set(wall.id, obj);
+        scene.add(obj);
+      } else if (isDoor) {
+        updateDoorProceduralGroup(existing as THREE.Group, wall);
       } else {
-        const mesh = createWallMesh(wall, texturesCache.current);
-        wallMeshMap.set(wall.id, mesh);
-        scene.add(mesh);
+        updateWallMesh(existing as THREE.Mesh, wall, texturesCache.current);
       }
       const wallStart = new THREE.Vector3(wall.start.x, 0, wall.start.y);
       const wallEnd = new THREE.Vector3(wall.end.x, 0, wall.end.y);
@@ -1444,6 +1483,52 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       }).catch(err => console.error('Failed to load floor normal map:', err));
     }
   }, [layout.floorTexture]);
+
+  // Interior shop floor tint (closed wall loop + layout.interiorFloorColor)
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+
+    const tint = layout.interiorFloorColor;
+    const poly = tint ? findShopEnclosurePolygon(layout.walls) : null;
+    let mesh: THREE.Mesh | null = null;
+
+    if (tint && poly && poly.vertices.length >= 3) {
+      const shape = new THREE.Shape();
+      const v0 = poly.vertices[0];
+      shape.moveTo(v0.x, v0.y);
+      for (let i = 1; i < poly.vertices.length; i++) {
+        shape.lineTo(poly.vertices[i].x, poly.vertices[i].y);
+      }
+      shape.closePath();
+
+      const geom = new THREE.ShapeGeometry(shape);
+      geom.rotateX(-Math.PI / 2);
+      const mat = new THREE.MeshStandardMaterial({
+        color: new THREE.Color(tint),
+        roughness: 0.88,
+        metalness: 0.04,
+        transparent: true,
+        opacity: 0.94,
+        side: THREE.DoubleSide,
+        depthWrite: false,
+      });
+      mesh = new THREE.Mesh(geom, mat);
+      mesh.position.y = 0.018;
+      mesh.receiveShadow = true;
+      scene.add(mesh);
+    }
+    interiorFloorMeshRef.current = mesh;
+
+    return () => {
+      if (mesh && scene) {
+        scene.remove(mesh);
+        mesh.geometry.dispose();
+        (mesh.material as THREE.Material).dispose();
+      }
+      if (interiorFloorMeshRef.current === mesh) interiorFloorMeshRef.current = null;
+    };
+  }, [layout.walls, layout.interiorFloorColor]);
 
   const detachTransform = useCallback(() => {
     transformControlsRef.current?.detach();
@@ -1772,9 +1857,162 @@ function loadTexture(url: string, cache: Map<string, THREE.Texture>): Promise<TH
   });
 }
 
+function disposeWallSceneObject(root: THREE.Object3D) {
+  root.traverse((child) => {
+    if (child instanceof THREE.Mesh) {
+      child.geometry?.dispose();
+      const mat = child.material;
+      if (Array.isArray(mat)) {
+        mat.forEach((m) => disposeOneMaterial(m as THREE.Material));
+      } else if (mat) {
+        disposeOneMaterial(mat as THREE.Material);
+      }
+    }
+  });
+}
+
+function disposeOneMaterial(m: THREE.Material) {
+  const anyM = m as THREE.MeshStandardMaterial & THREE.MeshPhysicalMaterial;
+  if (anyM.map) anyM.map.dispose();
+  if (anyM.normalMap) anyM.normalMap.dispose();
+  if (anyM.roughnessMap) anyM.roughnessMap.dispose();
+  if (anyM.metalnessMap) anyM.metalnessMap.dispose();
+  if (anyM.aoMap) anyM.aoMap.dispose();
+  m.dispose();
+}
+
+function clearDoorGroupMeshes(group: THREE.Group) {
+  while (group.children.length > 0) {
+    const ch = group.children[0];
+    group.remove(ch);
+    if (ch instanceof THREE.Mesh) {
+      ch.geometry?.dispose();
+      const mat = ch.material;
+      if (Array.isArray(mat)) mat.forEach((mm) => mm.dispose());
+      else mat.dispose();
+    }
+  }
+}
+
+function applyDoorGroupWorldPlacement(group: THREE.Group, wall: ShopBuilderWall) {
+  const start = new THREE.Vector3(wall.start.x, 0, wall.start.y);
+  const end = new THREE.Vector3(wall.end.x, 0, wall.end.y);
+  const mid = start.clone().lerp(end, 0.5);
+  const angle = Math.atan2(end.z - start.z, end.x - start.x);
+  group.position.set(mid.x, 0, mid.z);
+  group.rotation.y = -angle;
+}
+
+/** Storefront-style door (retail): aluminum frame, optional glass / roller slats / wood leaf. Height from wall.height. */
+function populateDoorProceduralGroup(group: THREE.Group, wall: ShopBuilderWall) {
+  const start = new THREE.Vector3(wall.start.x, 0, wall.start.y);
+  const end = new THREE.Vector3(wall.end.x, 0, wall.end.y);
+  const length = Math.max(0.08, start.distanceTo(end));
+  const h = Math.min(5.5, Math.max(2, wall.height || 3));
+  const t = Math.max(0.04, wall.thickness);
+
+  const kind: 'wood' | 'metal' | 'glass' =
+    wall.texture === 'door_metal' ? 'metal' : wall.texture === 'door_glass' ? 'glass' : 'wood';
+
+  const frameColor = kind === 'wood' ? 0x2a1810 : kind === 'metal' ? 0x1e293b : 0x0c1220;
+  const frameMat = new THREE.MeshStandardMaterial({
+    color: frameColor,
+    roughness: kind === 'metal' ? 0.32 : 0.78,
+    metalness: kind === 'metal' ? 0.72 : 0.1,
+  });
+
+  const headMat = new THREE.MeshStandardMaterial({
+    color: 0x111827,
+    metalness: 0.55,
+    roughness: 0.38,
+  });
+
+  const fw = Math.max(0.045, Math.min(0.12, length * 0.075));
+  const kickH = Math.max(0.09, h * 0.055);
+
+  const addMesh = (geo: THREE.BufferGeometry, mat: THREE.Material, px: number, py: number, pz: number) => {
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set(px, py, pz);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  };
+
+  addMesh(new THREE.BoxGeometry(length, fw * 1.15, t * 1.08), headMat, 0, h - fw * 0.55, 0);
+
+  const kickMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.58, roughness: 0.42 });
+  addMesh(new THREE.BoxGeometry(length * 0.97, kickH, t * 0.96), kickMat, 0, kickH / 2 + fw * 0.35, 0);
+
+  const jambH = Math.max(0.15, h - fw * 1.4 - kickH);
+  const jambMidY = kickH + fw + jambH / 2;
+  addMesh(new THREE.BoxGeometry(fw, jambH, t), frameMat, -length / 2 + fw / 2, jambMidY, 0);
+  addMesh(new THREE.BoxGeometry(fw, jambH, t), frameMat, length / 2 - fw / 2, jambMidY, 0);
+
+  const openingW = Math.max(0.06, length - 2 * fw);
+  const openingH = Math.max(0.28, jambH - fw * 0.45);
+  const openingCY = kickH + fw + openingH / 2;
+  const leafT = Math.max(0.025, t * 0.62);
+  const mullionW = Math.max(0.022, fw * 0.4);
+
+  const barMat = new THREE.MeshStandardMaterial({ color: 0xb91c1c, metalness: 0.45, roughness: 0.35 });
+  addMesh(new THREE.BoxGeometry(openingW * 0.58, 0.038, 0.048), barMat, 0, openingCY + openingH * 0.08, t * 0.46);
+
+  if (kind === 'metal') {
+    const backMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.88, metalness: 0.12 });
+    addMesh(new THREE.BoxGeometry(openingW * 0.92, openingH, leafT * 0.4), backMat, 0, openingCY, -leafT * 0.12);
+    const slatN = Math.min(18, Math.max(7, Math.round(openingH / 0.17)));
+    const slot = openingH / slatN;
+    const slatMat = new THREE.MeshStandardMaterial({ color: 0xc5cad3, metalness: 0.84, roughness: 0.22 });
+    for (let i = 0; i < slatN; i++) {
+      const y = kickH + fw + slot * (i + 0.5);
+      addMesh(new THREE.BoxGeometry(openingW * 0.9, slot * 0.44, leafT * 0.88), slatMat, 0, y, leafT * 0.2);
+    }
+  } else if (kind === 'glass') {
+    const leafMat = new THREE.MeshPhysicalMaterial({
+      color: 0xbae6fd,
+      metalness: 0,
+      roughness: 0.08,
+      transmission: 0.62,
+      thickness: leafT * 2.8,
+      transparent: true,
+      opacity: 0.96,
+      ior: 1.48,
+      envMapIntensity: 0.95,
+    });
+    addMesh(new THREE.BoxGeometry(openingW * 0.88, openingH * 0.94, leafT), leafMat, 0, openingCY, 0);
+    addMesh(new THREE.BoxGeometry(mullionW, openingH * 0.9, leafT * 1.06), frameMat, -openingW * 0.26, openingCY, 0);
+    addMesh(new THREE.BoxGeometry(mullionW, openingH * 0.9, leafT * 1.06), frameMat, openingW * 0.26, openingCY, 0);
+    addMesh(new THREE.BoxGeometry(openingW * 0.85, mullionW * 0.9, leafT * 1.04), frameMat, 0, openingCY + openingH * 0.12, 0);
+  } else {
+    const leafMat = new THREE.MeshStandardMaterial({
+      color: 0x92400e,
+      metalness: 0.05,
+      roughness: 0.72,
+    });
+    addMesh(new THREE.BoxGeometry(openingW * 0.9, openingH * 0.93, leafT), leafMat, 0, openingCY, 0);
+    const railMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.82, metalness: 0 });
+    addMesh(new THREE.BoxGeometry(openingW * 0.82, fw * 0.5, leafT * 1.06), railMat, 0, openingCY + openingH * 0.06, 0);
+    const pullMat = new THREE.MeshStandardMaterial({ color: 0xd4af37, metalness: 0.7, roughness: 0.28 });
+    addMesh(new THREE.BoxGeometry(0.04, 0.14, t * 0.28), pullMat, openingW * 0.32, openingCY, t * 0.42);
+  }
+}
+
+function createDoorProceduralGroup(wall: ShopBuilderWall): THREE.Group {
+  const group = new THREE.Group();
+  group.name = `door-${wall.id}`;
+  populateDoorProceduralGroup(group, wall);
+  applyDoorGroupWorldPlacement(group, wall);
+  return group;
+}
+
+function updateDoorProceduralGroup(group: THREE.Group, wall: ShopBuilderWall) {
+  clearDoorGroupMeshes(group);
+  populateDoorProceduralGroup(group, wall);
+  applyDoorGroupWorldPlacement(group, wall);
+}
+
 function createWallMesh(wall: ShopBuilderWall, texturesCache: Map<string, THREE.Texture>): THREE.Mesh {
-  const isDoor = wall.texture?.startsWith('door_');
-  const renderHeight = isDoor ? 2.2 : wall.height;
+  const renderHeight = wall.height;
   const start = new THREE.Vector3(wall.start.x, renderHeight / 2, wall.start.y);
   const end = new THREE.Vector3(wall.end.x, renderHeight / 2, wall.end.y);
   const length = start.clone().setY(0).distanceTo(end.clone().setY(0));
@@ -1795,9 +2033,6 @@ function createWallMesh(wall: ShopBuilderWall, texturesCache: Map<string, THREE.
     loadTexture(textureConfig.map, texturesCache).then(texture => {
             const tex = texture.clone();
       tex.needsUpdate = true;
-      if (isDoor) {
-        tex.repeat.set(1, 1);
-      }
       material.map = tex;
       material.needsUpdate = true;
     }).catch(err => console.error('Failed to load texture:', err));
@@ -1807,9 +2042,6 @@ function createWallMesh(wall: ShopBuilderWall, texturesCache: Map<string, THREE.
     loadTexture(textureConfig.normalMap, texturesCache).then(texture => {
             const tex = texture.clone();
       tex.needsUpdate = true;
-      if (isDoor) {
-        tex.repeat.set(1, 1);
-      }
       material.normalMap = tex;
       material.needsUpdate = true;
     }).catch(err => console.error('Failed to load normal map:', err));
@@ -1827,8 +2059,7 @@ function createWallMesh(wall: ShopBuilderWall, texturesCache: Map<string, THREE.
 }
 
 function updateWallMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, texturesCache: Map<string, THREE.Texture>) {
-  const isDoor = wall.texture?.startsWith('door_');
-  const renderHeight = isDoor ? 2.2 : wall.height;
+  const renderHeight = wall.height;
   const start = new THREE.Vector3(wall.start.x, renderHeight / 2, wall.start.y);
   const end = new THREE.Vector3(wall.end.x, renderHeight / 2, wall.end.y);
   const length = start.clone().setY(0).distanceTo(end.clone().setY(0));
@@ -1857,8 +2088,8 @@ function updateWallMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, texturesCache: 
     // Create new material
     mesh.material = new THREE.MeshStandardMaterial({ 
       color: new THREE.Color(wall.color),
-      roughness: isDoor ? 0.4 : 0.8,
-      metalness: isDoor ? 0.1 : 0.0,
+      roughness: 0.8,
+      metalness: 0.0,
     });
     
     // Load textures asynchronously
@@ -1867,7 +2098,6 @@ function updateWallMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, texturesCache: 
         if (mesh.material instanceof THREE.MeshStandardMaterial) {
           const tex = texture.clone();
           tex.needsUpdate = true;
-          if (isDoor) { tex.repeat.set(1, 1); }
           tex.userData = { url: textureConfig.map };
           mesh.material.map = tex;
           mesh.material.needsUpdate = true;
@@ -1880,7 +2110,6 @@ function updateWallMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, texturesCache: 
         if (mesh.material instanceof THREE.MeshStandardMaterial) {
           const tex = texture.clone();
           tex.needsUpdate = true;
-          if (isDoor) { tex.repeat.set(1, 1); }
           mesh.material.normalMap = tex;
           mesh.material.needsUpdate = true;
         }
