@@ -17,7 +17,7 @@ export interface ShopBuilderWall {
   height: number;
   thickness: number;
   color: string;
-  texture?: 'painted_white' | 'painted_beige' | 'painted_rough' | 'wallpaper_damask' | 'brick_red' | 'brick_white' | 'concrete_smooth' | 'concrete_panels' | 'wood_planks' | 'wood_panels' | 'marble_white' | 'tiles_white' | 'tiles_ceramic' | 'stone_wall' | 'stone_blocks'; // Wall texture type
+  texture?: 'painted_white' | 'painted_beige' | 'painted_rough' | 'wallpaper_damask' | 'brick_red' | 'brick_white' | 'concrete_smooth' | 'concrete_panels' | 'wood_planks' | 'wood_panels' | 'marble_white' | 'tiles_white' | 'tiles_ceramic' | 'stone_wall' | 'stone_blocks' | 'door_metal' | 'door_wood' | 'door_glass'; // Wall texture type
   columns?: ShopBuilderColumn[]; // Columns attached to this wall
   slatWalls?: ShopBuilderSlatWall[]; // Slat walls attached to this wall
   primoStands?: ShopBuilderPrimoStand[]; // Primo stands attached to this wall

@@ -169,7 +169,7 @@ type ImportItem = Partial<ProductFormData> & {
   [key: string]: string | number | boolean | string[] | undefined;
 };
 
-type ImportRowStatus = 'ready' | 'quarantined_duplicate' | 'invalid';
+type ImportRowStatus = 'ready' | 'quarantined_duplicate' | 'invalid' | 'skipped_file_duplicate';
 type ImportCategoryState = 'resolved' | 'missing' | 'ambiguous';
 
 type ImportRowReason = {
@@ -846,6 +846,7 @@ const AdminProducts = () => {
   // Preview controls
   const [previewPerPage, setPreviewPerPage] = useState<number | 'all'>(10);
   const [previewPage, setPreviewPage] = useState(1);
+  const [importPreviewSearch, setImportPreviewSearch] = useState('');
   const [bulkCategoryId, setBulkCategoryId] = useState<string>('');
   const importRowSeqRef = useRef(1);
   // Matching strategy for Smart Update

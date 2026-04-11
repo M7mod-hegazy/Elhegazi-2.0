@@ -481,9 +481,25 @@ app.delete('/products/:id', async (c) => {
   try {
     const { default: Product } = await import('../server/models/Product.js');
     const id = c.req.param('id');
-    const deleted = await Product.findByIdAndDelete(id).maxTimeMS(8000);
-    if (!deleted) return c.json({ ok: false, error: 'Product not found' }, 404);
-    return c.json({ ok: true });
+    if (!id) return c.json({ ok: false, error: 'Invalid product id' }, 400);
+
+    let existing = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      existing = await Product.findById(id).maxTimeMS(8000);
+    } else {
+      // Legacy fallback for non-ObjectId identifiers (older datasets)
+      existing = await Product.findOne({ sku: id }).maxTimeMS(8000);
+    }
+
+    // Keep DELETE idempotent: if already deleted/missing, return success.
+    if (!existing) return c.json({ ok: true, deleted: false, message: 'Already deleted or missing' });
+
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      await Product.findByIdAndDelete(id).maxTimeMS(8000);
+    } else {
+      await Product.deleteOne({ _id: existing._id }).maxTimeMS(8000);
+    }
+    return c.json({ ok: true, deleted: true });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);

@@ -3358,6 +3358,40 @@ app.put('/api/products/:id', requirePermission('products', 'update', { attach: t
   }
 });
 
+app.delete('/api/products/:id', requirePermission('products', 'delete', { attach: true }), async (req, res) => {
+  try {
+    const id = String(req.params.id || '');
+    if (!id) {
+      return res.status(400).json({ ok: false, error: 'Invalid product id' });
+    }
+
+    let existing = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      existing = await Product.findById(id);
+    } else {
+      // Legacy fallback for non-ObjectId identifiers (older datasets)
+      existing = await Product.findOne({ sku: id });
+    }
+
+    // Keep DELETE idempotent: if already deleted/missing, return success.
+    if (!existing) return res.json({ ok: true, deleted: false, message: 'Already deleted or missing' });
+
+    if (req.permission?.conditions) {
+      const okExisting = validateWriteAgainstConditions(existing, req.permission.conditions, req.permission.userId);
+      if (!okExisting) return res.status(403).json({ ok: false, error: 'Not allowed for this record' });
+    }
+
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      await Product.findByIdAndDelete(id);
+    } else {
+      await Product.deleteOne({ _id: existing._id });
+    }
+    return res.json({ ok: true, deleted: true });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
 // Create new order (checkout endpoint)
 app.post('/api/orders', async (req, res) => {
   try {
