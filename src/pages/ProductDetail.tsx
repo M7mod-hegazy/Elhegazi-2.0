@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -145,15 +145,86 @@ const ImageGalleryModal = ({
   const safeCurrentIndex = Math.min(Math.max(currentIndex, 0), safeImages.length - 1);
   const [zoom, setZoom] = useState(1);
 
+  // Drag / swipe state
+  const [dragX, setDragX] = useState(0);   // horizontal slide offset (px)
+  const [panX, setPanX] = useState(0);      // pan offset when zoomed
+  const [panY, setPanY] = useState(0);
+  const isDragging = useRef(false);
+  const startX = useRef(0);
+  const startY = useRef(0);
+  const startPanX = useRef(0);
+  const startPanY = useRef(0);
+  const hasMoved = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const SWIPE_THRESHOLD = 60; // px needed to trigger image switch
+
   useEffect(() => {
     setZoom(1);
+    setDragX(0);
+    setPanX(0);
+    setPanY(0);
   }, [safeCurrentIndex]);
 
   const adjustZoom = (delta: number) => {
     setZoom((z) => {
       const next = Math.round((z + delta) * 100) / 100;
-      return Math.min(4, Math.max(1, next));
+      const clamped = Math.min(4, Math.max(1, next));
+      if (clamped === 1) { setPanX(0); setPanY(0); }
+      return clamped;
     });
+  };
+
+  // ── Pointer handlers ──────────────────────────────────────────────────────
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    isDragging.current = true;
+    hasMoved.current = false;
+    startX.current = e.clientX;
+    startY.current = e.clientY;
+    startPanX.current = panX;
+    startPanY.current = panY;
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    e.currentTarget.style.cursor = 'grabbing';
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    const dx = e.clientX - startX.current;
+    const dy = e.clientY - startY.current;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) hasMoved.current = true;
+
+    if (zoom > 1) {
+      // Pan mode
+      setPanX(startPanX.current + dx);
+      setPanY(startPanY.current + dy);
+    } else {
+      // Swipe mode — rubber-band resistance at edges
+      const atStart = safeCurrentIndex === 0;
+      const atEnd = safeCurrentIndex === safeImages.length - 1;
+      const resistance = 0.25;
+      let offset = dx;
+      if ((atStart && dx > 0) || (atEnd && dx < 0)) {
+        offset = dx * resistance;
+      }
+      setDragX(offset);
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging.current) return;
+    isDragging.current = false;
+    e.currentTarget.style.cursor = '';
+
+    if (zoom > 1) {
+      // Keep pan position
+    } else {
+      if (Math.abs(dragX) >= SWIPE_THRESHOLD) {
+        if (dragX < 0) onNext();
+        else onPrev();
+      }
+      setDragX(0);
+    }
   };
 
   const handleDownload = async () => {
@@ -216,10 +287,20 @@ const ImageGalleryModal = ({
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 flex items-stretch justify-center relative px-2 pb-20 sm:pb-24">
+      {/* Drag / swipe area */}
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 flex items-stretch justify-center relative pb-20 sm:pb-24 overflow-hidden select-none"
+        style={{ cursor: zoom > 1 ? 'grab' : 'ew-resize', touchAction: 'none' }}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+      >
+        {/* Arrow buttons (desktop) */}
         <button
           type="button"
-          onClick={onPrev}
+          onClick={(e) => { e.stopPropagation(); onPrev(); }}
           className="hidden sm:flex absolute start-2 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
           aria-label="الصورة السابقة"
         >
@@ -228,19 +309,39 @@ const ImageGalleryModal = ({
 
         <button
           type="button"
-          onClick={onNext}
+          onClick={(e) => { e.stopPropagation(); onNext(); }}
           className="hidden sm:flex absolute end-2 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
           aria-label="الصورة التالية"
         >
           <ChevronRight className="w-6 h-6 text-white" />
         </button>
 
-        <div className="flex-1 overflow-auto flex items-center justify-center touch-pan-x touch-pan-y w-full max-w-5xl mx-auto py-4">
+        {/* Swipe hint overlay (shows briefly) */}
+        {safeImages.length > 1 && zoom === 1 && (
+          <div className="pointer-events-none absolute bottom-24 inset-x-0 flex justify-center z-20">
+            <span className="text-white/30 text-xs select-none">← اسحب للتنقل →</span>
+          </div>
+        )}
+
+        <div
+          className="flex-1 flex items-center justify-center w-full max-w-5xl mx-auto py-4 px-2"
+          style={{
+            transition: 'transform 0.0s ease', // Immediate updates during drag
+          }}
+        >
           <img
             src={safeImages[safeCurrentIndex]}
             alt={`صورة المنتج ${safeCurrentIndex + 1}`}
-            className="max-w-none w-auto h-auto max-h-[min(72vh,100%)] object-contain select-none"
-            style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
+            className="max-w-none w-auto h-auto max-h-[min(72vh,100%)] object-contain"
+            style={{
+              transform: zoom > 1
+                ? `scale(${zoom}) translate(${panX / zoom}px, ${panY / zoom}px)`
+                : `translateX(${dragX}px) scale(${1 - Math.abs(dragX) / 2000})`,
+              transition: isDragging.current ? 'none' : 'transform 0.3s cubic-bezier(0.25,0.46,0.45,0.94)',
+              willChange: 'transform',
+              userSelect: 'none',
+              WebkitUserSelect: 'none',
+            }}
             onError={applyProductImageFallback}
             draggable={false}
           />
@@ -334,7 +435,8 @@ const MobileProductDetail = ({
   showCommentsModal,
   setShowCommentsModal,
   social,
-  hidePrices
+  hidePrices,
+  onRatingSubmit
 }: {
   product: ApiProduct;
   relatedProducts: ApiProduct[];
@@ -353,6 +455,7 @@ const MobileProductDetail = ({
   setShowCommentsModal: (show: boolean) => void;
   social: any;
   hidePrices: boolean;
+  onRatingSubmit: () => void;
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showFullDescription, setShowFullDescription] = useState(false);
@@ -779,43 +882,55 @@ const MobileProductDetail = ({
           {activeTab === 'reviews' && (
             <div>
               <h3 className="font-bold text-slate-900 mb-4">تقييم العملاء</h3>
-              <div className="flex items-center gap-4 mb-6">
-                <div className="text-center">
-                  <div className="text-3xl font-bold text-slate-900">{product.rating || 4.5}</div>
-                  <div className="flex items-center gap-1">
-                    {[...Array(5)].map((_, i) => (
-                      <Star
-                        key={i}
-                        className={cn(
-                          "w-4 h-4",
-                          i < Math.floor(product.rating || 4.5)
-                            ? "text-amber-500 fill-amber-500"
-                            : "text-slate-300"
-                        )}
-                      />
-                    ))}
-                  </div>
-                  <div className="text-sm text-slate-600 mt-1">
-                    {product.reviews || 150} تقييم
-                  </div>
-                </div>
-                <div className="flex-1">
-                  {[5, 4, 3, 2, 1].map((star) => (
-                    <div key={star} className="flex items-center gap-2 mb-1">
-                      <div className="flex items-center gap-1 w-10">
-                        <span className="text-sm">{star}</span>
-                        <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                      </div>
-                      <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full bg-amber-500 rounded-full"
-                          style={{ width: `${star === 5 ? 70 : star === 4 ? 20 : star === 3 ? 7 : star === 2 ? 2 : 1}%` }}
-                        ></div>
-                      </div>
+              {(product.reviews || 0) > 0 ? (
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="text-center">
+                    <div className="text-3xl font-bold text-slate-900">{product.rating || 0}</div>
+                    <div className="flex items-center gap-1">
+                      {[...Array(5)].map((_, i) => (
+                        <Star
+                          key={i}
+                          className={cn(
+                            "w-4 h-4",
+                            i < Math.floor(product.rating || 0)
+                              ? "text-amber-500 fill-amber-500"
+                              : "text-slate-300"
+                          )}
+                        />
+                      ))}
                     </div>
-                  ))}
+                    <div className="text-sm text-slate-600 mt-1">
+                      {product.reviews} تقييم
+                    </div>
+                  </div>
+                  <div className="flex-1">
+                    {[5, 4, 3, 2, 1].map((star) => {
+                      const count = ratingHistory.filter(r => r.rating === star).length;
+                      const pct = ratingHistory.length > 0 ? Math.round((count / ratingHistory.length) * 100) : 0;
+                      return (
+                        <div key={star} className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-1 w-10">
+                            <span className="text-sm">{star}</span>
+                            <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                          </div>
+                          <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                            <div
+                              className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-slate-500 w-8 text-right">{pct}%</span>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-6 text-slate-400 gap-2 mb-6">
+                  <Star className="w-10 h-10" />
+                  <p className="text-sm">لا توجد تقييمات بعد. كن أول من يقيّم!</p>
+                </div>
+              )}
 
               {/* Rating History button */}
               <div className="border-t border-slate-200 pt-6 mb-6">
@@ -831,10 +946,7 @@ const MobileProductDetail = ({
               <div className="border-t border-slate-200 pt-6">
                 <Rating
                   productId={product._id}
-                  onRatingSubmit={(rating, review) => {
-                    // In a real implementation, you would update the product rating
-
-                  }}
+                  onRatingSubmit={() => onRatingSubmit()}
                 />
               </div>
             </div>
@@ -915,7 +1027,8 @@ const DesktopProductDetail = ({
   showCommentsModal,
   setShowCommentsModal,
   social,
-  hidePrices
+  hidePrices,
+  onRatingSubmit
 }: {
   product: ApiProduct;
   relatedProducts: ApiProduct[];
@@ -934,8 +1047,8 @@ const DesktopProductDetail = ({
   setShowCommentsModal: (show: boolean) => void;
   social: any;
   hidePrices: boolean;
+  onRatingSubmit: () => void;
 }) => {
-  const { canPurchase, showPrices } = usePricingSettings();
   const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [showGallery, setShowGallery] = useState(false);
@@ -1297,43 +1410,55 @@ const DesktopProductDetail = ({
               {activeTab === 'reviews' && (
                 <div>
                   <h3 className="font-bold text-slate-900 mb-4">تقييم العملاء</h3>
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="text-center">
-                      <div className="text-3xl font-bold text-slate-900">{product.rating || 4.5}</div>
-                      <div className="flex items-center gap-1">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={cn(
-                              "w-4 h-4",
-                              i < Math.floor(product.rating || 4.5)
-                                ? "text-amber-500 fill-amber-500"
-                                : "text-slate-300"
-                            )}
-                          />
-                        ))}
-                      </div>
-                      <div className="text-sm text-slate-600 mt-1">
-                        {product.reviews || 150} تقييم
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      {[5, 4, 3, 2, 1].map((star) => (
-                        <div key={star} className="flex items-center gap-2 mb-1">
-                          <div className="flex items-center gap-1 w-10">
-                            <span className="text-sm">{star}</span>
-                            <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
-                          </div>
-                          <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-amber-500 rounded-full"
-                              style={{ width: `${star === 5 ? 70 : star === 4 ? 20 : star === 3 ? 7 : star === 2 ? 2 : 1}%` }}
-                            ></div>
-                          </div>
+                  {(product.reviews || 0) > 0 ? (
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="text-center">
+                        <div className="text-3xl font-bold text-slate-900">{product.rating || 0}</div>
+                        <div className="flex items-center gap-1">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={cn(
+                                "w-4 h-4",
+                                i < Math.floor(product.rating || 0)
+                                  ? "text-amber-500 fill-amber-500"
+                                  : "text-slate-300"
+                              )}
+                            />
+                          ))}
                         </div>
-                      ))}
+                        <div className="text-sm text-slate-600 mt-1">
+                          {product.reviews} تقييم
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        {[5, 4, 3, 2, 1].map((star) => {
+                          const count = ratingHistory.filter(r => r.rating === star).length;
+                          const pct = ratingHistory.length > 0 ? Math.round((count / ratingHistory.length) * 100) : 0;
+                          return (
+                            <div key={star} className="flex items-center gap-2 mb-1">
+                              <div className="flex items-center gap-1 w-10">
+                                <span className="text-sm">{star}</span>
+                                <Star className="w-3 h-3 text-amber-500 fill-amber-500" />
+                              </div>
+                              <div className="flex-1 h-2 bg-slate-200 rounded-full overflow-hidden">
+                                <div
+                                  className="h-full bg-amber-500 rounded-full transition-all duration-500"
+                                  style={{ width: `${pct}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-slate-500 w-8 text-right">{pct}%</span>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="flex flex-col items-center justify-center py-6 text-slate-400 gap-2 mb-6">
+                      <Star className="w-10 h-10" />
+                      <p className="text-sm">لا توجد تقييمات بعد. كن أول من يقيّم!</p>
+                    </div>
+                  )}
 
                   {/* Rating History button */}
                   <div className="border-t border-slate-200 pt-6 mb-6">
@@ -1349,10 +1474,7 @@ const DesktopProductDetail = ({
                   <div className="border-t border-slate-200 pt-6">
                     <Rating
                       productId={product._id}
-                      onRatingSubmit={(rating, review) => {
-                        // In a real implementation, you would update the product rating
-
-                      }}
+                      onRatingSubmit={() => onRatingSubmit()}
                     />
                   </div>
                 </div>
@@ -1691,6 +1813,25 @@ const ProductDetail = () => {
     );
   }
 
+  // Refresh ratings data from backend (called after rating submit)
+  const refreshRatings = async () => {
+    if (!product?._id) return;
+    try {
+      const ratingsRes = await apiGet<any>(`/api/products/${product._id}/ratings`);
+      if ('ok' in ratingsRes && ratingsRes.ok) {
+        const items = Array.isArray(ratingsRes.items) ? ratingsRes.items : [];
+        setRatingHistory(items);
+        setProduct((prev) => prev ? ({
+          ...prev,
+          rating: Number(ratingsRes.averageRating ?? prev.rating ?? 0),
+          reviews: Number(ratingsRes.total ?? items.length ?? prev.reviews ?? 0),
+        }) : prev);
+      }
+    } catch (error) {
+      console.warn('Failed to refresh product ratings after submit:', error);
+    }
+  };
+
   const handleAddToCart = async () => {
     // If user is not authenticated, show auth modal instead of adding to cart
     if (!isAuthenticated) {
@@ -1844,6 +1985,7 @@ const ProductDetail = () => {
           setShowCommentsModal={setShowCommentsModal}
           social={social}
           hidePrices={hidePrices}
+          onRatingSubmit={refreshRatings}
         />
       ) : (
         <DesktopProductDetail
@@ -1864,6 +2006,7 @@ const ProductDetail = () => {
           setShowCommentsModal={setShowCommentsModal}
           social={social}
           hidePrices={hidePrices}
+          onRatingSubmit={refreshRatings}
         />
       )}
 
@@ -1878,22 +2021,7 @@ const ProductDetail = () => {
         comments={ratingHistory}
         productId={product._id}
         productName={product.nameAr || product.name}
-        onRatingSubmit={async (rating, review) => {
-          try {
-            const ratingsRes = await apiGet<any>(`/api/products/${product._id}/ratings`);
-            if ('ok' in ratingsRes && ratingsRes.ok) {
-              const items = Array.isArray(ratingsRes.items) ? ratingsRes.items : [];
-              setRatingHistory(items);
-              setProduct((prev) => prev ? ({
-                ...prev,
-                rating: Number(ratingsRes.averageRating ?? prev.rating ?? 0),
-                reviews: Number(ratingsRes.total ?? items.length ?? prev.reviews ?? 0),
-              }) : prev);
-            }
-          } catch (error) {
-            console.warn('Failed to refresh product ratings after submit:', error);
-          }
-        }}
+        onRatingSubmit={async () => { await refreshRatings(); }}
         averageRating={product.rating || 0}
         totalReviews={product.reviews || 0}
       />

@@ -340,10 +340,10 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   }, [selectedCategory, searchTerm]);
 
   const handleAddWall = useCallback(() => {
-    const offset = layout.walls.length * 2.4;
+    const offset = (layout.walls.length % 5) * 0.5;
     const id = upsertWall({
-      start: { x: -2 + offset, y: -1.5 },
-      end: { x: -2 + offset, y: 1.5 },
+      start: { x: -1.5 + offset, y: offset },
+      end: { x: 1.5 + offset, y: offset },
       height: 3,
       thickness: 0.25,
       color: layout.defaultWallColor || '#ffffff',
@@ -353,10 +353,10 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   }, [layout.walls.length, layout.defaultWallColor, selectWall, toast, upsertWall]);
 
   const handleAddDoor = useCallback((material: string) => {
-    const offset = layout.walls.length * 2.4;
+    const offset = (layout.walls.length % 4) * 0.5;
     const id = upsertWall({
-      start: { x: -2 + offset, y: -1.5 },
-      end: { x: -2 + offset, y: -0.5 },
+      start: { x: -0.5 + offset, y: offset },
+      end: { x: 0.5 + offset, y: offset },
       height: 2.2,
       thickness: 0.1,
       color: '#ffffff',

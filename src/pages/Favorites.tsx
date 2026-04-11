@@ -14,8 +14,6 @@ import ProductCard from '@/components/product/ProductCard';
 import { apiGet, type ApiResponse } from '@/lib/api';
 import { resolveProductCategory, type CategoryListRecord } from '@/lib/category-display';
 
-const FAVORITES_EVENT = 'favorites:updated';
-
 type ApiProduct = {
   _id: string;
   name: string;
@@ -88,18 +86,15 @@ const Favorites = () => {
   const { toast } = useToast();
   const { isMobile } = useDeviceDetection();
 
-  const loadFavorites = useCallback(async (forcedFavorites?: string[]) => {
+  const loadFavorites = useCallback(async () => {
     if (!isAuthenticated || isAdmin) {
       setFavoriteProducts([]);
       setLoading(false);
       return;
     }
 
-    // Use provided favorites or get from hook
-    const favList = forcedFavorites ?? favorites ?? [];
-    
     try {
-      const validIds = favList.filter((id): id is string => {
+      const validIds = (favorites || []).filter((id): id is string => {
         if (typeof id !== 'string') return false;
         const v = id.trim().toLowerCase();
         if (!v) return false;
@@ -135,19 +130,12 @@ const Favorites = () => {
       setFavoriteProducts([]);
     }
     setLoading(false);
-  }, [isAuthenticated, isAdmin]);
+  }, [isAuthenticated, isAdmin, favorites]);
 
-  // Load favorites when component mounts or when favorites array changes from hook
   useEffect(() => {
-    if (favorites && favorites.length > 0) {
-      const timer = setTimeout(() => {
-        void loadFavorites(favorites);
-      }, 50);
-      return () => clearTimeout(timer);
-    } else if (!loading && favorites) {
-      setFavoriteProducts([]);
-    }
-  }, [favorites, loadFavorites]);
+    setLoading(true);
+    void loadFavorites();
+  }, [loadFavorites]);
 
   const handleClearAll = () => {
     clearFavorites();

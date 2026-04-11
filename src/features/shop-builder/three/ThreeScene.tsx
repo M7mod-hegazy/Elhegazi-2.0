@@ -19,10 +19,10 @@ import { useShopBuilder } from '../store';
 import type { ShopBuilderProduct, ShopBuilderWall, ShopBuilderColumn, ShopBuilderSlatWall } from '../types';
 import type { CameraMode } from '../store';
 import { createProceduralHangGroup } from './proceduralProducts';
-import { createWallMesh, updateWallMesh, createColumnMesh, updateColumnMesh, createSlatWallMesh } from './wall-system';
+
 
 // Texture loader
-const textureLoader = new THREE.TextureLoader();
+const textureLoader = new THREE.TextureLoader().setCrossOrigin('anonymous');
 textureLoader.crossOrigin = 'anonymous';
 
 // Wall texture URLs - Using embedded SVG data URLs (100% reliable, no external dependencies)
@@ -167,19 +167,19 @@ export const FLOOR_TEXTURES = {
     preview: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMCIgaGVpZ2h0PSIxMCI+PHJlY3Qgd2lkdGg9IjEwIiBoZWlnaHQ9IjEwIiBmaWxsPSIjMzM0MTU1Ii8+PHBhdGggZD0iTTAgMEwxMCAxMCBNMTAgMEwwIDEwIiBzdHJva2U9IiM0NzU1NjkiIHN0cm9rZS13aWR0aD0iMSIgb3BhY2l0eT0iMC41Ii8+PC9zdmc+',
   },
   door_metal: {
-    map: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9Im1ldGFsIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzdmOGM4ZCIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjYmRjM2M3Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjN2Y4YzhkIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjbWV0YWwpIi8+PHJlY3QgeD0iMTYiIHk9IjE2IiB3aWR0aD0iNDgwIiBoZWlnaHQ9IjQ5NiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmMzZTUwIiBzdHJva2Utd2lkdGg9IjMyIi8+PHJlY3QgeD0iNDIwIiB5PSIyMzAiIHdpZHRoPSIyMCIgaGVpZ2h0PSI4MCIgZmlsbD0iIzM0NDk1ZSIgcng9IjEwIi8+PGNpcmNsZSBjeD0iNDMwIiBjeT0iMjcwIiByPSI1IiBmaWxsPSIjMWFiYzljIi8+PC9zdmc+',
+    map: 'https://upload.wikimedia.org/wikipedia/commons/7/77/Galvanized_steel_surface.jpg',
     normalMap: null,
-    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9Im1ldGFsIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjEwMCUiIHkyPSIwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzdmOGM4ZCIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjYmRjM2M3Ii8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjN2Y4YzhkIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjbWV0YWwpIi8+PHJlY3QgeD0iMTYiIHk9IjE2IiB3aWR0aD0iNDgwIiBoZWlnaHQ9IjQ5NiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjMmMzZTUwIiBzdHJva2Utd2lkdGg9IjMyIi8+PHJlY3QgeD0iNDIwIiB5PSIyMzAiIHdpZHRoPSIyMCIgaGVpZ2h0PSI4MCIgZmlsbD0iIzM0NDk1ZSIgcng9IjEwIi8+PGNpcmNsZSBjeD0iNDMwIiBjeT0iMjcwIiByPSI1IiBmaWxsPSIjMWFiYzljIi8+PC9zdmc+',
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/7/77/Galvanized_steel_surface.jpg',
   },
   door_wood: {
-    map: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9Indvb2RHIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzhCNUEyQiIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjQTA2QTNBIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOEI1QTJCIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZEcpIi8+PHJlY3QgeD0iMjAiIHk9IjIwIiB3aWR0aD0iNDcyIiBoZWlnaHQ9IjQ5MiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNUMzQTIxIiBzdHJva2Utd2lkdGg9IjQwIi8+PHJlY3QgeD0iNjAiIHk9IjYwIiB3aWR0aD0iMzkyIiBoZWlnaHQ9IjE4MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNUMzQTIxIiBzdHJva2Utd2lkdGg9IjEwIi8+PHJlY3QgeD0iNjAiIHk9IjI3MCIgd2lkdGg9IjM5MiIgaGVpZ2h0PSIyMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzVDM0EyMSIgc3Ryb2tlLXdpZHRoPSIxMCIvPjxjaXJjbGUgY3g9IjQ0MCIgY3k9IjI1NiIgcj0iMTYiIGZpbGw9IiNENEFGMzciLz48Y2lyY2xlIGN4PSI0NDAiIGN5PSIyNTYiIHI9IjEyIiBmaWxsPSIjQjg4NjBCIi8+PC9zdmc+',
+    map: 'https://upload.wikimedia.org/wikipedia/commons/4/4e/Wood_texture_with_natural_pattern.jpg',
     normalMap: null,
-    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZGVmcz48bGluZWFyR3JhZGllbnQgaWQ9Indvb2RHIiB4MT0iMCUiIHkxPSIwJSIgeDI9IjAlIiB5Mj0iMTAwJSI+PHN0b3Agb2Zmc2V0PSIwJSIgc3RvcC1jb2xvcj0iIzhCNUEyQiIvPjxzdG9wIG9mZnNldD0iNTAlIiBzdG9wLWNvbG9yPSIjQTA2QTNBIi8+PHN0b3Agb2Zmc2V0PSIxMDAlIiBzdG9wLWNvbG9yPSIjOEI1QTJCIi8+PC9saW5lYXJHcmFkaWVudD48L2RlZnM+PHJlY3Qgd2lkdGg9IjUxMiIgaGVpZ2h0PSI1MTIiIGZpbGw9InVybCgjd29vZEcpIi8+PHJlY3QgeD0iMjAiIHk9IjIwIiB3aWR0aD0iNDcyIiBoZWlnaHQ9IjQ5MiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNUMzQTIxIiBzdHJva2Utd2lkdGg9IjQwIi8+PHJlY3QgeD0iNjAiIHk9IjYwIiB3aWR0aD0iMzkyIiBoZWlnaHQ9IjE4MCIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjNUMzQTIxIiBzdHJva2Utd2lkdGg9IjEwIi8+PHJlY3QgeD0iNjAiIHk9IjI3MCIgd2lkdGg9IjM5MiIgaGVpZ2h0PSIyMTAiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzVDM0EyMSIgc3Ryb2tlLXdpZHRoPSIxMCIvPjxjaXJjbGUgY3g9IjQ0MCIgY3k9IjI1NiIgcj0iMTYiIGZpbGw9IiNENEFGMzciLz48Y2lyY2xlIGN4PSI0NDAiIGN5PSIyNTYiIHI9IjEyIiBmaWxsPSIjQjg4NjBCIi8+PC9zdmc+',
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/4/4e/Wood_texture_with_natural_pattern.jpg',
   },
   door_glass: {
-    map: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iI0U2RkFGRiIvPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSI0OTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJDM0U1MCIgc3Ryb2tlLXdpZHRoPSIzMiIvPjxsaW5lIHgxPSIxNiIgeTE9IjI1NiIgeDI9IjQ5NiIgeTI9IjI1NiIgc3Ryb2tlPSIjMkMzRTUwIiBzdHJva2Utd2lkdGg9IjE2Ii8+PHBhdGggZD0iTSA2MCA0NTAgTCA0NTAgNjAiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSIyNCIgb3BhY2l0eT0iMC42Ii8+PHBhdGggZD0iTSAxNTAgNDUwIEwgNDUwIDE1MCIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjEyIiBvcGFjaXR5PSIwLjQiLz48cmVjdCB4PSI0MjAiIHk9IjIwMCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjExMiIgZmlsbD0iIzk1QTVBNiIgcng9IjgiLz48L3N2Zz4=',
+    map: 'https://upload.wikimedia.org/wikipedia/commons/d/df/Blue_Glass_Texture.jpg',
     normalMap: null,
-    preview: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgZmlsbD0iI0U2RkFGRiIvPjxyZWN0IHg9IjE2IiB5PSIxNiIgd2lkdGg9IjQ4MCIgaGVpZ2h0PSI0OTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iIzJDM0U1MCIgc3Ryb2tlLXdpZHRoPSIzMiIvPjxsaW5lIHgxPSIxNiIgeTE9IjI1NiIgeDI9IjQ5NiIgeTI9IjI1NiIgc3Ryb2tlPSIjMkMzRTUwIiBzdHJva2Utd2lkdGg9IjE2Ii8+PHBhdGggZD0iTSA2MCA0NTAgTCA0NTAgNjAiIHN0cm9rZT0iI0ZGRkZGRiIgc3Ryb2tlLXdpZHRoPSIyNCIgb3BhY2l0eT0iMC42Ii8+PHBhdGggZD0iTSAxNTAgNDUwIEwgNDUwIDE1MCIgc3Ryb2tlPSIjRkZGRkZGIiBzdHJva2Utd2lkdGg9IjEyIiBvcGFjaXR5PSIwLjQiLz48cmVjdCB4PSI0MjAiIHk9IjIwMCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjExMiIgZmlsbD0iIzk1QTVBNiIgcng9IjgiLz48L3N2Zz4=',
+    preview: 'https://upload.wikimedia.org/wikipedia/commons/d/df/Blue_Glass_Texture.jpg',
   },
 };
 
@@ -1773,10 +1773,12 @@ function loadTexture(url: string, cache: Map<string, THREE.Texture>): Promise<TH
 }
 
 function createWallMesh(wall: ShopBuilderWall, texturesCache: Map<string, THREE.Texture>): THREE.Mesh {
-  const start = new THREE.Vector3(wall.start.x, wall.height / 2, wall.start.y);
-  const end = new THREE.Vector3(wall.end.x, wall.height / 2, wall.end.y);
+  const isDoor = wall.texture?.startsWith('door_');
+  const renderHeight = isDoor ? 2.2 : wall.height;
+  const start = new THREE.Vector3(wall.start.x, renderHeight / 2, wall.start.y);
+  const end = new THREE.Vector3(wall.end.x, renderHeight / 2, wall.end.y);
   const length = start.clone().setY(0).distanceTo(end.clone().setY(0));
-  const geometry = new THREE.BoxGeometry(length, wall.height, wall.thickness);
+  const geometry = new THREE.BoxGeometry(length, renderHeight, wall.thickness);
   
   const textureType = wall.texture || 'painted_white';
   const textureConfig = WALL_TEXTURES[textureType as keyof typeof WALL_TEXTURES] || WALL_TEXTURES.painted_white;
@@ -1791,14 +1793,24 @@ function createWallMesh(wall: ShopBuilderWall, texturesCache: Map<string, THREE.
   // Load textures asynchronously
   if (textureConfig && textureConfig.map) {
     loadTexture(textureConfig.map, texturesCache).then(texture => {
-      material.map = texture;
+            const tex = texture.clone();
+      tex.needsUpdate = true;
+      if (isDoor) {
+        tex.repeat.set(1, 1);
+      }
+      material.map = tex;
       material.needsUpdate = true;
     }).catch(err => console.error('Failed to load texture:', err));
   }
   
   if (textureConfig && textureConfig.normalMap) {
     loadTexture(textureConfig.normalMap, texturesCache).then(texture => {
-      material.normalMap = texture;
+            const tex = texture.clone();
+      tex.needsUpdate = true;
+      if (isDoor) {
+        tex.repeat.set(1, 1);
+      }
+      material.normalMap = tex;
       material.needsUpdate = true;
     }).catch(err => console.error('Failed to load normal map:', err));
   }
@@ -1806,7 +1818,7 @@ function createWallMesh(wall: ShopBuilderWall, texturesCache: Map<string, THREE.
   const mesh = new THREE.Mesh(geometry, material);
 
   const mid = start.clone().lerp(end, 0.5);
-  mesh.position.set(mid.x, wall.height / 2, mid.z);
+  mesh.position.set(mid.x, renderHeight / 2, mid.z);
 
   // Calculate angle: atan2(deltaZ, deltaX) for proper orientation
   const angle = Math.atan2(end.z - start.z, end.x - start.x);
@@ -1815,25 +1827,15 @@ function createWallMesh(wall: ShopBuilderWall, texturesCache: Map<string, THREE.
 }
 
 function updateWallMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, texturesCache: Map<string, THREE.Texture>) {
-  const start = new THREE.Vector3(wall.start.x, wall.height / 2, wall.start.y);
-  const end = new THREE.Vector3(wall.end.x, wall.height / 2, wall.end.y);
+  const isDoor = wall.texture?.startsWith('door_');
+  const renderHeight = isDoor ? 2.2 : wall.height;
+  const start = new THREE.Vector3(wall.start.x, renderHeight / 2, wall.start.y);
+  const end = new THREE.Vector3(wall.end.x, renderHeight / 2, wall.end.y);
   const length = start.clone().setY(0).distanceTo(end.clone().setY(0));
-
-  // Store current position and rotation before updates
-  const currentPosition = mesh.position.clone();
-  const currentRotation = mesh.rotation.clone();
-
-  // Only update geometry if dimensions changed
-  const currentGeometry = mesh.geometry as THREE.BoxGeometry;
-  const needsGeometryUpdate = !currentGeometry.parameters || 
-    Math.abs(currentGeometry.parameters.width - length) > 0.001 ||
-    Math.abs(currentGeometry.parameters.height - wall.height) > 0.001 ||
-    Math.abs(currentGeometry.parameters.depth - wall.thickness) > 0.001;
-
-  if (needsGeometryUpdate) {
-    mesh.geometry.dispose();
-    mesh.geometry = new THREE.BoxGeometry(length, wall.height, wall.thickness);
-  }
+  
+  const geometry = new THREE.BoxGeometry(length, renderHeight, wall.thickness);
+  mesh.geometry.dispose();
+  mesh.geometry = geometry;
 
   // Update material only if color or texture changed
   const currentMaterial = mesh.material as THREE.MeshStandardMaterial;
@@ -1855,16 +1857,19 @@ function updateWallMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, texturesCache: 
     // Create new material
     mesh.material = new THREE.MeshStandardMaterial({ 
       color: new THREE.Color(wall.color),
-      roughness: 0.8,
-      metalness: 0.0,
+      roughness: isDoor ? 0.4 : 0.8,
+      metalness: isDoor ? 0.1 : 0.0,
     });
     
     // Load textures asynchronously
     if (textureConfig && textureConfig.map) {
       loadTexture(textureConfig.map, texturesCache).then(texture => {
         if (mesh.material instanceof THREE.MeshStandardMaterial) {
-          texture.userData = { url: textureConfig.map }; // Store URL for comparison
-          mesh.material.map = texture;
+          const tex = texture.clone();
+          tex.needsUpdate = true;
+          if (isDoor) { tex.repeat.set(1, 1); }
+          tex.userData = { url: textureConfig.map };
+          mesh.material.map = tex;
           mesh.material.needsUpdate = true;
         }
       }).catch(err => console.error('Failed to load texture:', err));
@@ -1873,7 +1878,10 @@ function updateWallMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, texturesCache: 
     if (textureConfig && textureConfig.normalMap) {
       loadTexture(textureConfig.normalMap, texturesCache).then(texture => {
         if (mesh.material instanceof THREE.MeshStandardMaterial) {
-          mesh.material.normalMap = texture;
+          const tex = texture.clone();
+          tex.needsUpdate = true;
+          if (isDoor) { tex.repeat.set(1, 1); }
+          mesh.material.normalMap = tex;
           mesh.material.needsUpdate = true;
         }
       }).catch(err => console.error('Failed to load normal map:', err));
@@ -1887,13 +1895,8 @@ function updateWallMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, texturesCache: 
   // Calculate new position and rotation
   const mid = start.clone().lerp(end, 0.5);
   const angle = Math.atan2(end.z - start.z, end.x - start.x);
-  const newRotation = -angle;
-
-  // Only update position if it actually changed
-  if (!currentPosition.equals(mid) || Math.abs(currentRotation.y - newRotation) > 0.001) {
-    mesh.position.set(mid.x, wall.height / 2, mid.z);
-    mesh.rotation.y = newRotation;
-  }
+  mesh.position.set(mid.x, renderHeight / 2, mid.z);
+  mesh.rotation.y = -angle;
 }
 
 function createColumnMesh(wall: ShopBuilderWall, column: ShopBuilderColumn, texturesCache: Map<string, THREE.Texture>): THREE.Mesh {

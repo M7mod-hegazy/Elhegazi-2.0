@@ -226,14 +226,39 @@ const FloorplanCanvas: React.FC = () => {
 
       // wall line - Increased width, reduced visual height representation
       ctx.beginPath();
-      ctx.strokeStyle = isWallSelected ? primaryColor : wall.color;
-      ctx.lineWidth = isWallSelected ? 12 : 10; // Increased from 6/5 to 12/10
+      const isDoor = wall.texture?.startsWith('door_');
+      ctx.strokeStyle = isWallSelected ? primaryColor : (isDoor ? '#8b5a2b' : wall.color);
+      ctx.lineWidth = isWallSelected ? 12 : (isDoor ? 4 : 10);
       ctx.moveTo(start.x, start.y);
       ctx.lineTo(end.x, end.y);
       ctx.stroke();
 
+      if (isDoor) {
+        const length = Math.hypot(end.x - start.x, end.y - start.y);
+        const angle = Math.atan2(end.y - start.y, end.x - start.x);
+        ctx.save();
+        ctx.translate(start.x, start.y);
+        ctx.rotate(angle);
+        
+        ctx.beginPath();
+        ctx.strokeStyle = 'rgba(139, 90, 43, 0.4)';
+        ctx.lineWidth = 1;
+        ctx.setLineDash([4, 4]);
+        ctx.arc(0, 0, length, 0, Math.PI / 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        
+        ctx.beginPath();
+        ctx.strokeStyle = '#8b5a2b';
+        ctx.lineWidth = 4;
+        ctx.moveTo(0, 0);
+        ctx.lineTo(0, length);
+        ctx.stroke();
+        ctx.restore();
+      }
+
       // endpoints
-      ctx.fillStyle = isWallSelected ? primaryColor : '#64748b';
+      ctx.fillStyle = isWallSelected ? primaryColor : (isDoor ? '#8b5a2b' : '#64748b');
       ctx.beginPath();
       ctx.arc(start.x, start.y, ENDPOINT_RADIUS, 0, Math.PI * 2);
       ctx.fill();

@@ -786,7 +786,7 @@ const CategoryPage = () => {
                 <SelectContent>
                   <SelectItem value="newest">الأحدث</SelectItem>
                   <SelectItem value="name">الاسم</SelectItem>
-                  {!hidePrices && <SelectItem value="price">السعر</SelectItem>}
+                  <SelectItem value="price">السعر</SelectItem>
                   <SelectItem value="rating">التقييم</SelectItem>
                 </SelectContent>
               </Select>
@@ -841,7 +841,6 @@ const CategoryPage = () => {
             <ScrollAnimation animation="slideUp" className="mt-6 p-6 bg-white rounded-2xl shadow-lg border border-slate-200">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 {/* Price Range */}
-                {!hidePrices && (
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 mb-3">نطاق السعر</label>
                   <div className="space-y-2">
@@ -876,12 +875,11 @@ const CategoryPage = () => {
                           onChange={(e) => { setPriceTouched(true); const n = Number(e.target.value); if (!Number.isNaN(n)) setPriceRange([priceRange[0], Math.min(dynMax, Math.max(n, priceRange[0]))]); }}
                           className="text-sm"
                         />
-                          <span className="text-xs text-slate-500">ج.م</span>
+                        <span className="text-xs text-slate-500">ج.م</span>
                       </div>
                     </div>
                   </div>
                 </div>
-                )}
 
                 {/* Rating Filter */}
                 <div>
