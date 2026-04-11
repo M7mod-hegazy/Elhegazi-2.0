@@ -17,9 +17,11 @@ import ProductsFilterBar from '@/components/product/ProductsFilterBar';
 import SocialLinks from '@/components/layout/SocialLinks';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
 import ScrollAnimation from '@/components/ui/scroll-animation';
-import { apiGet, type ApiResponse } from '@/lib/api';
+import { apiGet } from '@/lib/api';
 import { SectionGuard } from '@/components/common/SectionGuard';
 import type { Product } from '@/types';
+import { groupListingRowsByFamily } from '@/lib/productFamilyListings';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
 
 type ApiProduct = {
   _id: string;
@@ -79,10 +81,15 @@ const FeaturedProductsContent = () => {
         const response = await apiGet<ApiProduct>(`/api/products?ids=${idsParam}`);
 
         if (response.ok && response.items) {
-          const activeProducts = response.items.filter((product: ApiProduct) =>
-            product.active !== false
-          );
-          setProducts(activeProducts);
+          const activeById = new Map<string, ApiProduct>();
+          for (const product of response.items) {
+            if (product.active === false) continue;
+            activeById.set(String(product._id), product);
+          }
+          const ordered = selectedIds
+            .map((id) => activeById.get(String(id)))
+            .filter((p): p is ApiProduct => !!p);
+          setProducts(ordered);
         } else {
           setError('فشل في تحميل المنتجات المميزة');
         }
@@ -145,7 +152,9 @@ const FeaturedProductsContent = () => {
 
   // Final filter and sort
   const filteredProducts = useMemo(() => {
-    const withinPrice = baseFiltered.filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
+    const withinPrice = hidePrices
+      ? baseFiltered
+      : baseFiltered.filter((p) => p.price >= priceRange[0] && p.price <= priceRange[1]);
     const sorted = [...withinPrice];
     sorted.sort((a, b) => {
       let comparison = 0;
@@ -168,8 +177,19 @@ const FeaturedProductsContent = () => {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [baseFiltered, priceRange, sortBy, sortOrder]);
+  }, [baseFiltered, priceRange, sortBy, sortOrder, hidePrices]);
 
+  type ApiWithId = ApiProduct & { id: string };
+  /** Home-config picks are explicit: show one card per selected product (never collapse by family). */
+  const listingRows = useMemo(
+    () =>
+      groupListingRowsByFamily(
+        filteredProducts.map((p) => ({ ...p, id: String(p._id) })) as ApiWithId[],
+        [],
+        false
+      ),
+    [filteredProducts]
+  );
 
   if (loading) {
     return (
@@ -279,7 +299,7 @@ const FeaturedProductsContent = () => {
         setRatingFilter={setRatingFilter}
         viewMode={viewMode}
         setViewMode={setViewMode}
-        resultsCount={filteredProducts.length}
+        resultsCount={listingRows.length}
         onClearFilters={() => {
           setPriceTouched(false);
           setPriceRange([dynMin, dynMax]);
@@ -290,12 +310,14 @@ const FeaturedProductsContent = () => {
 
       {/* Products Grid */}
       <div className="container mx-auto px-4 py-8">
-        {filteredProducts.length > 0 ? (
+        {listingRows.length > 0 ? (
           <div className={`grid gap-6 ${viewMode === 'grid'
             ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
             : 'grid-cols-1'
             }`}>
-            {filteredProducts.map((product, index) => (
+            {listingRows.map((row, index) => {
+              const product = row.product;
+              return (
               <ScrollAnimation key={product._id} delay={index * 0.1}>
                 <div className="relative group">
                   <ProductCard
@@ -331,7 +353,8 @@ const FeaturedProductsContent = () => {
                   </div>
                 </div>
               </ScrollAnimation>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <div className="text-center py-16">

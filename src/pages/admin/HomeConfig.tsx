@@ -49,6 +49,7 @@ import { Separator } from '@/components/ui/separator';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import ImageUpload from '@/components/ui/image-upload';
 import { logHistory } from '@/lib/history';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
 
 // External Modal Components
 import { HeroSlidesModal } from '@/components/admin/home-config/HeroSlidesModal';
@@ -71,6 +72,7 @@ const defaultSlide: Slide = {
 
 const AdminHomeConfig = () => {
   const { toast } = useToast();
+  const { familyCardsInListings } = usePricingSettings();
   const { isMobile, isTablet } = useDeviceDetection();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -81,9 +83,17 @@ const AdminHomeConfig = () => {
   const [pickerOpen, setPickerOpen] = useState<false | 'featuredProducts' | 'categories' | 'bestSellers' | 'sale' | 'newArrivals'>(false);
   const [pickerSearch, setPickerSearch] = useState('');
   const [pickerLoading, setPickerLoading] = useState(false);
-  const [pickerResults, setPickerResults] = useState<Array<{ id: string; label: string; image?: string }>>([]);
+  const [pickerResults, setPickerResults] = useState<
+    Array<{ id: string; label: string; image?: string; familyName?: string; sku?: string }>
+  >([]);
   const [pickerSelected, setPickerSelected] = useState<string[]>([]);
+  const [pickerSelectionMeta, setPickerSelectionMeta] = useState<
+    Record<string, { label: string; familyName?: string; image?: string }>
+  >({});
+  const [productIdToFamilyName, setProductIdToFamilyName] = useState<Record<string, string>>({});
   const [categoriesCache, setCategoriesCache] = useState<Array<{ id: string; label: string; image?: string }>>([]);
+  const [pickerCategoryFilter, setPickerCategoryFilter] = useState<string>('all');
+  const [pickerCategoryOptions, setPickerCategoryOptions] = useState<Array<{ id: string; label: string }>>([]);
   const [pickerVisibleCount, setPickerVisibleCount] = useState(10);
   // Modals open state
   const [heroSlidesOpen, setHeroSlidesOpen] = useState(false);
@@ -151,7 +161,116 @@ const AdminHomeConfig = () => {
     }
     // Keep existing results; user may have just reopened
     setPickerSearch('');
+    setPickerCategoryFilter('all');
   }, [pickerOpen]);
+
+  useEffect(() => {
+    if (!pickerOpen || pickerOpen === 'categories') return;
+    if (pickerCategoryOptions.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        type Cat = { _id?: string; name?: string; nameAr?: string };
+        const res = await apiGet<Cat>('/api/categories?page=1&limit=500');
+        if (res.ok === false || cancelled) return;
+        const opts = (res.items || [])
+          .map((c) => ({
+            id: String(c._id || ''),
+            label: (c.nameAr || c.name || '').trim() || String(c._id),
+          }))
+          .filter((c) => c.id.length > 0);
+        if (!cancelled) setPickerCategoryOptions(opts);
+      } catch {
+        if (!cancelled) setPickerCategoryOptions([]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerOpen, pickerCategoryOptions.length]);
+
+  useEffect(() => {
+    if (!familyCardsInListings) {
+      setProductIdToFamilyName({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        type FamRow = { name?: string; nameAr?: string; memberProductIds?: string[] };
+        const res = await apiGet<FamRow>('/api/product-families');
+        if (res.ok === false || cancelled) return;
+        const map: Record<string, string> = {};
+        for (const f of res.items || []) {
+          const label = (f.nameAr || f.name || '').trim();
+          if (!label) continue;
+          for (const pid of f.memberProductIds || []) {
+            map[String(pid)] = label;
+          }
+        }
+        if (!cancelled) setProductIdToFamilyName(map);
+      } catch {
+        if (!cancelled) setProductIdToFamilyName({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [familyCardsInListings]);
+
+  useEffect(() => {
+    if (!pickerOpen) setPickerSelectionMeta({});
+  }, [pickerOpen]);
+
+  useEffect(() => {
+    if (!pickerOpen || pickerOpen === 'categories') return;
+    const ids = pickerSelected.filter(Boolean);
+    if (ids.length === 0) {
+      setPickerSelectionMeta({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        type P = {
+          _id?: string;
+          id?: string;
+          name?: string;
+          nameAr?: string;
+          title?: string;
+          image?: string;
+          images?: string[];
+        };
+        const res = await apiGet<P>(
+          `/api/products?ids=${encodeURIComponent(ids.join(','))}&fields=${encodeURIComponent('name,nameAr,title,image,images')}`
+        );
+        if (res.ok === false || cancelled) return;
+        setPickerSelectionMeta((prev) => {
+          const fromApi: Record<string, { label: string; familyName?: string; image?: string }> = {};
+          for (const p of res.items ?? []) {
+            const id = String(p._id || p.id || '');
+            if (!id) continue;
+            fromApi[id] = {
+              label: (p.nameAr || p.name || p.title || id).trim() || id,
+              familyName: familyCardsInListings ? productIdToFamilyName[id] : undefined,
+              image: p.image || (Array.isArray(p.images) ? p.images[0] : undefined),
+            };
+          }
+          const out: Record<string, { label: string; familyName?: string; image?: string }> = {};
+          for (const sid of ids) {
+            if (fromApi[sid]) out[sid] = fromApi[sid];
+            else if (prev[sid]) out[sid] = prev[sid];
+          }
+          return out;
+        });
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerOpen, pickerSelected, familyCardsInListings, productIdToFamilyName]);
 
   const fetchPicker = useCallback(async () => {
     if (!pickerOpen) return;
@@ -159,11 +278,41 @@ const AdminHomeConfig = () => {
       setPickerLoading(true);
       dbg('Fetch picker start', { pickerOpen, pickerSearch });
       if (pickerOpen === 'featuredProducts' || pickerOpen === 'bestSellers' || pickerOpen === 'sale' || pickerOpen === 'newArrivals') {
-        type Product = { _id?: string; id?: string; name?: string; title?: string; slug?: string; image?: string; images?: string[]; thumbnail?: string };
-        const res = await apiGet<Product>(`/api/products?search=${encodeURIComponent(pickerSearch || '')}`);
+        type Product = {
+          _id?: string;
+          id?: string;
+          name?: string;
+          nameAr?: string;
+          title?: string;
+          slug?: string;
+          sku?: string;
+          image?: string;
+          images?: string[];
+          thumbnail?: string;
+        };
+        const params = new URLSearchParams();
+        params.set('limit', '50');
+        params.set('search', pickerSearch || '');
+        if (pickerCategoryFilter && pickerCategoryFilter !== 'all') {
+          params.set('categoryId', pickerCategoryFilter);
+        }
+        params.set(
+          'fields',
+          '_id,name,nameAr,sku,image,images,thumbnail'
+        );
+        const res = await apiGet<Product>(`/api/products?${params.toString()}`);
         if (res.ok === false) throw new Error(res.error);
         const list: Product[] = res.items ?? [];
-        const mapped = list.map((p) => ({ id: p._id || p.id || '', label: p.name || p.title || p.slug || '', image: p.image || (p.images && p.images[0]) || p.thumbnail }));
+        const mapped = list.map((p) => {
+          const pid = String(p._id || p.id || '');
+          return {
+            id: pid,
+            label: (p.nameAr || p.name || p.title || p.slug || '').trim() || pid,
+            sku: p.sku,
+            image: p.image || (p.images && p.images[0]) || p.thumbnail,
+            familyName: familyCardsInListings && pid ? productIdToFamilyName[pid] : undefined,
+          };
+        });
         setPickerResults(mapped);
         dbg('Fetch products ok', { count: mapped.length });
       } else if (pickerOpen === 'categories') {
@@ -192,7 +341,7 @@ const AdminHomeConfig = () => {
       setPickerLoading(false);
       dbg('Fetch picker end');
     }
-  }, [pickerOpen, pickerSearch, categoriesCache]);
+  }, [pickerOpen, pickerSearch, pickerCategoryFilter, categoriesCache, familyCardsInListings, productIdToFamilyName]);
 
   useEffect(() => {
     if (!pickerOpen) return;
@@ -215,7 +364,27 @@ const AdminHomeConfig = () => {
   }, [pickerOpen, pickerSearch]);
 
   const togglePick = (id: string) => {
-    setPickerSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+    setPickerSelected((prev) => {
+      if (prev.includes(id)) {
+        setPickerSelectionMeta((m) => {
+          const { [id]: _removed, ...rest } = m;
+          return rest;
+        });
+        return prev.filter((x) => x !== id);
+      }
+      const row = pickerResults.find((r) => r.id === id);
+      if (row) {
+        setPickerSelectionMeta((m) => ({
+          ...m,
+          [id]: {
+            label: row.label,
+            familyName: familyCardsInListings ? row.familyName : undefined,
+            image: row.image,
+          },
+        }));
+      }
+      return [...prev, id];
+    });
   };
 
   const applyPicker = () => {
@@ -1666,6 +1835,11 @@ const AdminHomeConfig = () => {
                    'اختيار الفئات المميزة'}
             results={pickerResults}
             selected={pickerSelected}
+            selectionMeta={pickerOpen !== 'categories' ? pickerSelectionMeta : undefined}
+            showFamilyHints={pickerOpen !== 'categories' && familyCardsInListings}
+            categoryFilter={pickerOpen !== 'categories' ? pickerCategoryFilter : undefined}
+            onCategoryFilterChange={pickerOpen !== 'categories' ? setPickerCategoryFilter : undefined}
+            categoryOptions={pickerOpen !== 'categories' ? pickerCategoryOptions : undefined}
             search={pickerSearch}
             loading={pickerLoading}
             visibleCount={pickerVisibleCount}

@@ -122,12 +122,11 @@ const SearchSuggestions = ({
         setRecentSearches(updated);
       }
 
-      // Track search in backend (fire and forget)
-      fetch('/api/search/track', {
+      void apiFetch('/api/search/track', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: searchQuery.trim() })
-      }).catch(err => console.error('Failed to track search:', err));
+        body: JSON.stringify({ query: searchQuery.trim() }),
+      }).catch((err) => console.error('Failed to track search:', err));
 
       // Navigate to products page with search
       navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);

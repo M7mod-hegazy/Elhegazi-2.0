@@ -1,5 +1,7 @@
 export interface Product {
   id: string;
+  /** Mongo id when payload includes both (favorites / links should prefer this when set). */
+  _id?: string;
   name: string;
   nameAr: string;
   description: string;
@@ -12,6 +14,8 @@ export interface Product {
   categoryAr: string;
   categoryId?: string;
   categorySlug?: string;
+  /** Set when product belongs to a variant family (Mongo ObjectId string). */
+  productFamilyId?: string;
   // Deprecated: automatic stock tracking is being removed. Keep optional for backward compatibility.
   stock?: number;
   // New manual visibility flag: when true, product is hidden from storefront

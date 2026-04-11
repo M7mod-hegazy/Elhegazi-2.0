@@ -19,6 +19,7 @@ import { buildProductPath } from '@/lib/product-link';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Pagination } from 'swiper/modules';
 import { useFavorites } from '@/hooks/useFavorites';
+import { favoriteProductKey } from '@/lib/favorite-ids';
 import {
   Tooltip,
   TooltipContent,
@@ -48,7 +49,8 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
   const { isAuthenticated, isAdmin } = useDualAuth();
   const { toast } = useToast();
   const { hidePrices, loading: pricingLoading } = usePricingSettings();
-  const { favorites, toggleFavorite: toggleFavoriteHook } = useFavorites();
+  const { isFavorite, toggleFavorite: toggleFavoriteHook } = useFavorites();
+  const favKey = favoriteProductKey(product);
 
   const categoryPath = (() => {
     return buildCategoryPath({
@@ -101,7 +103,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
       setShowAuthModal(true);
       return;
     }
-    toggleFavoriteHook(product.id);
+    if (favKey) toggleFavoriteHook(favKey);
   };
 
   const renderStars = (rating: number) => {
@@ -226,7 +228,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                     <button
                       type="button"
                       onClick={handleToggleFavorite}
-                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative z-30 heart-button ${favorites.includes(product.id) ? 'heart-active' : ''
+                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative z-30 heart-button ${favKey && isFavorite(favKey) ? 'heart-active' : ''
                         }`}
                     >
                       {/* 3D Heart with State-Based Rendering */}
@@ -234,7 +236,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                         transformStyle: 'preserve-3d',
                         transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}>
-                        {favorites.includes(product.id) ? (
+                        {favKey && isFavorite(favKey) ? (
                           // Active State - Theme Colored Heart
                           <div className="relative">
                             <svg
@@ -270,7 +272,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                         )}
 
                         {/* Hover State - Theme Preview */}
-                        {!favorites.includes(product.id) && (
+                        {!(favKey && isFavorite(favKey)) && (
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 scale-75 group-hover/heart:opacity-100 group-hover/heart:scale-100 transition-all duration-400 ease-out">
                             <svg
                               className="w-6 h-6 absolute"
@@ -307,7 +309,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                     className="max-w-[13rem] whitespace-normal text-center leading-snug z-[200]"
                   >
                     <p className="text-sm">
-                      {favorites.includes(product.id) ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
+                      {favKey && isFavorite(favKey) ? 'إزالة من المفضلة' : 'إضافة إلى المفضلة'}
                     </p>
                   </TooltipContent>
                 </Tooltip>
@@ -361,8 +363,10 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
               </div>
             </div>
 
-            {/* Bottom action buttons - Eye + Action button */}
-            <div className={`flex gap-2 ${compactMobile ? 'pt-1' : 'mt-auto pt-2'}`}>
+            {/* Bottom action buttons - Eye + Action button (aligned height & radius) */}
+            <div
+              className={`flex items-stretch gap-2 ${compactMobile ? 'pt-1' : 'mt-auto pt-2'}`}
+            >
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -371,7 +375,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                         e.stopPropagation();
                         window.location.href = productPath;
                       }}
-                      className={`${compactMobile ? 'h-8 w-8' : 'h-10 w-10'} rounded-lg bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0 relative flex-shrink-0`}
+                      className={`${compactMobile ? 'h-8 w-8 min-h-8 min-w-8 rounded-md' : 'h-10 w-10 min-h-10 min-w-10 shrink-0 rounded-xl'} bg-secondary hover:bg-secondary/90 text-white transition-all duration-300 group/eye flex items-center justify-center p-0`}
                     >
                       <Eye className={`${compactMobile ? 'w-3.5 h-3.5' : 'w-4 h-4'} transition-all duration-300 group-hover/eye:scale-110`} />
                     </Button>
@@ -389,15 +393,15 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                     e.stopPropagation();
                     handleContactWhatsApp(e);
                   }}
-                  className={`flex-1 rounded-lg ${compactMobile ? 'h-8 text-[11px]' : 'h-10 text-xs'} font-semibold bg-green-500 hover:bg-green-600 text-white flex items-center justify-center gap-1.5`}
+                  className={`flex-1 min-w-0 min-h-0 ${compactMobile ? 'h-8 rounded-md text-[11px]' : 'h-10 min-h-10 rounded-xl text-xs'} font-semibold bg-green-500 hover:bg-green-600 text-white inline-flex items-center justify-center gap-1.5`}
                 >
-                  <img src={whatsappIcon} alt="WhatsApp" className={`${compactMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'}`} />
-                  <span>لمعرفة السعر</span>
+                  <img src={whatsappIcon} alt="WhatsApp" className={`${compactMobile ? 'w-2.5 h-2.5' : 'w-3 h-3'} shrink-0`} />
+                  <span className="truncate">لمعرفة السعر</span>
                 </Button>
               ) : (
                 <Button
                   onClick={(e) => handleAddToCart(e)}
-                  className={`flex-1 rounded-lg h-10 text-xs font-semibold transition-all duration-500 group/btn relative overflow-hidden ${inCart
+                  className={`flex-1 min-w-0 relative overflow-hidden font-semibold transition-all duration-500 group/btn ${compactMobile ? 'h-8 min-h-8 rounded-md text-[11px]' : 'h-10 min-h-10 rounded-xl text-xs'} ${inCart
                     ? 'bg-green-500 hover:bg-green-600 text-white'
                     : 'bg-primary hover:bg-primary/90 text-white'
                     }`}
@@ -446,7 +450,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
         isOpen={showWhatsAppModal}
         onClose={() => setShowWhatsAppModal(false)}
         productName={product.nameAr || product.name || ''}
-        productId={product.id || ''}
+        productId={favKey || product.id || ''}
         productCode={product.sku}
         productImage={product.image}
       />

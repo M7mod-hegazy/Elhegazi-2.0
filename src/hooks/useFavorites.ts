@@ -2,6 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Product } from '@/types';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { apiDelete, apiGet, apiPostJson } from '@/lib/api';
+import { normalizeFavoriteProductId } from '@/lib/favorite-ids';
+
+function normalizeFavoriteList(raw: string[]): string[] {
+  const next = raw.map((x) => normalizeFavoriteProductId(x)).filter((x) => x.length > 0);
+  return [...new Set(next)];
+}
 
 const FAVORITES_STORAGE_KEY = 'user_favorites';
 const FAVORITES_EVENT = 'favorites:updated';
@@ -45,7 +51,9 @@ export const useFavorites = () => {
           // Use T=string so ApiResponse items?: string[]
           const res = await apiGet<string>(`/api/users/${user.id}/favorites`);
           const ok = res as Extract<import('@/lib/api').ApiResponse<string>, { ok: true }>;
-          const items = (ok.items || []).filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+          const items = normalizeFavoriteList(
+            (ok.items || []).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+          );
           setFavoritesState({ items, count: items.length });
           broadcastFavorites(items);
         } catch {
@@ -56,7 +64,8 @@ export const useFavorites = () => {
       }
     };
     load();
-  }, [isAuthenticated, user, broadcastFavorites]);
+    // Use user id only so a new `user` object reference each render does not re-fetch favorites endlessly.
+  }, [isAuthenticated, user?.id, broadcastFavorites]);
 
   // Listen for global favorites updates to sync all hook instances (e.g., Navbar)
   useEffect(() => {
@@ -64,7 +73,7 @@ export const useFavorites = () => {
       const ev = e as CustomEvent<{ userId: string; items: string[] }>;
       const evUserId = ev.detail?.userId || 'guest';
       if ((user?.id || 'guest') !== evUserId) return;
-      const items = Array.isArray(ev.detail?.items) ? ev.detail.items : [];
+      const items = normalizeFavoriteList(Array.isArray(ev.detail?.items) ? ev.detail.items : []);
       setFavoritesState({ items, count: items.length });
     };
     window.addEventListener(FAVORITES_EVENT, onFavs as EventListener);
@@ -78,9 +87,13 @@ export const useFavorites = () => {
     }
 
     try {
-      const res = await apiPostJson<string, Record<string, never>>(`/api/users/${user.id}/favorites/${productId}`, {});
+      const id = normalizeFavoriteProductId(productId);
+      if (!id) return false;
+      const res = await apiPostJson<string, Record<string, never>>(`/api/users/${user.id}/favorites/${id}`, {});
       const ok = res as Extract<import('@/lib/api').ApiResponse<string>, { ok: true }>;
-      const items = (ok.items || []).filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+      const items = normalizeFavoriteList(
+        (ok.items || []).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      );
       setFavoritesState({ items, count: items.length });
       broadcastFavorites(items);
       return true;
@@ -92,9 +105,13 @@ export const useFavorites = () => {
   const removeFromFavorites = useCallback(async (productId: string) => {
     if (!isAuthenticated || !user) return false;
     try {
-      const res = await apiDelete(`/api/users/${user.id}/favorites/${productId}`);
+      const id = normalizeFavoriteProductId(productId);
+      if (!id) return false;
+      const res = await apiDelete(`/api/users/${user.id}/favorites/${id}`);
       const ok = res as Extract<import('@/lib/api').ApiResponse<string>, { ok: true }>;
-      const items = (ok.items || []).filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+      const items = normalizeFavoriteList(
+        (ok.items || []).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      );
       setFavoritesState({ items, count: items.length });
       broadcastFavorites(items);
       return true;
@@ -105,12 +122,15 @@ export const useFavorites = () => {
 
   const toggleFavorite = useCallback((productId: string) => {
     if (!isAuthenticated || !user) return false;
-    const isInFavorites = favoritesState.items.includes(productId);
-    return isInFavorites ? removeFromFavorites(productId) : addToFavorites(productId);
+    const id = normalizeFavoriteProductId(productId);
+    if (!id) return false;
+    const isInFavorites = favoritesState.items.includes(id);
+    return isInFavorites ? removeFromFavorites(id) : addToFavorites(id);
   }, [favoritesState.items, addToFavorites, removeFromFavorites, isAuthenticated, user]);
 
   const isFavorite = useCallback((productId: string) => {
-    return favoritesState.items.includes(productId);
+    const id = normalizeFavoriteProductId(productId);
+    return id.length > 0 && favoritesState.items.includes(id);
   }, [favoritesState.items]);
 
   const getFavoriteProducts = useCallback(() => {
@@ -123,7 +143,9 @@ export const useFavorites = () => {
     try {
       const res = await apiDelete(`/api/users/${user.id}/favorites`);
       const ok = res as Extract<import('@/lib/api').ApiResponse<string>, { ok: true }>;
-      const items = (ok.items || []).filter((x): x is string => typeof x === 'string' && x.trim().length > 0);
+      const items = normalizeFavoriteList(
+        (ok.items || []).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+      );
       setFavoritesState({ items, count: items.length });
       broadcastFavorites(items);
       return true;

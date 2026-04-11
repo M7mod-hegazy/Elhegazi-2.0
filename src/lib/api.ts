@@ -1,6 +1,16 @@
 export type ApiResponse<T> = { ok: true; item?: T; items?: T[]; total?: number; page?: number; pages?: number } | { ok: false; error: string };
 import { auth } from '@/lib/firebase';
 
+/** Thrown by {@link request} on non-2xx responses so callers can branch on HTTP status (e.g. 404). */
+export class ApiHttpError extends Error {
+  readonly status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.name = 'ApiHttpError';
+    this.status = status;
+  }
+}
+
 const base = '';
 const ADMIN_IDLE_TIMEOUT_MS = 15 * 60 * 1000;
 
@@ -104,7 +114,7 @@ async function request(input: RequestInfo, init?: RequestInit): Promise<unknown>
       }
     } catch { /* ignore event dispatch errors */ }
     const message = typeof data === 'string' ? data : (data?.error || res.statusText);
-    throw new Error(message);
+    throw new ApiHttpError(res.status, typeof message === 'string' ? message : String(message));
   }
   return data;
 }

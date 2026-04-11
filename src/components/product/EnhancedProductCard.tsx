@@ -19,6 +19,7 @@ import { optimizeImage, buildSrcSet, applyProductImageFallback } from '@/lib/ima
 import { buildCategoryPath } from '@/lib/category-link';
 import { buildProductPath } from '@/lib/product-link';
 import { useFavorites } from '@/hooks/useFavorites';
+import { favoriteProductKey } from '@/lib/favorite-ids';
 import {
   Tooltip,
   TooltipContent,
@@ -46,7 +47,8 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
   const { isAuthenticated, isAdmin } = useDualAuth();
   const { hidePrices } = usePricingSettings();
   const { toast } = useToast();
-  const { favorites, toggleFavorite: toggleFavoriteHook } = useFavorites();
+  const { isFavorite, toggleFavorite: toggleFavoriteHook } = useFavorites();
+  const favKey = favoriteProductKey(product);
 
   const categoryPath = (() => {
     return buildCategoryPath({
@@ -99,7 +101,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
       setShowAuthModal(true);
       return;
     }
-    toggleFavoriteHook(product.id);
+    if (favKey) toggleFavoriteHook(favKey);
   };
 
   const handleRatingClick = (e: React.MouseEvent) => {
@@ -211,7 +213,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                   <TooltipTrigger asChild>
                     <button
                       onClick={handleToggleFavorite}
-                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative heart-button ${favorites.includes(product.id) ? 'heart-active' : ''
+                      className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative heart-button ${favKey && isFavorite(favKey) ? 'heart-active' : ''
                         }`}
                     >
                       {/* 3D Heart with State-Based Rendering */}
@@ -219,7 +221,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                         transformStyle: 'preserve-3d',
                         transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                       }}>
-                        {favorites.includes(product.id) ? (
+                        {favKey && isFavorite(favKey) ? (
                           // Active State - Theme Colored Heart
                           <div className="relative">
                             <svg
@@ -255,7 +257,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                         )}
 
                         {/* Hover State - Theme Preview */}
-                        {!favorites.includes(product.id) && (
+                        {!(favKey && isFavorite(favKey)) && (
                           <div className="absolute inset-0 flex items-center justify-center opacity-0 scale-75 group-hover/heart:opacity-100 group-hover/heart:scale-100 transition-all duration-400 ease-out">
                             <svg
                               className="w-6 h-6 absolute"
@@ -285,7 +287,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
                     </button>
                   </TooltipTrigger>
                   <TooltipContent side="bottom">
-                    <p>{favorites.includes(product.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}</p>
+                    <p>{favKey && isFavorite(favKey) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -418,7 +420,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
             </div>
           </DialogHeader>
           <Rating
-            productId={product.id}
+            productId={favKey || product.id}
             initialRating={0}
             onRatingSubmit={handleRatingSubmit}
           />
@@ -436,7 +438,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
         isOpen={showWhatsAppModal}
         onClose={() => setShowWhatsAppModal(false)}
         productName={product.nameAr || product.name || ''}
-        productId={product.id || ''}
+        productId={favKey || product.id || ''}
         productCode={product.sku}
         productImage={product.image}
       />

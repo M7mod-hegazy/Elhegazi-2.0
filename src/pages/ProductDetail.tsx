@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import {
   ArrowLeft,
   Star,
@@ -34,7 +34,8 @@ import {
   Eye,
   ZoomIn,
   ZoomOut,
-  Download
+  Download,
+  Layers,
 } from 'lucide-react';
 import { Product } from '@/types';
 import { apiGet, type ApiResponse } from '@/lib/api';
@@ -42,6 +43,7 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import ProductCard from '@/components/product/ProductCard';
+import { FamilyListingCard } from '@/components/product/FamilyListingCard';
 import Rating from '@/components/product/Rating';
 import CommentsModal from '@/components/product/CommentsModal';
 import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal';
@@ -69,6 +71,13 @@ import { optimizeImage, buildSrcSet, PRODUCT_IMAGE_FALLBACK, applyProductImageFa
 import { useSettings } from '@/hooks/useSettings';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useDualAuth } from '@/hooks/useDualAuth';
+import {
+  familyVariantTypedValues,
+  fetchStorefrontProductFamilies,
+  groupListingRowsByFamily,
+  type StorefrontFamilyVariant,
+  type StorefrontProductFamily,
+} from '@/lib/productFamilyListings';
 
 type ApiProduct = {
   id: string;
@@ -105,6 +114,192 @@ type ApiProduct = {
   categoryAr?: string;
   tags: string[];
 };
+
+/** وصف مختصر لما يميّز أفراد العائلة (للعناوين) */
+function familyDiffTypeSummary(family: StorefrontProductFamily): string {
+  const labels = (family.options || [])
+    .map((o) => String(o.labelAr || o.label || '').trim())
+    .filter(Boolean);
+  if (labels.length) return labels.join('، ');
+  const keys = new Set<string>();
+  for (const v of family.variants || []) {
+    Object.keys(v.values || {}).forEach((k) => keys.add(k));
+  }
+  if (keys.size) return [...keys].join('، ');
+  return '';
+}
+
+/** When every variant differs on exactly one labeled axis, return that label once (e.g. «مقاس»). */
+function familySingleDifferentiatorLabel(family: StorefrontProductFamily): string | null {
+  const vars = family.variants || [];
+  if (vars.length < 2) return null;
+  const ref = familyVariantTypedValues(family, vars[0]);
+  if (ref.length !== 1) return null;
+  const label = ref[0].label;
+  const sameAxis = vars.every((v) => {
+    const t = familyVariantTypedValues(family, v);
+    return t.length === 1 && t[0].label === label;
+  });
+  return sameAxis ? label : null;
+}
+
+function ProductFamilyVariantPicker({
+  family,
+  currentProductId,
+  hidePrices,
+}: {
+  family: StorefrontProductFamily;
+  currentProductId: string;
+  hidePrices: boolean;
+}) {
+  const navigate = useNavigate();
+  const cur = String(currentProductId);
+  const diffSummary = familyDiffTypeSummary(family);
+  const singleAxisLabel = familySingleDifferentiatorLabel(family);
+  const sectionTitle = singleAxisLabel || (diffSummary ? diffSummary : 'خيارات المنتج');
+
+  if (!family.variants || family.variants.length < 2) return null;
+
+  return (
+    <div
+      className="space-y-3 rounded-2xl border border-violet-200/90 bg-gradient-to-br from-violet-50/80 via-white to-slate-50/90 p-4 shadow-sm"
+      dir="rtl"
+    >
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-violet-600 text-white shadow-sm">
+          <Layers className="h-4 w-4" aria-hidden />
+        </div>
+        <div className="min-w-0 flex-1">
+          <h3 className="text-sm font-bold leading-snug text-slate-900">{sectionTitle}</h3>
+          {!singleAxisLabel && !diffSummary ? (
+            <p className="mt-0.5 text-xs text-slate-600">اختر أحد الخيارات — كل زر يفتح صفحة ذلك المنتج.</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="list" aria-label={sectionTitle}>
+        {family.variants.map((v) => {
+          const active = v.active !== false;
+          const isCurrent = v.productId === cur;
+          const typed = familyVariantTypedValues(family, v);
+          return (
+            <Button
+              key={v.productId}
+              type="button"
+              variant={isCurrent ? 'default' : 'outline'}
+              size="sm"
+              className={cn(
+                'h-auto min-h-[2.75rem] rounded-xl px-4 py-2 text-right shadow-sm transition-all',
+                'inline-flex max-w-[min(100%,14rem)] flex-col items-stretch justify-center gap-0.5',
+                !active && 'opacity-55',
+                !isCurrent && 'border-slate-200 bg-white hover:border-primary/40 hover:bg-slate-50/80',
+                isCurrent && 'border-primary bg-primary text-primary-foreground shadow-md ring-2 ring-primary/25 ring-offset-2 ring-offset-white'
+              )}
+              onClick={() => {
+                if (v.productId === cur) return;
+                navigate(buildProductPath(v.productId), { replace: true });
+              }}
+            >
+              {typed.length === 0 ? (
+                <span
+                  className={cn(
+                    'text-sm font-semibold leading-snug line-clamp-2',
+                    isCurrent && 'text-primary-foreground'
+                  )}
+                >
+                  {v.nameAr || v.name}
+                </span>
+              ) : singleAxisLabel && typed.length === 1 ? (
+                <span
+                  className={cn('text-sm font-bold tabular-nums', isCurrent ? 'text-primary-foreground' : 'text-slate-900')}
+                >
+                  {typed[0].value}
+                </span>
+              ) : typed.length === 1 ? (
+                <div className="flex w-full flex-col items-end gap-0.5">
+                  <span
+                    className={cn('text-[10px] font-medium', isCurrent ? 'text-primary-foreground/85' : 'text-slate-500')}
+                  >
+                    {typed[0].label}
+                  </span>
+                  <span
+                    className={cn('text-sm font-bold leading-tight', isCurrent ? 'text-primary-foreground' : 'text-slate-900')}
+                  >
+                    {typed[0].value}
+                  </span>
+                </div>
+              ) : (
+                <div className="flex w-full flex-col items-end gap-1">
+                  {typed.map((t) => (
+                    <div
+                      key={`${t.label}-${t.value}`}
+                      className="flex flex-wrap items-baseline justify-end gap-1 text-xs"
+                    >
+                      <span className={isCurrent ? 'text-primary-foreground/80' : 'text-slate-500'}>{t.label}:</span>
+                      <span className={cn('font-bold', isCurrent ? 'text-primary-foreground' : 'text-slate-900')}>
+                        {t.value}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!hidePrices && Number(v.price) > 0 ? (
+                <span
+                  className={cn(
+                    'text-[11px] tabular-nums border-t pt-1 mt-0.5 w-full text-end',
+                    isCurrent ? 'border-primary-foreground/30 text-primary-foreground/95' : 'border-slate-200 text-slate-600'
+                  )}
+                >
+                  {v.price.toLocaleString('ar-EG')} ج.م
+                </span>
+              ) : null}
+            </Button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+/** كتلة «خصائص الخيار» داخل تبويب التفاصيل */
+function ProductFamilyCurrentOptionDetails({
+  product,
+  productFamily,
+}: {
+  product: ApiProduct;
+  productFamily: StorefrontProductFamily;
+}) {
+  const pid = String(product._id || product.id);
+  const variant = productFamily.variants.find((x) => String(x.productId) === pid);
+  const rows = variant ? familyVariantTypedValues(productFamily, variant) : [];
+  return (
+    <div className="rounded-xl border border-violet-200/80 bg-gradient-to-br from-violet-50/50 to-white p-4 space-y-3">
+      <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+        <Tag className="h-4 w-4 text-violet-700 shrink-0" aria-hidden />
+        خصائص الخيار الحالي
+      </h3>
+      {rows.length === 0 ? (
+        <p className="text-xs text-slate-500 leading-relaxed">
+          لم تُضف تسميات تفصيلية لهذا الخيار في لوحة التحكم. يمكن إضافة «مقاس» أو «لون» وغيرها من تعديل العائلة.
+        </p>
+      ) : (
+        <dl className="divide-y divide-violet-100 rounded-lg border border-violet-100/60 bg-white/90">
+          {rows.map((r, ri) => (
+            <div key={`${r.label}-${ri}`} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2.5">
+              <dt className="text-sm text-slate-600">{r.label}</dt>
+              <dd className="text-sm font-bold text-slate-900 text-end">{r.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {productFamily.variants.length > 1 ? (
+        <p className="text-[11px] text-slate-500 leading-relaxed">
+          للتبديل بين الخيارات استخدم الأزرار أسفل اسم المنتج دون إعادة البحث.
+        </p>
+      ) : null}
+    </div>
+  );
+}
 
 // Add this type for rating history
 type RatingHistory = {
@@ -178,6 +373,11 @@ const ImageGalleryModal = ({
   // ── Pointer handlers ──────────────────────────────────────────────────────
   const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
+    // Don't capture swipe/drag when the user interacts with nav buttons — capture steals
+    // the pointer from the button so onClick never fires (arrows appear dead).
+    const target = e.target as HTMLElement | null;
+    if (target?.closest('button')) return;
+
     isDragging.current = true;
     hasMoved.current = false;
     startX.current = e.clientX;
@@ -212,9 +412,16 @@ const ImageGalleryModal = ({
   };
 
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const el = e.currentTarget as HTMLDivElement;
+    try {
+      el.releasePointerCapture(e.pointerId);
+    } catch {
+      /* not captured */
+    }
+    el.style.cursor = '';
+
     if (!isDragging.current) return;
     isDragging.current = false;
-    e.currentTarget.style.cursor = '';
 
     if (zoom > 1) {
       // Keep pan position
@@ -297,11 +504,12 @@ const ImageGalleryModal = ({
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        {/* Arrow buttons (desktop) */}
+        {/* Arrow buttons (desktop) — z-40 so transformed image never wins hit-testing; stop pointer propagation so parent swipe handler doesn't capture */}
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onPrev(); }}
-          className="hidden sm:flex absolute start-2 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
+          className="hidden sm:flex absolute start-2 top-1/2 -translate-y-1/2 z-40 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
           aria-label="الصورة السابقة"
         >
           <ChevronLeftIcon className="w-6 h-6 text-white" />
@@ -309,8 +517,9 @@ const ImageGalleryModal = ({
 
         <button
           type="button"
+          onPointerDown={(e) => e.stopPropagation()}
           onClick={(e) => { e.stopPropagation(); onNext(); }}
-          className="hidden sm:flex absolute end-2 top-1/2 -translate-y-1/2 z-10 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
+          className="hidden sm:flex absolute end-2 top-1/2 -translate-y-1/2 z-40 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
           aria-label="الصورة التالية"
         >
           <ChevronRight className="w-6 h-6 text-white" />
@@ -324,7 +533,7 @@ const ImageGalleryModal = ({
         )}
 
         <div
-          className="flex-1 flex items-center justify-center w-full max-w-5xl mx-auto py-4 px-2"
+          className="relative z-0 flex flex-1 items-center justify-center w-full max-w-5xl mx-auto py-4 px-2"
           style={{
             transition: 'transform 0.0s ease', // Immediate updates during drag
           }}
@@ -417,10 +626,15 @@ const ImageGalleryModal = ({
   );
 };
 
+type RelatedListingRow =
+  | { kind: 'family'; family: StorefrontProductFamily }
+  | { kind: 'product'; product: ApiProduct };
+
 // Mobile Product Detail Component
 const MobileProductDetail = ({
   product,
-  relatedProducts,
+  productFamily,
+  relatedRows,
   ratingHistory,
   selectedImage,
   setSelectedImage,
@@ -439,7 +653,8 @@ const MobileProductDetail = ({
   onRatingSubmit
 }: {
   product: ApiProduct;
-  relatedProducts: ApiProduct[];
+  productFamily: StorefrontProductFamily | null;
+  relatedRows: RelatedListingRow[];
   ratingHistory: RatingHistory[];
   selectedImage: number;
   setSelectedImage: (index: number) => void;
@@ -526,9 +741,14 @@ const MobileProductDetail = ({
 
           <div className="flex items-center gap-2">
             <FavoriteButton
-              productId={product._id}
+              productId={String(product._id || product.id)}
+              favoriteGroupIds={
+                productFamily
+                  ? (productFamily.variants || []).map((v) => String(v.productId))
+                  : undefined
+              }
               size="sm"
-              className="w-10 h-10 rounded-full bg-white border border-slate-200 hover:border-indigo-300 shadow-sm"
+              className="h-10 w-10 rounded-full border border-slate-200 bg-white shadow-sm hover:border-indigo-300"
             />
             <Button variant="ghost" size="icon" className="rounded-full w-10 h-10">
               <Share2 className="w-5 h-5" />
@@ -639,6 +859,13 @@ const MobileProductDetail = ({
           <h1 className="text-2xl font-bold text-slate-900 leading-tight">
             {product.nameAr}
           </h1>
+          {productFamily && (
+            <ProductFamilyVariantPicker
+              family={productFamily}
+              currentProductId={String(product._id || product.id)}
+              hidePrices={hidePrices}
+            />
+          )}
         </div>
 
         {/* Rating and Reviews - Clickable stars to open comments modal */}
@@ -838,6 +1065,10 @@ const MobileProductDetail = ({
                 ) : null}
               </div>
 
+              {productFamily ? (
+                <ProductFamilyCurrentOptionDetails product={product} productFamily={productFamily} />
+              ) : null}
+
               <div>
                 <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
                 <p className="text-sm text-slate-700 leading-relaxed">
@@ -965,12 +1196,21 @@ const MobileProductDetail = ({
       </div>
 
       {/* Related Products */}
-      {relatedProducts.length > 0 && (
+      {relatedRows.length > 0 && (
         <div className="px-4 py-6">
           <div className="grid grid-cols-2 gap-4">
-            {relatedProducts.map((relatedProduct) => {
+            {relatedRows.map((row) => {
+              if (row.kind === 'family') {
+                return (
+                  <div key={`fam-${row.family.id}`} className="w-full">
+                    <FamilyListingCard family={row.family} className="h-full" />
+                  </div>
+                );
+              }
+              const relatedProduct = row.product;
               const productForCard: Product = {
                 id: relatedProduct.id,
+                _id: relatedProduct._id,
                 name: relatedProduct.name,
                 nameAr: relatedProduct.nameAr,
                 description: relatedProduct.description,
@@ -1012,7 +1252,8 @@ const MobileProductDetail = ({
 // Desktop Product Detail Component
 const DesktopProductDetail = ({
   product,
-  relatedProducts,
+  productFamily,
+  relatedRows,
   ratingHistory,
   selectedImage,
   setSelectedImage,
@@ -1031,7 +1272,8 @@ const DesktopProductDetail = ({
   onRatingSubmit
 }: {
   product: ApiProduct;
-  relatedProducts: ApiProduct[];
+  productFamily: StorefrontProductFamily | null;
+  relatedRows: RelatedListingRow[];
   ratingHistory: RatingHistory[];
   selectedImage: number;
   setSelectedImage: (index: number) => void;
@@ -1184,10 +1426,29 @@ const DesktopProductDetail = ({
                 )}
               </div>
 
-              {/* Product name on its own line */}
-              <h1 className="text-2xl font-bold text-slate-900 leading-tight">
-                {product.nameAr}
-              </h1>
+              {/* Product name + favorite (matches mobile header control) */}
+              <div className="flex flex-wrap items-start gap-3">
+                <h1 className="min-w-0 flex-1 text-2xl font-bold leading-tight text-slate-900">
+                  {product.nameAr}
+                </h1>
+                <FavoriteButton
+                  productId={String(product._id || product.id)}
+                  favoriteGroupIds={
+                    productFamily
+                      ? (productFamily.variants || []).map((v) => String(v.productId))
+                      : undefined
+                  }
+                  size="md"
+                  className="h-11 w-11 shrink-0 rounded-full border border-slate-200 bg-white shadow-sm hover:border-indigo-300"
+                />
+              </div>
+              {productFamily && (
+                <ProductFamilyVariantPicker
+                  family={productFamily}
+                  currentProductId={String(product._id || product.id)}
+                  hidePrices={hidePrices}
+                />
+              )}
 
               {/* Rating and Reviews - Clickable stars to open comments modal */}
               <div className="flex items-center gap-2">
@@ -1366,6 +1627,10 @@ const DesktopProductDetail = ({
                     ) : null}
                   </div>
 
+                  {productFamily ? (
+                    <ProductFamilyCurrentOptionDetails product={product} productFamily={productFamily} />
+                  ) : null}
+
                   <div>
                     <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
                     <p className="text-sm text-slate-700 leading-relaxed">
@@ -1494,12 +1759,21 @@ const DesktopProductDetail = ({
         </div>
 
         {/* Related Products */}
-        {relatedProducts.length > 0 && (
+        {relatedRows.length > 0 && (
           <section className="mt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {relatedProducts.map((relatedProduct) => {
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {relatedRows.map((row) => {
+                if (row.kind === 'family') {
+                  return (
+                    <div key={`fam-${row.family.id}`} className="w-full">
+                      <FamilyListingCard family={row.family} className="h-full" />
+                    </div>
+                  );
+                }
+                const relatedProduct = row.product;
                 const productForCard: Product = {
                   id: relatedProduct.id,
+                  _id: relatedProduct._id,
                   name: relatedProduct.name,
                   nameAr: relatedProduct.nameAr || relatedProduct.name,
                   description: relatedProduct.description || '',
@@ -1543,19 +1817,20 @@ const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const resolvedProductId = resolveProductIdParam(id || '');
   const navigate = useNavigate();
-  const location = useLocation();
   const { addItem, isInCart, getItemByProductId } = useCart();
   const { toast } = useToast();
   const { isMobile } = useDeviceDetection();
   const { social } = useSettings();
   const { isAuthenticated } = useDualAuth();
-  const { hidePrices, contactMessage } = usePricingSettings();
+  const { hidePrices, contactMessage, familyCardsInListings } = usePricingSettings();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
 
   const [product, setProduct] = useState<ApiProduct | null>(null);
+  const [productFamily, setProductFamily] = useState<StorefrontProductFamily | null>(null);
   const [related, setRelated] = useState<ApiProduct[]>([]);
+  const [storefrontFamiliesCatalog, setStorefrontFamiliesCatalog] = useState<StorefrontProductFamily[]>([]);
   const [selectedImage, setSelectedImage] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -1572,22 +1847,22 @@ const ProductDetail = () => {
     (async () => {
       try {
         setLoading(true);
+        setProductFamily(null);
 
-        const stateProduct = (location.state as { product?: ApiProduct } | null)?.product;
-        const stateId = stateProduct?._id ?? stateProduct?.id;
-        const stateMatchesUrl =
-          !!stateProduct &&
-          !!resolvedProductId &&
-          String(stateId) === String(resolvedProductId);
-
-        let item: ApiProduct | undefined = stateMatchesUrl ? stateProduct : undefined;
-
-        if (!item) {
-          const res = await apiGet<ApiProduct>(`/api/products/${resolvedProductId}`);
-          item = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).item as ApiProduct | undefined;
-        }
-
-        if (!item) throw new Error('Product not found');
+        const res = await apiGet<ApiProduct>(`/api/products/${resolvedProductId}`);
+        if (!res.ok || !('item' in res) || !res.item) throw new Error('Product not found');
+        const detail = res as Extract<ApiResponse<ApiProduct>, { ok: true }> & {
+          productFamily?: StorefrontProductFamily | null;
+        };
+        const item = detail.item as ApiProduct;
+        const famRaw = detail.productFamily;
+        const fam =
+          famRaw &&
+          typeof famRaw === 'object' &&
+          Array.isArray((famRaw as StorefrontProductFamily).variants) &&
+          (famRaw as StorefrontProductFamily).variants.length >= 2
+            ? (famRaw as StorefrontProductFamily)
+            : null;
 
         const itemCategoryId =
           item.categoryId != null && String(item.categoryId).trim() !== ''
@@ -1646,7 +1921,16 @@ const ProductDetail = () => {
         };
 
         const relItems = (relRes as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
-        const relatedProducts: ApiProduct[] = relItems
+        const relatedLimit = familyCardsInListings ? 36 : 4;
+        let catalogFams: StorefrontProductFamily[] = [];
+        if (familyCardsInListings) {
+          try {
+            catalogFams = await fetchStorefrontProductFamilies();
+          } catch {
+            catalogFams = [];
+          }
+        }
+        const relatedPool: ApiProduct[] = relItems
           .filter((p) => p._id !== item._id && p.active !== false)
           .map((p) => {
             const pid =
@@ -1684,7 +1968,7 @@ const ProductDetail = () => {
               tags: p.tags || []
             };
           })
-          .slice(0, 4);
+          .slice(0, relatedLimit);
 
         // Fetch real rating history from backend
         let realRatingHistory: RatingHistory[] = [];
@@ -1729,33 +2013,53 @@ const ProductDetail = () => {
             rating: realAverageRating,
             reviews: realTotalReviews,
           });
-          setRelated(relatedProducts);
+          setProductFamily(fam);
+          setStorefrontFamiliesCatalog(catalogFams);
+          setRelated(relatedPool);
           setRatingHistory(realRatingHistory);
           setSelectedImage(0);
         }
       } catch (e) {
         console.error('Failed to fetch product:', e);
-        if (isMounted) setProduct(null);
+        if (isMounted) {
+          setProduct(null);
+          setProductFamily(null);
+          setStorefrontFamiliesCatalog([]);
+          setRelated([]);
+        }
       } finally {
         if (isMounted) setLoading(false);
       }
     })();
     return () => { isMounted = false; };
-  }, [id, resolvedProductId, navigate, location.key]);
+  }, [id, resolvedProductId, navigate, familyCardsInListings]);
 
   const productCatKey = product
     ? String(product.categorySlug ?? product.category ?? '').trim()
     : '';
-  const relatedProducts = related.filter((p) => {
-    if (!product) return true;
-    const rid = String(p._id ?? (p as ApiProduct).id ?? '');
+
+  const relatedRows: RelatedListingRow[] = useMemo(() => {
+    if (!product) return [];
     const cur = String(product._id ?? product.id ?? '');
-    if (rid === cur) return false;
-    if (p.isHidden) return false;
-    if (!productCatKey) return true;
-    const pCat = String(p.categorySlug ?? p.category ?? '').trim();
-    return pCat === productCatKey;
-  }).slice(0, 4);
+    const pool = related.filter((p) => {
+      const rid = String(p._id ?? (p as ApiProduct).id ?? '');
+      if (rid === cur) return false;
+      if (p.isHidden) return false;
+      if (!productCatKey) return true;
+      const pCat = String(p.categorySlug ?? p.category ?? '').trim();
+      return pCat === productCatKey;
+    });
+    if (!familyCardsInListings || !storefrontFamiliesCatalog.length) {
+      return pool.slice(0, 4).map((p) => ({ kind: 'product' as const, product: p }));
+    }
+    const withId = pool.map((p) => ({ ...p, id: String(p._id ?? p.id) }));
+    const grouped = groupListingRowsByFamily(withId, storefrontFamiliesCatalog, true);
+    const withoutOpenProductFamily = grouped.filter((row) => {
+      if (row.kind === 'product') return true;
+      return !row.family.variants?.some((v) => String(v.productId) === cur);
+    });
+    return withoutOpenProductFamily.slice(0, 4);
+  }, [related, product, productCatKey, familyCardsInListings, storefrontFamiliesCatalog]);
 
   if (loading) {
     return (
@@ -1969,7 +2273,8 @@ const ProductDetail = () => {
       {isMobile ? (
         <MobileProductDetail
           product={product}
-          relatedProducts={relatedProducts}
+          productFamily={productFamily}
+          relatedRows={relatedRows}
           ratingHistory={ratingHistory}
           selectedImage={selectedImage}
           setSelectedImage={setSelectedImage}
@@ -1990,7 +2295,8 @@ const ProductDetail = () => {
       ) : (
         <DesktopProductDetail
           product={product}
-          relatedProducts={relatedProducts}
+          productFamily={productFamily}
+          relatedRows={relatedRows}
           ratingHistory={ratingHistory}
           selectedImage={selectedImage}
           setSelectedImage={setSelectedImage}

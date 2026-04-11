@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Search, Filter, Grid, List, SortAsc, SortDesc, Package } from 'lucide-react';
 import ProductCard from '@/components/product/ProductCard';
+import { FamilyListingCard } from '@/components/product/FamilyListingCard';
 import { ProductGridSkeleton } from '@/components/ui/loading';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +29,12 @@ import { Product, ProductFilters, SortOption, Category } from '@/types';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import SocialLinks from '@/components/layout/SocialLinks';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
+import {
+  fetchStorefrontProductFamilies,
+  groupListingRowsByFamily,
+  type StorefrontProductFamily,
+} from '@/lib/productFamilyListings';
+import { cn } from '@/lib/utils';
 
 type ApiCategory = {
   _id: string;
@@ -75,8 +82,8 @@ const DEFAULT_MAX_PRICE = 10000;
 const Products = () => {
   // Set page title
   usePageTitle('المنتجات');
-  const { hidePrices } = usePricingSettings();
-  
+  const { hidePrices, familyCardsInListings } = usePricingSettings();
+
   const [searchParams, setSearchParams] = useSearchParams();
   const [loading, setLoading] = useState(true);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -87,6 +94,7 @@ const Products = () => {
   // Live data
   const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
+  const [storefrontFamilies, setStorefrontFamilies] = useState<StorefrontProductFamily[]>([]);
 
   // Fetch categories and products from backend
   useEffect(() => {
@@ -175,6 +183,25 @@ const Products = () => {
     };
   }, []);
 
+  useEffect(() => {
+    let on = true;
+    if (!familyCardsInListings) {
+      setStorefrontFamilies([]);
+      return;
+    }
+    (async () => {
+      try {
+        const items = await fetchStorefrontProductFamilies();
+        if (on) setStorefrontFamilies(items);
+      } catch {
+        if (on) setStorefrontFamilies([]);
+      }
+    })();
+    return () => {
+      on = false;
+    };
+  }, [familyCardsInListings]);
+
   // Price range state
   const spMin = searchParams.get('minPrice');
   const spMax = searchParams.get('maxPrice');
@@ -204,6 +231,12 @@ const Products = () => {
   });
 
   const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'newest');
+
+  useEffect(() => {
+    if (hidePrices && (sortBy === 'price-low' || sortBy === 'price-high')) {
+      setSortBy('newest');
+    }
+  }, [hidePrices, sortBy]);
 
   // Simulate loading
   useEffect(() => {
@@ -317,9 +350,11 @@ const Products = () => {
 
   // Apply price filtering and sorting for final list
   const filteredProducts = useMemo(() => {
-    const withinPrice = baseFilteredProducts.filter(product =>
-      product.price >= priceRange[0] && product.price <= priceRange[1]
-    );
+    const withinPrice = hidePrices
+      ? baseFilteredProducts
+      : baseFilteredProducts.filter(
+          (product) => product.price >= priceRange[0] && product.price <= priceRange[1]
+        );
 
     // Apply sorting on a cloned array
     const sorted = [...withinPrice];
@@ -346,20 +381,25 @@ const Products = () => {
     }
 
     return sorted;
-  }, [baseFilteredProducts, priceRange, sortBy]);
+  }, [baseFilteredProducts, priceRange, sortBy, hidePrices]);
 
   // Reset page when filters/sort change
   useEffect(() => {
     setPage(1);
   }, [filters, sortBy]);
 
-  const totalItems = filteredProducts.length;
+  const listingRows = useMemo(
+    () => groupListingRowsByFamily(filteredProducts, storefrontFamilies, familyCardsInListings),
+    [filteredProducts, storefrontFamilies, familyCardsInListings]
+  );
+
+  const totalItems = listingRows.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const paginatedProducts = useMemo(() => {
+  const paginatedRows = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
-    return filteredProducts.slice(start, start + pageSize);
-  }, [filteredProducts, currentPage]);
+    return listingRows.slice(start, start + pageSize);
+  }, [listingRows, currentPage, pageSize]);
 
   const handleSearchChange = (value: string) => {
     setFilters(prev => ({ ...prev, search: value }));
@@ -505,25 +545,33 @@ const Products = () => {
 
               {/* Results Count */}
               <Badge variant="secondary" className="px-3 py-1.5 text-sm">
-                {filteredProducts.length} منتج
+                {totalItems} {familyCardsInListings ? 'عنصر في القائمة' : 'منتج'}
               </Badge>
             </div>
           </div>
 
           {/* Expanded Filters */}
           {isFilterOpen && (
-            <div className="mt-6 p-6 bg-white rounded-2xl shadow-lg border border-slate-200">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Category Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">الفئة</label>
+            <div className="mt-6 rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50/90 via-white to-primary/[0.03] p-5 sm:p-6 shadow-md">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+                <h2 className="text-base font-bold text-slate-900">تصفية المنتجات</h2>
+                <p className="text-xs text-slate-500">الفئة{hidePrices ? '' : ' والسعر'} حسب ما يناسبك</p>
+              </div>
+              <div
+                className={cn(
+                  'grid gap-6',
+                  hidePrices ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                )}
+              >
+                <div className="rounded-xl border border-slate-100 bg-white/90 p-4 shadow-sm">
+                  <label className="mb-3 block text-sm font-bold text-slate-800">الفئة</label>
                   <Select
-                    value={filters.category}
+                    value={filters.category || 'all'}
                     onValueChange={(value) => {
-                      setFilters(prev => ({ ...prev, category: value === 'all' ? '' : value }))
+                      setFilters((prev) => ({ ...prev, category: value === 'all' ? '' : value }));
                     }}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11">
                       <SelectValue placeholder="جميع الفئات" />
                     </SelectTrigger>
                     <SelectContent>
@@ -537,59 +585,64 @@ const Products = () => {
                   </Select>
                 </div>
 
-                {/* Price Range */}
                 {!hidePrices && (
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">نطاق السعر</label>
-                  <div className="space-y-2">
-                    <Slider
-                      value={priceRange}
-                      onValueChange={handlePriceRangeChange}
-                      max={dynamicMaxPrice}
-                      min={dynamicMinPrice}
-                      step={priceStep}
-                      className="w-full"
-                    />
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600 whitespace-nowrap">من</span>
-                        <Input
-                          type="number"
-                          value={priceRange[0]}
-                          min={dynamicMinPrice}
-                          max={priceRange[1]}
-                          step={priceStep}
-                          onChange={(e) => handleMinPriceInput(e.target.value)}
-                          className="text-sm"
-                        />
-                        <span className="text-xs text-slate-500">ج.م</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600 whitespace-nowrap">إلى</span>
-                        <Input
-                          type="number"
-                          value={priceRange[1]}
-                          min={priceRange[0]}
-                          max={dynamicMaxPrice}
-                          step={priceStep}
-                          onChange={(e) => handleMaxPriceInput(e.target.value)}
-                          className="text-sm"
-                        />
-                          <span className="text-xs text-slate-500">ج.م</span>
+                  <div className="rounded-xl border border-slate-100 bg-white/90 p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <label className="text-sm font-bold text-slate-800">نطاق السعر</label>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                        {priceRange[0].toLocaleString('ar-EG')} — {priceRange[1].toLocaleString('ar-EG')} ج.م
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      <Slider
+                        value={priceRange}
+                        onValueChange={handlePriceRangeChange}
+                        max={dynamicMaxPrice}
+                        min={dynamicMinPrice}
+                        step={priceStep}
+                        className="w-full"
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <span className="text-xs text-slate-500">من</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={priceRange[0]}
+                              min={dynamicMinPrice}
+                              max={priceRange[1]}
+                              step={priceStep}
+                              onChange={(e) => handleMinPriceInput(e.target.value)}
+                              className="h-10 text-sm"
+                            />
+                            <span className="text-xs text-slate-400 shrink-0">ج.م</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-xs text-slate-500">إلى</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={priceRange[1]}
+                              min={priceRange[0]}
+                              max={dynamicMaxPrice}
+                              step={priceStep}
+                              onChange={(e) => handleMaxPriceInput(e.target.value)}
+                              className="h-10 text-sm"
+                            />
+                            <span className="text-xs text-slate-400 shrink-0">ج.م</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
                 )}
 
-                {/* Visibility is handled automatically: hidden products are excluded */}
-
-                {/* Clear Filters */}
-                <div className="flex items-end">
+                <div className="flex items-end sm:col-span-2 lg:col-span-1">
                   <Button
                     variant="outline"
                     onClick={clearFilters}
-                    className="w-full"
+                    className="h-11 w-full rounded-xl border-2 border-dashed border-slate-300 text-slate-700 hover:border-primary hover:text-primary"
                   >
                     مسح الفلاتر
                   </Button>
@@ -603,19 +656,23 @@ const Products = () => {
         <section className="py-16">
           {loading ? (
             <ProductGridSkeleton count={8} />
-          ) : filteredProducts.length > 0 ? (
+          ) : listingRows.length > 0 ? (
             <div className={`grid gap-8 ${
               viewMode === 'grid'
                 ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
                 : 'grid-cols-1 max-w-4xl mx-auto'
             }`}>
-              {paginatedProducts.map((product, index) => (
+              {paginatedRows.map((row, index) => (
                 <div
-                  key={product.id}
+                  key={row.kind === 'family' ? `fam-${row.family.id}` : row.product.id}
                   className="animate-fade-in"
                   style={{ animationDelay: `${index * 50}ms` }}
                 >
-                  <ProductCard product={product} />
+                  {row.kind === 'family' ? (
+                    <FamilyListingCard family={row.family} />
+                  ) : (
+                    <ProductCard product={row.product} />
+                  )}
                 </div>
               ))}
             </div>
@@ -630,7 +687,7 @@ const Products = () => {
             </div>
           )}
           {/* Pagination Controls */}
-          {filteredProducts.length > 0 && (
+          {listingRows.length > 0 && (
             <div className="flex items-center justify-center gap-4 mt-8">
               <Button variant="outline" disabled={currentPage <= 1} onClick={() => setPage(p => Math.max(1, p - 1))}>
                 السابق

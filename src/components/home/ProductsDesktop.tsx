@@ -18,6 +18,7 @@ import FavoriteButton from '@/components/ui/FavoriteButton';
 import { useCart } from '@/hooks/useCart';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { useFavorites } from '@/hooks/useFavorites';
+import { isProductFavorited, normalizeFavoriteProductId } from '@/lib/favorite-ids';
 import { useToast } from '@/hooks/use-toast';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import { buildCategoryPath } from '@/lib/category-link';
@@ -54,11 +55,11 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
   const navigate = useNavigate();
   const { addItem, isInCart: checkIsInCart, getItemByProductId } = useCart();
   const { isAuthenticated, isAdmin } = useDualAuth();
-  const { 
-    showAuthModal: favoritesAuthModal, 
+  const {
+    showAuthModal: favoritesAuthModal,
     setShowAuthModal: setFavoritesAuthModal,
-    favorites,
-    toggleFavorite: toggleFavoriteHook
+    isFavorite,
+    toggleFavorite: toggleFavoriteHook,
   } = useFavorites();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authAction, setAuthAction] = useState<'cart' | 'favorites' | 'general'>('general');
@@ -229,7 +230,8 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
 
   const handleToggleFavorite = async (productId: string) => {
     try {
-      await toggleFavoriteHook(productId);
+      const id = normalizeFavoriteProductId(productId);
+      if (id) await toggleFavoriteHook(id);
     } catch (error) {
       console.error('Error toggling favorite:', error);
     }
@@ -408,10 +410,12 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                                     onClick={(e) => {
                                       e.preventDefault();
                                       e.stopPropagation();
-                                      handleToggleFavorite(product.id);
+                                      handleToggleFavorite(getCleanProductId(product.id));
                                     }}
                                     className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2.5 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 relative heart-button ${
-                                      favorites.includes(product.id) ? 'heart-active' : ''
+                                      isProductFavorited({ ...product, id: getCleanProductId(product.id) }, isFavorite)
+                                        ? 'heart-active'
+                                        : ''
                                     }`}
                                   >
                                     {/* Single Heart with State-Based Rendering */}
@@ -420,7 +424,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                                       transition: 'transform 0.4s cubic-bezier(0.4, 0, 0.2, 1)'
                                     }}>
                                       {/* Conditional rendering based on state */}
-                                      {favorites.includes(product.id) ? (
+                                      {isProductFavorited({ ...product, id: getCleanProductId(product.id) }, isFavorite) ? (
                                         // Active State - Theme Colored Heart
                                         <div className="relative">
                                           {/* Shadow */}
@@ -459,7 +463,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                                       )}
                                       
                                       {/* Hover State - Theme Preview */}
-                                      {!favorites.includes(product.id) && (
+                                      {!isProductFavorited({ ...product, id: getCleanProductId(product.id) }, isFavorite) && (
                                         <div className="absolute inset-0 flex items-center justify-center opacity-0 scale-75 group-hover/heart:opacity-100 group-hover/heart:scale-100 transition-all duration-400 ease-out">
                                           {/* Shadow */}
                                           <svg 
@@ -492,7 +496,11 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                                   </button>
                                 </TooltipTrigger>
                                 <TooltipContent side="bottom">
-                                  <p>{favorites.includes(product.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}</p>
+                                  <p>
+                                    {isProductFavorited({ ...product, id: getCleanProductId(product.id) }, isFavorite)
+                                      ? 'إزالة من المفضلة'
+                                      : 'إضافة للمفضلة'}
+                                  </p>
                                 </TooltipContent>
                               </Tooltip>
                             </TooltipProvider>

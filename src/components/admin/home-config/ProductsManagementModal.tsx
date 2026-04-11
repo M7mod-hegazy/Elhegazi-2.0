@@ -1,7 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { PackageSearch } from 'lucide-react';
 import type { HomeConfig } from '@/types/home-config';
@@ -35,6 +34,14 @@ export const ProductsManagementModal: React.FC<ProductsManagementModalProps> = (
             إدارة المنتجات المعروضة في الأقسام
           </DialogDescription>
         </DialogHeader>
+
+        <div className="rounded-lg border border-amber-200/80 bg-amber-50/90 px-4 py-3 text-sm text-amber-950 leading-relaxed">
+          <span className="font-semibold">عندما يكون العدد 0:</span>
+          {' '}
+          الصفحة الرئيسية لا تزال تعرض منتجات تلقائياً من الكتالوج — كل قسم بقواعده (مثل: مميزة = علامة «مميز»، الأكثر مبيعاً = تقييم مرتفع، العروض = سعر مخفّض، الجديد = الأحدث).
+          {' '}
+          اختيار منتجات هنا يثبت العرض على ما اخترتَه فقط ويُلغي هذا السلوك التلقائي لذلك القسم.
+        </div>
         
         <div className="space-y-6">
           <div className="flex items-center justify-between">

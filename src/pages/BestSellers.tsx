@@ -15,6 +15,7 @@ import { optimizeImage, buildSrcSet } from '@/lib/images';
 import ScrollAnimation from '@/components/ui/scroll-animation';
 import { apiGet, type ApiResponse } from '@/lib/api';
 import type { Product } from '@/types';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
 
 type ApiProduct = {
   _id: string;
@@ -51,6 +52,11 @@ const BestSellersContent = () => {
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { hidePrices } = usePricingSettings();
+
+  useEffect(() => {
+    if (hidePrices && sortBy === 'price') setSortBy('newest');
+  }, [hidePrices, sortBy]);
 
   // Fetch best sellers based on admin panel selection
   useEffect(() => {
@@ -78,10 +84,15 @@ const BestSellersContent = () => {
         const response = await apiGet<ApiProduct>(`/api/products?ids=${idsParam}`);
 
         if (response.ok && response.items) {
-          const activeProducts = response.items.filter((product: ApiProduct) =>
-            product.active !== false
-          );
-          setProducts(activeProducts);
+          const activeById = new Map<string, ApiProduct>();
+          for (const product of response.items) {
+            if (product.active === false) continue;
+            activeById.set(String(product._id), product);
+          }
+          const ordered = selectedIds
+            .map((id) => activeById.get(String(id)))
+            .filter((p): p is ApiProduct => !!p);
+          setProducts(ordered);
         } else {
           setError('فشل في تحميل المنتجات الأكثر مبيعاً');
         }
@@ -103,7 +114,8 @@ const BestSellersContent = () => {
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.nameAr && product.nameAr.includes(searchTerm));
 
-      const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
+      const matchesPrice =
+        hidePrices || (product.price >= priceRange[0] && product.price <= priceRange[1]);
 
       return matchesSearch && matchesPrice;
     });
@@ -131,7 +143,7 @@ const BestSellersContent = () => {
     });
 
     return filtered;
-  }, [products, searchTerm, priceRange, sortBy, sortOrder]);
+  }, [products, searchTerm, priceRange, sortBy, sortOrder, hidePrices]);
 
   const maxPrice = useMemo(() => {
     return Math.max(...products.map(p => p.price), 10000);

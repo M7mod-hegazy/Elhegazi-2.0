@@ -27,6 +27,7 @@ type SettingsDoc = {
   logo?: { url?: string; altText?: string; publicId?: string; width?: number; height?: number };
   theme?: { primaryColor?: string; secondaryColor?: string };
   pricingSettings?: { hidePrices?: boolean };
+  catalogSettings?: { familyCardsInListings?: boolean };
   checkoutEnabled?: boolean;
   shippingCost?: number;
   expressShippingCost?: number;
@@ -71,6 +72,7 @@ const AdminSettings: React.FC = () => {
   const [primaryColor, setPrimaryColor] = useState('#3B82F6');
   const [secondaryColor, setSecondaryColor] = useState('#8B5CF6');
   const [hidePrices, setHidePrices] = useState(false);
+  const [familyCardsInListings, setFamilyCardsInListings] = useState(false);
   const [checkoutEnabled, setCheckoutEnabled] = useState(true);
   const [shippingCost, setShippingCost] = useState(25);
   const [expressShippingCost, setExpressShippingCost] = useState(50);
@@ -167,6 +169,7 @@ const AdminSettings: React.FC = () => {
     setPrimaryColor(item.theme?.primaryColor || '#3B82F6');
     setSecondaryColor(item.theme?.secondaryColor || '#8B5CF6');
     setHidePrices(Boolean(item.pricingSettings?.hidePrices));
+    setFamilyCardsInListings(Boolean(item.catalogSettings?.familyCardsInListings));
     setCheckoutEnabled(item.checkoutEnabled ?? true);
     setShippingCost(item.shippingCost ?? 25);
     setExpressShippingCost(item.expressShippingCost ?? 50);
@@ -343,6 +346,7 @@ const AdminSettings: React.FC = () => {
     try {
       const res = await apiPutJson('/api/settings', {
         pricingSettings: { hidePrices },
+        catalogSettings: { familyCardsInListings },
         checkoutEnabled,
         shippingCost,
         expressShippingCost,
@@ -352,6 +356,7 @@ const AdminSettings: React.FC = () => {
         orderSettings,
       }, controlHeaders);
       if (!res.ok) throw new Error('error' in res ? res.error : 'Failed');
+      window.dispatchEvent(new Event('pricing-settings-changed'));
       toast({ title: 'Control Center', description: 'تم حفظ الإعدادات المتقدمة' });
     } catch (error) {
       toast({ title: 'Control Center', description: error instanceof Error ? error.message : 'Error', variant: 'destructive' });
@@ -766,7 +771,16 @@ const AdminSettings: React.FC = () => {
                           </div>
                           <Switch checked={hidePrices} onCheckedChange={setHidePrices} />
                         </div>
-                        <Button onClick={saveControlCenterSettings} disabled={controlCenterBusy}>{controlCenterBusy ? 'جارٍ الحفظ...' : 'حفظ إعدادات الأسعار'}</Button>
+                        <div className="flex items-center justify-between rounded-md border p-3">
+                          <div>
+                            <p className="font-medium">بطاقة واحدة لكل عائلة منتجات</p>
+                            <p className="text-sm text-slate-500">
+                              في قوائم المتجر والأقسام: عرض بطاقة واحدة لكل مجموعة (مقاسات/ألوان) بدل بطاقة لكل SKU. مستقل عن إخفاء الأسعار. عطّله للعودة للعرض السابق.
+                            </p>
+                          </div>
+                          <Switch checked={familyCardsInListings} onCheckedChange={setFamilyCardsInListings} />
+                        </div>
+                        <Button onClick={saveControlCenterSettings} disabled={controlCenterBusy}>{controlCenterBusy ? 'جارٍ الحفظ...' : 'حفظ إعدادات الأسعار والكتالوج'}</Button>
                       </div>
                     )}
 

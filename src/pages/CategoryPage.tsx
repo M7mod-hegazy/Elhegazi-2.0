@@ -1,4 +1,5 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef, useLayoutEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useParams, Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { Search, Filter, SortAsc, SortDesc, Grid, List, ArrowRight, Package, Star, ShoppingBag, Eye, Heart, Check, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import whatsappIcon from '@/assets/whatsapp.png';
@@ -32,6 +33,7 @@ import SocialLinks from '@/components/layout/SocialLinks';
 import { optimizeImage, buildSrcSet, applyProductImageFallback, applyCategoryImageFallback } from '@/lib/images';
 import { buildCategoryPath, getCategorySegment, normalizeCategorySegment } from '@/lib/category-link';
 import { buildProductPath } from '@/lib/product-link';
+import { cn } from '@/lib/utils';
 import ScrollAnimation from '@/components/ui/scroll-animation';
 import { apiGet, type ApiResponse } from '@/lib/api';
 import { usePageTitle } from '@/hooks/usePageTitle';
@@ -39,6 +41,13 @@ import { WhatsAppContactModal } from '@/components/product/WhatsAppContactModal'
 import ProductsDesktop from '@/components/home/ProductsDesktop';
 import ProductsMobile from '@/components/home/ProductsMobile';
 import type { Product, Category } from '@/types';
+import { FamilyListingCard } from '@/components/product/FamilyListingCard';
+import {
+  fetchStorefrontProductFamilies,
+  groupListingRowsByFamily,
+  type StorefrontProductFamily,
+} from '@/lib/productFamilyListings';
+import { isProductFavorited, normalizeFavoriteProductId } from '@/lib/favorite-ids';
 
 type ApiCategory = {
   _id: string;
@@ -75,7 +84,13 @@ const CategoryPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [searchTerm, setSearchTerm] = useState('');
-  
+  const searchAnchorRef = useRef<HTMLDivElement>(null);
+  const [searchDropdownRect, setSearchDropdownRect] = useState<{
+    top: number;
+    left: number;
+    width: number;
+  } | null>(null);
+
   // State for category and products
   const [categoryData, setCategoryData] = useState<ApiCategory | null>(null);
   const [products, setProducts] = useState<ApiProduct[]>([]);
@@ -103,9 +118,13 @@ const CategoryPage = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useDualAuth();
   const { addItem, isInCart: checkIsInCart, getItemByProductId } = useCart();
-  const { favorites, toggleFavorite } = useFavorites();
-  const { hidePrices } = usePricingSettings();
+  const { isFavorite, toggleFavorite } = useFavorites();
+  const { hidePrices, familyCardsInListings } = usePricingSettings();
   const { toast } = useToast();
+
+  useEffect(() => {
+    if (hidePrices && sortBy === 'price') setSortBy('newest');
+  }, [hidePrices, sortBy]);
 
   const handleToggleFavorite = (e: React.MouseEvent, productId: string) => {
     e.preventDefault();
@@ -120,7 +139,8 @@ const CategoryPage = () => {
     }
 
 
-    toggleFavorite(productId);
+    const id = normalizeFavoriteProductId(productId);
+    if (id) toggleFavorite(id);
   };
 
   const handleAddToCart = async (e: React.MouseEvent, product: Product) => {
@@ -234,6 +254,26 @@ const CategoryPage = () => {
   // Live data state
   const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
+  const [storefrontFamilies, setStorefrontFamilies] = useState<StorefrontProductFamily[]>([]);
+
+  useEffect(() => {
+    let on = true;
+    if (!familyCardsInListings) {
+      setStorefrontFamilies([]);
+      return;
+    }
+    (async () => {
+      try {
+        const items = await fetchStorefrontProductFamilies();
+        if (on) setStorefrontFamilies(items);
+      } catch {
+        if (on) setStorefrontFamilies([]);
+      }
+    })();
+    return () => {
+      on = false;
+    };
+  }, [familyCardsInListings]);
 
   // Fetch categories and products from backend (live refresh)
   useEffect(() => {
@@ -272,6 +312,7 @@ const CategoryPage = () => {
           const cat = catBySlug.get(slugVal);
           return {
             id: p._id,
+            _id: p._id,
             name: p.name,
             nameAr: p.nameAr ?? p.name,
             description: p.description ?? '',
@@ -388,6 +429,39 @@ const CategoryPage = () => {
     });
   }, [liveProducts, category]);
 
+  const searchSuggestions = useMemo(() => {
+    const t = searchTerm.trim().toLowerCase();
+    if (!t) return [] as Product[];
+    return categoryProducts
+      .filter(
+        (p) =>
+          p.nameAr.toLowerCase().includes(t) ||
+          p.name.toLowerCase().includes(t) ||
+          (p.sku && p.sku.toLowerCase().includes(t))
+      )
+      .slice(0, 8);
+  }, [categoryProducts, searchTerm]);
+
+  useLayoutEffect(() => {
+    const update = () => {
+      const el = searchAnchorRef.current;
+      if (!searchTerm.trim() || !el) {
+        setSearchDropdownRect(null);
+        return;
+      }
+      const r = el.getBoundingClientRect();
+      setSearchDropdownRect({ top: r.bottom + 8, left: r.left, width: r.width });
+    };
+    update();
+    if (!searchTerm.trim()) return;
+    window.addEventListener('scroll', update, true);
+    window.addEventListener('resize', update);
+    return () => {
+      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', update);
+    };
+  }, [searchTerm]);
+
   // Base filtered products (exclude price for dynamic bounds)
   const baseFiltered = useMemo(() => {
     let filtered = categoryProducts.filter(product =>
@@ -429,9 +503,11 @@ const CategoryPage = () => {
     ]);
   }, [dynMin, dynMax, baseFiltered.length, priceTouched]);
 
-  // Final filter and sort
+  // عند إخفاء الأسعار لا نفلتر ولا نعتمد على نطاق السعر
   const filteredAndSortedProducts = useMemo(() => {
-    const withinPrice = baseFiltered.filter(p => p.price >= priceRange[0] && p.price <= priceRange[1]);
+    const withinPrice = hidePrices
+      ? baseFiltered
+      : baseFiltered.filter((p) => p.price >= priceRange[0] && p.price <= priceRange[1]);
     const sorted = [...withinPrice];
     sorted.sort((a, b) => {
       let comparison = 0;
@@ -452,7 +528,7 @@ const CategoryPage = () => {
       return sortOrder === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [baseFiltered, priceRange, sortBy, sortOrder]);
+  }, [baseFiltered, priceRange, sortBy, sortOrder, hidePrices]);
 
   // Reset page on filter/sort changes
   useEffect(() => {
@@ -466,13 +542,19 @@ const CategoryPage = () => {
     setSearchParams(params);
   }, [page, searchParams, setSearchParams]);
 
-  const totalItems = filteredAndSortedProducts.length;
+  const familyGridEnabled = familyCardsInListings && viewMode === 'grid';
+  const listingRows = useMemo(
+    () => groupListingRowsByFamily(filteredAndSortedProducts, storefrontFamilies, familyGridEnabled),
+    [filteredAndSortedProducts, storefrontFamilies, familyGridEnabled]
+  );
+  const totalItems = familyGridEnabled ? listingRows.length : filteredAndSortedProducts.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
   const currentPage = Math.min(page, totalPages);
-  const paginatedProducts = useMemo(() => {
+  const pageItems = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
+    if (familyGridEnabled) return listingRows.slice(start, start + pageSize);
     return filteredAndSortedProducts.slice(start, start + pageSize);
-  }, [filteredAndSortedProducts, currentPage]);
+  }, [familyGridEnabled, listingRows, filteredAndSortedProducts, currentPage, pageSize]);
 
   if (!category) {
     return (
@@ -707,72 +789,67 @@ const CategoryPage = () => {
       </section>
 
       {/* Search and Filters - 2 Lines Layout */}
-      <ScrollAnimation animation="fadeIn" delay={200}>
-        <section className="py-6 bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-[100] overflow-visible">
-        <div className="container mx-auto px-4 overflow-visible">
-          {/* Line 1: Search with Suggestions */}
-          <div className="mb-4">
-            <div className="relative max-w-2xl mx-auto">
-              <Search className="absolute right-4 top-1/2 transform -translate-y-1/2 text-slate-400 w-5 h-5 z-10" />
+      <ScrollAnimation animation="fadeIn" delay={200} className="overflow-visible">
+        <section className="relative z-[500] overflow-visible border-b border-slate-200 bg-white/80 py-6 backdrop-blur-sm sticky top-0">
+        <div className="container mx-auto overflow-visible px-4">
+          {/* اقتراحات البحث عبر portal + fixed لتجاوز تكدس الطبقات من sticky/scroll-animation */}
+          <div className="relative z-10 mx-auto mb-4 max-w-2xl">
+            <div ref={searchAnchorRef} className="relative w-full">
+              <Search className="pointer-events-none absolute end-4 top-1/2 z-10 h-5 w-5 -translate-y-1/2 text-slate-400" />
               <Input
                 placeholder="البحث في المنتجات..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pr-12 rounded-full border-2 border-slate-300 focus:border-primary w-full"
+                className="relative z-10 w-full rounded-full border-2 border-slate-300 pr-12 focus:border-primary"
               />
             </div>
-            
-            {/* Search Suggestions Dropdown - Outside relative container */}
-            {searchTerm.length > 0 && (
-              <div className="fixed left-1/2 -translate-x-1/2 mt-2 bg-white border border-slate-200 rounded-2xl shadow-2xl z-[9999] max-h-96 overflow-y-auto w-[calc(100%-2rem)] max-w-2xl pointer-events-auto" style={{ top: 'calc(100% + 2rem)' }}>
-                  {categoryProducts
-                    .filter(p => 
-                      p.nameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-                    )
-                    .slice(0, 8)
-                    .map((product) => (
-                      <button
-                        key={product.id}
-                        onClick={() => {
-                          setSearchTerm(product.nameAr);
-                          document.querySelector('[data-products-section]')?.scrollIntoView({ behavior: 'smooth' });
-                        }}
-                        className="w-full px-4 py-3 hover:bg-slate-50 border-b border-slate-100 last:border-b-0 transition-colors flex items-center gap-3 text-right"
-                      >
-                        {/* Product Image */}
-                        <img
-                          src={optimizeImage(product.image || '', { w: 60 })}
-                          alt={product.nameAr}
-                          className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
-                          onError={applyProductImageFallback}
-                        />
-                        
-                        {/* Product Info */}
-                        <div className="flex-1 text-right">
-                          <h4 className="font-semibold text-slate-900 text-sm line-clamp-1">
-                            {product.nameAr}
-                          </h4>
-                          <p className="text-xs text-slate-500">
-                            {product.sku && `كود: ${product.sku}`}
-                          </p>
-                        </div>
-                      </button>
-                    ))}
-                  
-                  {categoryProducts.filter(p => 
-                    p.nameAr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                    p.sku?.toLowerCase().includes(searchTerm.toLowerCase())
-                  ).length === 0 && (
-                    <div className="px-4 py-6 text-center text-slate-500 text-sm">
-                      لا توجد نتائج
-                    </div>
-                  )}
-                </div>
-              )}
           </div>
+
+          {searchTerm.trim() &&
+            searchDropdownRect &&
+            typeof document !== 'undefined' &&
+            createPortal(
+              <div
+                dir="rtl"
+                className="max-h-[min(22rem,70vh)] overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-2xl ring-1 ring-black/5"
+                style={{
+                  position: 'fixed',
+                  top: searchDropdownRect.top,
+                  left: searchDropdownRect.left,
+                  width: searchDropdownRect.width,
+                  zIndex: 200000,
+                }}
+                role="listbox"
+                aria-label="اقتراحات البحث"
+              >
+                {searchSuggestions.map((product) => (
+                  <button
+                    key={product.id}
+                    type="button"
+                    onClick={() => {
+                      setSearchTerm(product.nameAr);
+                      document.querySelector('[data-products-section]')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
+                    className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-3 text-right transition-colors last:border-b-0 hover:bg-slate-50"
+                  >
+                    <img
+                      src={optimizeImage(product.image || '', { w: 60 })}
+                      alt={product.nameAr}
+                      className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
+                      onError={applyProductImageFallback}
+                    />
+                    <div className="min-w-0 flex-1 text-right">
+                      <h4 className="line-clamp-1 text-sm font-semibold text-slate-900">{product.nameAr}</h4>
+                      <p className="text-xs text-slate-500">{product.sku && `كود: ${product.sku}`}</p>
+                    </div>
+                  </button>
+                ))}
+                {searchSuggestions.length === 0 ? (
+                  <div className="px-4 py-6 text-center text-sm text-slate-500">لا توجد نتائج</div>
+                ) : null}
+              </div>,
+              document.body
+            )}
 
           {/* Line 2: All Controls */}
           <div className="flex flex-wrap items-center justify-center gap-3">
@@ -786,7 +863,7 @@ const CategoryPage = () => {
                 <SelectContent>
                   <SelectItem value="newest">الأحدث</SelectItem>
                   <SelectItem value="name">الاسم</SelectItem>
-                  <SelectItem value="price">السعر</SelectItem>
+                  {!hidePrices ? <SelectItem value="price">السعر</SelectItem> : null}
                   <SelectItem value="rating">التقييم</SelectItem>
                 </SelectContent>
               </Select>
@@ -838,54 +915,88 @@ const CategoryPage = () => {
 
           {/* Expanded Filters */}
           {showFilters && (
-            <ScrollAnimation animation="slideUp" className="mt-6 p-6 bg-white rounded-2xl shadow-lg border border-slate-200">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Price Range */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">نطاق السعر</label>
-                  <div className="space-y-2">
-                    <Slider
-                      value={priceRange as unknown as number[]}
-                      onValueChange={(vals) => { setPriceTouched(true); setPriceRange(vals as [number, number]); }}
-                      min={dynMin}
-                      max={dynMax}
-                      step={Math.max(1, Math.ceil((dynMax - dynMin) / 100))}
-                      className="w-full"
-                    />
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600 whitespace-nowrap">من</span>
-                        <Input
-                          type="number"
-                          value={priceRange[0]}
-                          min={dynMin}
-                          max={priceRange[1]}
-                          onChange={(e) => { setPriceTouched(true); const n = Number(e.target.value); if (!Number.isNaN(n)) setPriceRange([Math.max(dynMin, Math.min(n, priceRange[1])), priceRange[1]]); }}
-                          className="text-sm"
-                        />
-                        <span className="text-xs text-slate-500">ج.م</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-slate-600 whitespace-nowrap">إلى</span>
-                        <Input
-                          type="number"
-                          value={priceRange[1]}
-                          min={priceRange[0]}
-                          max={dynMax}
-                          onChange={(e) => { setPriceTouched(true); const n = Number(e.target.value); if (!Number.isNaN(n)) setPriceRange([priceRange[0], Math.min(dynMax, Math.max(n, priceRange[0]))]); }}
-                          className="text-sm"
-                        />
-                        <span className="text-xs text-slate-500">ج.م</span>
+            <ScrollAnimation
+              animation="slideUp"
+              className="mt-6 rounded-2xl border border-slate-200/90 bg-gradient-to-br from-slate-50/90 via-white to-primary/[0.03] p-5 sm:p-6 shadow-md"
+            >
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+                <h2 className="text-base font-bold text-slate-900">تصفية النتائج</h2>
+                <p className="text-xs text-slate-500">اضبط المعايير ثم أغلق اللوحة أو استمر بالتصفح</p>
+              </div>
+              <div
+                className={cn(
+                  'grid gap-6 sm:gap-8',
+                  hidePrices ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
+                )}
+              >
+                {!hidePrices && (
+                  <div className="rounded-xl border border-slate-100 bg-white/90 p-4 shadow-sm">
+                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                      <label className="text-sm font-bold text-slate-800">نطاق السعر</label>
+                      <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                        {priceRange[0].toLocaleString('ar-EG')} — {priceRange[1].toLocaleString('ar-EG')} ج.م
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      <Slider
+                        value={priceRange as unknown as number[]}
+                        onValueChange={(vals) => {
+                          setPriceTouched(true);
+                          setPriceRange(vals as [number, number]);
+                        }}
+                        min={dynMin}
+                        max={dynMax}
+                        step={Math.max(1, Math.ceil((dynMax - dynMin) / 100))}
+                        className="w-full"
+                      />
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <span className="text-xs text-slate-500">من</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={priceRange[0]}
+                              min={dynMin}
+                              max={priceRange[1]}
+                              onChange={(e) => {
+                                setPriceTouched(true);
+                                const n = Number(e.target.value);
+                                if (!Number.isNaN(n))
+                                  setPriceRange([Math.max(dynMin, Math.min(n, priceRange[1])), priceRange[1]]);
+                              }}
+                              className="text-sm h-10"
+                            />
+                            <span className="text-xs text-slate-400 shrink-0">ج.م</span>
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-xs text-slate-500">إلى</span>
+                          <div className="flex items-center gap-1">
+                            <Input
+                              type="number"
+                              value={priceRange[1]}
+                              min={priceRange[0]}
+                              max={dynMax}
+                              onChange={(e) => {
+                                setPriceTouched(true);
+                                const n = Number(e.target.value);
+                                if (!Number.isNaN(n))
+                                  setPriceRange([priceRange[0], Math.min(dynMax, Math.max(n, priceRange[0]))]);
+                              }}
+                              className="text-sm h-10"
+                            />
+                            <span className="text-xs text-slate-400 shrink-0">ج.م</span>
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                )}
 
-                {/* Rating Filter */}
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 mb-3">التقييم</label>
+                <div className="rounded-xl border border-slate-100 bg-white/90 p-4 shadow-sm">
+                  <label className="mb-3 block text-sm font-bold text-slate-800">التقييم</label>
                   <Select value={ratingFilter} onValueChange={(value: 'all' | '4+' | '3+') => setRatingFilter(value)}>
-                    <SelectTrigger>
+                    <SelectTrigger className="h-11">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -896,8 +1007,12 @@ const CategoryPage = () => {
                   </Select>
                 </div>
 
-                {/* Clear Filters */}
-                <div className="flex items-end">
+                <div
+                  className={cn(
+                    'flex items-end',
+                    hidePrices ? 'md:col-span-2 lg:col-span-1' : 'lg:col-span-1'
+                  )}
+                >
                   <Button
                     variant="outline"
                     onClick={() => {
@@ -906,7 +1021,7 @@ const CategoryPage = () => {
                       setRatingFilter('all');
                       setSearchTerm('');
                     }}
-                    className="w-full"
+                    className="h-11 w-full rounded-xl border-2 border-dashed border-slate-300 text-slate-700 hover:border-primary hover:text-primary"
                   >
                     مسح الفلاتر
                   </Button>
@@ -920,7 +1035,10 @@ const CategoryPage = () => {
 
       {/* Products Grid */}
       <ScrollAnimation animation="slideUp" delay={300}>
-        <section className="py-16 bg-gradient-to-br from-primary/5 via-white to-primary/10">
+        <section
+          data-products-section
+          className="relative z-0 py-16 bg-gradient-to-br from-primary/5 via-white to-primary/10"
+        >
           <div className="container mx-auto px-4">
           {filteredAndSortedProducts.length === 0 ? (
             <ScrollAnimation animation="fadeIn" className="text-center py-20">
@@ -934,7 +1052,24 @@ const CategoryPage = () => {
                 ? 'grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6' 
                 : 'flex flex-col gap-4 max-w-6xl mx-auto'
             }`}>
-              {paginatedProducts.map((product, index) => (
+              {pageItems.map((item, index) => {
+                let product: Product;
+                if (familyGridEnabled) {
+                  const row = item as
+                    | { kind: 'family'; family: StorefrontProductFamily }
+                    | { kind: 'product'; product: Product };
+                  if (row.kind === 'family') {
+                    return (
+                      <ScrollAnimation key={`fam-${row.family.id}`} animation="fadeIn" delay={Math.min(index * 50, 400)}>
+                        <FamilyListingCard family={row.family} className="h-full" />
+                      </ScrollAnimation>
+                    );
+                  }
+                  product = row.product;
+                } else {
+                  product = item as Product;
+                }
+                return (
                 viewMode === 'list' ? (
                   // List View - Split Layout
                   <div
@@ -972,12 +1107,12 @@ const CategoryPage = () => {
                                 <button
                                   onClick={(e) => handleToggleFavorite(e, product.id)}
                                   className={`bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg border border-slate-100 hover:bg-white hover:shadow-2xl transition-all duration-300 ${
-                                    favorites.includes(product.id) ? 'heart-active' : ''
+                                    isProductFavorited(product, isFavorite) ? 'heart-active' : ''
                                   }`}
                                 >
                                   <Heart 
                                     className={`w-4 h-4 transition-all duration-300 ${
-                                      favorites.includes(product.id) 
+                                      isProductFavorited(product, isFavorite)
                                         ? 'fill-primary text-primary' 
                                         : 'text-slate-400 hover:text-primary hover:fill-primary'
                                     }`}
@@ -985,7 +1120,7 @@ const CategoryPage = () => {
                                 </button>
                               </TooltipTrigger>
                               <TooltipContent side="right">
-                                <p>{favorites.includes(product.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}</p>
+                                <p>{isProductFavorited(product, isFavorite) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
@@ -1258,12 +1393,12 @@ const CategoryPage = () => {
                             <button
                               onClick={(e) => handleToggleFavorite(e, product.id)}
                               className={`group/heart bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg border border-slate-100 hover:bg-white hover:shadow-xl hover:scale-110 transition-all duration-300 relative ${
-                                favorites.includes(product.id) ? 'heart-active' : ''
+                                isProductFavorited(product, isFavorite) ? 'heart-active' : ''
                               }`}
                             >
                               <Heart 
                                 className={`w-5 h-5 transition-all duration-300 ${
-                                  favorites.includes(product.id) 
+                                  isProductFavorited(product, isFavorite)
                                     ? 'fill-primary text-primary' 
                                     : 'text-slate-400 group-hover/heart:text-primary group-hover/heart:fill-primary'
                                 }`}
@@ -1271,7 +1406,7 @@ const CategoryPage = () => {
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="bottom">
-                            <p>{favorites.includes(product.id) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}</p>
+                            <p>{isProductFavorited(product, isFavorite) ? 'إزالة من المفضلة' : 'إضافة للمفضلة'}</p>
                           </TooltipContent>
                         </Tooltip>
                       </TooltipProvider>
@@ -1403,7 +1538,8 @@ const CategoryPage = () => {
                   </div>
                 </div>
                 )
-              ))}
+              );
+              })}
             </div>
           )}
           

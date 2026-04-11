@@ -15,6 +15,7 @@ import { optimizeImage, buildSrcSet } from '@/lib/images';
 import ScrollAnimation from '@/components/ui/scroll-animation';
 import { apiGet, type ApiResponse } from '@/lib/api';
 import type { Product } from '@/types';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
 
 type ApiProduct = {
   _id: string;
@@ -51,6 +52,11 @@ const SpecialOffersContent = () => {
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { hidePrices } = usePricingSettings();
+
+  useEffect(() => {
+    if (hidePrices && sortBy === 'price') setSortBy('newest');
+  }, [hidePrices, sortBy]);
 
   // Fetch special offers based on admin panel selection
   useEffect(() => {
@@ -78,18 +84,22 @@ const SpecialOffersContent = () => {
         const response = await apiGet<ApiProduct>(`/api/products?ids=${idsParam}`);
 
         if (response.ok && response.items) {
-          const activeProducts = response.items.filter((product: ApiProduct) =>
-            product.active !== false
-          );
+          const activeById = new Map<string, ApiProduct>();
+          for (const product of response.items) {
+            if (product.active === false) continue;
+            activeById.set(String(product._id), product);
+          }
+          const ordered = selectedIds
+            .map((id) => activeById.get(String(id)))
+            .filter((p): p is ApiProduct => !!p);
 
-          // Calculate discount percentage if not provided
-          const productsWithDiscount = activeProducts.map(product => ({
+          const productsWithDiscount = ordered.map((product) => ({
             ...product,
             discount: product.discount || (
               product.originalPrice && product.originalPrice > product.price
                 ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
                 : 0
-            )
+            ),
           }));
 
           setProducts(productsWithDiscount);
@@ -114,7 +124,8 @@ const SpecialOffersContent = () => {
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.nameAr && product.nameAr.includes(searchTerm));
 
-      const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
+      const matchesPrice =
+        hidePrices || (product.price >= priceRange[0] && product.price <= priceRange[1]);
       const matchesDiscount = (product.discount || 0) >= discountRange[0] && (product.discount || 0) <= discountRange[1];
 
       return matchesSearch && matchesPrice && matchesDiscount;
@@ -143,7 +154,7 @@ const SpecialOffersContent = () => {
     });
 
     return filtered;
-  }, [products, searchTerm, priceRange, discountRange, sortBy, sortOrder]);
+  }, [products, searchTerm, priceRange, discountRange, sortBy, sortOrder, hidePrices]);
 
   const maxPrice = useMemo(() => {
     return Math.max(...products.map(p => p.price), 10000);

@@ -1,8 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import ScrollAnimation from '@/components/ui/scroll-animation';
 import { apiGet, type ApiResponse } from '@/lib/api';
 import { usePricingSettings } from '@/hooks/usePricingSettings';
 import type { Product } from '@/types';
@@ -19,6 +17,106 @@ interface CreativeProductsSliderProps {
   selectedIds?: string[];
 }
 
+type ApiCategory = {
+  _id: string;
+  name: string;
+  nameAr?: string;
+  slug: string;
+};
+
+type ApiProduct = {
+  _id: string;
+  name: string;
+  nameAr?: string;
+  sku?: string;
+  categorySlug?: string;
+  categoryId?: string;
+  category?: string;
+  price: number;
+  originalPrice?: number;
+  description?: string;
+  image?: string;
+  images?: string[];
+  stock?: number;
+  featured?: boolean;
+  active?: boolean;
+  rating?: number;
+  reviews?: number;
+  createdAt: string;
+  updatedAt: string;
+};
+
+function mapApiProductsToStoreProducts(
+  items: ApiProduct[],
+  catBySlug: Map<string, ApiCategory>,
+  catById: Map<string, ApiCategory>
+): Product[] {
+  return items.map((p) => {
+    const slug = p.categorySlug ?? '';
+    const cid = p.categoryId != null && String(p.categoryId).trim() !== '' ? String(p.categoryId) : '';
+
+    let resolvedSlug = slug;
+    if (!resolvedSlug && typeof p.category === 'string' && p.category.trim()) {
+      resolvedSlug = p.category.trim();
+    }
+    if (!resolvedSlug && cid) {
+      const byId = catById.get(cid);
+      if (byId?.slug) resolvedSlug = byId.slug.trim();
+    }
+
+    const cat = (resolvedSlug ? catBySlug.get(resolvedSlug) : undefined) ?? (cid ? catById.get(cid) : undefined);
+    const categoryAr = cat?.nameAr?.trim() || cat?.name?.trim() || resolvedSlug || '';
+
+    return {
+      id: String(p._id),
+      name: p.name,
+      nameAr: p.nameAr ?? p.name,
+      description: p.description ?? '',
+      descriptionAr: p.description ?? '',
+      price: p.price,
+      originalPrice: p.originalPrice,
+      image: p.image ?? '',
+      images: Array.isArray(p.images) ? p.images : p.image ? [p.image] : [],
+      category: resolvedSlug,
+      categoryId: cid || undefined,
+      categoryAr,
+      stock: p.stock,
+      isHidden: p.active === false,
+      featured: !!p.featured,
+      discount: undefined,
+      rating: p.rating ?? 0,
+      reviews: p.reviews ?? 0,
+      tags: [],
+      sku: p.sku ?? '',
+      weight: undefined,
+      dimensions: undefined,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt,
+    };
+  });
+}
+
+const PRODUCT_FIELDS = [
+  '_id',
+  'name',
+  'nameAr',
+  'price',
+  'originalPrice',
+  'image',
+  'images',
+  'categorySlug',
+  'categoryId',
+  'category',
+  'featured',
+  'active',
+  'createdAt',
+  'updatedAt',
+  'stock',
+  'sku',
+  'rating',
+  'reviews',
+].join(',');
+
 const CreativeProductsSlider = ({
   title,
   subtitle,
@@ -26,7 +124,6 @@ const CreativeProductsSlider = ({
   selectedIds,
 }: CreativeProductsSliderProps) => {
   const { hidePrices } = usePricingSettings();
-  // Get redirect URL based on filter type
   const getRedirectUrl = () => {
     switch (filterType) {
       case 'featured':
@@ -45,151 +142,69 @@ const CreativeProductsSlider = ({
   const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
 
-  type ApiCategory = {
-    _id: string;
-    name: string;
-    nameAr?: string;
-    slug: string;
-  };
+  const hasCuratedIds = Array.isArray(selectedIds) && selectedIds.length > 0;
 
-  type ApiProduct = {
-    _id: string;
-    name: string;
-    nameAr?: string;
-    sku?: string;
-    categorySlug?: string;
-    categoryId?: string;
-    category?: string;
-    price: number;
-    description?: string;
-    image?: string;
-    images?: string[];
-    stock?: number;
-    featured?: boolean;
-    active?: boolean;
-    rating?: number;
-    reviews?: number;
-    createdAt: string;
-    updatedAt: string;
-  };
+  /**
+   * Shared catalog slice for sliders. When the admin has not picked specific IDs, each section
+   * applies its own rules in getFilteredProducts(). Do not pass featured=true here: that query
+   * often returns zero rows (no flagged products), so "Featured" went empty while "Best sellers"
+   * still showed items because it used the general list.
+   */
+  const fetchFallbackProducts = useCallback(
+    async (
+      catBySlug: Map<string, ApiCategory>,
+      catById: Map<string, ApiCategory>
+    ): Promise<Product[]> => {
+      const params = new URLSearchParams();
+      params.set('limit', '60');
+      params.set('fields', PRODUCT_FIELDS);
+      const res = await apiGet<ApiProduct>(`/api/products?${params.toString()}`);
+      const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
+      return mapApiProductsToStoreProducts(items, catBySlug, catById);
+    },
+    []
+  );
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        // Fetch categories first
+        setLoading(true);
         const catRes = await apiGet<ApiCategory>('/api/categories?limit=500');
         const catItems = (catRes as Extract<ApiResponse<ApiCategory>, { ok: true }>).items ?? [];
         const catBySlug = new Map(catItems.map((c) => [c.slug, c]));
         const catById = new Map(catItems.map((c) => [String(c._id), c]));
 
-        if (Array.isArray(selectedIds)) {
-          if (selectedIds.length === 0) {
-            if (mounted) setLiveProducts([]);
-            return;
-          }
-          const idsParam = encodeURIComponent(selectedIds.join(','));
-          const fields = ['_id', 'name', 'nameAr', 'price', 'image', 'images', 'categorySlug', 'categoryId', 'category', 'featured', 'active', 'createdAt', 'updatedAt', 'stock', 'sku', 'rating', 'reviews'].join(',');
-          const res = await apiGet<ApiProduct>(`/api/products?ids=${idsParam}&fields=${fields}`);
+        if (hasCuratedIds) {
+          const idsParam = encodeURIComponent(selectedIds!.join(','));
+          const res = await apiGet<ApiProduct>(
+            `/api/products?ids=${idsParam}&fields=${encodeURIComponent(PRODUCT_FIELDS)}`
+          );
           const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
-          const mapped: Product[] = items.map((p) => {
-            const slug = p.categorySlug ?? '';
-            const cid = p.categoryId != null && String(p.categoryId).trim() !== '' ? String(p.categoryId) : '';
-            
-            let resolvedSlug = slug;
-            if (!resolvedSlug && typeof p.category === 'string' && p.category.trim()) {
-              resolvedSlug = p.category.trim();
-            }
-            if (!resolvedSlug && cid) {
-              const byId = catById.get(cid);
-              if (byId?.slug) resolvedSlug = byId.slug.trim();
-            }
-            
-            const cat = (resolvedSlug ? catBySlug.get(resolvedSlug) : undefined) ?? (cid ? catById.get(cid) : undefined);
-            const categoryAr = cat?.nameAr?.trim() || cat?.name?.trim() || resolvedSlug || '';
-            
-            return {
-              id: p._id,
-              name: p.name,
-              nameAr: p.nameAr ?? p.name,
-              description: '',
-              descriptionAr: '',
-              price: p.price,
-              originalPrice: undefined,
-              image: p.image ?? '',
-              images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
-              category: resolvedSlug,
-              categoryId: cid || undefined,
-              categoryAr,
-              stock: p.stock,
-              isHidden: p.active === false,
-              featured: !!p.featured,
-              discount: undefined,
-              rating: p.rating ?? 0,
-              reviews: p.reviews ?? 0,
-              tags: [],
-              sku: p.sku ?? '',
-              weight: undefined,
-              dimensions: undefined,
-              createdAt: p.createdAt,
-              updatedAt: p.updatedAt,
-            };
-          });
-          if (mounted) setLiveProducts(mapped);
-          return;
-        }
+          let mapped = mapApiProductsToStoreProducts(items, catBySlug, catById);
 
-        const params = new URLSearchParams();
-        params.set('limit', '60');
-        if (filterType === 'featured') params.set('featured', 'true');
-        const fields = ['_id', 'name', 'nameAr', 'price', 'image', 'images', 'categorySlug', 'categoryId', 'category', 'featured', 'active', 'createdAt', 'updatedAt', 'stock', 'sku', 'rating', 'reviews'].join(',');
-        params.set('fields', fields);
-        const res = await apiGet<ApiProduct>(`/api/products?${params.toString()}`);
-        const items = (res as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
-        const mapped: Product[] = items.map((p) => {
-          const slug = p.categorySlug ?? '';
-          const cid = p.categoryId != null && String(p.categoryId).trim() !== '' ? String(p.categoryId) : '';
-          
-          let resolvedSlug = slug;
-          if (!resolvedSlug && typeof p.category === 'string' && p.category.trim()) {
-            resolvedSlug = p.category.trim();
+          const requested = selectedIds!.length;
+          const resolved = mapped.filter((p) => !p.isHidden).length;
+          if (mapped.length === 0 || resolved === 0 || mapped.length < requested) {
+            const fallback = await fetchFallbackProducts(catBySlug, catById);
+            if (mapped.length === 0 || resolved === 0) {
+              mapped = fallback;
+            } else {
+              const have = new Set(mapped.map((p) => p.id));
+              for (const p of fallback) {
+                if (mapped.length >= 60) break;
+                if (!have.has(p.id)) {
+                  mapped.push(p);
+                  have.add(p.id);
+                }
+              }
+            }
           }
-          if (!resolvedSlug && cid) {
-            const byId = catById.get(cid);
-            if (byId?.slug) resolvedSlug = byId.slug.trim();
-          }
-          
-          const cat = (resolvedSlug ? catBySlug.get(resolvedSlug) : undefined) ?? (cid ? catById.get(cid) : undefined);
-          const categoryAr = cat?.nameAr?.trim() || cat?.name?.trim() || resolvedSlug || '';
-          
-          return {
-            id: p._id,
-            name: p.name,
-            nameAr: p.nameAr ?? p.name,
-            description: p.description ?? '',
-            descriptionAr: p.description ?? '',
-            price: p.price,
-            originalPrice: undefined,
-            image: p.image ?? '',
-            images: Array.isArray(p.images) ? p.images : (p.image ? [p.image] : []),
-            category: resolvedSlug,
-            categoryId: cid || undefined,
-            categoryAr,
-            stock: p.stock,
-            isHidden: p.active === false,
-            featured: !!p.featured,
-            discount: undefined,
-            rating: p.rating ?? 0,
-            reviews: p.reviews ?? 0,
-            tags: [],
-            sku: p.sku ?? '',
-            weight: undefined,
-            dimensions: undefined,
-            createdAt: p.createdAt,
-            updatedAt: p.updatedAt,
-          };
-        });
-        if (mounted) setLiveProducts(mapped);
+          if (mounted) setLiveProducts(mapped);
+        } else {
+          const mapped = await fetchFallbackProducts(catBySlug, catById);
+          if (mounted) setLiveProducts(mapped);
+        }
       } catch (e) {
         console.error('Failed to fetch products for slider:', e);
         if (mounted) setLiveProducts([]);
@@ -197,39 +212,50 @@ const CreativeProductsSlider = ({
         if (mounted) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
-  }, [selectedIds, filterType]);
+    return () => {
+      mounted = false;
+    };
+  }, [selectedIds, filterType, hasCuratedIds, fetchFallbackProducts]);
 
   const getFilteredProducts = () => {
-    if (Array.isArray(selectedIds)) {
-      const map = new Map(liveProducts.map(p => [p.id, p] as const));
-      return selectedIds
-        .map(id => map.get(id))
+    if (hasCuratedIds) {
+      const map = new Map(liveProducts.map((p) => [String(p.id), p] as const));
+      return selectedIds!
+        .map((id) => map.get(String(id)))
         .filter((p): p is Product => !!p && !p.isHidden)
         .slice(0, 12);
     }
     switch (filterType) {
       case 'featured':
-        return liveProducts.filter(p => !p.isHidden && p.featured).slice(0, 8);
+        return liveProducts.filter((p) => !p.isHidden && p.featured).slice(0, 8);
       case 'trending':
-        return liveProducts.filter(p => !p.isHidden && p.rating >= 4.5).slice(0, 8);
+        return liveProducts.filter((p) => !p.isHidden && p.rating >= 4.5).slice(0, 8);
       case 'sale':
-        return liveProducts.filter(p => !p.isHidden && p.originalPrice && p.originalPrice > p.price).slice(0, 8);
+        return liveProducts
+          .filter((p) => !p.isHidden && p.originalPrice && p.originalPrice > p.price)
+          .slice(0, 8);
       case 'new':
         return liveProducts
-          .filter(p => !p.isHidden)
+          .filter((p) => !p.isHidden)
           .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
           .slice(0, 8);
       default:
-        return liveProducts.filter(p => !p.isHidden).slice(0, 8);
+        return liveProducts.filter((p) => !p.isHidden).slice(0, 8);
     }
   };
 
   let filteredProducts = getFilteredProducts();
-  const hasExplicitSelection = Array.isArray(selectedIds);
+  const hasExplicitSelection = hasCuratedIds;
   if (!hasExplicitSelection && filteredProducts.length === 0 && liveProducts.length > 0) {
     filteredProducts = liveProducts
-      .filter(p => !p.isHidden)
+      .filter((p) => !p.isHidden)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 8);
+  }
+
+  if (hasExplicitSelection && filteredProducts.length === 0 && liveProducts.length > 0) {
+    filteredProducts = liveProducts
+      .filter((p) => !p.isHidden)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 8);
   }

@@ -62,6 +62,7 @@ function buildInternalNote({ text, user }) {
 
 // Models
 import Product from './models/Product.js';
+import ProductFamily from './models/ProductFamily.js';
 import Category from './models/Category.js';
 import User from './models/User.js';
 import Order from './models/Order.js';
@@ -202,6 +203,7 @@ const BACKUP_MODULES = [
   'shopSetup',
   'categories',
   'products',
+  'productFamilies',
   'products3d',
   'builderProjects',
   'orders',
@@ -336,6 +338,19 @@ async function buildBackupData(selectedModules) {
     const items = await Product.find({}).lean();
     out.products = items.map(stripCommonMeta);
   }
+  if (selectedModules.includes('productFamilies')) {
+    const items = await ProductFamily.find({}).lean();
+    out.productFamilies = await Promise.all(
+      items.map(async (fam) => {
+        const base = stripCommonMeta(fam);
+        const prods = await Product.find({ _id: { $in: fam.memberProductIds || [] } })
+          .select('sku')
+          .lean();
+        base.memberSkus = prods.map((p) => String(p.sku || '').trim()).filter(Boolean);
+        return base;
+      })
+    );
+  }
   if (selectedModules.includes('products3d')) {
     const items = await Product3D.find({}).lean();
     out.products3d = items.map(stripCommonMeta);
@@ -380,6 +395,7 @@ function humanModuleName(moduleName) {
     shopSetup: 'إعدادات منشئ المتجر',
     categories: 'الأقسام',
     products: 'المنتجات',
+    productFamilies: 'عائلات المنتجات (متغيرات)',
     products3d: 'منتجات ثلاثية الأبعاد',
     builderProjects: 'مشاريع منشئ المتجر',
     orders: 'الطلبات',
@@ -410,6 +426,8 @@ function previewRows(moduleName, incomingData) {
         return { key: String(row.shopName || row.actorKey || ''), title: row.shopName || row.actorKey || 'shop setup' };
       case 'history':
         return { key: String(row.section || ''), title: `${row.section || ''} / ${row.action || ''}`.trim() || 'history' };
+      case 'productFamilies':
+        return { key: backupKey('productFamilies', row), title: row.nameAr || row.name || 'family' };
       case 'settings':
       case 'homeConfig':
       case 'profitSettings':
@@ -442,6 +460,7 @@ async function existingRowsForModule(moduleName) {
     case 'users': return (await User.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
     case 'orders': return (await Order.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
     case 'products3d': return (await Product3D.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
+    case 'productFamilies': return (await ProductFamily.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
     case 'builderProjects': return (await BuilderProject.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
     case 'shopSetup': return (await ShopSetup.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
     case 'history': return (await History.find({}).lean()).map((x) => sanitizeIncomingForApply(moduleName, x));
@@ -492,6 +511,8 @@ function backupKey(moduleName, item) {
   switch (moduleName) {
     case 'categories': return String(item.slug || '').trim().toLowerCase();
     case 'products': return String(item.sku || item.nameAr || item.name || '').trim().toLowerCase();
+    case 'productFamilies':
+      return `${String(item.nameAr || '').trim().toLowerCase()}::${String(item.name || '').trim().toLowerCase()}`;
     case 'users': return String(item.email || '').trim().toLowerCase();
     case 'orders': return String(item.orderNumber || item._id || '').trim().toLowerCase();
     case 'products3d': return String(item.name || item.title || item._id || '').trim().toLowerCase();
@@ -507,6 +528,7 @@ async function existingKeySet(moduleName) {
   switch (moduleName) {
     case 'categories': rows = await Category.find({}, { slug: 1 }).lean(); break;
     case 'products': rows = await Product.find({}, { sku: 1, nameAr: 1, name: 1 }).lean(); break;
+    case 'productFamilies': rows = await ProductFamily.find({}, { name: 1, nameAr: 1 }).lean(); break;
     case 'users': rows = await User.find({}, { email: 1 }).lean(); break;
     case 'orders': rows = await Order.find({}, { orderNumber: 1 }).lean(); break;
     case 'products3d': rows = await Product3D.find({}, { name: 1, title: 1 }).lean(); break;
@@ -3096,6 +3118,64 @@ app.post('/api/categories/update-counts', requirePermission('categories', 'updat
   }
 });
 
+// Product families (variant groups) — shared hydrate for detail + storefront list
+async function hydrateProductFamilyPayload(fam) {
+  if (!fam || !fam._id) return null;
+  const memberIds = Array.isArray(fam.memberProductIds) ? fam.memberProductIds : [];
+  if (memberIds.length < 2) return null;
+  const prods = await Product.find({ _id: { $in: memberIds } }).lean();
+  const byId = new Map(prods.map((p) => [String(p._id), p]));
+  let defaultId = fam.defaultProductId ? String(fam.defaultProductId) : '';
+  if (!defaultId || !byId.has(defaultId)) {
+    let best = '';
+    let bestPrice = Infinity;
+    for (const p of prods) {
+      if (p.active === false) continue;
+      const pr = Number(p.price);
+      if (Number.isFinite(pr) && pr < bestPrice) {
+        bestPrice = pr;
+        best = String(p._id);
+      }
+    }
+    defaultId = best || (prods[0] ? String(prods[0]._id) : '');
+  }
+  const variants = memberIds
+    .map((oid) => {
+      const p = byId.get(String(oid));
+      if (!p) return null;
+      const mem = (fam.members || []).find((m) => String(m.productId) === String(oid));
+      return {
+        productId: String(p._id),
+        name: p.name,
+        nameAr: p.nameAr,
+        values: mem && mem.values && typeof mem.values === 'object' ? { ...mem.values } : {},
+        image: p.image || (Array.isArray(p.images) && p.images[0]) || '',
+        price: Number(p.price || 0),
+        active: p.active !== false,
+      };
+    })
+    .filter(Boolean);
+  return {
+    id: String(fam._id),
+    name: fam.name,
+    nameAr: fam.nameAr,
+    defaultProductId: defaultId,
+    options: Array.isArray(fam.options) ? fam.options : [],
+    variants,
+  };
+}
+
+async function findProductFamilyLeanForProductId(productId) {
+  if (!mongoose.Types.ObjectId.isValid(String(productId))) return null;
+  const pid = new mongoose.Types.ObjectId(String(productId));
+  let fam = await ProductFamily.findOne({ memberProductIds: pid }).lean();
+  if (!fam) {
+    const p = await Product.findById(pid).select('productFamilyId').lean();
+    if (p && p.productFamilyId) fam = await ProductFamily.findById(p.productFamilyId).lean();
+  }
+  return fam;
+}
+
 // Product CRUD
 async function attachRatingStatsToProducts(items) {
   if (!Array.isArray(items) || items.length === 0) return [];
@@ -3132,15 +3212,47 @@ async function attachRatingStatsToProducts(items) {
   });
 }
 
+/** Remove one product from its family; dissolve family if fewer than 2 members remain. */
+async function detachProductFromItsFamily(productIdStr) {
+  const pid = String(productIdStr);
+  if (!mongoose.Types.ObjectId.isValid(pid)) return;
+  const p = await Product.findById(pid).select('productFamilyId').lean();
+  if (!p || !p.productFamilyId) return;
+  const fid = String(p.productFamilyId);
+  const fam = await ProductFamily.findById(fid);
+  if (!fam) {
+    await Product.updateOne({ _id: pid }, { $unset: { productFamilyId: 1 } });
+    return;
+  }
+  const mids = (fam.memberProductIds || []).map((x) => String(x));
+  const remaining = mids.filter((id) => id !== pid);
+  fam.memberProductIds = remaining.map((id) => new mongoose.Types.ObjectId(id));
+  fam.members = (fam.members || []).filter((m) => String(m.productId) !== pid);
+  if (remaining.length < 2) {
+    await Product.updateMany(
+      { _id: { $in: mids.map((id) => new mongoose.Types.ObjectId(id)) } },
+      { $unset: { productFamilyId: 1 } }
+    );
+    await ProductFamily.findByIdAndDelete(fid);
+  } else {
+    await fam.save();
+    await Product.updateOne({ _id: pid }, { $unset: { productFamilyId: 1 } });
+  }
+}
+
 app.get('/api/products', async (req, res) => {
-  const { page = 1, limit = 20, featured, categorySlug, search, ids, fields } = req.query;
+  const { page = 1, limit = 20, featured, categorySlug, categoryId, search, ids, fields } = req.query;
   try {
     // If ids are provided, fetch specific products in one query and ignore pagination
     if (ids) {
       const idList = String(ids)
         .split(',')
         .map((s) => s.trim())
-        .filter(Boolean);
+        .filter(Boolean)
+        .filter((id) => mongoose.Types.ObjectId.isValid(id));
+      if (idList.length === 0) {
+        return sendJsonWithEtag(req, res, { ok: true, items: [], total: 0, page: 1, pages: 1 });
+      }
       const projection = typeof fields === 'string' ? String(fields).split(',').join(' ') : undefined;
       const docs = await Product.find({ _id: { $in: idList } })
         .select(projection)
@@ -3152,6 +3264,9 @@ app.get('/api/products', async (req, res) => {
     let q = {};
     if (featured !== undefined) q.featured = featured === 'true';
     if (categorySlug) q.categorySlug = categorySlug;
+    if (categoryId && mongoose.Types.ObjectId.isValid(String(categoryId))) {
+      q.categoryId = new mongoose.Types.ObjectId(String(categoryId));
+    }
     if (search) {
       const raw = String(search).trim();
       const esc = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -3191,7 +3306,176 @@ app.get('/api/products/:id', async (req, res) => {
   const item = await Product.findById(req.params.id).lean();
   if (!item) return res.status(404).json({ ok: false, error: 'Not found' });
   const [itemWithStats] = await attachRatingStatsToProducts([item]);
-  res.json({ ok: true, item: itemWithStats });
+  let productFamily = null;
+  try {
+    const fam = await findProductFamilyLeanForProductId(item._id);
+    if (fam) productFamily = await hydrateProductFamilyPayload(fam);
+  } catch (e) {
+    console.warn('productFamily hydrate failed', e.message);
+  }
+  res.json({ ok: true, item: itemWithStats, productFamily });
+});
+
+/** Public: all variant families for storefront grouping (small collection). */
+app.get('/api/product-families/storefront', async (req, res) => {
+  try {
+    const families = await ProductFamily.find({}).lean();
+    const items = [];
+    for (const fam of families) {
+      const payload = await hydrateProductFamilyPayload(fam);
+      if (payload && payload.variants && payload.variants.length >= 2) items.push(payload);
+    }
+    return sendJsonWithEtag(req, res, { ok: true, items });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/product-families', requirePermission('products', 'read', { attach: true }), async (_req, res) => {
+  try {
+    const families = await ProductFamily.find({}).sort({ updatedAt: -1 }).lean();
+    return res.json({ ok: true, items: families });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/product-families', requirePermission('products', 'create', { attach: true }), async (req, res) => {
+  try {
+    const body = req.body || {};
+    let name = String(body.name || '').trim();
+    let nameAr = String(body.nameAr || '').trim();
+    if (!nameAr && name) nameAr = name;
+    if (!name && nameAr) name = nameAr;
+    const memberProductIds = Array.isArray(body.memberProductIds) ? body.memberProductIds : [];
+    const options = Array.isArray(body.options) ? body.options : [];
+    const membersRaw = Array.isArray(body.members) ? body.members : [];
+    const members = membersRaw.map((m) => ({
+      productId: mongoose.Types.ObjectId.isValid(String(m.productId))
+        ? new mongoose.Types.ObjectId(String(m.productId))
+        : null,
+      values: m.values && typeof m.values === 'object' ? m.values : {},
+    })).filter((m) => m.productId);
+    if (!nameAr && !name) return res.status(400).json({ ok: false, error: 'اسم العائلة مطلوب' });
+    if (!nameAr) nameAr = name;
+    if (!name) name = nameAr;
+    if (memberProductIds.length < 2 || memberProductIds.length > 20) {
+      return res.status(400).json({ ok: false, error: 'Between 2 and 20 products required' });
+    }
+    const ids = memberProductIds.filter((id) => mongoose.Types.ObjectId.isValid(String(id))).map((id) => new mongoose.Types.ObjectId(String(id)));
+    let prods = await Product.find({ _id: { $in: ids } }).lean();
+    if (prods.length !== ids.length) return res.status(400).json({ ok: false, error: 'One or more products not found' });
+    const transfer = body.transferFromOtherFamilies === true;
+    for (const p of prods) {
+      if (p.productFamilyId) {
+        if (!transfer) {
+          return res.status(400).json({ ok: false, error: `Product ${p._id} already belongs to a family` });
+        }
+        await detachProductFromItsFamily(String(p._id));
+      }
+    }
+    prods = await Product.find({ _id: { $in: ids } }).lean();
+    const defaultProductId = body.defaultProductId && mongoose.Types.ObjectId.isValid(String(body.defaultProductId))
+      ? new mongoose.Types.ObjectId(String(body.defaultProductId))
+      : null;
+    const doc = await ProductFamily.create({
+      name,
+      nameAr,
+      memberProductIds: ids,
+      options,
+      members,
+      defaultProductId,
+    });
+    let defaultId = doc.defaultProductId;
+    if (!defaultId) {
+      let best = null;
+      let bestPrice = Infinity;
+      for (const p of prods) {
+        if (p.active === false) continue;
+        const pr = Number(p.price);
+        if (Number.isFinite(pr) && pr < bestPrice) {
+          bestPrice = pr;
+          best = p._id;
+        }
+      }
+      defaultId = best || prods[0]._id;
+      doc.defaultProductId = defaultId;
+      await doc.save();
+    }
+    await Product.updateMany({ _id: { $in: ids } }, { $set: { productFamilyId: doc._id } });
+    const lean = doc.toObject();
+    return res.status(201).json({ ok: true, item: lean });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.put('/api/product-families/:id', requirePermission('products', 'update', { attach: true }), async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ ok: false, error: 'Invalid id' });
+    const existing = await ProductFamily.findById(id);
+    if (!existing) return res.status(404).json({ ok: false, error: 'Not found' });
+    const body = req.body || {};
+    if (body.name != null) existing.name = String(body.name).trim();
+    if (body.nameAr != null) existing.nameAr = String(body.nameAr).trim();
+    if (Array.isArray(body.options)) existing.options = body.options;
+    if (Array.isArray(body.members)) {
+      existing.members = body.members
+        .map((m) => ({
+          productId: mongoose.Types.ObjectId.isValid(String(m.productId))
+            ? new mongoose.Types.ObjectId(String(m.productId))
+            : null,
+          values: m.values && typeof m.values === 'object' ? m.values : {},
+        }))
+        .filter((m) => m.productId);
+    }
+    if (Array.isArray(body.memberProductIds) && body.memberProductIds.length >= 2) {
+      const transfer = body.transferFromOtherFamilies === true;
+      const oldIds = (existing.memberProductIds || []).map(String);
+      const newIds = body.memberProductIds.filter((x) => mongoose.Types.ObjectId.isValid(String(x))).map((x) => new mongoose.Types.ObjectId(String(x)));
+      if (newIds.length > 20) return res.status(400).json({ ok: false, error: 'Max 20 members' });
+      const removed = oldIds.filter((oid) => !newIds.map(String).includes(oid));
+      if (removed.length) await Product.updateMany({ _id: { $in: removed } }, { $unset: { productFamilyId: 1 } });
+      for (const oid of newIds) {
+        const p = await Product.findById(oid).select('productFamilyId').lean();
+        if (!p) return res.status(400).json({ ok: false, error: 'Invalid member list' });
+        const pf = p.productFamilyId ? String(p.productFamilyId) : '';
+        if (pf && pf !== String(existing._id)) {
+          if (!transfer) {
+            return res.status(400).json({ ok: false, error: `Product ${p._id} in another family` });
+          }
+          await detachProductFromItsFamily(String(p._id));
+        }
+      }
+      const prods = await Product.find({ _id: { $in: newIds } }).lean();
+      if (prods.length !== newIds.length) return res.status(400).json({ ok: false, error: 'Invalid member list' });
+      existing.memberProductIds = newIds;
+      await Product.updateMany({ _id: { $in: newIds } }, { $set: { productFamilyId: existing._id } });
+    }
+    if (body.defaultProductId && mongoose.Types.ObjectId.isValid(String(body.defaultProductId))) {
+      existing.defaultProductId = new mongoose.Types.ObjectId(String(body.defaultProductId));
+    }
+    await existing.save();
+    return res.json({ ok: true, item: existing.toObject() });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message });
+  }
+});
+
+app.delete('/api/product-families/:id', requirePermission('products', 'delete', { attach: true }), async (req, res) => {
+  try {
+    const id = req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(id)) return res.status(400).json({ ok: false, error: 'Invalid id' });
+    const fam = await ProductFamily.findById(id);
+    if (!fam) return res.json({ ok: true, deleted: false });
+    const ids = (fam.memberProductIds || []).map((x) => x);
+    await Product.updateMany({ _id: { $in: ids } }, { $unset: { productFamilyId: 1 } });
+    await ProductFamily.findByIdAndDelete(id);
+    return res.json({ ok: true, deleted: true });
+  } catch (err) {
+    return res.status(400).json({ ok: false, error: err.message });
+  }
 });
 
 app.get('/api/products/:id/ratings', async (req, res) => {
@@ -4846,6 +5130,7 @@ app.post('/api/backups/import/preview', async (req, res) => {
           case 'shopSetup': return (await ShopSetup.countDocuments({}));
           case 'categories': return (await Category.countDocuments({}));
           case 'products': return (await Product.countDocuments({}));
+          case 'productFamilies': return (await ProductFamily.countDocuments({}));
           case 'products3d': return (await Product3D.countDocuments({}));
           case 'builderProjects': return (await BuilderProject.countDocuments({}));
           case 'orders': return (await Order.countDocuments({}));
@@ -4946,6 +5231,76 @@ app.post('/api/backups/import/preview', async (req, res) => {
   }
 });
 
+async function applyProductFamiliesImport(moduleMode, data, summary) {
+  const rows = Array.isArray(data) ? data : [];
+  if (moduleMode === 'replace') {
+    await Product.updateMany({ productFamilyId: { $exists: true, $ne: null } }, { $unset: { productFamilyId: 1 } });
+    await ProductFamily.deleteMany({});
+  }
+  let inserted = 0;
+  let updated = 0;
+  for (const raw of rows) {
+    const row = sanitizeIncomingForApply('productFamilies', raw);
+    delete row.memberSkus;
+    let memberIds = [];
+    if (Array.isArray(row.memberProductIds) && row.memberProductIds.length) {
+      const cand = row.memberProductIds
+        .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+        .map((id) => new mongoose.Types.ObjectId(String(id)));
+      if (cand.length >= 2) {
+        const found = await Product.countDocuments({ _id: { $in: cand } });
+        if (found === cand.length) memberIds = cand;
+      }
+    }
+    if (memberIds.length < 2 && Array.isArray(raw.memberSkus)) {
+      for (const sku of raw.memberSkus) {
+        const p = await Product.findOne({ sku: String(sku || '').trim() }).select('_id').lean();
+        if (p) memberIds.push(p._id);
+      }
+    }
+    memberIds = [...new Set(memberIds.map(String))].map((s) => new mongoose.Types.ObjectId(s));
+    if (memberIds.length < 2) continue;
+    const memberRows = [];
+    for (const mid of memberIds) {
+      const oldMem = (row.members || []).find((m) => String(m.productId) === String(mid));
+      memberRows.push({
+        productId: mid,
+        values: oldMem?.values && typeof oldMem.values === 'object' ? { ...oldMem.values } : {},
+      });
+    }
+    const query = { name: row.name, nameAr: row.nameAr };
+    const doc = {
+      name: row.name,
+      nameAr: row.nameAr,
+      memberProductIds: memberIds,
+      options: row.options || [],
+      members: memberRows,
+      defaultProductId:
+        row.defaultProductId && mongoose.Types.ObjectId.isValid(String(row.defaultProductId))
+          ? new mongoose.Types.ObjectId(String(row.defaultProductId))
+          : memberIds[0],
+    };
+    const exists = await ProductFamily.findOne(query).select('_id').lean();
+    let famId;
+    if (exists) {
+      await ProductFamily.findOneAndUpdate(query, { $set: doc });
+      famId = exists._id;
+      updated += 1;
+    } else {
+      const created = await ProductFamily.create(doc);
+      famId = created._id;
+      inserted += 1;
+    }
+    await Product.updateMany({ _id: { $in: memberIds } }, { $set: { productFamilyId: famId } });
+  }
+  summary.productFamilies = {
+    inserted,
+    updated,
+    deletedBeforeInsert: moduleMode === 'replace',
+    mode: moduleMode,
+  };
+}
+
 app.post('/api/backups/import/apply', async (req, res) => {
   let job = null;
   try {
@@ -4968,7 +5323,28 @@ app.post('/api/backups/import/apply', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'Replace mode requires confirmText=REPLACE' });
     }
 
-    const selectedModules = normalizeBackupModules(req.body?.selectedModules?.length ? req.body.selectedModules : backup.modules);
+    const moduleDecisions = (req.body?.moduleDecisions && typeof req.body.moduleDecisions === 'object') ? req.body.moduleDecisions : {};
+    const selectedModulesRaw = normalizeBackupModules(req.body?.selectedModules?.length ? req.body.selectedModules : backup.modules);
+    const IMPORT_MODULE_ORDER = [
+      'settings',
+      'homeConfig',
+      'shopSetup',
+      'categories',
+      'products',
+      'productFamilies',
+      'products3d',
+      'builderProjects',
+      'orders',
+      'users',
+      'history',
+      'profitSettings',
+      'mediaManifest',
+    ];
+    const selectedModules = [...selectedModulesRaw].sort((a, b) => {
+      const ia = IMPORT_MODULE_ORDER.indexOf(a);
+      const ib = IMPORT_MODULE_ORDER.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
     job = await BackupJob.create({
       type: 'import-apply',
       status: 'running',
@@ -5051,6 +5427,8 @@ app.post('/api/backups/import/apply', async (req, res) => {
         await applyCollection(moduleName, Category, data, moduleMode);
       } else if (moduleName === 'products') {
         await applyCollection(moduleName, Product, data, moduleMode);
+      } else if (moduleName === 'productFamilies') {
+        await applyProductFamiliesImport(moduleMode, data, summary);
       } else if (moduleName === 'products3d') {
         await applyCollection(moduleName, Product3D, data, moduleMode);
       } else if (moduleName === 'builderProjects') {
@@ -5151,6 +5529,9 @@ app.put('/api/settings', async (req, res) => {
     }
     if (body.pricingSettings && typeof body.pricingSettings === 'object') {
       payload.pricingSettings = body.pricingSettings;
+    }
+    if (body.catalogSettings && typeof body.catalogSettings === 'object') {
+      payload.catalogSettings = body.catalogSettings;
     }
     if (body.checkoutEnabled !== undefined) payload.checkoutEnabled = body.checkoutEnabled;
     if (body.shippingCost !== undefined) payload.shippingCost = body.shippingCost;

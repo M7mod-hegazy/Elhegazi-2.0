@@ -269,51 +269,15 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                       {product.categoryAr || product.category}
                     </Link>
 
-                    {/* Simple Theme Heart Favorite Button - Top Left */}
-                    <div className="absolute top-1 left-1 z-10" onClick={(e) => e.stopPropagation()}>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          // Handle favorite toggle here
-
-                        }}
-                        className="group/heart bg-white/95 backdrop-blur-sm rounded-full p-1.5 shadow-md border border-slate-100 hover:bg-white hover:shadow-lg transition-all duration-300 relative heart-button"
-                      >
-                        {/* Default Heart Outline */}
-                        <div className="group-hover/heart:opacity-0 transition-opacity duration-300">
-                          <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" />
-                          </svg>
-                        </div>
-                        
-                        {/* Simple Theme Heart on Hover */}
-                        <div className="absolute inset-0 flex items-center justify-center opacity-0 scale-75 group-hover/heart:opacity-100 group-hover/heart:scale-100 transition-all duration-400 ease-out">
-                          {/* Shadow */}
-                          <svg 
-                            className="w-4 h-4 text-primary/20 fill-current absolute"
-                            style={{ 
-                              transform: 'translate(1.5px, 1.5px)',
-                              filter: 'blur(0.3px)'
-                            }}
-                            viewBox="0 0 24 24"
-                          >
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                          
-                          {/* Main heart - theme colored */}
-                          <svg 
-                            className="w-4 h-4 text-primary fill-current relative"
-                            style={{
-                              filter: 'drop-shadow(0 0 4px currentColor)',
-                              animation: 'heartPulse 2s ease-in-out infinite'
-                            }}
-                            viewBox="0 0 24 24"
-                          >
-                            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
-                          </svg>
-                        </div>
-                      </button>
+                    {/* Favorite: AuthModal عند عدم تسجيل الدخول (نفس مكوّن البطاقات الكامل) */}
+                    <div className="absolute left-1 top-1 z-10" onClick={(e) => e.stopPropagation()}>
+                      <FavoriteButton
+                        productId={getCleanProductId(product.id)}
+                        size="sm"
+                        showToast={false}
+                        suppressAuthModal
+                        className="h-8 w-8 rounded-full border border-slate-100 bg-white/95 p-0 shadow-md backdrop-blur-sm hover:bg-white hover:shadow-lg"
+                      />
                     </div>
 
                     {product.discount && (

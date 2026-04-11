@@ -72,7 +72,9 @@ const ProductsFilterBar = ({
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Check if any filters are active
-  const hasActiveFilters = ratingFilter !== 'all' || priceRange[0] !== dynMin || priceRange[1] !== dynMax;
+  const hasActiveFilters =
+    ratingFilter !== 'all' ||
+    (!hidePrices && (priceRange[0] !== dynMin || priceRange[1] !== dynMax));
 
   const ratingOptions = [
     { value: 'all', label: 'الكل', stars: 0 },
@@ -317,15 +319,21 @@ const ProductsFilterBar = ({
 
           {/* Desktop Expanded Filters */}
           {showFilters && (
-            <div className="hidden lg:block mt-6 p-6 bg-gradient-to-bl from-slate-50 to-white rounded-2xl border border-slate-200 shadow-inner animate-in slide-in-from-top-2 duration-300">
-              <div className="grid grid-cols-3 gap-8">
+            <div className="hidden lg:block mt-6 p-6 bg-gradient-to-br from-slate-50/95 via-white to-primary/[0.03] rounded-2xl border border-slate-200/90 shadow-md animate-in slide-in-from-top-2 duration-300">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200/80 pb-3">
+                <h2 className="text-base font-bold text-slate-900">تصفية النتائج</h2>
+                <p className="text-xs text-slate-500">حدّد المعايير المناسبة</p>
+              </div>
+              <div
+                className={cn('grid gap-8', hidePrices ? 'grid-cols-1 md:grid-cols-2' : 'grid-cols-1 md:grid-cols-3')}
+              >
                 {/* Price Range */}
                 {!hidePrices && (
-                <div className="space-y-4">
+                <div className="space-y-4 rounded-xl border border-slate-100 bg-white/90 p-4 shadow-sm">
                   <div className="flex items-center justify-between">
                     <label className="text-sm font-bold text-slate-800">نطاق السعر</label>
                     <span className="text-xs text-primary font-medium bg-primary/10 px-2 py-1 rounded-full">
-                      {priceRange[0].toLocaleString()} - {priceRange[1].toLocaleString()} ج.م
+                      {priceRange[0].toLocaleString()} — {priceRange[1].toLocaleString()} ج.م
                     </span>
                   </div>
                   <Slider
@@ -372,7 +380,7 @@ const ProductsFilterBar = ({
                 )}
 
                 {/* Rating Filter */}
-                <div className="space-y-4">
+                <div className="space-y-4 rounded-xl border border-slate-100 bg-white/90 p-4 shadow-sm">
                   <label className="text-sm font-bold text-slate-800">التقييم</label>
                   <div className="flex flex-wrap gap-2">
                     {ratingOptions.map((option) => (
@@ -400,7 +408,7 @@ const ProductsFilterBar = ({
                 </div>
 
                 {/* Clear Filters */}
-                <div className="flex items-end">
+                <div className="flex items-end rounded-xl border border-slate-100 bg-white/90 p-4 shadow-sm">
                   <Button
                     variant="outline"
                     onClick={onClearFilters}

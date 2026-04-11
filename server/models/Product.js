@@ -14,6 +14,17 @@ const ProductSchema = new mongoose.Schema(
     stock: { type: Number, default: 0 },
     featured: { type: Boolean, default: false },
     active: { type: Boolean, default: true },
+    descriptionAr: { type: String, default: '' },
+    originalPrice: { type: Number, min: 0 },
+    discount: { type: Number, min: 0, max: 100, default: 0 },
+    tags: [{ type: String }],
+    weight: { type: Number, min: 0 },
+    dimensions: {
+      length: { type: Number, min: 0 },
+      width: { type: Number, min: 0 },
+      height: { type: Number, min: 0 },
+    },
+    productFamilyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductFamily', default: null, index: true },
   },
   { timestamps: true }
 );
@@ -22,6 +33,7 @@ const ProductSchema = new mongoose.Schema(
 ProductSchema.index({ featured: 1 });
 ProductSchema.index({ active: 1 });
 ProductSchema.index({ createdAt: -1 });
+ProductSchema.index({ productFamilyId: 1 });
 // Remove the text index to avoid duplicate schema index warning
 // Optional text search on names (Arabic + English)
 // ProductSchema.index({ name: 'text', nameAr: 'text' });

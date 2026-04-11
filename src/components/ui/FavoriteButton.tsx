@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -6,26 +6,48 @@ import { useDualAuth } from '@/hooks/useDualAuth';
 import { useToast } from '@/hooks/use-toast';
 import AuthModal from '@/components/ui/auth-modal';
 import { cn } from '@/lib/utils';
+import { normalizeFavoriteProductId } from '@/lib/favorite-ids';
 
 interface FavoriteButtonProps {
   productId: string;
+  /**
+   * Extra product ids that count as the same “favorite” for display/toggle (e.g. all variants in a family).
+   * Primary `productId` is used when adding; removing clears every id in this group that is favorited.
+   */
+  favoriteGroupIds?: string[];
   size?: 'sm' | 'md' | 'lg';
   variant?: 'default' | 'ghost' | 'outline';
   className?: string;
   showToast?: boolean;
+  /** When the parent already renders AuthModal bound to useFavorites().showAuthModal */
+  suppressAuthModal?: boolean;
 }
 
 const FavoriteButton = ({ 
   productId, 
+  favoriteGroupIds,
   size = 'md', 
   variant = 'ghost',
   className,
-  showToast = true 
+  showToast = true,
+  suppressAuthModal = false,
 }: FavoriteButtonProps) => {
   const [isAnimating, setIsAnimating] = useState(false);
-  const { isFavorite, toggleFavorite, isAuthenticated, showAuthModal, setShowAuthModal } = useFavorites();
+  const { isFavorite, addToFavorites, removeFromFavorites, isAuthenticated, showAuthModal, setShowAuthModal } =
+    useFavorites();
   const { isAdmin } = useDualAuth();
   const { toast } = useToast();
+
+  const candidateIds = useMemo(() => {
+    const set = new Set<string>();
+    const p = normalizeFavoriteProductId(productId);
+    if (p) set.add(p);
+    for (const x of favoriteGroupIds ?? []) {
+      const n = normalizeFavoriteProductId(x);
+      if (n) set.add(n);
+    }
+    return [...set];
+  }, [productId, favoriteGroupIds]);
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -37,14 +59,25 @@ const FavoriteButton = ({
       return;
     }
 
-    const wasFav = isFavorite(productId);
-    const success = await toggleFavorite(productId);
+    const wasFav = candidateIds.some((id) => isFavorite(id));
+    let success = false;
+    if (wasFav) {
+      const toRemove = candidateIds.filter((id) => isFavorite(id));
+      for (const id of toRemove) {
+        const ok = await removeFromFavorites(id);
+        success = success || ok;
+      }
+    } else {
+      const primary = normalizeFavoriteProductId(productId);
+      if (primary) success = await addToFavorites(primary);
+    }
+
     if (success) {
       setIsAnimating(true);
       setTimeout(() => setIsAnimating(false), 300);
 
       if (showToast) {
-        const isNowFavorite = !wasFav; // reflect the intended post-toggle state
+        const isNowFavorite = !wasFav;
         toast({
           title: isNowFavorite ? "تمت الإضافة للمفضلة" : "تم الحذف من المفضلة",
           description: isNowFavorite ? "تم إضافة المنتج لقائمة المفضلة" : "تم حذف المنتج من قائمة المفضلة",
@@ -53,7 +86,7 @@ const FavoriteButton = ({
     }
   };
 
-  const isFav = isFavorite(productId);
+  const isFav = candidateIds.some((id) => isFavorite(id));
   
   const sizeClasses = {
     sm: 'w-8 h-8',
@@ -123,12 +156,13 @@ const FavoriteButton = ({
       )}
     </Button>
 
-    {/* Auth Modal */}
-    <AuthModal
-      isOpen={showAuthModal}
-      onClose={() => setShowAuthModal(false)}
-      action="favorites"
-    />
+    {!suppressAuthModal ? (
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        action="favorites"
+      />
+    ) : null}
   </>
   );
 };

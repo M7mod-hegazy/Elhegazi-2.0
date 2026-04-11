@@ -1,4 +1,4 @@
-﻿import mongoose from 'mongoose';
+import mongoose from 'mongoose';
 
 const SettingsSchema = new mongoose.Schema(
   {
@@ -62,6 +62,9 @@ const SettingsSchema = new mongoose.Schema(
     pricingSettings: {
       hidePrices: { type: Boolean, default: false },
       contactMessage: { type: String, default: '\u0627\u0644\u0633\u0644\u0627\u0645 \u0639\u0644\u064a\u0643\u0645\u060c \u0623\u0648\u062f \u0645\u0639\u0631\u0641\u0629 \u0633\u0639\u0631 \u0627\u0644\u0645\u0646\u062a\u062c' },
+    },
+    catalogSettings: {
+      familyCardsInListings: { type: Boolean, default: false },
     },
     ownerVault: {
       enabled: { type: Boolean, default: true },

@@ -1,17 +1,16 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 import { Link } from 'react-router-dom';
 import { Heart, Trash2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { useFavorites } from '@/hooks/useFavorites';
-import { useCart } from '@/hooks/useCart';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { useToast } from '@/hooks/use-toast';
 import useDeviceDetection from '@/hooks/useDeviceDetection';
 import { Product } from '@/types';
 import ProductCard from '@/components/product/ProductCard';
-import { apiGet, type ApiResponse } from '@/lib/api';
+import { apiGet, ApiHttpError, type ApiResponse } from '@/lib/api';
 import { resolveProductCategory, type CategoryListRecord } from '@/lib/category-display';
 
 type ApiProduct = {
@@ -51,6 +50,7 @@ function mapApiProductToFavorite(p: ApiProduct, catItems: CategoryListRecord[]):
 
   return {
     id: p._id,
+    _id: p._id,
     name: p.name,
     nameAr: p.nameAr ?? p.name,
     description: p.description ?? '',
@@ -80,11 +80,21 @@ function mapApiProductToFavorite(p: ApiProduct, catItems: CategoryListRecord[]):
 const Favorites = () => {
   const [favoriteProducts, setFavoriteProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
-  const { favorites, clearFavorites } = useFavorites();
-  const { addItem } = useCart();
+  const { favorites, clearFavorites, removeFromFavorites } = useFavorites();
   const { isAuthenticated, isAdmin } = useDualAuth();
   const { toast } = useToast();
   const { isMobile } = useDeviceDetection();
+  const loadGenRef = useRef(0);
+
+  const favoritesKey = useMemo(
+    () =>
+      [...(favorites || [])]
+        .filter((id) => typeof id === 'string' && id.trim())
+        .map((id) => id.trim())
+        .sort()
+        .join('|'),
+    [favorites]
+  );
 
   const loadFavorites = useCallback(async () => {
     if (!isAuthenticated || isAdmin) {
@@ -93,47 +103,80 @@ const Favorites = () => {
       return;
     }
 
-    try {
-      const validIds = (favorites || []).filter((id): id is string => {
-        if (typeof id !== 'string') return false;
-        const v = id.trim().toLowerCase();
-        if (!v) return false;
-        if (v === 'undefined' || v === 'null' || v === 'nan') return false;
-        if (!/^[a-f0-9]{24}$/i.test(v)) return false;
-        return true;
-      });
+    const runId = ++loadGenRef.current;
 
-      if (validIds.length === 0) {
+    const validIds = favoritesKey
+      ? favoritesKey.split('|').filter((id): id is string => {
+          const v = id.trim().toLowerCase();
+          if (!v) return false;
+          if (v === 'undefined' || v === 'null' || v === 'nan') return false;
+          if (!/^[a-f0-9]{24}$/i.test(v)) return false;
+          return true;
+        })
+      : [];
+
+    if (validIds.length === 0) {
+      if (loadGenRef.current === runId) {
         setFavoriteProducts([]);
         setLoading(false);
-        return;
       }
+      return;
+    }
 
+    if (loadGenRef.current === runId) setLoading(true);
+
+    try {
       const catsRes = await apiGet<CategoryListRecord>('/api/categories?limit=500&page=1');
+      if (loadGenRef.current !== runId) return;
       const catItems =
         (catsRes as Extract<ApiResponse<CategoryListRecord>, { ok: true }>).items ?? [];
 
-      const prods = await Promise.all(
-        validIds.map(async (id) => {
+      type Row = { id: string; product: Product | null; prune: boolean };
+      const results: Row[] = await Promise.all(
+        validIds.map(async (id): Promise<Row> => {
           try {
             const res = await apiGet<ApiProduct>(`/api/products/${id}`);
             const ok = res as Extract<ApiResponse<ApiProduct>, { ok: true }>;
-            if (!ok.item) return null;
-            return mapApiProductToFavorite(ok.item as ApiProduct, catItems);
-          } catch {
-            return null;
+            if (!ok.item) return { id, product: null, prune: false };
+            return { id, product: mapApiProductToFavorite(ok.item as ApiProduct, catItems), prune: false };
+          } catch (e) {
+            const prune = e instanceof ApiHttpError && e.status === 404;
+            return { id, product: null, prune };
           }
         })
       );
-      setFavoriteProducts(prods.filter((p): p is Product => !!p));
+
+      if (loadGenRef.current !== runId) return;
+
+      const missing404 = results.filter((r) => r.product == null && r.prune).map((r) => r.id);
+      const prods = results.map((r) => r.product).filter((p): p is Product => !!p);
+      setFavoriteProducts(prods);
+
+      if (missing404.length > 0) {
+        void (async () => {
+          let removed = 0;
+          for (const id of missing404) {
+            if (await removeFromFavorites(id)) removed += 1;
+          }
+          if (removed > 0) {
+            toast({
+              title: 'تنظيف المفضلة',
+              description:
+                removed === 1
+                  ? 'منتج لم يعد متوفراً وتمت إزالته من قائمة المفضلة.'
+                  : `تمت إزالة ${removed} منتجات لم تعد متوفرة من قائمة المفضلة.`,
+            });
+          }
+        })();
+      }
     } catch {
-      setFavoriteProducts([]);
+      if (loadGenRef.current === runId) setFavoriteProducts([]);
+    } finally {
+      if (loadGenRef.current === runId) setLoading(false);
     }
-    setLoading(false);
-  }, [isAuthenticated, isAdmin, favorites]);
+  }, [isAuthenticated, isAdmin, favoritesKey, removeFromFavorites, toast]);
 
   useEffect(() => {
-    setLoading(true);
     void loadFavorites();
   }, [loadFavorites]);
 

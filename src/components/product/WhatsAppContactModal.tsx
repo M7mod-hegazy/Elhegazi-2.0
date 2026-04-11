@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { useDualAuth } from '@/hooks/useDualAuth';
 import { apiGet } from '@/lib/api';
 import { buildProductPath } from '@/lib/product-link';
-import { applyProductImageFallback } from '@/lib/images';
+import { applyProductImageFallback, optimizeImage, PRODUCT_IMAGE_FALLBACK } from '@/lib/images';
+import type { User } from '@/types';
 import whatsappIcon from '@/assets/whatsapp.png';
 import messengerIcon from '@/assets/messenger.png';
 
@@ -21,6 +22,11 @@ const MessengerIcon = () => (
   <img src={messengerIcon} alt="Messenger" className="w-4 h-4" />
 );
 
+function formatProfileAddress(u: User): string {
+  const a = u.address;
+  if (!a || typeof a !== 'object') return '';
+  return [a.street, a.city, a.state, a.postalCode, a.country].filter(Boolean).join('، ');
+}
 
 interface WhatsAppContactModalProps {
   isOpen: boolean;
@@ -41,7 +47,8 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
   productImage,
   defaultMessage = 'السلام عليكم، أود معرفة سعر المنتج',
 }) => {
-  const { user, isAuthenticated } = useDualAuth();
+  const { user, isAuthenticated, isAdmin } = useDualAuth();
+  const isCustomerSession = Boolean(isAuthenticated && user && !isAdmin);
   const [message, setMessage] = useState(defaultMessage);
   const [userName, setUserName] = useState('');
   const [userPhone, setUserPhone] = useState('');
@@ -49,47 +56,49 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Auto-fill user info if authenticated
   useEffect(() => {
-    if (isAuthenticated && user) {
-      setUserName(user.email?.split('@')[0] || '');
-      setUserPhone(user.phone || '');
-      setUserAddress(typeof user.address === 'string' ? user.address : '');
-    } else {
+    if (!isOpen) return;
+    if (isCustomerSession && user) {
+      const name =
+        [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
+        user.email?.split('@')[0] ||
+        '';
+      setUserName(name);
+      setUserPhone((user.phone || '').trim());
+      setUserAddress(formatProfileAddress(user));
+    } else if (!isAuthenticated) {
       setUserName('');
       setUserPhone('');
       setUserAddress('');
     }
-  }, [isAuthenticated, user, isOpen]);
+  }, [isOpen, isCustomerSession, user, isAuthenticated]);
 
   // Build product details link
   const productDetailsLink = `${window.location.origin}${buildProductPath(productId)}`;
   
   // Build full message with product code if available
-  const fullMessage = `${message}\n\n👤 الاسم: ${userName}\n📱 الهاتف: ${userPhone}\n📍 العنوان: ${userAddress}\n\n📦 المنتج: ${productName}${productCode ? `\nالكود: ${productCode}` : ''}\n🔗 الرابط: ${productDetailsLink}`;
-  
-  // Debug logging
-  useEffect(() => {
-
-
-  }, [productCode, fullMessage]);
+  const displayName = userName.trim() || (isCustomerSession ? '—' : '');
+  const displayPhone = userPhone.trim() || (isCustomerSession ? 'غير مسجل في الحساب' : '');
+  const displayAddress = userAddress.trim() || (isCustomerSession ? 'غير مسجل في الحساب' : '');
+  const fullMessage = `${message}\n\n👤 الاسم: ${displayName}\n📱 الهاتف: ${displayPhone}\n📍 العنوان: ${displayAddress}\n\n📦 المنتج: ${productName}${productCode ? `\nالكود: ${productCode}` : ''}\n🔗 الرابط: ${productDetailsLink}`;
 
   const handleSend = async () => {
     try {
       setError(null);
 
-      // Validate required fields
-      if (!userName.trim()) {
-        setError('يرجى إدخال اسمك');
-        return;
-      }
-      if (!userPhone.trim()) {
-        setError('يرجى إدخال رقم هاتفك');
-        return;
-      }
-      if (!userAddress.trim()) {
-        setError('يرجى إدخال عنوانك');
-        return;
+      if (!isCustomerSession) {
+        if (!userName.trim()) {
+          setError('يرجى إدخال اسمك');
+          return;
+        }
+        if (!userPhone.trim()) {
+          setError('يرجى إدخال رقم هاتفك');
+          return;
+        }
+        if (!userAddress.trim()) {
+          setError('يرجى إدخال عنوانك');
+          return;
+        }
       }
 
       setIsSending(true);
@@ -182,18 +191,19 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
     try {
       setError(null);
 
-      // Validate required fields
-      if (!userName.trim()) {
-        setError('يرجى إدخال اسمك');
-        return;
-      }
-      if (!userPhone.trim()) {
-        setError('يرجى إدخال رقم هاتفك');
-        return;
-      }
-      if (!userAddress.trim()) {
-        setError('يرجى إدخال عنوانك');
-        return;
+      if (!isCustomerSession) {
+        if (!userName.trim()) {
+          setError('يرجى إدخال اسمك');
+          return;
+        }
+        if (!userPhone.trim()) {
+          setError('يرجى إدخال رقم هاتفك');
+          return;
+        }
+        if (!userAddress.trim()) {
+          setError('يرجى إدخال عنوانك');
+          return;
+        }
       }
 
       setIsSending(true);
@@ -273,72 +283,66 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
 
         <div className="space-y-4 max-h-[80vh] overflow-y-auto">
           {/* Product Image and Info */}
-          <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="flex gap-3">
-              {productImage && (
+              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
                 <img
-                  src={productImage}
+                  src={productImage ? optimizeImage(productImage, { w: 192 }) : PRODUCT_IMAGE_FALLBACK}
                   alt={productName}
-                  className="w-20 h-20 object-cover rounded-lg"
+                  className="h-full w-full object-cover"
                   onError={applyProductImageFallback}
                 />
-              )}
-              <div className="flex-1">
-                <h3 className="font-semibold text-sm text-slate-900 mb-1">{productName}</h3>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="mb-1 text-sm font-semibold text-slate-900">{productName}</h3>
                 <p className="text-xs text-slate-500">المعرف: {productId}</p>
               </div>
             </div>
           </div>
 
-          {/* User Information */}
-          <div className="space-y-3 bg-blue-50 rounded-lg p-4 border border-blue-200">
-            <h3 className="font-semibold text-sm text-slate-900">معلوماتك</h3>
-            
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">
-                الاسم *
-              </label>
-              <Input
-                value={userName}
-                onChange={(e) => setUserName(e.target.value)}
-                placeholder="أدخل اسمك"
-                disabled={isSending || isAuthenticated}
-                className="text-sm"
-              />
-            </div>
+          {/* User Information — للزوار فقط؛ للعميل المسجّل تُؤخذ البيانات من الحساب دون إدخال */}
+          {!isCustomerSession ? (
+            <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
+              <h3 className="text-sm font-semibold text-slate-900">معلوماتك</h3>
 
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">
-                رقم الهاتف *
-              </label>
-              <Input
-                value={userPhone}
-                onChange={(e) => setUserPhone(e.target.value)}
-                placeholder="أدخل رقم هاتفك"
-                disabled={isSending || isAuthenticated}
-                className="text-sm"
-              />
-            </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">الاسم *</label>
+                <Input
+                  value={userName}
+                  onChange={(e) => setUserName(e.target.value)}
+                  placeholder="أدخل اسمك"
+                  disabled={isSending}
+                  className="text-sm"
+                />
+              </div>
 
-            <div>
-              <label className="text-xs font-medium text-slate-700 block mb-1">
-                العنوان *
-              </label>
-              <Input
-                value={userAddress}
-                onChange={(e) => setUserAddress(e.target.value)}
-                placeholder="أدخل عنوانك"
-                disabled={isSending || isAuthenticated}
-                className="text-sm"
-              />
-            </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">رقم الهاتف *</label>
+                <Input
+                  value={userPhone}
+                  onChange={(e) => setUserPhone(e.target.value)}
+                  placeholder="أدخل رقم هاتفك"
+                  disabled={isSending}
+                  className="text-sm"
+                />
+              </div>
 
-            {isAuthenticated && (
-              <p className="text-xs text-blue-600 flex items-center gap-1">
-                ✓ تم ملء البيانات من حسابك
-              </p>
-            )}
-          </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-slate-700">العنوان *</label>
+                <Input
+                  value={userAddress}
+                  onChange={(e) => setUserAddress(e.target.value)}
+                  placeholder="أدخل عنوانك"
+                  disabled={isSending}
+                  className="text-sm"
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-900">
+              سيتم إرفاق بيانات التواصل من حسابك تلقائياً مع الرسالة. يمكنك تعديل نص الاستفسار أدناه فقط.
+            </div>
+          )}
 
           {/* Message Editor */}
           <div className="space-y-2">
@@ -396,7 +400,10 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
             <Button
               onClick={handleSendMessenger}
               className="flex-1 min-w-20 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-              disabled={isSending || !userName.trim() || !userPhone.trim() || !userAddress.trim()}
+              disabled={
+                isSending ||
+                (!isCustomerSession && (!userName.trim() || !userPhone.trim() || !userAddress.trim()))
+              }
             >
               {isSending ? (
                 <>
@@ -413,7 +420,10 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
             <Button
               onClick={handleSend}
               className="flex-1 min-w-20 bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2"
-              disabled={isSending || !userName.trim() || !userPhone.trim() || !userAddress.trim()}
+              disabled={
+                isSending ||
+                (!isCustomerSession && (!userName.trim() || !userPhone.trim() || !userAddress.trim()))
+              }
             >
               {isSending ? (
                 <>

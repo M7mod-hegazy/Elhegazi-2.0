@@ -27,10 +27,16 @@ import {
   DialogTitle,
   VisuallyHidden,
 } from '@/components/ui/dialog';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import AdminLayout from '@/components/admin/AdminLayout';
+import { ProductFamilyMergeDialog } from '@/pages/admin/ProductFamilyMergeDialog';
+import {
+  ProductFamilyEditDialog,
+  type AdminProductFamilyLean,
+} from '@/pages/admin/ProductFamilyEditDialog';
+import { clearStorefrontFamiliesCache } from '@/lib/productFamilyListings';
 import { ModernTable, ModernTableRow, ModernTableHeader, ModernTableCell } from '@/components/admin/ModernTable';
 import { apiGet, apiPostJson, apiPutJson, apiDelete } from '@/lib/api';
 import { Product, Category } from '@/types';
@@ -71,7 +77,10 @@ import {
   Tag,
   EyeOff,
   Package,
-  DollarSign
+  DollarSign,
+  Link2,
+  Pencil,
+  Users,
 } from 'lucide-react';
 
 // Small progress bar to visualize countdown (used in delete toasts)
@@ -133,6 +142,7 @@ type BackendProduct = {
   active?: boolean;
   createdAt: string;
   updatedAt: string;
+  productFamilyId?: string | null;
 };
 
 type ProductsListResponse = {
@@ -487,7 +497,7 @@ const AdminProducts = () => {
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const didInitFromParams = useRef(false);
   const lastBulkDeleteIdsRef = useRef<string[]>([]);
-  const { hidePrices } = usePricingSettings();
+  const { hidePrices, familyCardsInListings } = usePricingSettings();
 
   // State
   const [products, setProducts] = useState<Product[]>([]);
@@ -496,6 +506,7 @@ const AdminProducts = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [familyMergeOpen, setFamilyMergeOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [formData, setFormData] = useState<ProductFormData>({
@@ -888,6 +899,8 @@ const AdminProducts = () => {
       image: bp.image || '',
       images: bp.images || [],
       category: bp.categoryId || bp.categorySlug || '',
+      categoryId: bp.categoryId ? String(bp.categoryId) : undefined,
+      categorySlug: bp.categorySlug,
       categoryAr: '',
       stock: bp.stock,
       isHidden: bp.active === false ? true : false,
@@ -901,6 +914,7 @@ const AdminProducts = () => {
       dimensions: undefined,
       createdAt: bp.createdAt,
       updatedAt: bp.updatedAt,
+      productFamilyId: bp.productFamilyId ? String(bp.productFamilyId) : undefined,
     };
   };
 
@@ -1138,6 +1152,82 @@ const AdminProducts = () => {
     return filteredProducts.slice(startIndex, endIndex);
   }, [filteredProducts, currentPage, itemsPerPage]);
 
+  const [adminFamilyDocs, setAdminFamilyDocs] = useState<AdminProductFamilyLean[]>([]);
+  const [expandedFamilyIds, setExpandedFamilyIds] = useState<Set<string>>(new Set());
+  const [editFamily, setEditFamily] = useState<AdminProductFamilyLean | null>(null);
+
+  const fetchAdminFamilies = useCallback(async () => {
+    try {
+      const res = await apiGet<AdminProductFamilyLean>('/api/product-families');
+      if (res.ok && 'items' in res && Array.isArray(res.items)) {
+        setAdminFamilyDocs(res.items as AdminProductFamilyLean[]);
+      } else {
+        setAdminFamilyDocs([]);
+      }
+    } catch {
+      setAdminFamilyDocs([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void fetchAdminFamilies();
+  }, [products, fetchAdminFamilies]);
+
+  const familyRepsOnPage = useMemo(() => {
+    const pageIds = new Set(paginatedProducts.map((p) => String(p.id)));
+    const map = new Map<string, string>();
+    const seenFam = new Set<string>();
+    for (const p of paginatedProducts) {
+      const fid = p.productFamilyId;
+      if (!fid) continue;
+      const fs = String(fid);
+      if (seenFam.has(fs)) continue;
+      seenFam.add(fs);
+      const fam = adminFamilyDocs.find((f) => String(f._id) === fs);
+      const ids = (fam?.memberProductIds || []).map((x) => String(x));
+      const def = fam?.defaultProductId ? String(fam.defaultProductId) : '';
+      const rep =
+        (def && pageIds.has(def) ? def : ids.find((id) => pageIds.has(id))) || String(p.id);
+      map.set(fs, rep);
+    }
+    return map;
+  }, [paginatedProducts, adminFamilyDocs]);
+
+  const visiblePaginatedProducts = useMemo(() => {
+    return paginatedProducts.filter((p) => {
+      const fid = p.productFamilyId;
+      if (!fid) return true;
+      if (expandedFamilyIds.has(String(fid))) return true;
+      const rep = familyRepsOnPage.get(String(fid));
+      return rep != null && String(p.id) === rep;
+    });
+  }, [paginatedProducts, expandedFamilyIds, familyRepsOnPage]);
+
+  const isFamilyRepresentative = useCallback(
+    (p: Product) => {
+      const fid = p.productFamilyId;
+      if (!fid) return false;
+      return familyRepsOnPage.get(String(fid)) === String(p.id);
+    },
+    [familyRepsOnPage]
+  );
+
+  const toggleFamilyExpand = useCallback((familyId: string) => {
+    setExpandedFamilyIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(familyId)) next.delete(familyId);
+      else next.add(familyId);
+      return next;
+    });
+  }, []);
+
+  /** عرض سريع لعدد العائلات والمنتجات المرتبطة بها في القائمة المصفّاة */
+  const familyListingStats = useMemo(() => {
+    const withFam = filteredProducts.filter((p) => !!p.productFamilyId);
+    const unique = new Set(withFam.map((p) => String(p.productFamilyId)));
+    return { familyGroups: unique.size, memberRows: withFam.length };
+  }, [filteredProducts]);
+
   // Resolve product main image with category fallback
   const getProductPrimaryImage = useCallback((p: Product): string => {
     const cat = categories.find(
@@ -1148,18 +1238,18 @@ const AdminProducts = () => {
 
   // Select all on current page
   const toggleSelectAllOnPage = useCallback(() => {
-    const ids = paginatedProducts.map(p => String(p.id));
-    setSelectedIds(prev => {
+    const ids = visiblePaginatedProducts.map((p) => String(p.id));
+    setSelectedIds((prev) => {
       const next = new Set(prev);
-      const allSelected = ids.every(id => next.has(id));
+      const allSelected = ids.every((id) => next.has(id));
       if (allSelected) {
-        ids.forEach(id => next.delete(id));
+        ids.forEach((id) => next.delete(id));
       } else {
-        ids.forEach(id => next.add(id));
+        ids.forEach((id) => next.add(id));
       }
       return next;
     });
-  }, [paginatedProducts]);
+  }, [visiblePaginatedProducts]);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -2935,6 +3025,18 @@ const AdminProducts = () => {
                   <FileSpreadsheet className="w-4 h-4 mr-2" />
                   {'\u062a\u0635\u062f\u064a\u0631 \u0645\u0646\u062a\u062c\u0627\u062a'}
                 </Button>
+                {familyCardsInListings && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    type="button"
+                    onClick={() => setFamilyMergeOpen(true)}
+                    className="bg-indigo-50 hover:bg-indigo-100 border-indigo-200 text-indigo-800 shadow-sm"
+                  >
+                    <Link2 className="w-4 h-4 mr-2" />
+                    دمج عائلة
+                  </Button>
+                )}
                 <Dialog open={isCreateModalOpen} onOpenChange={setIsCreateModalOpen} modal={false}>
                   <Button
                     onClick={() => { resetForm(); setIsCreateModalOpen(true); }}
@@ -3028,7 +3130,11 @@ const AdminProducts = () => {
             </div>
 
             {/* Mobile Actions Row */}
-            <div className="grid grid-cols-3 md:hidden gap-2 mt-3">
+            <div
+              className={`grid md:hidden gap-2 mt-3 ${
+                familyCardsInListings ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'
+              }`}
+            >
               <Button
                 variant="outline"
                 size="sm"
@@ -3047,6 +3153,18 @@ const AdminProducts = () => {
                 <FileSpreadsheet className="w-4 h-4 mr-2" />
                 {'\u062a\u0635\u062f\u064a\u0631'}
               </Button>
+              {familyCardsInListings && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  type="button"
+                  onClick={() => setFamilyMergeOpen(true)}
+                  className="flex-1 h-10 bg-indigo-50 border-indigo-200 text-indigo-800"
+                >
+                  <Link2 className="w-4 h-4 mr-2" />
+                  دمج عائلة
+                </Button>
+              )}
               <Button
                 onClick={() => { resetForm(); setIsCreateModalOpen(true); }}
                 className="flex-1 h-10 bg-gradient-to-r from-primary to-secondary text-white"
@@ -3062,7 +3180,7 @@ const AdminProducts = () => {
         {isMobile ? (
           <div className="space-y-4">
             {/* Mobile: Revolutionary Card-Based Layout with Bigger Image Space */}
-            {paginatedProducts.map((product) => (
+            {visiblePaginatedProducts.map((product) => (
               <div key={product.id} className="bg-white/90 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg overflow-hidden">
                 {/* Mobile Layout: Image-First Design */}
                 <div className="flex">
@@ -3213,14 +3331,34 @@ const AdminProducts = () => {
                     <CardTitle className="text-lg md:text-2xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
                       جدول المنتجات ({filteredProducts.length})
                     </CardTitle>
-                    <CardDescription className="text-sm md:text-lg text-slate-600 font-medium">
-                      <span className="hidden sm:inline">
-                        عرض {(currentPage - 1) * itemsPerPage + 1} - {Math.min(currentPage * itemsPerPage, filteredProducts.length)} من أصل {filteredProducts.length} منتج
-                      </span>
-                      <span className="sm:hidden">
-                        {filteredProducts.length} منتج
-                      </span>
-                    </CardDescription>
+                    <div className="text-sm md:text-lg text-slate-600 font-medium space-y-2">
+                      <p className="text-sm md:text-lg text-slate-600">
+                        <span className="hidden sm:inline">
+                          عرض {(currentPage - 1) * itemsPerPage + 1} -{' '}
+                          {Math.min(currentPage * itemsPerPage, filteredProducts.length)} من أصل {filteredProducts.length}{' '}
+                          منتج
+                        </span>
+                        <span className="sm:hidden">{filteredProducts.length} منتج</span>
+                      </p>
+                      {familyListingStats.memberRows > 0 ? (
+                        <div className="flex flex-col gap-2 text-xs font-normal text-slate-600 md:text-sm">
+                          <p>
+                            <span className="font-semibold text-slate-800">العائلات في القائمة الحالية:</span>{' '}
+                            {familyListingStats.familyGroups} مجموعة — {familyListingStats.memberRows} صفاً مرتبطاً بعائلة
+                          </p>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-violet-300 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-900 md:text-xs">
+                              <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                              شريط بنفسجي: رئيس المجموعة
+                            </span>
+                            <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-indigo-200 bg-indigo-50/90 px-2.5 py-1 text-[11px] font-semibold text-indigo-900 md:text-xs">
+                              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                              شريط نيلي: عضو
+                            </span>
+                          </div>
+                        </div>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
 
@@ -3346,7 +3484,7 @@ const AdminProducts = () => {
                             <input
                               type="checkbox"
                               aria-label="تحديد الكل"
-                              checked={paginatedProducts.length > 0 && paginatedProducts.every(p => selectedIds.has(String(p.id)))}
+                              checked={visiblePaginatedProducts.length > 0 && visiblePaginatedProducts.every((p) => selectedIds.has(String(p.id)))}
                               onChange={toggleSelectAllOnPage}
                               className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary focus:ring-2"
                             />
@@ -3408,12 +3546,21 @@ const AdminProducts = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {paginatedProducts.map((product) => (
+                        {visiblePaginatedProducts.map((product) => (
                           <Fragment key={product.id}>
                             {/* Enhanced Main Row */}
                             <TableRow
                               key={product.id}
-                              className={`hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 border-l-4 ${expandedRows.has(product.id) ? 'bg-gradient-to-r from-primary/5 to-secondary/5 border-l-primary shadow-md' : 'border-l-transparent hover:border-l-primary/30'}`}
+                              className={[
+                                'hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 border-s-4',
+                                expandedRows.has(product.id)
+                                  ? 'bg-gradient-to-r from-primary/5 to-secondary/5 border-s-primary shadow-md'
+                                  : product.productFamilyId && isFamilyRepresentative(product)
+                                    ? 'border-s-violet-600 bg-gradient-to-l from-violet-100/95 via-violet-50/40 to-white shadow-sm'
+                                    : product.productFamilyId && !isFamilyRepresentative(product)
+                                      ? 'border-s-indigo-500 bg-indigo-50/80'
+                                      : 'border-s-transparent hover:border-s-primary/25',
+                              ].join(' ')}
                             >
                               <TableCell className="w-12">
                                 <Button
@@ -3514,6 +3661,58 @@ const AdminProducts = () => {
                                         </Badge>
                                       )}
                                     </div>
+                                  )}
+                                  {product.productFamilyId && isFamilyRepresentative(product) && (() => {
+                                    const fid = String(product.productFamilyId);
+                                    const fam = adminFamilyDocs.find((f) => String(f._id) === fid);
+                                    const n = fam?.memberProductIds?.length ?? 0;
+                                    if (n < 2) return null;
+                                    return (
+                                      <div
+                                        className="flex flex-wrap items-center justify-center gap-2 pt-1"
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        <Badge
+                                          variant="outline"
+                                          className="gap-1 text-[10px] font-bold border-violet-300 bg-violet-100 text-violet-950 shadow-sm"
+                                        >
+                                          <Link2 className="h-3 w-3 shrink-0" aria-hidden />
+                                          عائلة · {n} منتجات
+                                        </Badge>
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-7 gap-1 px-2 text-xs"
+                                          onClick={() => toggleFamilyExpand(fid)}
+                                        >
+                                          {expandedFamilyIds.has(fid) ? (
+                                            <ChevronDown className="h-3 w-3" />
+                                          ) : (
+                                            <ChevronRight className="h-3 w-3" />
+                                          )}
+                                          {expandedFamilyIds.has(fid) ? 'إخفاء الأعضاء' : 'عرض الأعضاء'}
+                                        </Button>
+                                        {fam ? (
+                                          <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="sm"
+                                            className="h-7 gap-1 px-2 text-xs"
+                                            onClick={() => setEditFamily(fam)}
+                                          >
+                                            <Pencil className="h-3 w-3" />
+                                            تعديل العائلة
+                                          </Button>
+                                        ) : null}
+                                      </div>
+                                    );
+                                  })()}
+                                  {product.productFamilyId && !isFamilyRepresentative(product) && (
+                                    <Badge className="mx-auto mt-1 flex w-fit items-center gap-1 text-[10px] font-semibold border border-indigo-300 bg-indigo-50 text-indigo-950">
+                                      <Users className="h-3 w-3 shrink-0" aria-hidden />
+                                      عضو في عائلة
+                                    </Badge>
                                   )}
                                 </div>
                               </TableCell>
@@ -5274,6 +5473,49 @@ const AdminProducts = () => {
           </div>
         </DialogContent>
       </Dialog>
+      <ProductFamilyEditDialog
+        open={!!editFamily}
+        onOpenChange={(o) => {
+          if (!o) setEditFamily(null);
+        }}
+        family={editFamily}
+        products={products.map((p) => ({
+          id: String(p.id),
+          name: p.name,
+          nameAr: p.nameAr,
+          sku: p.sku,
+          image: p.image,
+          categoryId: p.categoryId ?? (typeof p.category === 'string' ? p.category : String(p.category ?? '')),
+          productFamilyId: p.productFamilyId ?? null,
+        }))}
+        categories={categories.map((c) => ({ id: c.id, nameAr: c.nameAr, name: c.name }))}
+        onSaved={async () => {
+          clearStorefrontFamiliesCache();
+          await fetchAdminFamilies();
+          await refetchProducts();
+        }}
+      />
+      {familyCardsInListings && (
+        <ProductFamilyMergeDialog
+          open={familyMergeOpen}
+          onOpenChange={setFamilyMergeOpen}
+          products={products.map((p) => ({
+            _id: p.id,
+            name: p.name,
+            nameAr: p.nameAr,
+            sku: p.sku,
+            productFamilyId: p.productFamilyId,
+            image: p.image,
+            categoryId: p.categoryId ?? p.category ?? '',
+          }))}
+          categories={categories.map((c) => ({ id: c.id, nameAr: c.nameAr, name: c.name }))}
+          onCreated={async () => {
+            clearStorefrontFamiliesCache();
+            await fetchAdminFamilies();
+            await refetchProducts();
+          }}
+        />
+      )}
     </AdminLayout>
   );
 };

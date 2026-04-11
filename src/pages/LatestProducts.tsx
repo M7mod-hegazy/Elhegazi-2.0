@@ -13,8 +13,10 @@ import ProductsFilterBar from '@/components/product/ProductsFilterBar';
 import SocialLinks from '@/components/layout/SocialLinks';
 import { optimizeImage, buildSrcSet } from '@/lib/images';
 import ScrollAnimation from '@/components/ui/scroll-animation';
-import { apiGet, type ApiResponse } from '@/lib/api';
+import { apiGet } from '@/lib/api';
 import type { Product } from '@/types';
+import { groupListingRowsByFamily } from '@/lib/productFamilyListings';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
 
 type ApiProduct = {
   _id: string;
@@ -49,6 +51,11 @@ const LatestProductsContent = () => {
   const [products, setProducts] = useState<ApiProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { hidePrices } = usePricingSettings();
+
+  useEffect(() => {
+    if (hidePrices && sortBy === 'price') setSortBy('newest');
+  }, [hidePrices, sortBy]);
 
   // Fetch latest products based on admin panel selection
   useEffect(() => {
@@ -76,10 +83,15 @@ const LatestProductsContent = () => {
         const response = await apiGet<ApiProduct>(`/api/products?ids=${idsParam}`);
 
         if (response.ok && response.items) {
-          const activeProducts = response.items.filter((product: ApiProduct) =>
-            product.active !== false
-          );
-          setProducts(activeProducts);
+          const activeById = new Map<string, ApiProduct>();
+          for (const product of response.items) {
+            if (product.active === false) continue;
+            activeById.set(String(product._id), product);
+          }
+          const ordered = selectedIds
+            .map((id) => activeById.get(String(id)))
+            .filter((p): p is ApiProduct => !!p);
+          setProducts(ordered);
         } else {
           setError('فشل في تحميل أحدث المنتجات');
         }
@@ -101,7 +113,8 @@ const LatestProductsContent = () => {
         product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (product.nameAr && product.nameAr.includes(searchTerm));
 
-      const matchesPrice = product.price >= priceRange[0] && product.price <= priceRange[1];
+      const matchesPrice =
+        hidePrices || (product.price >= priceRange[0] && product.price <= priceRange[1]);
 
       const matchesRating = ratingFilter === 'all' ||
         (ratingFilter === '4+' && (product.rating || 0) >= 4) ||
@@ -134,7 +147,18 @@ const LatestProductsContent = () => {
     });
 
     return filtered;
-  }, [products, searchTerm, priceRange, sortBy, sortOrder, ratingFilter]);
+  }, [products, searchTerm, priceRange, sortBy, sortOrder, ratingFilter, hidePrices]);
+
+  type ApiWithId = ApiProduct & { id: string };
+  const listingRows = useMemo(
+    () =>
+      groupListingRowsByFamily(
+        filteredProducts.map((p) => ({ ...p, id: String(p._id) })) as ApiWithId[],
+        [],
+        false
+      ),
+    [filteredProducts]
+  );
 
   const maxPrice = useMemo(() => {
     return Math.max(...products.map(p => p.price), 10000);
@@ -261,7 +285,7 @@ const LatestProductsContent = () => {
         setRatingFilter={setRatingFilter}
         viewMode={viewMode}
         setViewMode={setViewMode}
-        resultsCount={filteredProducts.length}
+        resultsCount={listingRows.length}
         onClearFilters={() => {
           setPriceTouched(false);
           setPriceRange([0, maxPrice]);
@@ -272,12 +296,14 @@ const LatestProductsContent = () => {
 
       {/* Products Grid */}
       <div className="container mx-auto px-4 py-8">
-        {filteredProducts.length > 0 ? (
+        {listingRows.length > 0 ? (
           <div className={`grid gap-6 ${viewMode === 'grid'
             ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4'
             : 'grid-cols-1'
             }`}>
-            {filteredProducts.map((product, index) => (
+            {listingRows.map((row, index) => {
+              const product = row.product;
+              return (
               <ScrollAnimation key={product._id} delay={index * 0.1}>
                 <div className="relative group">
                   <ProductCard
@@ -312,7 +338,8 @@ const LatestProductsContent = () => {
                   )}
                 </div>
               </ScrollAnimation>
-            ))}
+            );
+            })}
           </div>
         ) : (
           <div className="text-center py-16">

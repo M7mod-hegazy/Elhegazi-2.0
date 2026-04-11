@@ -4,6 +4,8 @@ import { apiGet } from '@/lib/api';
 interface PricingSettings {
   hidePrices: boolean;
   contactMessage: string;
+  /** One storefront card per variant family in listings (Strategy B). */
+  familyCardsInListings: boolean;
 }
 
 interface SettingsResponse {
@@ -12,6 +14,9 @@ interface SettingsResponse {
     pricingSettings?: {
       hidePrices?: boolean;
       contactMessage?: string;
+    };
+    catalogSettings?: {
+      familyCardsInListings?: boolean;
     };
   };
 }
@@ -22,6 +27,8 @@ const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 interface CachedSettings extends PricingSettings {
   timestamp: number;
 }
+
+const defaultCatalog = { familyCardsInListings: false };
 
 const getCachedSettings = (): PricingSettings | null => {
   try {
@@ -40,6 +47,7 @@ const getCachedSettings = (): PricingSettings | null => {
     return {
       hidePrices: data.hidePrices,
       contactMessage: data.contactMessage,
+      familyCardsInListings: data.familyCardsInListings === true,
     };
   } catch (error) {
     console.error('Failed to read pricing settings cache:', error);
@@ -66,6 +74,7 @@ export const usePricingSettings = () => {
     cachedSettings || {
       hidePrices: false,
       contactMessage: 'السلام عليكم، أود معرفة سعر المنتج',
+      familyCardsInListings: defaultCatalog.familyCardsInListings,
     }
   );
   const [loading, setLoading] = useState(!cachedSettings); // Only loading if no cache
@@ -80,6 +89,7 @@ export const usePricingSettings = () => {
         const newSettings: PricingSettings = {
           hidePrices: res.item.pricingSettings?.hidePrices === true,
           contactMessage: res.item.pricingSettings?.contactMessage ?? 'السلام عليكم، أود معرفة سعر المنتج',
+          familyCardsInListings: res.item.catalogSettings?.familyCardsInListings === true,
         };
         
         setPricingSettings(newSettings);
@@ -119,6 +129,7 @@ export const usePricingSettings = () => {
   return {
     hidePrices: pricingSettings.hidePrices,
     contactMessage: pricingSettings.contactMessage,
+    familyCardsInListings: pricingSettings.familyCardsInListings,
     loading,
     error,
     refetch: loadSettings,

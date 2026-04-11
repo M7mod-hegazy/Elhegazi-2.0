@@ -217,24 +217,38 @@ const ImageUpload = ({
   const [isCheckingLinks, setIsCheckingLinks] = useState(false);
   const [isAddingLinks, setIsAddingLinks] = useState(false);
   const linkCheckRunRef = useRef(0);
+  const entriesRef = useRef<FileEntry[]>([]);
+  entriesRef.current = entries;
 
-  // Initialise from initialImages
+  // Initialise from parent `initialImages` (e.g. editing an existing product).
+  // IMPORTANT: While file uploads are in progress, the parent updates after each success — if we
+  // reset `entries` to only `initialImages`, we wipe queued/compressing/uploading rows and only
+  // the first file appears to upload. Skip syncing until nothing is in-flight.
   const prevInitRef = useRef<string[]>([]);
   useEffect(() => {
     const prev = prevInitRef.current;
-    const same = prev.length === initialImages.length && prev.every((u, i) => u === initialImages[i]);
+    const same =
+      prev.length === initialImages.length && prev.every((u, i) => u === initialImages[i]);
     if (same) return;
-    prevInitRef.current = initialImages;
-    setEntries(
-      initialImages.map((url, i) => ({
+
+    setEntries((current) => {
+      const busy = current.some(
+        (e) =>
+          e.status === 'queued' || e.status === 'compressing' || e.status === 'uploading'
+      );
+      if (busy) {
+        return current;
+      }
+      prevInitRef.current = initialImages;
+      return initialImages.map((url, i) => ({
         id: `init-${i}-${url}`,
         name: url.split('/').pop() || `image-${i + 1}`,
         previewUrl: url,
         remoteUrl: url,
         progress: 100,
         status: 'done',
-      }))
-    );
+      }));
+    });
   }, [initialImages]);
 
   const syncParent = useCallback(
@@ -243,6 +257,16 @@ const ImageUpload = ({
       onImagesChange(urls);
     },
     [onImagesChange]
+  );
+
+  /** Never call `onImagesChange` inside `setEntries` updaters — it updates the parent during the child's update and triggers React's setState-during-render warning. */
+  const deferSyncParent = useCallback(
+    (updated: FileEntry[]) => {
+      queueMicrotask(() => {
+        syncParent(updated);
+      });
+    },
+    [syncParent]
   );
 
   const getAuthHeaders = useCallback((): Record<string, string> => {
@@ -280,11 +304,11 @@ const ImageUpload = ({
         const next = [...prev];
         const [entry] = next.splice(idx, 1);
         next.unshift(entry);
-        syncParent(next);
+        deferSyncParent(next);
         return next;
       });
     },
-    [syncParent]
+    [deferSyncParent]
   );
 
   // Open lightbox for all done images
@@ -430,14 +454,14 @@ const ImageUpload = ({
 
   const handleFiles = useCallback(
     async (files: FileList) => {
-      const currentDone = entries.filter((e) => e.status === 'done' && e.remoteUrl).length;
+      const currentDone = entriesRef.current.filter((e) => e.status === 'done' && e.remoteUrl).length;
       const slots = maxImages - currentDone;
       if (slots <= 0) return;
       const toProcess = Array.from(files).filter((f) => acceptedTypes.includes(f.type)).slice(0, slots);
       if (toProcess.length === 0) return;
 
       const newEntries: FileEntry[] = toProcess.map((f) => ({
-        id: `upload-${Date.now()}-${Math.random()}`,
+        id: makeId('upload'),
         name: f.name,
         previewUrl: URL.createObjectURL(f),
         progress: 0,
@@ -458,7 +482,7 @@ const ImageUpload = ({
           });
           setEntries((prev) => {
             const next = prev.map((e) => e.id === entry.id ? { ...e, status: 'done' as const, remoteUrl: secureUrl, progress: 100 } : e);
-            syncParent(next);
+            deferSyncParent(next);
             return next;
           });
         } catch (err: unknown) {
@@ -467,7 +491,7 @@ const ImageUpload = ({
         }
       }
     },
-    [entries, maxImages, acceptedTypes, multiple, compressImage, uploadWithProgress, syncParent]
+    [maxImages, acceptedTypes, multiple, compressImage, uploadWithProgress, deferSyncParent]
   );
 
   const removeEntry = useCallback(
@@ -478,11 +502,11 @@ const ImageUpload = ({
           if (!e.remoteUrl && e.previewUrl.startsWith('blob:')) URL.revokeObjectURL(e.previewUrl);
           return false;
         });
-        syncParent(next);
+        deferSyncParent(next);
         return next;
       });
     },
-    [syncParent]
+    [deferSyncParent]
   );
 
   const parseLinkInput = useCallback((raw: string): string[] => {
@@ -690,11 +714,11 @@ const ImageUpload = ({
           next = [...prev, ...additions];
         }
 
-        syncParent(next);
+        deferSyncParent(next);
         return next;
       });
     },
-    [maxImages, multiple, syncParent]
+    [maxImages, multiple, deferSyncParent]
   );
 
   const handleAddValidLinks = useCallback(async () => {
