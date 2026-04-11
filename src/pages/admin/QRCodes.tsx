@@ -187,6 +187,7 @@ const AdminQRCodes = () => {
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [qrCache, setQrCache] = useState<{ [key: string]: string }>({});
+  const qrCacheRef = useRef<{ [key: string]: string }>({});
 
   // Auto-adjust itemsPerRow when margin or QR size changes
   useEffect(() => {
@@ -285,6 +286,7 @@ const AdminQRCodes = () => {
 
   // Clear QR cache when settings change to force regeneration
   useEffect(() => {
+    qrCacheRef.current = {};
     setQrCache({});
   }, [settings.size, settings.foregroundColor, settings.backgroundColor, settings.includeLogo, logoPreview]);
 
@@ -294,23 +296,33 @@ const AdminQRCodes = () => {
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
+      let cancelled = false;
       const generateQR = async () => {
         setIsLoading(true);
         try {
           const dataURL = await generateQRCodeWithLogo(product, size);
-          setQrSrc(dataURL);
+          if (!cancelled) setQrSrc(dataURL);
         } catch (error) {
           console.error('Failed to generate QR code:', error);
-          // Fallback to simple QR
-          setQrSrc(generateQRCodeURL(product, size));
+          if (!cancelled) setQrSrc(generateQRCodeURL(product, size));
         } finally {
-          setIsLoading(false);
+          if (!cancelled) setIsLoading(false);
         }
       };
 
       generateQR();
-      // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [product.id, size]);
+      return () => {
+        cancelled = true;
+      };
+    }, [
+      product.id,
+      size,
+      settings.includeLogo,
+      logoPreview,
+      settings.foregroundColor,
+      settings.backgroundColor,
+      generateQRCodeWithLogo,
+    ]);
 
     if (isLoading) {
       return (
@@ -338,36 +350,34 @@ const AdminQRCodes = () => {
     );
   };
 
-  // Generate QR code with logo overlay using canvas
+  // Generate QR code with logo overlay using canvas (ref cache — stable deps, ECC H when logo)
   const generateQRCodeWithLogo = useCallback(async (product: Product, customSize?: number): Promise<string> => {
     const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
     const size = customSize || settings.size;
-    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}`;
+    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}-${settings.foregroundColor}-${settings.backgroundColor}`;
 
-    // Check cache first
-    if (qrCache[cacheKey]) {
-      return qrCache[cacheKey];
-    }
+    const hit = qrCacheRef.current[cacheKey];
+    if (hit) return hit;
+
+    const ecc: 'L' | 'M' | 'Q' | 'H' = settings.includeLogo && logoPreview ? 'H' : 'M';
 
     try {
-      // Generate base QR code
       const qrDataURL = await QRCode.toDataURL(productURL, {
         width: size,
-        margin: 1,
+        margin: 2,
         color: {
           dark: settings.foregroundColor,
-          light: settings.backgroundColor
+          light: settings.backgroundColor,
         },
-        errorCorrectionLevel: 'M'
+        errorCorrectionLevel: ecc,
       });
 
-      // If no logo or logo not enabled, return base QR
       if (!settings.includeLogo || !logoPreview) {
-        setQrCache(prev => ({ ...prev, [cacheKey]: qrDataURL }));
+        qrCacheRef.current[cacheKey] = qrDataURL;
+        setQrCache((prev) => ({ ...prev, [cacheKey]: qrDataURL }));
         return qrDataURL;
       }
 
-      // Create canvas for logo overlay
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas context not available');
@@ -375,7 +385,6 @@ const AdminQRCodes = () => {
       canvas.width = size;
       canvas.height = size;
 
-      // Load QR code image
       const qrImage = document.createElement('img');
       await new Promise<void>((resolve, reject) => {
         qrImage.onload = () => resolve();
@@ -383,68 +392,67 @@ const AdminQRCodes = () => {
         qrImage.src = qrDataURL;
       });
 
-      // Draw QR code
       ctx.drawImage(qrImage, 0, 0, size, size);
 
-      // Load and draw logo
       const logoImage = document.createElement('img');
+      logoImage.crossOrigin = 'anonymous';
       await new Promise<void>((resolve, reject) => {
         logoImage.onload = () => resolve();
         logoImage.onerror = () => reject(new Error('Failed to load logo image'));
         logoImage.src = logoPreview;
       });
 
-      // Calculate logo size (20% of QR code size)
-      const logoSize = size * 0.2;
+      const logoSize = Math.max(8, size * 0.22);
       const logoX = (size - logoSize) / 2;
       const logoY = (size - logoSize) / 2;
 
-      // Draw white background circle for logo
-      ctx.fillStyle = 'white';
+      ctx.fillStyle = settings.backgroundColor || '#ffffff';
       ctx.beginPath();
-      ctx.arc(size / 2, size / 2, logoSize / 2 + 4, 0, 2 * Math.PI);
+      ctx.arc(size / 2, size / 2, logoSize / 2 + 3, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Draw logo
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(size / 2, size / 2, logoSize / 2, 0, 2 * Math.PI);
+      ctx.clip();
       ctx.drawImage(logoImage, logoX, logoY, logoSize, logoSize);
+      ctx.restore();
 
       const finalDataURL = canvas.toDataURL('image/png');
-      setQrCache(prev => ({ ...prev, [cacheKey]: finalDataURL }));
+      qrCacheRef.current[cacheKey] = finalDataURL;
+      setQrCache((prev) => ({ ...prev, [cacheKey]: finalDataURL }));
       return finalDataURL;
-
     } catch (error) {
       console.error('Error generating QR code with logo:', error);
-      // Fallback to simple QR code
       const fallbackQR = await QRCode.toDataURL(productURL, {
         width: size,
-        margin: 1,
+        margin: 2,
         color: {
           dark: settings.foregroundColor,
-          light: settings.backgroundColor
-        }
+          light: settings.backgroundColor,
+        },
+        errorCorrectionLevel: 'M',
       });
-      setQrCache(prev => ({ ...prev, [cacheKey]: fallbackQR }));
+      qrCacheRef.current[cacheKey] = fallbackQR;
+      setQrCache((prev) => ({ ...prev, [cacheKey]: fallbackQR }));
       return fallbackQR;
     }
-  }, [settings, logoPreview, qrCache]);
+  }, [settings.size, settings.foregroundColor, settings.backgroundColor, settings.includeLogo, logoPreview]);
 
   // Legacy function for compatibility - now uses the new logo-enabled function
   const generateQRCodeURL = (product: Product, customSize?: number) => {
-    // For immediate use, return a placeholder and generate async
-    const cacheKey = `${product.id}-${customSize || settings.size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}`;
+    const size = customSize || settings.size;
+    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}-${settings.foregroundColor}-${settings.backgroundColor}`;
 
-    if (qrCache[cacheKey]) {
-      return qrCache[cacheKey];
-    }
+    const sync = qrCacheRef.current[cacheKey];
+    if (sync) return sync;
 
-    // Generate async and update cache
-    generateQRCodeWithLogo(product, customSize).then(dataURL => {
-      setQrCache(prev => ({ ...prev, [cacheKey]: dataURL }));
+    generateQRCodeWithLogo(product, customSize).then((dataURL) => {
+      setQrCache((prev) => ({ ...prev, [cacheKey]: dataURL }));
     });
 
     // Return fallback URL while generating
     const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
-    const size = customSize || settings.size;
     const params = new URLSearchParams({
       size: `${size}x${size}`,
       data: productURL,

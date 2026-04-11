@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -30,9 +30,10 @@ import {
 } from '@/components/ui/select';
 import { apiPostJson } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Link2, ChevronLeft, ChevronRight, Package, Plus, Trash2 } from 'lucide-react';
+import { Link2, ChevronLeft, ChevronRight, Package, Plus, Trash2, Sparkles, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { optimizeImage, applyProductImageFallback } from '@/lib/images';
+import { buildFamilySuggestions, type SuggestionCluster } from '@/lib/productFamilySuggestions';
 
 export type RowProduct = {
   _id: string;
@@ -106,6 +107,21 @@ export function ProductFamilyMergeDialog({
   const [options, setOptions] = useState<OptionRow[]>([{ key: 'opt1', label: '', labelAr: '' }]);
   const [valuesByProduct, setValuesByProduct] = useState<Record<string, Record<string, string>>>({});
   const [transferPick, setTransferPick] = useState<RowProduct | null>(null);
+  const [nameCatalogQuery, setNameCatalogQuery] = useState('');
+
+  const smartSuggestions = useMemo(() => buildFamilySuggestions(products), [products]);
+
+  const nameCatalog = useMemo(() => {
+    const q = nameCatalogQuery.trim().toLowerCase();
+    return [...products]
+      .map((p) => ({
+        id: p._id,
+        label: (p.nameAr || p.name || '').trim(),
+        inFamily: !!p.productFamilyId,
+      }))
+      .filter((x) => x.label && (!q || x.label.toLowerCase().includes(q)))
+      .sort((a, b) => a.label.localeCompare(b.label, 'ar'));
+  }, [products, nameCatalogQuery]);
 
   useEffect(() => {
     if (!open) {
@@ -121,6 +137,7 @@ export function ProductFamilyMergeDialog({
       setOptions([{ key: 'opt1', label: '', labelAr: '' }]);
       setValuesByProduct({});
       setTransferPick(null);
+      setNameCatalogQuery('');
     }
   }, [open]);
 
@@ -226,6 +243,37 @@ export function ProductFamilyMergeDialog({
     });
     setTransferPick(null);
   };
+
+  const applySmartSuggestion = useCallback(
+    (cluster: SuggestionCluster<RowProduct>) => {
+      const ids = cluster.members.map((m) => m._id);
+      if (ids.length > MAX_MEMBERS) {
+        toast({ title: `الاقتراح يتجاوز ${MAX_MEMBERS} منتجاً`, variant: 'destructive' });
+        return;
+      }
+      setNameAr(cluster.suggestedFamilyNameAr);
+      setName('');
+      setSelected(new Set(ids));
+      setOptions([
+        {
+          key: cluster.optionKey,
+          label: '',
+          labelAr: cluster.suggestedOptionLabelAr,
+        },
+      ]);
+      setValuesByProduct(cluster.valuesByProduct);
+      setDefaultProductId(ids[0] || '');
+      setShowAllProducts(true);
+      setSearch('');
+      setCategoryFilter('all');
+      setStep(1);
+      toast({
+        title: 'تم تطبيق الاقتراح',
+        description: 'تم تعبئة الخطوات — انتقل بـ «التالي» لمراجعة اختيار المنتجات ثم أزرار الخيار.',
+      });
+    },
+    [toast]
+  );
 
   const goNextFromStep1 = () => {
     const nAr = nameAr.trim();
@@ -386,8 +434,96 @@ export function ProductFamilyMergeDialog({
               <div className="space-y-4 max-w-lg mx-auto">
                 <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-3 text-xs text-indigo-900 leading-relaxed">
                   الخطوة ١ من ٤ — يمكنك تعديل الاسم والخيارات لاحقاً من «تعديل العائلة» في جدول المنتجات.
+                  <span className="mt-2 block text-indigo-800/90">
+                    قسم <span className="font-semibold">«اقتراحات ذكية»</span> يظهر مباشرة تحت هذه الرسالة — أو املأ
+                    الاسم يدوياً ثم «التالي».
+                  </span>
                 </div>
+
+                <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50/90 to-white p-4 shadow-sm space-y-3">
+                  <div className="flex items-start gap-2">
+                    <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-100 text-violet-700">
+                      <Sparkles className="h-4 w-4" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-sm font-bold text-slate-900">اقتراحات ذكية (أسماء متقاربة جداً)</h3>
+                      <p className="text-[11px] text-slate-600 leading-relaxed mt-0.5">
+                        أي منتج مرتبط بعائلة يُستبعد بالكامل: لا يدخل في المقارنة ولا في المجموعات. التشابه يُحسب{' '}
+                        <span className="font-medium text-slate-700">بين المتبقي فقط</span> (غير المرتبطين بعائلة)،
+                        عبر ليفنشتاين + بادئة مشتركة. قد يظهر نفس المنتج في أكثر من اقتراح حتى يُربط بعائلة فعلاً.
+                        اسم العائلة يُوسَّع بالجزء المشترك من الوسط عند الإمكان، ونص الزر يُختصر بإزالة التكرار من
+                        البداية والنهاية. اختر مجموعة ثم راجع الخطوات الأربع قبل الإنشاء.
+                      </p>
+                    </div>
+                  </div>
+                  {smartSuggestions.length === 0 ? (
+                    <p className="text-xs text-slate-500 text-center py-2">
+                      لا توجد مجموعات واضحة بين المنتجات غير المرتبطة بعائلة (منتجان على الأقل، أسماء متشابهة جداً).
+                    </p>
+                  ) : (
+                    <div className="space-y-2 max-h-[min(52vh,420px)] overflow-y-auto pr-1">
+                      {smartSuggestions.map((cl) => (
+                        <div
+                          key={cl.id}
+                          className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm space-y-2"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-600">
+                                اسم مقترح للعائلة
+                              </p>
+                              <p className="text-sm font-bold text-slate-900 leading-snug break-words">
+                                {cl.suggestedFamilyNameAr}
+                              </p>
+                              <p className="text-[10px] text-slate-500 mt-1">
+                                تمييز: <span className="font-medium text-slate-700">{cl.suggestedOptionLabelAr}</span>
+                                {' · '}
+                                دقة المجموعة:{' '}
+                                <span className="tabular-nums">{Math.round(cl.avgSimilarity * 100)}٪</span>
+                                {' · '}
+                                {cl.members.length} منتجات
+                              </p>
+                            </div>
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="shrink-0 gap-1 bg-violet-600 hover:bg-violet-700"
+                              onClick={() => applySmartSuggestion(cl)}
+                            >
+                              استخدام
+                            </Button>
+                          </div>
+                          <ul className="space-y-1.5 border-t border-slate-100 pt-2">
+                            {cl.members.map((p) => {
+                              const full = (p.nameAr || p.name || '').trim();
+                              const chip = (cl.valuesByProduct[p._id]?.[cl.optionKey] || '').trim();
+                              return (
+                                <li key={p._id} className="text-xs text-slate-800">
+                                  <span className="break-words">
+                                    <span className="font-semibold text-slate-900">{chip || '—'}</span>
+                                    <span className="text-slate-400 font-normal mr-1"> · {full}</span>
+                                  </span>
+                                  {p.sku ? (
+                                    <span className="mr-2 font-mono text-[10px] text-slate-400">({p.sku})</span>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                          <p className="text-[10px] text-slate-500">
+                            الاسم أعلاه يُعبَّأ في الخطوة ١؛ النص الغامق = نص الزر (الخطوة ٣) ويجب أن يطابق الاختلاف
+                            الفعلي بين المنتجات.
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm space-y-3">
+                  <p className="text-[11px] font-medium text-slate-600">
+                    إدخال يدوي لاسم العائلة (إن لم تستخدم اقتراحاً أعلاه)
+                  </p>
                   <div className="grid gap-2">
                     <Label htmlFor="fam-name-ar">
                       اسم العائلة بالعربية <span className="text-destructive">*</span>
@@ -416,6 +552,43 @@ export function ProductFamilyMergeDialog({
                     />
                   </details>
                 </div>
+
+                <details className="rounded-2xl border border-slate-200 bg-slate-50/80 p-3">
+                  <summary className="cursor-pointer text-sm font-medium text-slate-800 flex items-center gap-2">
+                    <List className="h-4 w-4 text-slate-500" />
+                    قائمة بأسماء كل المنتجات ({products.length})
+                  </summary>
+                  <p className="text-[11px] text-slate-500 mt-2 mb-2">
+                    للمرجعية فقط — ابحث للمقارنة بين الأسماء القريبة يدوياً.
+                  </p>
+                  <Input
+                    placeholder="تصفية بالاسم..."
+                    value={nameCatalogQuery}
+                    onChange={(e) => setNameCatalogQuery(e.target.value)}
+                    className="h-9 mb-2 bg-white"
+                  />
+                  <div className="max-h-[200px] overflow-y-auto rounded-lg border border-slate-200 bg-white p-2 space-y-1 text-xs">
+                    {nameCatalog.length === 0 ? (
+                      <p className="text-slate-400 text-center py-2">لا نتائج</p>
+                    ) : (
+                      nameCatalog.map((row) => (
+                        <div
+                          key={row.id}
+                          className="flex justify-between gap-2 py-0.5 border-b border-slate-50 last:border-0"
+                        >
+                          <span className="text-slate-800 break-words">{row.label}</span>
+                          {row.inFamily ? (
+                            <span className="shrink-0 text-[10px] text-amber-700 bg-amber-50 px-1 rounded">
+                              عائلة
+                            </span>
+                          ) : (
+                            <span className="shrink-0 text-[10px] text-slate-400">—</span>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </details>
               </div>
             )}
 
