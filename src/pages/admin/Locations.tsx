@@ -1,5 +1,5 @@
 import { useState, useEffect, memo, useCallback, useRef } from 'react';
-import { Plus, Edit, Trash2, MapPin, Phone, Clock, Save, X, Globe, Navigation, Building, Star, Mail, Link2, CheckCircle, Sparkles, ChevronDown } from 'lucide-react';
+import { Plus, Edit, Trash2, MapPin, Phone, Clock, Save, X, Globe, Navigation, Building, Star, Mail, Link2, Sparkles, ChevronDown, ImageIcon, Minus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -13,6 +13,8 @@ import { useToast } from '@/hooks/use-toast';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { logHistory } from '@/lib/history';
 import { apiGet, apiPutJson, ApiHttpError } from '@/lib/api';
+import { getLocationPhoneList } from '@/lib/locationPhones';
+import { applyHeroImageFallback } from '@/lib/images';
 
 function extractCoordinatesFromMapsLink(link: string): { lat: number; lng: number } | null {
   const atMatch = link.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
@@ -38,8 +40,10 @@ const emptyLocationForm = (): Partial<Location> => ({
   name: '',
   address: '',
   phone: '',
+  phones: [''],
   email: '',
   hours: '',
+  imageUrl: '',
   coordinates: { lat: 0, lng: 0 },
   googleMapsLink: '',
   googleMapsEmbed: '',
@@ -51,8 +55,10 @@ interface Location {
   name: string;
   address: string;
   phone: string;
+  phones?: string[];
   email: string;
   hours: string;
+  imageUrl?: string;
   coordinates: {
     lat: number;
     lng: number;
@@ -70,13 +76,20 @@ function normalizeLocations(input: unknown): Location[] {
       const c = o.coordinates as { lat?: unknown; lng?: unknown } | undefined;
       const lat = typeof c?.lat === 'number' ? c.lat : 0;
       const lng = typeof c?.lng === 'number' ? c.lng : 0;
+      const phones = getLocationPhoneList({
+        phone: String(o.phone ?? ''),
+        phones: o.phones,
+      });
+      const phone = phones[0] ?? String(o.phone ?? '');
       return {
         id: String(o.id ?? `loc-${i}`),
         name: String(o.name ?? ''),
         address: String(o.address ?? ''),
-        phone: String(o.phone ?? ''),
+        phone,
+        phones,
         email: String(o.email ?? ''),
         hours: String(o.hours ?? ''),
+        imageUrl: String(o.imageUrl ?? '').trim(),
         coordinates: { lat, lng },
         googleMapsLink: String(o.googleMapsLink ?? ''),
         googleMapsEmbed: String(o.googleMapsEmbed ?? ''),
@@ -257,10 +270,14 @@ const AdminLocations = () => {
   };
 
   const handleSubmit = () => {
-    if (!formData.name || !formData.address || !formData.phone) {
+    const phoneList = getLocationPhoneList({
+      phone: formData.phone,
+      phones: formData.phones,
+    });
+    if (!formData.name || !formData.address || phoneList.length === 0) {
       toast({
         title: "خطأ",
-        description: "يرجى ملء جميع الحقول المطلوبة",
+        description: "يرجى ملء اسم الفرع والعنوان ورقم هاتف واحد على الأقل",
         variant: "destructive"
       });
       return;
@@ -277,10 +294,18 @@ const AdminLocations = () => {
       return;
     }
 
+    const imageUrl = String(formData.imageUrl ?? '').trim();
+    const payloadBase = {
+      ...formData,
+      phones: phoneList,
+      phone: phoneList[0],
+      imageUrl,
+    };
+
     if (editingLocation) {
       // Update existing location
       const prevLoc = locations.find(l => l.id === editingLocation.id);
-      const updated = { ...editingLocation, ...formData } as Location;
+      const updated = { ...editingLocation, ...payloadBase } as Location;
       setLocations(prev => prev.map(loc => loc.id === editingLocation.id ? updated : loc));
       try {
         logHistory({ section: 'admin_locations', action: 'update', note: updated.name, meta: { id: updated.id, before: prevLoc, after: updated } });
@@ -294,6 +319,7 @@ const AdminLocations = () => {
         clat != null && clng != null && hasValidPick(clat, clng) ? buildMapsUrls(clat, clng) : null;
       const newLocation: Location = {
         ...formData,
+        ...payloadBase,
         id: Date.now().toString(),
         googleMapsLink: formData.googleMapsLink || urls?.link || '',
         googleMapsEmbed: formData.googleMapsEmbed || urls?.embed || '',
@@ -314,7 +340,12 @@ const AdminLocations = () => {
 
   const handleEdit = (location: Location) => {
     setEditingLocation(location);
-    setFormData(location);
+    const phones = getLocationPhoneList(location);
+    setFormData({
+      ...location,
+      phones: phones.length ? phones : [''],
+      phone: phones[0] ?? location.phone,
+    });
     setIsDialogOpen(true);
     try { logHistory({ section: 'admin_locations', action: 'dialog_open', note: 'edit_location', meta: { id: location.id } }); } catch (e) { /* no-op */ }
   };
@@ -492,7 +523,7 @@ const AdminLocations = () => {
                 <div>
                   <p className="text-xs md:text-sm font-semibold text-orange-600 uppercase tracking-wide">بيانات كاملة</p>
                   <p className="text-2xl md:text-3xl font-black text-orange-900 mt-1">
-                    {locations.filter(loc => loc.phone && loc.email && loc.hours).length}
+                    {locations.filter((loc) => getLocationPhoneList(loc).length && loc.email && loc.hours).length}
                   </p>
                 </div>
                 <div className="p-2 md:p-3 bg-orange-200/50 rounded-xl">
@@ -550,6 +581,16 @@ const AdminLocations = () => {
                 </div>
               </CardHeader>
               <CardContent className="p-4 md:p-6 space-y-3 md:space-y-4">
+                {location.imageUrl ? (
+                  <div className="rounded-xl overflow-hidden border border-slate-200/80 shadow-sm">
+                    <img
+                      src={location.imageUrl}
+                      alt=""
+                      className="w-full h-36 object-cover"
+                      onError={applyHeroImageFallback}
+                    />
+                  </div>
+                ) : null}
                 <div className="bg-gradient-to-r from-slate-50 to-primary/5 rounded-xl p-3 md:p-4 flex items-start gap-2 md:gap-3">
                   <div className="p-1.5 md:p-2 bg-primary/10 rounded-lg">
                     <MapPin className="w-4 h-4 md:w-5 md:h-5 text-primary" />
@@ -564,9 +605,15 @@ const AdminLocations = () => {
                   <div className="bg-gradient-to-r from-green-50 to-green-100/30 border border-green-200/50 rounded-xl p-3 md:p-4">
                     <div className="flex items-center gap-2 mb-2">
                       <Phone className="w-3 h-3 md:w-4 md:h-4 text-green-600" />
-                      <span className="text-xs font-semibold text-green-700 uppercase tracking-wider">رقم الهاتف</span>
+                      <span className="text-xs font-semibold text-green-700 uppercase tracking-wider">أرقام الهاتف</span>
                     </div>
-                    <p className="text-xs md:text-sm font-medium text-slate-900 break-all">{location.phone}</p>
+                    <ul className="text-xs md:text-sm font-medium text-slate-900 space-y-1 list-none m-0 p-0">
+                      {getLocationPhoneList(location).map((p, pi) => (
+                        <li key={`${pi}-${p}`} className="break-all" dir="ltr">
+                          {p}
+                        </li>
+                      ))}
+                    </ul>
                   </div>
                   
                   {location.hours && (
@@ -682,6 +729,37 @@ const LocationForm = memo(function LocationForm({
   handleGoogleMapsLinkChange,
   applyPickedLocation,
 }: LocationFormProps) {
+  const phoneRows =
+    formData.phones && formData.phones.length > 0 ? formData.phones : formData.phone ? [formData.phone] : [''];
+
+  const updatePhoneRow = (index: number, value: string) => {
+    setFormData((prev) => {
+      const next = [...(prev.phones?.length ? prev.phones : prev.phone ? [prev.phone] : [''])];
+      next[index] = value;
+      const nums = next.map((s) => String(s).trim()).filter(Boolean);
+      return { ...prev, phones: next, phone: nums[0] ?? '' };
+    });
+  };
+
+  const addPhoneRow = () => {
+    setFormData((prev) => ({
+      ...prev,
+      phones: [...(prev.phones?.length ? prev.phones : prev.phone ? [prev.phone] : ['']), ''],
+    }));
+  };
+
+  const removePhoneRow = (index: number) => {
+    setFormData((prev) => {
+      const base = [...(prev.phones?.length ? prev.phones : prev.phone ? [prev.phone] : [''])];
+      base.splice(index, 1);
+      if (base.length === 0) base.push('');
+      const nums = base.map((s) => String(s).trim()).filter(Boolean);
+      return { ...prev, phones: base, phone: nums[0] ?? '' };
+    });
+  };
+
+  const previewPhones = getLocationPhoneList({ phone: formData.phone, phones: formData.phones });
+
   return (
     <div className="space-y-6 pt-6">
       {/* Basic Information Section */}
@@ -695,7 +773,7 @@ const LocationForm = memo(function LocationForm({
           </h3>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6">
           <div className="space-y-3">
             <label className="text-base font-semibold text-slate-700 flex items-center gap-2">
               <Building className="w-4 h-4 text-primary" />
@@ -708,17 +786,47 @@ const LocationForm = memo(function LocationForm({
               className="h-12 text-lg bg-white/80 backdrop-blur border-primary/20 focus:border-primary focus:ring-primary/20 shadow-sm transition-all duration-200 hover:shadow-md"
             />
           </div>
+
           <div className="space-y-3">
             <label className="text-base font-semibold text-slate-700 flex items-center gap-2">
               <Phone className="w-4 h-4 text-primary" />
-              رقم الهاتف *
+              أرقام الهاتف * (واحد أو أكثر)
             </label>
-            <Input
-              value={formData.phone || ''}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
-              placeholder="+966 11 123 4567"
-              className="h-12 text-lg bg-white/80 backdrop-blur border-primary/20 focus:border-primary focus:ring-primary/20 shadow-sm transition-all duration-200 hover:shadow-md"
-            />
+            <div className="space-y-2">
+              {phoneRows.map((row, idx) => (
+                <div key={idx} className="flex gap-2 items-center">
+                  <Input
+                    value={row}
+                    onChange={(e) => updatePhoneRow(idx, e.target.value)}
+                    placeholder={idx === 0 ? '+966 11 123 4567' : 'رقم إضافي'}
+                    className="h-12 text-lg bg-white/80 backdrop-blur border-primary/20 focus:border-primary focus:ring-primary/20 shadow-sm flex-1 min-w-0"
+                    dir="ltr"
+                  />
+                  {phoneRows.length > 1 ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="shrink-0 h-12 w-12"
+                      onClick={() => removePhoneRow(idx)}
+                      aria-label="حذف الرقم"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </Button>
+                  ) : null}
+                </div>
+              ))}
+              <Button type="button" variant="secondary" size="sm" onClick={addPhoneRow} className="gap-1">
+                <Plus className="w-4 h-4" />
+                إضافة رقم
+              </Button>
+            </div>
+            <div className="rounded-xl border border-primary/15 bg-white/60 px-3 py-2 text-sm text-slate-700">
+              <span className="font-semibold text-slate-600">معاينة مباشرة: </span>
+              <span dir="ltr" className="inline-block break-all">
+                {previewPhones.length ? previewPhones.join(' · ') : '—'}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -734,6 +842,30 @@ const LocationForm = memo(function LocationForm({
             rows={3}
             className="text-lg bg-white/80 backdrop-blur border-primary/20 focus:border-primary focus:ring-primary/20 shadow-sm transition-all duration-200 hover:shadow-md rounded-xl"
           />
+        </div>
+
+        <div className="space-y-3 mt-6">
+          <label className="text-base font-semibold text-slate-700 flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-primary" />
+            صورة الفرع (رابط — تظهر في صفحة المواقع)
+          </label>
+          <Input
+            value={formData.imageUrl || ''}
+            onChange={(e) => handleInputChange('imageUrl', e.target.value)}
+            placeholder="https://…"
+            className="h-11 text-base bg-white/80 backdrop-blur border-primary/20"
+            dir="ltr"
+          />
+          {formData.imageUrl?.trim() ? (
+            <div className="rounded-xl overflow-hidden border border-primary/20 max-w-md bg-slate-100">
+              <img
+                src={formData.imageUrl.trim()}
+                alt=""
+                className="w-full max-h-48 object-cover"
+                onError={applyHeroImageFallback}
+              />
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -762,16 +894,19 @@ const LocationForm = memo(function LocationForm({
               className="h-12 text-lg bg-white/80 backdrop-blur border-green-200/50 focus:border-green-500 focus:ring-green-500/20 shadow-sm transition-all duration-200 hover:shadow-md"
             />
           </div>
-          <div className="space-y-3">
+          <div className="space-y-3 md:col-span-2">
             <label className="text-base font-semibold text-slate-700 flex items-center gap-2">
               <Clock className="w-4 h-4 text-green-600" />
-              ساعات العمل
+              ساعات العمل (سطر لكل فترة — تُعرض كقائمة في الموقع)
             </label>
-            <Input
+            <Textarea
               value={formData.hours || ''}
               onChange={(e) => handleInputChange('hours', e.target.value)}
-              placeholder="السبت - الخميس: 9:00 ص - 10:00 م"
-              className="h-12 text-lg bg-white/80 backdrop-blur border-green-200/50 focus:border-green-500 focus:ring-green-500/20 shadow-sm transition-all duration-200 hover:shadow-md"
+              placeholder={
+                'السبت - الخميس: 10:00 ص - 10:00 م\nالسبت - الخميس (المتجر): 9:00 ص - 10:00 م\nالجمعة (المتجر): 2:00 م - 10:00 م'
+              }
+              rows={4}
+              className="text-base bg-white/80 backdrop-blur border-green-200/50 focus:border-green-500 focus:ring-green-500/20 shadow-sm rounded-xl"
             />
           </div>
         </div>

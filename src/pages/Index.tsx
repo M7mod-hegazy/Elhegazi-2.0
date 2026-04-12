@@ -13,6 +13,7 @@ import InteractiveBackground from '@/components/ui/interactive-background';
 const SectionDivider = lazy(() => import('@/components/ui/section-divider'));
 import { useHomeConfig } from '@/hooks/useHomeConfig';
 import { useSettings } from '@/hooks/useSettings';
+import { applyHeroImageFallback } from '@/lib/images';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { ResponsiveProvider } from '@/context/ResponsiveContext';
 
@@ -662,9 +663,23 @@ const Index = () => {
                   )}
                   {currentBranch && (
                     <div className="absolute bottom-4 left-4 bg-white/95 backdrop-blur-sm rounded-xl p-4 shadow-xl max-w-xs">
+                      {currentBranch.imageUrl ? (
+                        <img
+                          src={currentBranch.imageUrl}
+                          alt=""
+                          className="w-full h-20 object-cover rounded-lg mb-2 border border-slate-100"
+                          onError={applyHeroImageFallback}
+                        />
+                      ) : null}
                       <h4 className="font-bold text-slate-900 mb-2">{currentBranch?.name || 'فرع'}</h4>
                       <p className="text-sm text-slate-600 mb-2">{currentBranch?.address || ''}</p>
-                      <p className="text-xs text-slate-500">{currentBranch?.phone || ''}</p>
+                      <div className="text-xs text-slate-500 space-y-1">
+                        {(currentBranch.phones?.length ? currentBranch.phones : []).map((p, pi) => (
+                          <p key={`${pi}-${p}`} dir="ltr" className="break-all">
+                            {p}
+                          </p>
+                        ))}
+                      </div>
                     </div>
                   )}
                 </div>

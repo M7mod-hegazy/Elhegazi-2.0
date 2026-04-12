@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { apiGet } from '@/lib/api';
 import { cacheSiteName } from '@/hooks/useSiteName';
+import { getLocationPhoneList, getLocationPrimaryPhone } from '@/lib/locationPhones';
 
 export interface StoreInfo {
   name: string;
@@ -37,9 +38,14 @@ export interface LocationData {
   id: string;
   name: string;
   address: string;
+  /** First / primary number; kept for backward compatibility with older clients */
   phone: string;
+  /** Optional explicit list (preferred when set) */
+  phones?: string[];
   email: string;
   hours: string;
+  /** Public branch photo URL (admin-controlled); shown on /locations when set */
+  imageUrl?: string;
   coordinates: {
     lat: number;
     lng: number;
@@ -91,7 +97,18 @@ export interface Settings {
   loading: boolean;
   error: string | null;
   getActiveLocations: () => LocationData[];
-  getBranchLocations: () => Record<string, { name: string; address: string; phone: string; mapUrl: string; coordinates?: { lat: number; lng: number } }>;
+  getBranchLocations: () => Record<
+    string,
+    {
+      name: string;
+      address: string;
+      phone: string;
+      phones: string[];
+      imageUrl?: string;
+      mapUrl: string;
+      coordinates?: { lat: number; lng: number };
+    }
+  >;
   checkoutEnabled: boolean;
   shippingCost: number;
   expressShippingCost: number;
@@ -215,14 +232,21 @@ export const useSettings = () => {
         }
       }
 
+      const phones = getLocationPhoneList(location);
+      const phone = getLocationPrimaryPhone(location);
       branchMap[key] = {
         name: location.name,
         address: location.address,
-        phone: location.phone,
+        phone,
+        phones,
+        imageUrl: location.imageUrl?.trim() || undefined,
         mapUrl,
-        coordinates: (location.coordinates && typeof location.coordinates.lat === 'number' && typeof location.coordinates.lng === 'number')
-          ? { lat: location.coordinates.lat, lng: location.coordinates.lng }
-          : undefined
+        coordinates:
+          location.coordinates &&
+          typeof location.coordinates.lat === 'number' &&
+          typeof location.coordinates.lng === 'number'
+            ? { lat: location.coordinates.lat, lng: location.coordinates.lng }
+            : undefined,
       };
     });
 

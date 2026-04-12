@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { MapPin, Clock, Phone, Navigation, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { useSettings, type LocationData } from '@/hooks/useSettings';
+import { useSettings, type LocationData, type WorkHours } from '@/hooks/useSettings';
 import { applyHeroImageFallback } from '@/lib/images';
+import { getLocationPhoneList, getLocationPrimaryPhone } from '@/lib/locationPhones';
 
 const BRANCH_IMAGES = [
   'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600',
@@ -13,6 +14,14 @@ const BRANCH_IMAGES = [
 ];
 
 const DEFAULT_SERVICES = ['تسوق مباشر', 'استلام الطلبات'];
+
+function buildHourLines(hours: string | undefined, workHours: WorkHours): string[] {
+  const custom = hours?.trim();
+  if (custom) {
+    return custom.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  }
+  return [`السبت - الخميس: ${workHours.weekdays}`, `الجمعة: ${workHours.friday}`];
+}
 
 function buildMapEmbedSrc(loc: LocationData): string {
   const emb = loc.googleMapsEmbed?.trim();
@@ -64,7 +73,9 @@ const Locations = () => {
     return active.map((loc, idx) => ({
       ...loc,
       isMain: idx === 0,
-      image: BRANCH_IMAGES[idx % BRANCH_IMAGES.length],
+      image:
+        loc.imageUrl?.trim() ||
+        BRANCH_IMAGES[idx % BRANCH_IMAGES.length],
       mapEmbedSrc: buildMapEmbedSrc(loc),
       directionsUrl: buildDirectionsUrl(loc),
     }));
@@ -147,6 +158,10 @@ const Locations = () => {
 
   const current = displayLocations[selectedLocation];
   if (!current) return null;
+
+  const currentPhones = getLocationPhoneList(current);
+  const primaryPhone = getLocationPrimaryPhone(current);
+  const hourLines = buildHourLines(current.hours, workHours);
 
   return (
     <div className="min-h-screen bg-background">
@@ -319,9 +334,25 @@ const Locations = () => {
 
                     <div className="flex items-start space-x-3 space-x-reverse">
                       <Phone className="w-5 h-5 text-primary mt-1 shrink-0" />
-                      <div>
+                      <div className="min-w-0 flex-1">
                         <p className="font-medium mb-1">الهاتف</p>
-                        <p className="text-muted-foreground">{current.phone}</p>
+                        {currentPhones.length ? (
+                          <ul className="text-muted-foreground space-y-1 list-none m-0 p-0">
+                            {currentPhones.map((num, pi) => (
+                              <li key={`${pi}-${num}`}>
+                                <a
+                                  href={phoneHref(num)}
+                                  className="hover:text-primary underline-offset-2 hover:underline break-all inline-block text-start"
+                                  dir="ltr"
+                                >
+                                  {num}
+                                </a>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <p className="text-muted-foreground">—</p>
+                        )}
                       </div>
                     </div>
 
@@ -337,18 +368,23 @@ const Locations = () => {
 
                     <div className="flex items-start space-x-3 space-x-reverse">
                       <Clock className="w-5 h-5 text-primary mt-1 shrink-0" />
-                      <div>
-                        <p className="font-medium mb-1">ساعات العمل</p>
-                        <div className="text-muted-foreground space-y-1">
-                          {current.hours ? <p className="text-sm">{current.hours}</p> : null}
-                          <p>السبت - الخميس (المتجر): {workHours.weekdays}</p>
-                          <p>الجمعة (المتجر): {workHours.friday}</p>
-                          <p
-                            className={`text-xs ${getCurrentStatus() === 'مفتوح الآن' ? 'text-success' : 'text-muted-foreground'}`}
-                          >
-                            الحالة العامة: {getCurrentStatus()}
-                          </p>
-                        </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium mb-2">ساعات العمل</p>
+                        <ul className="text-muted-foreground text-sm space-y-2 list-none m-0 p-0">
+                          {hourLines.map((line, lineIdx) => (
+                            <li key={`${lineIdx}-${line.slice(0, 24)}`} className="flex gap-2 items-baseline text-right">
+                              <span className="text-primary shrink-0" aria-hidden>
+                                •
+                              </span>
+                              <span className="flex-1 min-w-0 leading-relaxed">{line}</span>
+                            </li>
+                          ))}
+                        </ul>
+                        <p
+                          className={`text-xs mt-3 ${getCurrentStatus() === 'مفتوح الآن' ? 'text-success' : 'text-muted-foreground'}`}
+                        >
+                          الحالة العامة: {getCurrentStatus()}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -371,13 +407,28 @@ const Locations = () => {
                         احصل على الاتجاهات
                       </a>
                     </Button>
-                    <Button variant="outline" className="flex-1" asChild>
-                      <a href={phoneHref(current.phone)}>
-                        <Phone className="w-4 h-4 ml-2" />
-                        اتصل بالفرع
-                      </a>
-                    </Button>
+                    {primaryPhone ? (
+                      <Button variant="outline" className="flex-1" asChild>
+                        <a href={phoneHref(primaryPhone)}>
+                          <Phone className="w-4 h-4 ml-2" />
+                          اتصل بالفرع
+                        </a>
+                      </Button>
+                    ) : null}
                   </div>
+                  {currentPhones.length > 1 ? (
+                    <p className="text-xs text-muted-foreground text-center sm:text-right">
+                      أرقام إضافية:{' '}
+                      {currentPhones.slice(1).map((num, i) => (
+                        <span key={num}>
+                          {i > 0 ? ' · ' : null}
+                          <a href={phoneHref(num)} className="text-primary hover:underline" dir="ltr">
+                            {num}
+                          </a>
+                        </span>
+                      ))}
+                    </p>
+                  ) : null}
                 </div>
               </div>
             </div>
