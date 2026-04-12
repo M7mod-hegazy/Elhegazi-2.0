@@ -7,7 +7,7 @@
       "destination": "/api/index"
     },
     {
-      "source": "/((?!api/|assets/|favicon.ico|manifest.json|iconPng.png|service-worker.js).*)",
+      "source": "/((?!api/|assets/|styles/|fonts/|favicon.ico|manifest.json|iconPng.png|service-worker.js|robots.txt).*)",
       "destination": "/index.html"
     }
   ]

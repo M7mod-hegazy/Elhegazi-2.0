@@ -15,6 +15,7 @@ import { logHistory } from '@/lib/history';
 import { apiGet, apiPutJson, ApiHttpError } from '@/lib/api';
 import { getLocationPhoneList } from '@/lib/locationPhones';
 import { applyHeroImageFallback } from '@/lib/images';
+import ImageUpload from '@/components/ui/image-upload';
 
 function extractCoordinatesFromMapsLink(link: string): { lat: number; lng: number } | null {
   const atMatch = link.match(/@(-?\d+\.?\d*),(-?\d+\.?\d*)/);
@@ -847,8 +848,19 @@ const LocationForm = memo(function LocationForm({
         <div className="space-y-3 mt-6">
           <label className="text-base font-semibold text-slate-700 flex items-center gap-2">
             <ImageIcon className="w-4 h-4 text-primary" />
-            صورة الفرع (رابط — تظهر في صفحة المواقع)
+            صورة الفرع (سحب وإفلات أو رفع — تظهر في صفحة المواقع)
           </label>
+          <div className="rounded-xl border border-primary/20 bg-white/70 p-3">
+            <ImageUpload
+              maxImages={1}
+              multiple={false}
+              initialImages={formData.imageUrl?.trim() ? [formData.imageUrl.trim()] : []}
+              onImagesChange={(urls) => handleInputChange('imageUrl', urls[0] || '')}
+              cloudinaryFolder="branch-locations"
+              className="[&_.text-xs]:text-slate-600"
+            />
+          </div>
+          <p className="text-sm text-slate-600">أو الصق رابط الصورة يدويًا:</p>
           <Input
             value={formData.imageUrl || ''}
             onChange={(e) => handleInputChange('imageUrl', e.target.value)}

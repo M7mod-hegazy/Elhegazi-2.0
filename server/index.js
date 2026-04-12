@@ -631,6 +631,12 @@ async function getOwnerVaultConfig() {
 }
 
 async function getOwnerVisibility() {
+  if (mongoose.connection.readyState !== 1) {
+    return {
+      enabled: true,
+      visibility: mergeVisibility({}),
+    };
+  }
   const settings = await getOwnerVaultConfig();
   const ownerVault = settings.ownerVault || {};
   return {
@@ -1302,19 +1308,21 @@ app.post('/api/history/mark-read', async (req, res) => {
 // MongoDB connection
 const MONGODB_URI = process.env.MONGODB_URI;
 if (!MONGODB_URI) {
-  console.error('MONGODB_URI is not set. Create server/.env');
+  console.error('MONGODB_URI is not set. Create server/.env — API routes that need the database will return 503 until it is configured.');
 }
 
 mongoose.set('strictQuery', false);
-mongoose
-  .connect(MONGODB_URI, {
-    dbName: process.env.MONGODB_DB || 'appdb',
-    maxPoolSize: 30,
-    serverSelectionTimeoutMS: 10000,
-    socketTimeoutMS: 45000,
-  })
-  .then(() => console.log('MongoDB connected'))
-  .catch((err) => console.error('MongoDB connection error:', err.message));
+if (MONGODB_URI) {
+  mongoose
+    .connect(MONGODB_URI, {
+      dbName: process.env.MONGODB_DB || 'appdb',
+      maxPoolSize: 30,
+      serverSelectionTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+    })
+    .then(() => console.log('MongoDB connected'))
+    .catch((err) => console.error('MongoDB connection error:', err.message));
+}
 
 // After Mongo connects, optionally auto-bootstrap a dev SuperAdmin user
 mongoose.connection.once('open', async () => {
@@ -1715,6 +1723,9 @@ app.post('/api/history', requirePermission('reports', 'create', { attach: true }
 // Home Config (get or initialize default)
 app.get('/api/home-config', async (req, res) => {
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ ok: false, error: 'Database not connected yet' });
+    }
     let cfg = await HomeConfig.findOne().lean();
     if (!cfg) {
       cfg = await HomeConfig.create({
@@ -3081,6 +3092,9 @@ app.post('/api/upload-3d-model', (req, res, next) => {
 app.get('/api/categories', async (req, res) => {
   const { page = 1, limit = 20, featured } = req.query;
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ ok: false, error: 'Database not connected yet' });
+    }
     let q = {};
     if (featured !== undefined) q.featured = featured === 'true';
     
@@ -3397,6 +3411,9 @@ async function detachProductFromItsFamily(productIdStr) {
 app.get('/api/products', async (req, res) => {
   const { page = 1, limit = 20, featured, categorySlug, categoryId, search, ids, fields } = req.query;
   try {
+    if (mongoose.connection.readyState !== 1) {
+      return res.status(503).json({ ok: false, error: 'Database not connected yet' });
+    }
     // If ids are provided, fetch specific products in one query and ignore pagination
     if (ids) {
       const idList = String(ids)

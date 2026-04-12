@@ -1,0 +1,4 @@
+/* Minimal critical path CSS — satisfies preload in usePrefetch; extend if needed. */
+:root {
+  color-scheme: light dark;
+}

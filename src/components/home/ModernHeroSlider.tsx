@@ -443,6 +443,10 @@ const ModernHeroSlider: React.FC = () => {
     return fakeProducts.slice(0, 3);
   })();
 
+  /** Must match loop copies below so the marquee returns seamlessly. */
+  const MARQUEE_COPIES = 4;
+  const marqueeScrollPercent = 100 / MARQUEE_COPIES;
+
   // Loading state or empty state with skeleton
   if (loading || noSlides) {
     return (
@@ -554,35 +558,44 @@ const ModernHeroSlider: React.FC = () => {
           {/* Desktop/Tablet Layout - Two Columns from md and up */}
           <div className="grid grid-cols-1 md:grid-cols-12 gap-8 md:gap-10 lg:gap-12 items-stretch h-full" style={{ direction: 'ltr' }}>
             {/* Left Content - Products, animated vertical marquee */}
-            <div className="md:col-start-1 md:col-end-6 relative h-full">
-              <div className="h-full overflow-hidden flex items-center">
+            <div className="md:col-start-1 md:col-end-6 relative h-full min-h-0">
+              <div className="h-full min-h-[280px] overflow-hidden flex items-center justify-center">
                 <style>
                   {`
                   @keyframes hero-vertical-scroll {
-                    from { transform: translate(-50%, -50%); }
-                    to { transform: translate(-50%, calc(-50% - 100vh)); }
+                    from { transform: translate(-50%, -50%) translateY(0); }
+                    to { transform: translate(-50%, -50%) translateY(-${marqueeScrollPercent}%); }
+                  }
+                  @media (prefers-reduced-motion: reduce) {
+                    .hero-marquee-track { animation: none !important; }
                   }
                   `}
                 </style>
-                <style>
-                  {`.animated-product-hero { transform: scale(1.5); }`}
-                </style>
-                <div className="relative w-full" style={{ height: '100%' }}>
+                <div className="relative w-full h-full max-w-[300px] mx-auto" style={{ height: '100%' }}>
                   <div
-                    className="absolute top-1/2 left-1/2"
+                    className="hero-marquee-track absolute top-1/2 left-1/2 w-full will-change-transform"
                     style={{
-                      animation: 'hero-vertical-scroll 8s linear infinite',
+                      animation: 'hero-vertical-scroll 22s linear infinite',
                       width: '100%',
                     }}
                   >
-                    {[...activeProducts, ...activeProducts, ...activeProducts, ...activeProducts].map((product, index) => (
-                      <div key={`${product.id}-${index}`} className="flex justify-center py-16 animated-product-hero">
-                        <AnimatedProductCard
-                          product={product}
-                          index={index}
-                        />
-                      </div>
-                    ))}
+                    {Array.from({ length: MARQUEE_COPIES }, () => activeProducts)
+                      .flat()
+                      .map((product, index) => (
+                        <div
+                          key={`${product.id}-${index}`}
+                          className="flex justify-center items-center h-[min(32vh,320px)] shrink-0 py-2 box-border"
+                        >
+                          <div className="w-full max-w-[272px] h-[280px] flex items-center justify-center">
+                            <AnimatedProductCard
+                              product={product}
+                              index={index}
+                              className="w-full max-w-[272px] !max-w-[272px] shadow-lg"
+                              variant="hero"
+                            />
+                          </div>
+                        </div>
+                      ))}
                   </div>
                 </div>
               </div>

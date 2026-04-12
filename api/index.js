@@ -99,6 +99,149 @@ async function isAdminRequest(c) {
   }
 }
 
+/** Aligns with server/index.js owner vault defaults (read-only merge for GET /site-visibility). */
+const DEFAULT_OWNER_VISIBILITY = {
+  publicPages: {
+    home: true,
+    products: true,
+    productDetail: true,
+    categories: true,
+    cart: true,
+    checkout: true,
+    favorites: true,
+    profile: true,
+    orders: true,
+    about: true,
+    contact: true,
+    locations: true,
+    shopBuilder: true,
+    latestWork: true,
+  },
+  adminModules: {
+    dashboard: true,
+    products: true,
+    products3d: true,
+    categories: true,
+    orders: true,
+    users: true,
+    locations: true,
+    qrcodes: true,
+    homeConfig: true,
+    settings: true,
+    history: true,
+    profit: true,
+    shareholders: true,
+    latestWork: true,
+  },
+  featureFlags: {
+    rating: true,
+    favorites: true,
+    shopBuilder3d: true,
+    prices: true,
+  },
+};
+
+function mergeOwnerVisibility(visibility = {}) {
+  return {
+    publicPages: { ...DEFAULT_OWNER_VISIBILITY.publicPages, ...(visibility.publicPages || {}) },
+    adminModules: { ...DEFAULT_OWNER_VISIBILITY.adminModules, ...(visibility.adminModules || {}) },
+    featureFlags: { ...DEFAULT_OWNER_VISIBILITY.featureFlags, ...(visibility.featureFlags || {}) },
+  };
+}
+
+async function getOwnerVisibilityRead() {
+  const { default: Settings } = await import('../server/models/Settings.js');
+  const settings = await Settings.findOne().maxTimeMS(8000).lean();
+  const ov = settings?.ownerVault || {};
+  return {
+    enabled: ov.enabled !== false,
+    visibility: mergeOwnerVisibility(ov.visibility || {}),
+  };
+}
+
+async function attachRatingStatsToProductsVercel(items) {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const { default: Rating } = await import('../server/models/Rating.js');
+  const ids = items
+    .map((item) => String(item?._id || item?.id || ''))
+    .filter(Boolean)
+    .filter((id) => mongoose.Types.ObjectId.isValid(id))
+    .map((id) => new mongoose.Types.ObjectId(id));
+  if (ids.length === 0) return items;
+
+  const stats = await Rating.aggregate([
+    { $match: { product: { $in: ids } } },
+    {
+      $group: {
+        _id: '$product',
+        avgRating: { $avg: '$rating' },
+        reviews: { $sum: 1 },
+      },
+    },
+  ]).maxTimeMS(8000);
+
+  const statsMap = new Map(
+    stats.map((s) => [String(s._id), { rating: Number(s.avgRating || 0), reviews: Number(s.reviews || 0) }])
+  );
+
+  return items.map((item) => {
+    const key = String(item?._id || item?.id || '');
+    const stat = statsMap.get(key) || { rating: 0, reviews: 0 };
+    return {
+      ...item,
+      rating: Number(stat.rating.toFixed(1)),
+      reviews: stat.reviews,
+    };
+  });
+}
+
+async function hydrateProductFamilyPayloadVercel(fam) {
+  if (!fam || !fam._id) return null;
+  const { default: Product } = await import('../server/models/Product.js');
+  const memberIds = Array.isArray(fam.memberProductIds) ? fam.memberProductIds : [];
+  if (memberIds.length < 2) return null;
+  const prods = await Product.find({ _id: { $in: memberIds } }).lean().maxTimeMS(8000);
+  const byId = new Map(prods.map((p) => [String(p._id), p]));
+  let defaultId = fam.defaultProductId ? String(fam.defaultProductId) : '';
+  if (!defaultId || !byId.has(defaultId)) {
+    let best = '';
+    let bestPrice = Infinity;
+    for (const p of prods) {
+      if (p.active === false) continue;
+      const pr = Number(p.price);
+      if (Number.isFinite(pr) && pr < bestPrice) {
+        bestPrice = pr;
+        best = String(p._id);
+      }
+    }
+    defaultId = best || (prods[0] ? String(prods[0]._id) : '');
+  }
+  const variants = memberIds
+    .map((oid) => {
+      const p = byId.get(String(oid));
+      if (!p) return null;
+      const mem = (fam.members || []).find((m) => String(m.productId) === String(oid));
+      return {
+        productId: String(p._id),
+        name: p.name,
+        nameAr: p.nameAr,
+        values: mem && mem.values && typeof mem.values === 'object' ? { ...mem.values } : {},
+        image: p.image || (Array.isArray(p.images) && p.images[0]) || '',
+        price: Number(p.price || 0),
+        active: p.active !== false,
+      };
+    })
+    .filter(Boolean);
+  return {
+    id: String(fam._id),
+    name: fam.name,
+    nameAr: fam.nameAr,
+    defaultProductId: defaultId,
+    options: Array.isArray(fam.options) ? fam.options : [],
+    variants,
+  };
+}
+
 const BUILDER_PROJECT_SCHEMA_VERSION = 1;
 const parseBool = (value, fallback = false) => {
   if (value === undefined || value === null || value === '') return fallback;
@@ -392,60 +535,137 @@ app.post('/debug/seed-products', async (c) => {
   }
 });
 
+// ===== SITE VISIBILITY & PRODUCT FAMILIES (Vercel API parity with monolithic server) =====
+app.get('/site-visibility', async (c) => {
+  try {
+    const payload = await getOwnerVisibilityRead();
+    return c.json({ ok: true, item: payload });
+  } catch (err) {
+    console.error('[API site-visibility]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/product-families/storefront', async (c) => {
+  try {
+    const { default: ProductFamily } = await import('../server/models/ProductFamily.js');
+    const families = await ProductFamily.find({}).lean().maxTimeMS(15000);
+    const items = [];
+    for (const fam of families) {
+      const payload = await hydrateProductFamilyPayloadVercel(fam);
+      if (payload && payload.variants && payload.variants.length >= 2) items.push(payload);
+    }
+    return c.json({ ok: true, items });
+  } catch (err) {
+    console.error('[API product-families/storefront]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+async function canReadProductsResource(c) {
+  if (await isAdminRequest(c)) return true;
+  const userId = c.req.header('x-user-id');
+  if (!userId) return false;
+  try {
+    const { getPermissionContext } = await import('../server/rbac/permissions.js');
+    const ctx = await getPermissionContext(userId, 'products', 'read');
+    return !!(ctx && ctx.allowed);
+  } catch {
+    return false;
+  }
+}
+
+app.get('/product-families', async (c) => {
+  try {
+    const allowed = await canReadProductsResource(c);
+    if (!allowed) return c.json({ ok: false, error: 'Forbidden' }, 403);
+    const { default: ProductFamily } = await import('../server/models/ProductFamily.js');
+    const families = await ProductFamily.find({}).sort({ updatedAt: -1 }).lean().maxTimeMS(15000);
+    return c.json({ ok: true, items: families });
+  } catch (err) {
+    console.error('[API product-families]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // ===== PRODUCTS =====
 app.get('/products', async (c) => {
   try {
     const { default: Product } = await import('../server/models/Product.js');
     const ids = c.req.query('ids');
     const categorySlug = c.req.query('categorySlug');
+    const categoryId = c.req.query('categoryId');
     const search = c.req.query('search');
-    const limitParam = c.req.query('limit');
+    const featured = c.req.query('featured');
+    const pageRaw = c.req.query('page');
+    const limitRaw = c.req.query('limit') || c.req.query('perPage');
+    const fields = c.req.query('fields');
 
-    console.log('[API /products] Params:', { ids, categorySlug, search, limitParam });
+    const page = Math.max(1, parseInt(String(pageRaw || '1'), 10) || 1);
+    const limit = Math.min(500, Math.max(1, parseInt(String(limitRaw || '20'), 10) || 20));
 
-    let query = { active: { $ne: false } };
     if (ids) {
-      const idArray = ids
+      const idList = String(ids)
         .split(',')
-        .map(id => id.trim())
-        .filter(Boolean);
-      const validObjectIds = idArray.filter((id) => mongoose.Types.ObjectId.isValid(id));
-      if (validObjectIds.length > 0) {
-        query._id = { $in: validObjectIds };
-      } else {
-        // Keep deterministic response for invalid ids input instead of throwing cast errors
-        return c.json({ ok: true, items: [] });
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .filter((id) => mongoose.Types.ObjectId.isValid(id));
+      if (idList.length === 0) {
+        return c.json({ ok: true, items: [], total: 0, page: 1, pages: 1 });
       }
+      const projection = typeof fields === 'string' && fields.trim() ? String(fields).split(',').join(' ') : undefined;
+      const docs = await Product.find({ _id: { $in: idList } })
+        .select(projection)
+        .lean()
+        .maxTimeMS(15000);
+      const itemsWithStats = await attachRatingStatsToProductsVercel(docs);
+      return c.json({
+        ok: true,
+        items: itemsWithStats,
+        total: itemsWithStats.length,
+        page: 1,
+        pages: 1,
+      });
     }
-    if (categorySlug) {
-      query.categorySlug = categorySlug;
+
+    let q = { active: { $ne: false } };
+    if (featured !== undefined) q.featured = featured === 'true';
+    if (categorySlug) q.categorySlug = categorySlug;
+    if (categoryId && mongoose.Types.ObjectId.isValid(String(categoryId))) {
+      q.categoryId = new mongoose.Types.ObjectId(String(categoryId));
     }
-    // Search filter - search in name, nameAr, sku, and description
-    if (search && search.trim()) {
-      const searchTerm = search.trim();
-      const searchRegex = { $regex: searchTerm, $options: 'i' };
-      query.$or = [
-        { name: searchRegex },
-        { nameAr: searchRegex },
-        { sku: searchRegex },
-        { description: searchRegex },
-        { descriptionAr: searchRegex }
+    if (search && String(search).trim()) {
+      const raw = String(search).trim();
+      const esc = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      q.$or = [
+        { name: { $regex: esc, $options: 'i' } },
+        { nameAr: { $regex: esc, $options: 'i' } },
+        { sku: { $regex: esc, $options: 'i' } },
       ];
-      console.log('[API /products] Search query:', JSON.stringify(query));
     }
 
-    // Only apply limit if explicitly passed, otherwise fetch all
-    let productsQuery = Product.find(query);
-    if (limitParam) {
-      const limit = parseInt(limitParam);
-      if (limit > 0) productsQuery = productsQuery.limit(limit);
-    }
-
-    const products = await productsQuery.lean().maxTimeMS(15000);
-    console.log('[API /products] Results:', products.length, 'products');
-    return c.json({ ok: true, items: products });
+    const skip = (page - 1) * limit;
+    const projection = typeof fields === 'string' && fields.trim() ? String(fields).split(',').join(' ') : undefined;
+    const [items, total] = await Promise.all([
+      Product.find(q)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select(projection)
+        .lean()
+        .maxTimeMS(15000),
+      Product.countDocuments(q, { maxTimeMS: 15000 }),
+    ]);
+    const itemsWithStats = await attachRatingStatsToProductsVercel(items);
+    return c.json({
+      ok: true,
+      items: itemsWithStats,
+      total,
+      page,
+      pages: Math.max(1, Math.ceil(total / limit)),
+    });
   } catch (err) {
-    console.error('[API] Error:', err.message);
+    console.error('[API /products]', err.message);
     return c.json({ ok: false, error: err.message }, 500);
   }
 });

@@ -26,14 +26,18 @@ interface AnimatedProductCardProps {
   index: number;
   className?: string;
   hidePrices?: boolean;
+  /** Fixed footprint for desktop hero marquee */
+  variant?: 'default' | 'hero';
 }
 
-const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>> = ({ 
-  product, 
-  index, 
-  className = ""
+const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>> = ({
+  product,
+  index,
+  className = '',
+  variant = 'default',
 }) => {
   const { hidePrices } = usePricingSettings();
+  const imgTargetW = variant === 'hero' ? 256 : 280;
   const cardRef = useRef<HTMLDivElement>(null);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
@@ -71,6 +75,7 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
   };
 
   const renderStars = (rating: number) => {
+    const starCls = variant === 'hero' ? 'w-3 h-3' : 'w-4 h-4';
     return Array.from({ length: 5 }, (_, i) => {
       const starIndex = i + 1;
       const isHoveredStar = hoveredRating >= starIndex;
@@ -80,7 +85,7 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
       return (
         <Star
           key={i}
-          className={`w-4 h-4 transition-colors duration-200 cursor-pointer ${
+          className={`${starCls} transition-colors duration-200 cursor-pointer ${
             shouldHighlight
               ? 'text-yellow-400 fill-yellow-400'
               : 'text-white/30 hover:text-yellow-300'
@@ -97,15 +102,17 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
     <div
       ref={cardRef}
       data-product-id={product.id}
-      className={`bg-white/10 backdrop-blur-lg rounded-3xl p-3 border border-white/20 cursor-pointer relative overflow-hidden ${className}`}
+      className={`bg-white/10 backdrop-blur-lg rounded-3xl border border-white/20 cursor-pointer relative overflow-hidden ${
+        variant === 'hero' ? 'p-2 max-h-[268px]' : 'p-3'
+      } ${className}`}
       style={{ opacity: 1 }}
     >
       <div className="relative z-10 pointer-events-none">
-        <div className="relative mb-2 pointer-events-auto">
-          <AspectRatio ratio={4/3} className="w-full pointer-events-auto">
+        <div className={`relative pointer-events-auto ${variant === 'hero' ? 'mb-1' : 'mb-2'}`}>
+          <AspectRatio ratio={4 / 3} className="w-full pointer-events-auto">
             <div className="w-full h-full rounded-2xl overflow-hidden bg-white/5">
               <img
-                src={optimizeImage(product.image, { w: 280 })}
+                src={optimizeImage(product.image, { w: imgTargetW })}
                 alt={`${product.nameAr} - ${product.name}`}
                 className="w-full h-full object-cover pointer-events-none"
                 onError={applyProductImageFallback}
@@ -114,8 +121,8 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
                 ref={(el) => {
                   if (el) el.setAttribute('fetchpriority', 'low');
                 }}
-                srcSet={buildSrcSet(product.image, 280)}
-                sizes="(max-width: 640px) 45vw, 280px"
+                srcSet={buildSrcSet(product.image, imgTargetW)}
+                sizes={variant === 'hero' ? '272px' : '(max-width: 640px) 45vw, 280px'}
               />
             </div>
           </AspectRatio>
@@ -137,22 +144,27 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
           )}
         </div>
 
-        <h3 
-          className="text-white font-bold text-sm mb-1 line-clamp-2"
+        <h3
+          className={`text-white font-bold mb-1 line-clamp-2 ${
+            variant === 'hero' ? 'text-xs leading-snug' : 'text-sm'
+          }`}
         >
           {product.nameAr}
         </h3>
         
         {/* Modern Separation Line */}
-        <div className="relative h-0.5 bg-white/10 rounded-full overflow-hidden mb-2">
+        <div className={`relative h-0.5 bg-white/10 rounded-full overflow-hidden ${variant === 'hero' ? 'mb-1' : 'mb-2'}`}>
           <div className="absolute inset-0 bg-gradient-to-r from-yellow-400 via-orange-400 to-yellow-400 transform -translate-x-full group-hover:translate-x-0 transition-transform duration-700 ease-out"></div>
         </div>
         
-        <div className="flex items-center gap-2 mb-2" onMouseLeave={handleStarLeave}>
-          <div className="flex items-center gap-1">
+        <div
+          className={`flex items-center gap-2 ${variant === 'hero' ? 'mb-1' : 'mb-2'}`}
+          onMouseLeave={handleStarLeave}
+        >
+          <div className={`flex items-center ${variant === 'hero' ? 'gap-0.5' : 'gap-1'}`}>
             {renderStars(product.rating)}
-            <span 
-              className="text-sm text-white/60 cursor-pointer hover:text-white/80 transition-colors"
+            <span
+              className={`${variant === 'hero' ? 'text-xs' : 'text-sm'} text-white/60 cursor-pointer hover:text-white/80 transition-colors`}
               onClick={(e) => handleRatingClick(e)}
             >
               ({product.reviews})
@@ -166,16 +178,12 @@ const AnimatedProductCard: React.FC<Omit<AnimatedProductCardProps, 'hidePrices'>
         </div>
         
         {!hidePrices && (
-          <div className="flex items-center gap-2 mb-2">
-            <span 
-              className="text-lg font-bold text-white"
-            >
+          <div className={`flex items-center gap-2 ${variant === 'hero' ? 'mb-0' : 'mb-2'}`}>
+            <span className={variant === 'hero' ? 'text-sm font-bold text-white' : 'text-lg font-bold text-white'}>
               {product.price.toLocaleString()} ج.م
             </span>
             {product.originalPrice && (
-              <span 
-                className="text-sm text-white/60 line-through"
-              >
+              <span className={variant === 'hero' ? 'text-xs text-white/60 line-through' : 'text-sm text-white/60 line-through'}>
                 {product.originalPrice.toLocaleString()}
               </span>
             )}

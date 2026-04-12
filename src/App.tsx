@@ -151,8 +151,10 @@ const AppInner = () => {
   }, [siteName]);
 
   useEffect(() => {
-    // Remove the static pre-splash from index.html ONLY after hero is ready or timeout
+    let removed = false;
     const removeSplash = () => {
+      if (removed) return;
+      removed = true;
       const pre = document.getElementById('pre-splash');
       if (pre && pre.parentElement) {
         pre.style.opacity = '0';
@@ -164,34 +166,25 @@ const AppInner = () => {
       requestAnimationFrame(() => setDocLoaded(true));
     };
 
-    // Listen for hero-ready event from ModernHeroSlider
-    window.addEventListener('hero-ready', removeSplash, { once: true });
-
-    // Fallback timeout in case hero takes too long or isn't present
-    const fallbackTimer = setTimeout(removeSplash, 3500);
-
-    const onDomReady = () => {
-      // We don't remove splash here anymore, we wait for hero-ready
-      // But we still ensure docLoaded is set eventually
+    const tryRemoveSplash = () => {
+      if (allReady && !ownerVisibilityLoading) removeSplash();
     };
 
-    if (document.readyState === 'interactive' || document.readyState === 'complete') {
-      // requestAnimationFrame(() => setDocLoaded(true)); // Moved to removeSplash
-    } else {
-      document.addEventListener('DOMContentLoaded', onDomReady, { once: true });
-    }
+    tryRemoveSplash();
+    window.addEventListener('hero-ready', tryRemoveSplash);
+    const fallbackTimer = setTimeout(removeSplash, 9000);
 
     return () => {
-      window.removeEventListener('hero-ready', removeSplash);
+      window.removeEventListener('hero-ready', tryRemoveSplash);
       clearTimeout(fallbackTimer);
     };
+  }, [allReady, ownerVisibilityLoading]);
 
-    // Prevent React Router from hijacking external links (WhatsApp, etc.)
+  useEffect(() => {
     const handleClickCapture = (e: Event) => {
       const target = (e.target as HTMLElement).closest('a');
       if (target) {
         const href = target.getAttribute('href');
-        // If it's an external protocol or WhatsApp link, prevent React Router from hijacking it
         if (href && (
           href.startsWith('http://wa.me/') ||
           href.startsWith('https://wa.me/') ||
@@ -200,42 +193,34 @@ const AppInner = () => {
           href.startsWith('mailto:') ||
           href.startsWith('tel:')
         )) {
-          // Prevent React Router from intercepting
           e.preventDefault();
           e.stopPropagation();
-
-          // Let the browser handle it natively
           const newWindow = window.open(href, '_blank', 'noopener,noreferrer');
           if (!newWindow) {
-            // Fallback if popup blocked
             window.location.href = href;
           }
         }
       }
     };
 
-    // Intercept window.open calls for WhatsApp links
     const originalWindowOpen = window.open;
-    (window as any).open = function (url: string, target?: string, features?: string) {
-      // If it's a WhatsApp link, open it directly without React Router interference
+    (window as Window & { open: typeof window.open }).open = function (url: string, target?: string, features?: string) {
       if (url && (
         url.startsWith('http://wa.me/') ||
         url.startsWith('https://wa.me/') ||
         url.startsWith('https://web.whatsapp.com/') ||
         url.startsWith('whatsapp://')
       )) {
-        // Use the original window.open but it will be handled by the browser natively
         return originalWindowOpen.call(window, url, target, features);
       }
-      // For other URLs, use the original window.open
       return originalWindowOpen.call(window, url, target, features);
     };
 
     document.addEventListener('click', handleClickCapture, true);
 
     return () => {
-      document.removeEventListener('DOMContentLoaded', onDomReady);
       document.removeEventListener('click', handleClickCapture, true);
+      (window as Window & { open: typeof window.open }).open = originalWindowOpen;
     };
   }, []);
 

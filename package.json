@@ -4,7 +4,8 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently -n api,web -c blue,magenta \"npm run server:dev\" \"vite\"",
+    "dev:client": "vite",
     "prepare": "husky",
     "check:encoding": "node scripts/check-encoding-corruption.mjs",
     "build": "npm run check:encoding && vite build",
@@ -13,7 +14,7 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "server:dev": "nodemon server/index.js",
-    "dev:full": "concurrently \"npm run server:dev\" \"vite\""
+    "dev:full": "concurrently -n api,web -c blue,magenta \"npm run server:dev\" \"vite\""
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
