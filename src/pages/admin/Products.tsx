@@ -1308,6 +1308,7 @@ const AdminProducts = () => {
   }, [paginatedProducts, adminFamilyDocs]);
 
   const visiblePaginatedProducts = useMemo(() => {
+    if (!familyCardsInListings) return paginatedProducts;
     return paginatedProducts.filter((p) => {
       const fid = p.productFamilyId;
       if (!fid) return true;
@@ -1315,7 +1316,7 @@ const AdminProducts = () => {
       const rep = familyRepsOnPage.get(String(fid));
       return rep != null && String(p.id) === rep;
     });
-  }, [paginatedProducts, expandedFamilyIds, familyRepsOnPage]);
+  }, [paginatedProducts, expandedFamilyIds, familyRepsOnPage, familyCardsInListings]);
 
   /** First/last row per expanded family for rounded “container” corners */
   const expandedFamilyEdges = useMemo(() => {
@@ -1391,6 +1392,10 @@ const AdminProducts = () => {
   useEffect(() => {
     if (!familyCardsInListings && familyTableFilter !== 'all') setFamilyTableFilter('all');
   }, [familyCardsInListings, familyTableFilter]);
+
+  useEffect(() => {
+    if (!familyCardsInListings) setExpandedFamilyIds(new Set());
+  }, [familyCardsInListings]);
 
   // Toggle row expansion
   const toggleRowExpansion = useCallback((productId: string) => {
@@ -3361,7 +3366,8 @@ const AdminProducts = () => {
           <div className="space-y-4">
             {/* Mobile: Revolutionary Card-Based Layout with Bigger Image Space */}
             {visiblePaginatedProducts.map((product) => {
-              const famKeyCard = product.productFamilyId ? String(product.productFamilyId) : '';
+              const famKeyCard =
+                familyCardsInListings && product.productFamilyId ? String(product.productFamilyId) : '';
               const familyCardOpen = Boolean(famKeyCard && expandedFamilyIds.has(famKeyCard));
               return (
               <div
@@ -3413,6 +3419,14 @@ const AdminProducts = () => {
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           {(() => {
+                            if (!familyCardsInListings) {
+                              return (
+                                <>
+                                  <h3 className="font-bold text-slate-900 text-base leading-tight">{product.nameAr}</h3>
+                                  <p className="text-xs text-slate-500 font-mono">{product.sku}</p>
+                                </>
+                              );
+                            }
                             const meta = getFamilyTableMeta(product);
                             const fid = meta?.fid ?? '';
                             const famOpen = Boolean(fid && expandedFamilyIds.has(fid));
@@ -3606,7 +3620,7 @@ const AdminProducts = () => {
                         </span>
                         <span className="sm:hidden">{displayedProducts.length} منتج</span>
                       </p>
-                      {familyListingStats.memberRows > 0 ? (
+                      {familyCardsInListings && familyListingStats.memberRows > 0 ? (
                         <p className="text-xs text-slate-500 md:text-sm">
                           {familyListingStats.familyGroups} عائلة · {familyListingStats.memberRows} صفاً في القائمة المعروضة
                         </p>
@@ -3806,7 +3820,10 @@ const AdminProducts = () => {
                       </TableHeader>
                       <TableBody>
                         {visiblePaginatedProducts.map((product) => {
-                          const famKeyRow = product.productFamilyId ? String(product.productFamilyId) : '';
+                          const famKeyRow =
+                            familyCardsInListings && product.productFamilyId
+                              ? String(product.productFamilyId)
+                              : '';
                           const inExpandedFamily =
                             famKeyRow !== '' && expandedFamilyIds.has(famKeyRow);
                           const famEdge = famKeyRow ? expandedFamilyEdges.get(famKeyRow) : undefined;
@@ -3824,7 +3841,7 @@ const AdminProducts = () => {
                                 'border-s-4 transition-[background-color,box-shadow,border-color,filter] duration-300 ease-out',
                                 expandedRows.has(product.id)
                                   ? 'hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 bg-gradient-to-r from-primary/5 to-secondary/5 border-s-primary shadow-md'
-                                  : inExpandedFamily
+                                    : inExpandedFamily
                                     ? [
                                         'border-s-transparent motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300',
                                         'hover:brightness-[0.985]',
@@ -3833,9 +3850,13 @@ const AdminProducts = () => {
                                       ].join(' ')
                                     : [
                                         'hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5',
-                                        product.productFamilyId && isFamilyRepresentative(product)
+                                        familyCardsInListings &&
+                                        product.productFamilyId &&
+                                        isFamilyRepresentative(product)
                                           ? 'border-s-violet-600 bg-gradient-to-l from-violet-100/95 via-violet-50/40 to-white shadow-sm'
-                                          : product.productFamilyId && !isFamilyRepresentative(product)
+                                          : familyCardsInListings &&
+                                              product.productFamilyId &&
+                                              !isFamilyRepresentative(product)
                                             ? 'border-s-indigo-500 bg-indigo-50/80'
                                             : 'border-s-transparent hover:border-s-primary/25',
                                       ].join(' '),
@@ -3923,6 +3944,23 @@ const AdminProducts = () => {
                                     />
                                   ) : (
                                     (() => {
+                                      if (!familyCardsInListings) {
+                                        return (
+                                          <div
+                                            className="group flex w-full min-w-0 cursor-text flex-col items-center gap-1"
+                                            onClick={() => startInlineEdit(product, 'name')}
+                                            title="انقر للتعديل"
+                                          >
+                                            <p
+                                              className="w-full min-w-0 max-w-full break-words text-center font-medium leading-snug text-slate-900 line-clamp-2"
+                                              title={product.nameAr || product.name}
+                                            >
+                                              {product.nameAr || product.name}
+                                            </p>
+                                            <Edit className="w-3 h-3 shrink-0 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                          </div>
+                                        );
+                                      }
                                       const meta = getFamilyTableMeta(product);
                                       const fid = meta?.fid ?? '';
                                       const famOpen = Boolean(fid && expandedFamilyIds.has(fid));

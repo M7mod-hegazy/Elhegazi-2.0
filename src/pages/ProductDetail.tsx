@@ -2061,6 +2061,9 @@ const ProductDetail = () => {
     return withoutOpenProductFamily.slice(0, 4);
   }, [related, product, productCatKey, familyCardsInListings, storefrontFamiliesCatalog]);
 
+  /** Hide variant/family chrome when catalog setting is off; API still returns `productFamily` for when the flag is on again. */
+  const productFamilyForUi = familyCardsInListings ? productFamily : null;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 py-12">
@@ -2273,7 +2276,7 @@ const ProductDetail = () => {
       {isMobile ? (
         <MobileProductDetail
           product={product}
-          productFamily={productFamily}
+          productFamily={productFamilyForUi}
           relatedRows={relatedRows}
           ratingHistory={ratingHistory}
           selectedImage={selectedImage}
@@ -2295,7 +2298,7 @@ const ProductDetail = () => {
       ) : (
         <DesktopProductDetail
           product={product}
-          productFamily={productFamily}
+          productFamily={productFamilyForUi}
           relatedRows={relatedRows}
           ratingHistory={ratingHistory}
           selectedImage={selectedImage}
