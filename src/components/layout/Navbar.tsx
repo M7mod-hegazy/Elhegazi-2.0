@@ -145,6 +145,7 @@ const Navbar = () => {
     { path: '/products', label: 'المنتجات', labelEn: 'Products' },
     { path: '/shop-builder', label: 'مُخطط المتجر 3D', labelEn: 'Shop Builder 3D' },
     { path: '/about', label: 'من نحن', labelEn: 'About' },
+    { path: '/portfolio', label: 'أعمالنا السابقة', labelEn: 'Our work' },
     { path: '/locations', label: 'فروعنا', labelEn: 'Locations' },
     // Contact removed as requested
   ].filter((item) => {
@@ -152,6 +153,7 @@ const Navbar = () => {
     if (item.path === '/products') return isVisible('publicPages', 'products');
     if (item.path === '/shop-builder') return isVisible('publicPages', 'shopBuilder');
     if (item.path === '/about') return isVisible('publicPages', 'about');
+    if (item.path === '/portfolio') return isVisible('publicPages', 'latestWork');
     if (item.path === '/locations') return isVisible('publicPages', 'locations');
     return true;
   });

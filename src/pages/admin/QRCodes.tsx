@@ -24,6 +24,7 @@ import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 
 import { Product, Category } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { useLogo } from '@/hooks/useLogo';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import {
@@ -136,9 +137,19 @@ function getInnerPageDimensionsMm(
   return { w: innerW, h: innerH };
 }
 
+function resolveLogoSrcForCanvas(url: string): string {
+  const u = (url || '').trim();
+  if (!u) return '';
+  if (u.startsWith('data:')) return u;
+  if (u.startsWith('http://') || u.startsWith('https://')) return u;
+  if (typeof window !== 'undefined' && u.startsWith('/')) return `${window.location.origin}${u}`;
+  return u;
+}
+
 const AdminQRCodes = () => {
   const { toast } = useToast();
   const { isMobile, isTablet } = useDeviceDetection();
+  const { logo: siteLogo } = useLogo();
 
   // State
   const [products, setProducts] = useState<Product[]>([]);
@@ -165,6 +176,7 @@ const AdminQRCodes = () => {
   const [previewMode, setPreviewMode] = useState<'grid' | 'a4'>('grid');
   const [currentPage, setCurrentPage] = useState(1);
   const [logoFile, setLogoFile] = useState<File | null>(null);
+  const [logoMode, setLogoMode] = useState<'site' | 'upload'>('site');
   const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
   const [logoPreview, setLogoPreview] = useState<string>('');
   const [qrCache, setQrCache] = useState<{ [key: string]: string }>({});
@@ -240,6 +252,18 @@ const AdminQRCodes = () => {
     });
   }, [selectedProductIds]);
 
+  const resolvedSiteLogoUrl = useMemo(
+    () => resolveLogoSrcForCanvas(siteLogo?.url || ''),
+    [siteLogo?.url]
+  );
+
+  /** Data URL (upload) or absolute/site URL for canvas compositing */
+  const effectiveLogoSrc = useMemo(() => {
+    if (!settings.includeLogo) return '';
+    if (logoMode === 'site') return resolvedSiteLogoUrl;
+    return logoPreview;
+  }, [settings.includeLogo, logoMode, resolvedSiteLogoUrl, logoPreview]);
+
   // Build printable list (allows same product multiple times)
   const selectedProducts = useMemo(() => {
     const byId = new Map(products.map((p) => [p.id, p]));
@@ -269,17 +293,25 @@ const AdminQRCodes = () => {
   useEffect(() => {
     qrCacheRef.current = {};
     setQrCache({});
-  }, [settings.size, settings.foregroundColor, settings.backgroundColor, settings.includeLogo, logoPreview]);
+  }, [
+    settings.size,
+    settings.foregroundColor,
+    settings.backgroundColor,
+    settings.includeLogo,
+    effectiveLogoSrc,
+    logoMode,
+  ]);
 
   const generateQRCodeWithLogo = useCallback(async (product: Product, customSize?: number): Promise<string> => {
     const productURL = `${window.location.origin}${buildProductPath(product.id)}`;
     const size = customSize || settings.size;
-    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}-${settings.foregroundColor}-${settings.backgroundColor}`;
+    const logoKey = effectiveLogoSrc ? `${logoMode}-${effectiveLogoSrc.slice(0, 180)}` : 'nologo';
+    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoKey}-${settings.foregroundColor}-${settings.backgroundColor}`;
 
     const hit = qrCacheRef.current[cacheKey];
     if (hit) return hit;
 
-    const ecc: 'L' | 'M' | 'Q' | 'H' = settings.includeLogo && logoPreview ? 'H' : 'M';
+    const ecc: 'L' | 'M' | 'Q' | 'H' = settings.includeLogo && effectiveLogoSrc ? 'H' : 'M';
 
     try {
       const qrDataURL = await QRCode.toDataURL(productURL, {
@@ -292,7 +324,7 @@ const AdminQRCodes = () => {
         errorCorrectionLevel: ecc,
       });
 
-      if (!settings.includeLogo || !logoPreview) {
+      if (!settings.includeLogo || !effectiveLogoSrc) {
         qrCacheRef.current[cacheKey] = qrDataURL;
         setQrCache((prev) => ({ ...prev, [cacheKey]: qrDataURL }));
         return qrDataURL;
@@ -315,10 +347,20 @@ const AdminQRCodes = () => {
       ctx.drawImage(qrImage, 0, 0, size, size);
 
       const logoImage = document.createElement('img');
+      if (!effectiveLogoSrc.startsWith('data:')) {
+        try {
+          const abs = new URL(effectiveLogoSrc, window.location.origin);
+          if (abs.origin !== window.location.origin) {
+            logoImage.crossOrigin = 'anonymous';
+          }
+        } catch {
+          /* same-origin relative URLs: omit crossOrigin to avoid needless CORS */
+        }
+      }
       await new Promise<void>((resolve, reject) => {
         logoImage.onload = () => resolve();
         logoImage.onerror = () => reject(new Error('Failed to load logo image'));
-        logoImage.src = logoPreview;
+        logoImage.src = effectiveLogoSrc;
       });
 
       const logoSize = Math.max(8, size * 0.22);
@@ -356,11 +398,19 @@ const AdminQRCodes = () => {
       setQrCache((prev) => ({ ...prev, [cacheKey]: fallbackQR }));
       return fallbackQR;
     }
-  }, [settings.size, settings.foregroundColor, settings.backgroundColor, settings.includeLogo, logoPreview]);
+  }, [
+    settings.size,
+    settings.foregroundColor,
+    settings.backgroundColor,
+    settings.includeLogo,
+    effectiveLogoSrc,
+    logoMode,
+  ]);
 
   const generateQRCodeURL = (product: Product, customSize?: number) => {
     const size = customSize || settings.size;
-    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoPreview ? 'logo' : 'nologo'}-${settings.foregroundColor}-${settings.backgroundColor}`;
+    const logoKey = effectiveLogoSrc ? `${logoMode}-${effectiveLogoSrc.slice(0, 180)}` : 'nologo';
+    const cacheKey = `${product.id}-${size}-${settings.includeLogo}-${logoKey}-${settings.foregroundColor}-${settings.backgroundColor}`;
 
     const sync = qrCacheRef.current[cacheKey];
     if (sync) return sync;
@@ -410,7 +460,7 @@ const AdminQRCodes = () => {
       product.id,
       size,
       settings.includeLogo,
-      logoPreview,
+      effectiveLogoSrc,
       settings.foregroundColor,
       settings.backgroundColor,
       generateQRCodeWithLogo,
@@ -1267,6 +1317,7 @@ const AdminQRCodes = () => {
       }
 
       setLogoFile(file);
+      setLogoMode('upload');
 
       // Create preview
       const reader = new FileReader();
@@ -1287,12 +1338,20 @@ const AdminQRCodes = () => {
   const handleRemoveLogo = () => {
     setLogoFile(null);
     setLogoPreview('');
-    setSettings({ ...settings, includeLogo: false });
-
-    toast({
-      title: "تم حذف الشعار",
-      description: "تم حذف الشعار من الإعدادات",
-    });
+    if (resolvedSiteLogoUrl) {
+      setLogoMode('site');
+      setSettings((prev) => ({ ...prev, includeLogo: true }));
+      toast({
+        title: "تم إزالة الملف",
+        description: "تم العودة لشعار الموقع من الإعدادات",
+      });
+    } else {
+      setSettings((prev) => ({ ...prev, includeLogo: false }));
+      toast({
+        title: "تم حذف الشعار",
+        description: "تم حذف الشعار من الإعدادات",
+      });
+    }
   };
 
   // Handle preview link for individual product
@@ -2217,83 +2276,119 @@ const AdminQRCodes = () => {
                         </div>
                       </div>
 
-                      {/* Logo Settings */}
+                      {/* Logo Settings — site logo or custom upload */}
                       <div className="space-y-4 p-4 rounded-lg border bg-slate-50/50">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                           <div>
                             <Label className="font-medium text-slate-900">إضافة الشعار</Label>
-                            <p className="text-sm text-slate-500">تضمين شعار الشركة في الرمز</p>
+                            <p className="text-sm text-slate-500">شعار الموقع من الإعدادات أو صورة ترفعها هنا</p>
                           </div>
                           <Switch
                             checked={settings.includeLogo}
                             onCheckedChange={(checked) => setSettings({ ...settings, includeLogo: checked })}
-                            className="data-[state=checked]:bg-indigo-600 data-[state=unchecked]:bg-gray-400 scale-125 shadow-lg data-[state=checked]:shadow-indigo-300 transition-all duration-300 disabled:opacity-50 disabled:scale-100"
-                            disabled={!logoPreview}
+                            className="data-[state=checked]:bg-indigo-600 data-[state=unchecked]:bg-gray-400 scale-125 shadow-lg data-[state=checked]:shadow-indigo-300 transition-all duration-300 shrink-0"
                           />
                         </div>
 
-                        {/* Logo Upload Section */}
-                        <div className="space-y-3">
-                          {!logoPreview ? (
-                            <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-colors">
-                              <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleLogoUpload}
-                                className="hidden"
-                                id="logo-upload"
+                        <div className="flex flex-wrap gap-2">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={logoMode === 'site' ? 'default' : 'outline'}
+                            className="gap-1.5"
+                            onClick={() => {
+                              setLogoMode('site');
+                              setLogoFile(null);
+                              setLogoPreview('');
+                            }}
+                          >
+                            <Image className="h-4 w-4" aria-hidden />
+                            شعار الموقع
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant={logoMode === 'upload' ? 'default' : 'outline'}
+                            className="gap-1.5"
+                            onClick={() => setLogoMode('upload')}
+                          >
+                            <Upload className="h-4 w-4" aria-hidden />
+                            رفع صورة
+                          </Button>
+                        </div>
+
+                        {settings.includeLogo && !effectiveLogoSrc ? (
+                          <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-md px-2 py-1.5">
+                            {logoMode === 'site'
+                              ? 'لا يوجد شعار محفوظ للموقع. عيّنه من الإعدادات أو اختر «رفع صورة».'
+                              : 'ارفع صورة شعار لاستخدامها في الرمز.'}
+                          </p>
+                        ) : null}
+
+                        {logoMode === 'site' ? (
+                          <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
+                            <div className="flex-shrink-0">
+                              <img
+                                src={resolvedSiteLogoUrl || LOGO_IMAGE_FALLBACK}
+                                alt=""
+                                className="w-14 h-14 object-contain rounded border bg-white"
+                                onError={applyLogoImageFallback}
                               />
-                              <label
-                                htmlFor="logo-upload"
-                                className="cursor-pointer flex flex-col items-center gap-2"
-                              >
-                                <Upload className="w-8 h-8 text-slate-400" />
-                                <div className="text-sm text-slate-600">
-                                  <span className="font-medium text-primary hover:text-primary">
-                                    اختر ملف الشعار
-                                  </span>
-                                  <p className="text-xs text-slate-500 mt-1">
-                                    PNG, JPG, GIF حتى 2MB
+                            </div>
+                            <p className="text-sm text-slate-600 flex-1 min-w-0">
+                              يُستخدم الشعار المعروض في المتجر (من صفحة الإعدادات).
+                            </p>
+                          </div>
+                        ) : (
+                          <div className="space-y-3">
+                            {!logoPreview ? (
+                              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center hover:border-slate-400 transition-colors">
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleLogoUpload}
+                                  className="hidden"
+                                  id="logo-upload"
+                                />
+                                <label
+                                  htmlFor="logo-upload"
+                                  className="cursor-pointer flex flex-col items-center gap-2"
+                                >
+                                  <Upload className="w-8 h-8 text-slate-400" />
+                                  <div className="text-sm text-slate-600">
+                                    <span className="font-medium text-primary">اختر ملف الشعار</span>
+                                    <p className="text-xs text-slate-500 mt-1">PNG, JPG, GIF حتى 2MB</p>
+                                  </div>
+                                </label>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
+                                <div className="flex-shrink-0">
+                                  <img
+                                    src={logoPreview || LOGO_IMAGE_FALLBACK}
+                                    alt=""
+                                    className="w-12 h-12 object-contain rounded border"
+                                    onError={applyLogoImageFallback}
+                                  />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-medium text-slate-900 truncate">{logoFile?.name}</p>
+                                  <p className="text-xs text-slate-500">
+                                    {logoFile ? `${(logoFile.size / 1024).toFixed(1)} KB` : ''}
                                   </p>
                                 </div>
-                              </label>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-3 p-3 bg-white rounded-lg border">
-                              <div className="flex-shrink-0">
-                                <img
-                                  src={logoPreview || LOGO_IMAGE_FALLBACK}
-                                  alt="Logo Preview"
-                                  className="w-12 h-12 object-contain rounded border"
-                                  onError={applyLogoImageFallback}
-                                />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={handleRemoveLogo}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
                               </div>
-                              <div className="flex-1 min-w-0">
-                                <p className="text-sm font-medium text-slate-900 truncate">
-                                  {logoFile?.name}
-                                </p>
-                                <p className="text-xs text-slate-500">
-                                  {logoFile ? `${(logoFile.size / 1024).toFixed(1)} KB` : ''}
-                                </p>
-                              </div>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={handleRemoveLogo}
-                                className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            </div>
-                          )}
-
-                          {logoPreview && (
-                            <div className="text-xs text-slate-500 bg-primary/5 p-2 rounded">
-                              <Image className="w-3 h-3 inline mr-1" />
-                              سيتم عرض الشعار في وسط رمز QR عند تفعيل الخيار أعلاه
-                            </div>
-                          )}
-                        </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

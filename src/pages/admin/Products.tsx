@@ -80,7 +80,8 @@ import {
   DollarSign,
   Link2,
   Pencil,
-  Users,
+  ArrowDownWideNarrow,
+  Layers,
 } from 'lucide-react';
 
 // Small progress bar to visualize countdown (used in delete toasts)
@@ -486,6 +487,16 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
   );
 });
 
+/** Stable hue (0–359) per family id so multiple expanded families are easy to tell apart. */
+function stableHueFromFamilyId(familyId: string): number {
+  let h = 2166136261;
+  for (let i = 0; i < familyId.length; i++) {
+    h ^= familyId.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h) % 360;
+}
+
 const AdminProducts = () => {
   // Set page title
   usePageTitle('إدارة المنتجات');
@@ -869,6 +880,17 @@ const AdminProducts = () => {
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(10);
+  type AdminTableSort =
+    | 'newest'
+    | 'oldest'
+    | 'name_asc'
+    | 'name_desc'
+    | 'price_asc'
+    | 'price_desc'
+    | 'sku_asc';
+  const [tableSort, setTableSort] = useState<AdminTableSort>('newest');
+  type FamilyTableFilter = 'all' | 'no_family' | 'family_rep';
+  const [familyTableFilter, setFamilyTableFilter] = useState<FamilyTableFilter>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   // Inline edit state
   const [editingField, setEditingField] = useState<null | { id: string; field: 'name' | 'sku' | 'price'; value: string }>(null);
@@ -925,17 +947,28 @@ const AdminProducts = () => {
       let page = 1;
       let pages = 1;
       const all: BackendProduct[] = [];
+      let listValid = true;
 
       while (page <= pages) {
         const res = await apiGet<BackendProduct>(`/api/products?page=${page}&limit=${pageSize}`);
-        if (!res.ok) break;
-        if (Array.isArray(res.items)) all.push(...res.items);
+        if (
+          !res ||
+          typeof res !== 'object' ||
+          res.ok !== true ||
+          !Array.isArray(res.items)
+        ) {
+          listValid = false;
+          break;
+        }
+        all.push(...res.items);
         pages = Number(res.pages || 1);
         page += 1;
       }
 
-      const deduped = Array.from(new Map(all.map((item) => [String(item._id), item])).values());
-      setProducts(deduped.map(mapBackendProduct));
+      if (listValid) {
+        const deduped = Array.from(new Map(all.map((item) => [String(item._id), item])).values());
+        setProducts(deduped.map(mapBackendProduct));
+      }
     } finally {
       setIsLoadingProducts(false);
     }
@@ -1141,17 +1174,6 @@ const AdminProducts = () => {
     });
   }, [products, searchTerm, selectedCategory]);
 
-  // Pagination calculations (memoized)
-  const totalPages = useMemo(() => {
-    return Math.ceil(filteredProducts.length / itemsPerPage);
-  }, [filteredProducts.length, itemsPerPage]);
-
-  const paginatedProducts = useMemo(() => {
-    const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return filteredProducts.slice(startIndex, endIndex);
-  }, [filteredProducts, currentPage, itemsPerPage]);
-
   const [adminFamilyDocs, setAdminFamilyDocs] = useState<AdminProductFamilyLean[]>([]);
   const [expandedFamilyIds, setExpandedFamilyIds] = useState<Set<string>>(new Set());
   const [editFamily, setEditFamily] = useState<AdminProductFamilyLean | null>(null);
@@ -1159,19 +1181,111 @@ const AdminProducts = () => {
   const fetchAdminFamilies = useCallback(async () => {
     try {
       const res = await apiGet<AdminProductFamilyLean>('/api/product-families');
-      if (res.ok && 'items' in res && Array.isArray(res.items)) {
+      if (
+        res &&
+        typeof res === 'object' &&
+        res.ok === true &&
+        'items' in res &&
+        Array.isArray(res.items)
+      ) {
         setAdminFamilyDocs(res.items as AdminProductFamilyLean[]);
-      } else {
-        setAdminFamilyDocs([]);
       }
+      // Keep previous families on malformed/304-style responses instead of clearing the list
     } catch {
-      setAdminFamilyDocs([]);
+      /* keep existing adminFamilyDocs */
     }
   }, []);
 
   useEffect(() => {
     void fetchAdminFamilies();
   }, [products, fetchAdminFamilies]);
+
+  /** Stable representative id per family (default product when present in catalog). */
+  const familyRepIdByFamilyId = useMemo(() => {
+    const map = new Map<string, string>();
+    const byId = new Map(products.map((p) => [String(p.id), p]));
+    for (const fam of adminFamilyDocs) {
+      const fid = String(fam._id);
+      const mids = (fam.memberProductIds || []).map(String);
+      if (mids.length < 2) continue;
+      const def = fam.defaultProductId != null ? String(fam.defaultProductId) : '';
+      let rep: string | null = null;
+      if (def && byId.has(def)) rep = def;
+      else rep = mids.find((id) => byId.has(id)) ?? mids[0] ?? null;
+      if (rep) map.set(fid, rep);
+    }
+    return map;
+  }, [adminFamilyDocs, products]);
+
+  const getFamilyTableMeta = useCallback(
+    (product: Product) => {
+      const fid = product.productFamilyId ? String(product.productFamilyId) : '';
+      if (!fid) return null;
+      const fam = adminFamilyDocs.find((f) => String(f._id) === fid);
+      if (!fam) return null;
+      const n = fam.memberProductIds?.length ?? 0;
+      if (n < 2) return null;
+      const defId = fam.defaultProductId != null ? String(fam.defaultProductId) : '';
+      const defProd = defId ? products.find((p) => String(p.id) === defId) : undefined;
+      const isRep = familyRepIdByFamilyId.get(fid) === String(product.id);
+      return { fam, n, defProd, isRep, fid };
+    },
+    [adminFamilyDocs, products, familyRepIdByFamilyId]
+  );
+
+  const displayedProducts = useMemo(() => {
+    let list = filteredProducts;
+    if (familyTableFilter === 'no_family') {
+      list = list.filter((p) => !p.productFamilyId);
+    } else if (familyTableFilter === 'family_rep') {
+      list = list.filter((p) => {
+        const fid = p.productFamilyId ? String(p.productFamilyId) : '';
+        if (!fid) return false;
+        return familyRepIdByFamilyId.get(fid) === String(p.id);
+      });
+    }
+    const arr = [...list];
+    const nameKey = (p: Product) => (p.nameAr || p.name || '').trim();
+    const cmpName = (a: Product, b: Product) => nameKey(a).localeCompare(nameKey(b), 'ar');
+    const cmpSku = (a: Product, b: Product) =>
+      (a.sku || '').localeCompare(b.sku || '', undefined, { numeric: true });
+    const tCreated = (p: Product) =>
+      new Date(p.createdAt || p.updatedAt || 0).getTime();
+    switch (tableSort) {
+      case 'name_asc':
+        arr.sort(cmpName);
+        break;
+      case 'name_desc':
+        arr.sort((a, b) => -cmpName(a, b));
+        break;
+      case 'price_asc':
+        arr.sort((a, b) => a.price - b.price);
+        break;
+      case 'price_desc':
+        arr.sort((a, b) => b.price - a.price);
+        break;
+      case 'sku_asc':
+        arr.sort(cmpSku);
+        break;
+      case 'oldest':
+        arr.sort((a, b) => tCreated(a) - tCreated(b));
+        break;
+      case 'newest':
+      default:
+        arr.sort((a, b) => tCreated(b) - tCreated(a));
+    }
+    return arr;
+  }, [filteredProducts, familyTableFilter, familyRepIdByFamilyId, tableSort]);
+
+  const totalPages = useMemo(() => {
+    return Math.ceil(displayedProducts.length / itemsPerPage);
+  }, [displayedProducts.length, itemsPerPage]);
+
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    return displayedProducts.slice(startIndex, endIndex);
+  }, [displayedProducts, currentPage, itemsPerPage]);
 
   const familyRepsOnPage = useMemo(() => {
     const pageIds = new Set(paginatedProducts.map((p) => String(p.id)));
@@ -1203,6 +1317,24 @@ const AdminProducts = () => {
     });
   }, [paginatedProducts, expandedFamilyIds, familyRepsOnPage]);
 
+  /** First/last row per expanded family for rounded “container” corners */
+  const expandedFamilyEdges = useMemo(() => {
+    const m = new Map<string, { firstId: string; lastId: string }>();
+    const list = visiblePaginatedProducts;
+    for (let i = 0; i < list.length; i++) {
+      const fid = list[i].productFamilyId ? String(list[i].productFamilyId) : '';
+      if (!fid || !expandedFamilyIds.has(fid) || m.has(fid)) continue;
+      let j = i;
+      while (j < list.length && String(list[j].productFamilyId || '') === fid) j += 1;
+      const slice = list.slice(i, j);
+      if (slice.length) {
+        m.set(fid, { firstId: String(slice[0].id), lastId: String(slice[slice.length - 1].id) });
+      }
+      i = j - 1;
+    }
+    return m;
+  }, [visiblePaginatedProducts, expandedFamilyIds]);
+
   const isFamilyRepresentative = useCallback(
     (p: Product) => {
       const fid = p.productFamilyId;
@@ -1221,12 +1353,12 @@ const AdminProducts = () => {
     });
   }, []);
 
-  /** عرض سريع لعدد العائلات والمنتجات المرتبطة بها في القائمة المصفّاة */
+  /** عرض سريع لعدد العائلات والمنتجات المرتبطة بها في القائمة المعروضة بالجدول */
   const familyListingStats = useMemo(() => {
-    const withFam = filteredProducts.filter((p) => !!p.productFamilyId);
+    const withFam = displayedProducts.filter((p) => !!p.productFamilyId);
     const unique = new Set(withFam.map((p) => String(p.productFamilyId)));
     return { familyGroups: unique.size, memberRows: withFam.length };
-  }, [filteredProducts]);
+  }, [displayedProducts]);
 
   // Resolve product main image with category fallback
   const getProductPrimaryImage = useCallback((p: Product): string => {
@@ -1251,10 +1383,14 @@ const AdminProducts = () => {
     });
   }, [visiblePaginatedProducts]);
 
-  // Reset to first page when filters change
+  // Reset to first page when filters / table view change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedCategory]);
+  }, [searchTerm, selectedCategory, tableSort, familyTableFilter]);
+
+  useEffect(() => {
+    if (!familyCardsInListings && familyTableFilter !== 'all') setFamilyTableFilter('all');
+  }, [familyCardsInListings, familyTableFilter]);
 
   // Toggle row expansion
   const toggleRowExpansion = useCallback((productId: string) => {
@@ -1632,8 +1768,8 @@ const AdminProducts = () => {
       if (exportSelectedIds.size === 0) return [];
       return products.filter((p) => exportSelectedIds.has(String(p.id)));
     }
-    return filteredProducts;
-  }, [exportScope, products, exportSelectedIds, filteredProducts]);
+    return displayedProducts;
+  }, [exportScope, products, exportSelectedIds, displayedProducts]);
 
   const exportScopePoolFiltered = useMemo(() => {
     const poolByCategory =
@@ -3000,7 +3136,12 @@ const AdminProducts = () => {
                 <div>
                   <h2 className="text-lg md:text-xl font-bold text-slate-900">جدول المنتجات</h2>
                   <p className="text-xs md:text-sm text-slate-500">
-                    {filteredProducts.length} منتج {selectedCategory && selectedCategory !== 'all' ? 'في الفئة المحددة' : 'إجمالي'}
+                    <span className="font-medium text-slate-700">{displayedProducts.length}</span> في الجدول
+                    {displayedProducts.length !== filteredProducts.length ? (
+                      <span className="text-slate-400"> (من {filteredProducts.length} بعد البحث والفئة)</span>
+                    ) : (
+                      <span> {selectedCategory && selectedCategory !== 'all' ? 'في الفئة المحددة' : 'إجمالي'}</span>
+                    )}
                   </p>
                 </div>
               </div>
@@ -3080,11 +3221,10 @@ const AdminProducts = () => {
             </div>
           </div>
 
-          {/* Bottom Row: Filters & Search */}
+          {/* Filters & search — single wrapping row */}
           <div className="p-4 md:p-5 bg-slate-50/50">
-            <div className="flex flex-col md:flex-row gap-3">
-              {/* Category Filter */}
-              <div className="w-full md:w-48">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <div className="w-full min-w-0 sm:w-44 md:w-48 shrink-0">
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm">
                     <SelectValue placeholder="جميع الفئات" />
@@ -3100,21 +3240,62 @@ const AdminProducts = () => {
                 </Select>
               </div>
 
-              {/* Search */}
-              <div className="flex-1 relative">
-                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <div className="relative flex-1 min-w-[200px] basis-full sm:basis-[min(100%,18rem)] grow">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 pointer-events-none" />
                 <Input
                   placeholder="البحث بالاسم أو الكود..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pr-10 h-10 bg-white border-slate-200 shadow-sm"
+                  className="pr-10 h-10 bg-white border-slate-200 shadow-sm w-full"
                   ref={searchInputRef}
                 />
               </div>
 
-              {/* Per Page Selector */}
-              <div className="w-full md:w-28">
-                <Select value={String(itemsPerPage)} onValueChange={(val) => setItemsPerPage(Number(val))}>
+              <div className="w-[calc(50%-0.25rem)] min-w-0 sm:w-40 md:w-44 shrink-0">
+                <Select value={tableSort} onValueChange={(v) => setTableSort(v as AdminTableSort)}>
+                  <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm gap-2">
+                    <ArrowDownWideNarrow className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                    <SelectValue placeholder="الترتيب" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="newest">الأحدث أولاً</SelectItem>
+                    <SelectItem value="oldest">الأقدم أولاً</SelectItem>
+                    <SelectItem value="name_asc">الاسم (أ–ي)</SelectItem>
+                    <SelectItem value="name_desc">الاسم (ي–أ)</SelectItem>
+                    <SelectItem value="price_asc">السعر: من الأقل</SelectItem>
+                    <SelectItem value="price_desc">السعر: من الأعلى</SelectItem>
+                    <SelectItem value="sku_asc">رمز SKU</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {familyCardsInListings ? (
+                <div className="w-[calc(50%-0.25rem)] min-w-0 sm:w-44 md:w-52 shrink-0">
+                  <Select
+                    value={familyTableFilter}
+                    onValueChange={(v) => setFamilyTableFilter(v as FamilyTableFilter)}
+                  >
+                    <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm gap-2">
+                      <Layers className="h-4 w-4 shrink-0 text-slate-500" aria-hidden />
+                      <SelectValue placeholder="العائلات" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">كل المنتجات</SelectItem>
+                      <SelectItem value="no_family">بدون عائلة</SelectItem>
+                      <SelectItem value="family_rep">عائلات فقط (ممثل)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              ) : null}
+
+              <div className="w-full min-w-0 sm:w-28 shrink-0 sm:ms-auto">
+                <Select
+                  value={String(itemsPerPage)}
+                  onValueChange={(val) => {
+                    setItemsPerPage(Number(val));
+                    setCurrentPage(1);
+                  }}
+                >
                   <SelectTrigger className="h-10 bg-white border-slate-200 shadow-sm">
                     <SelectValue />
                   </SelectTrigger>
@@ -3126,7 +3307,6 @@ const AdminProducts = () => {
                   </SelectContent>
                 </Select>
               </div>
-
             </div>
 
             {/* Mobile Actions Row */}
@@ -3180,8 +3360,18 @@ const AdminProducts = () => {
         {isMobile ? (
           <div className="space-y-4">
             {/* Mobile: Revolutionary Card-Based Layout with Bigger Image Space */}
-            {visiblePaginatedProducts.map((product) => (
-              <div key={product.id} className="bg-white/90 backdrop-blur-xl border border-slate-200/50 rounded-2xl shadow-lg overflow-hidden">
+            {visiblePaginatedProducts.map((product) => {
+              const famKeyCard = product.productFamilyId ? String(product.productFamilyId) : '';
+              const familyCardOpen = Boolean(famKeyCard && expandedFamilyIds.has(famKeyCard));
+              return (
+              <div
+                key={product.id}
+                className={`bg-white/90 backdrop-blur-xl border rounded-2xl shadow-lg overflow-hidden ${
+                  familyCardOpen
+                    ? 'border-violet-400 ring-2 ring-violet-200/90'
+                    : 'border-slate-200/50'
+                }`}
+              >
                 {/* Mobile Layout: Image-First Design */}
                 <div className="flex">
                   {/* Large Image Section - Takes More Space */}
@@ -3222,8 +3412,83 @@ const AdminProducts = () => {
                     <div className="space-y-2">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <h3 className="font-bold text-slate-900 text-base leading-tight">{product.nameAr}</h3>
-                          <p className="text-xs text-slate-500 font-mono">{product.sku}</p>
+                          {(() => {
+                            const meta = getFamilyTableMeta(product);
+                            const fid = meta?.fid ?? '';
+                            const famOpen = Boolean(fid && expandedFamilyIds.has(fid));
+                            const collapsedRep = Boolean(meta?.isRep && !famOpen);
+                            const defName = meta?.defProd
+                              ? meta.defProd.nameAr || meta.defProd.name || meta.defProd.sku || ''
+                              : '';
+                            const variantName = product.nameAr || '';
+
+                            if (collapsedRep && meta) {
+                              const famTitle = meta.fam.nameAr || meta.fam.name || 'عائلة';
+                              const sub = defName || variantName;
+                              return (
+                                <>
+                                  <h3 className="font-bold text-slate-900 text-base leading-tight">{famTitle}</h3>
+                                  {sub ? (
+                                    <p className="text-xs text-slate-500 leading-snug line-clamp-2" dir="auto">
+                                      {sub}
+                                    </p>
+                                  ) : null}
+                                  <p className="text-xs text-slate-500 font-mono mt-0.5">{product.sku}</p>
+                                  <div className="flex flex-wrap gap-1.5 mt-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-[11px]"
+                                      onClick={() => toggleFamilyExpand(fid)}
+                                    >
+                                      أعضاء ({meta.n})
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
+                                      title="تعديل العائلة"
+                                      onClick={() => setEditFamily(meta.fam)}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                </>
+                              );
+                            }
+
+                            return (
+                              <>
+                                <h3 className="font-bold text-slate-900 text-base leading-tight">{product.nameAr}</h3>
+                                <p className="text-xs text-slate-500 font-mono">{product.sku}</p>
+                                {meta?.isRep && famOpen ? (
+                                  <div className="flex flex-wrap gap-1.5 mt-2">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 text-[11px]"
+                                      onClick={() => toggleFamilyExpand(fid)}
+                                    >
+                                      طيّ
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      className="h-7 w-7 p-0"
+                                      title="تعديل العائلة"
+                                      onClick={() => setEditFamily(meta.fam)}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </div>
+                                ) : null}
+                              </>
+                            );
+                          })()}
                         </div>
                       </div>
 
@@ -3316,7 +3581,8 @@ const AdminProducts = () => {
                   </div>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         ) : (
           /* Desktop: Traditional Table Layout */
@@ -3329,34 +3595,21 @@ const AdminProducts = () => {
                   </div>
                   <div>
                     <CardTitle className="text-lg md:text-2xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                      جدول المنتجات ({filteredProducts.length})
+                      جدول المنتجات ({displayedProducts.length})
                     </CardTitle>
                     <div className="text-sm md:text-lg text-slate-600 font-medium space-y-2">
                       <p className="text-sm md:text-lg text-slate-600">
                         <span className="hidden sm:inline">
                           عرض {(currentPage - 1) * itemsPerPage + 1} -{' '}
-                          {Math.min(currentPage * itemsPerPage, filteredProducts.length)} من أصل {filteredProducts.length}{' '}
+                          {Math.min(currentPage * itemsPerPage, displayedProducts.length)} من أصل {displayedProducts.length}{' '}
                           منتج
                         </span>
-                        <span className="sm:hidden">{filteredProducts.length} منتج</span>
+                        <span className="sm:hidden">{displayedProducts.length} منتج</span>
                       </p>
                       {familyListingStats.memberRows > 0 ? (
-                        <div className="flex flex-col gap-2 text-xs font-normal text-slate-600 md:text-sm">
-                          <p>
-                            <span className="font-semibold text-slate-800">العائلات في القائمة الحالية:</span>{' '}
-                            {familyListingStats.familyGroups} مجموعة — {familyListingStats.memberRows} صفاً مرتبطاً بعائلة
-                          </p>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-violet-300 bg-violet-50 px-2.5 py-1 text-[11px] font-semibold text-violet-900 md:text-xs">
-                              <Link2 className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                              شريط بنفسجي: رئيس المجموعة
-                            </span>
-                            <span className="inline-flex items-center gap-1.5 rounded-full border-2 border-indigo-200 bg-indigo-50/90 px-2.5 py-1 text-[11px] font-semibold text-indigo-900 md:text-xs">
-                              <Users className="h-3.5 w-3.5 shrink-0" aria-hidden />
-                              شريط نيلي: عضو
-                            </span>
-                          </div>
-                        </div>
+                        <p className="text-xs text-slate-500 md:text-sm">
+                          {familyListingStats.familyGroups} عائلة · {familyListingStats.memberRows} صفاً في القائمة المعروضة
+                        </p>
                       ) : null}
                     </div>
                   </div>
@@ -3365,7 +3618,13 @@ const AdminProducts = () => {
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 md:gap-4 w-full sm:w-auto">
                   <div className="flex items-center gap-2">
                     <Label className="text-xs md:text-sm font-semibold text-slate-700 whitespace-nowrap">لكل صفحة:</Label>
-                    <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+                    <Select
+                      value={itemsPerPage.toString()}
+                      onValueChange={(value) => {
+                        setItemsPerPage(Number(value));
+                        setCurrentPage(1);
+                      }}
+                    >
                       <SelectTrigger className="w-16 md:w-20 bg-white/80 border-slate-300 shadow-md text-xs md:text-sm">
                         <SelectValue />
                       </SelectTrigger>
@@ -3546,21 +3805,50 @@ const AdminProducts = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {visiblePaginatedProducts.map((product) => (
+                        {visiblePaginatedProducts.map((product) => {
+                          const famKeyRow = product.productFamilyId ? String(product.productFamilyId) : '';
+                          const inExpandedFamily =
+                            famKeyRow !== '' && expandedFamilyIds.has(famKeyRow);
+                          const famEdge = famKeyRow ? expandedFamilyEdges.get(famKeyRow) : undefined;
+                          const isFamFirst =
+                            Boolean(famEdge && String(product.id) === famEdge.firstId);
+                          const isFamLast =
+                            Boolean(famEdge && String(product.id) === famEdge.lastId);
+                          const famHue = famKeyRow ? stableHueFromFamilyId(famKeyRow) : 0;
+                          return (
                           <Fragment key={product.id}>
                             {/* Enhanced Main Row */}
                             <TableRow
                               key={product.id}
                               className={[
-                                'hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 transition-all duration-300 border-s-4',
+                                'border-s-4 transition-[background-color,box-shadow,border-color,filter] duration-300 ease-out',
                                 expandedRows.has(product.id)
-                                  ? 'bg-gradient-to-r from-primary/5 to-secondary/5 border-s-primary shadow-md'
-                                  : product.productFamilyId && isFamilyRepresentative(product)
-                                    ? 'border-s-violet-600 bg-gradient-to-l from-violet-100/95 via-violet-50/40 to-white shadow-sm'
-                                    : product.productFamilyId && !isFamilyRepresentative(product)
-                                      ? 'border-s-indigo-500 bg-indigo-50/80'
-                                      : 'border-s-transparent hover:border-s-primary/25',
+                                  ? 'hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5 bg-gradient-to-r from-primary/5 to-secondary/5 border-s-primary shadow-md'
+                                  : inExpandedFamily
+                                    ? [
+                                        'border-s-transparent motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300',
+                                        'hover:brightness-[0.985]',
+                                        isFamFirst ? 'rounded-tr-2xl' : '',
+                                        isFamLast ? 'rounded-br-2xl' : '',
+                                      ].join(' ')
+                                    : [
+                                        'hover:bg-gradient-to-r hover:from-primary/5 hover:to-secondary/5',
+                                        product.productFamilyId && isFamilyRepresentative(product)
+                                          ? 'border-s-violet-600 bg-gradient-to-l from-violet-100/95 via-violet-50/40 to-white shadow-sm'
+                                          : product.productFamilyId && !isFamilyRepresentative(product)
+                                            ? 'border-s-indigo-500 bg-indigo-50/80'
+                                            : 'border-s-transparent hover:border-s-primary/25',
+                                      ].join(' '),
                               ].join(' ')}
+                              style={
+                                inExpandedFamily && famKeyRow
+                                  ? {
+                                      borderLeftColor: `hsl(${famHue} 58% 42%)`,
+                                      backgroundImage: `linear-gradient(to left, hsl(${famHue} 65% 95.5%), hsl(${famHue} 52% 91% / 0.92), hsl(${famHue} 42% 97% / 0.42))`,
+                                      boxShadow: `inset 0 0 0 1px hsl(${famHue} 50% 46% / 0.4), 4px 0 24px -8px hsl(${famHue} 48% 38% / 0.38)`,
+                                    }
+                                  : undefined
+                              }
                             >
                               <TableCell className="w-12">
                                 <Button
@@ -3634,19 +3922,122 @@ const AdminProducts = () => {
                                       className="h-8 w-full min-w-0 text-center"
                                     />
                                   ) : (
-                                    <div
-                                      className="group flex w-full min-w-0 cursor-text flex-col items-center gap-1"
-                                      onClick={() => startInlineEdit(product, 'name')}
-                                      title="انقر للتعديل"
-                                    >
-                                      <p
-                                        className="w-full min-w-0 max-w-full break-words text-center font-medium leading-snug text-slate-900 line-clamp-2"
-                                        title={product.nameAr || product.name}
-                                      >
-                                        {product.nameAr || product.name}
-                                      </p>
-                                      <Edit className="w-3 h-3 shrink-0 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
-                                    </div>
+                                    (() => {
+                                      const meta = getFamilyTableMeta(product);
+                                      const fid = meta?.fid ?? '';
+                                      const famOpen = Boolean(fid && expandedFamilyIds.has(fid));
+                                      const collapsedRep = Boolean(meta?.isRep && !famOpen);
+
+                                      const defaultName = meta?.defProd
+                                        ? meta.defProd.nameAr || meta.defProd.name || meta.defProd.sku || ''
+                                        : '';
+                                      const variantName = product.nameAr || product.name || '';
+
+                                      if (collapsedRep && meta) {
+                                        const famTitle = meta.fam.nameAr || meta.fam.name || 'عائلة';
+                                        const sub = defaultName || variantName;
+                                        return (
+                                          <>
+                                            <div
+                                              className="group flex w-full min-w-0 cursor-text flex-col items-center gap-0.5"
+                                              onClick={() => startInlineEdit(product, 'name')}
+                                              title="تعديل اسم المنتج"
+                                            >
+                                              <p
+                                                className="w-full min-w-0 max-w-full break-words text-center font-semibold leading-snug text-slate-900 line-clamp-2"
+                                                title={famTitle}
+                                              >
+                                                {famTitle}
+                                              </p>
+                                              {sub ? (
+                                                <p
+                                                  className="w-full min-w-0 max-w-full break-words text-center text-xs text-slate-500 line-clamp-2"
+                                                  dir="auto"
+                                                  title={sub}
+                                                >
+                                                  {sub}
+                                                </p>
+                                              ) : null}
+                                              <Edit className="w-3 h-3 shrink-0 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                            </div>
+                                            <div
+                                              className="flex justify-center gap-1 pt-1"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 px-2 text-[11px]"
+                                                onClick={() => toggleFamilyExpand(fid)}
+                                              >
+                                                أعضاء ({meta.n})
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 w-7 p-0"
+                                                title="تعديل العائلة"
+                                                onClick={() => setEditFamily(meta.fam)}
+                                              >
+                                                <Pencil className="h-3.5 w-3.5" />
+                                              </Button>
+                                            </div>
+                                          </>
+                                        );
+                                      }
+
+                                      const titleBlock = (
+                                        <div
+                                          className="group flex w-full min-w-0 cursor-text flex-col items-center gap-1"
+                                          onClick={() => startInlineEdit(product, 'name')}
+                                          title="انقر للتعديل"
+                                        >
+                                          <p
+                                            className="w-full min-w-0 max-w-full break-words text-center font-medium leading-snug text-slate-900 line-clamp-2"
+                                            title={product.nameAr || product.name}
+                                          >
+                                            {product.nameAr || product.name}
+                                          </p>
+                                          <Edit className="w-3 h-3 shrink-0 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        </div>
+                                      );
+
+                                      if (meta?.isRep && famOpen) {
+                                        return (
+                                          <>
+                                            {titleBlock}
+                                            <div
+                                              className="flex justify-center gap-1 pt-0.5"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 px-2 text-[11px]"
+                                                onClick={() => toggleFamilyExpand(fid)}
+                                              >
+                                                طيّ
+                                              </Button>
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="h-7 w-7 p-0"
+                                                title="تعديل العائلة"
+                                                onClick={() => setEditFamily(meta.fam)}
+                                              >
+                                                <Pencil className="h-3.5 w-3.5" />
+                                              </Button>
+                                            </div>
+                                          </>
+                                        );
+                                      }
+
+                                      return titleBlock;
+                                    })()
                                   )}
                                   {product.tags && product.tags.length > 0 && (
                                     <div className="flex gap-1 justify-center">
@@ -3661,58 +4052,6 @@ const AdminProducts = () => {
                                         </Badge>
                                       )}
                                     </div>
-                                  )}
-                                  {product.productFamilyId && isFamilyRepresentative(product) && (() => {
-                                    const fid = String(product.productFamilyId);
-                                    const fam = adminFamilyDocs.find((f) => String(f._id) === fid);
-                                    const n = fam?.memberProductIds?.length ?? 0;
-                                    if (n < 2) return null;
-                                    return (
-                                      <div
-                                        className="flex flex-wrap items-center justify-center gap-2 pt-1"
-                                        onClick={(e) => e.stopPropagation()}
-                                      >
-                                        <Badge
-                                          variant="outline"
-                                          className="gap-1 text-[10px] font-bold border-violet-300 bg-violet-100 text-violet-950 shadow-sm"
-                                        >
-                                          <Link2 className="h-3 w-3 shrink-0" aria-hidden />
-                                          عائلة · {n} منتجات
-                                        </Badge>
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="sm"
-                                          className="h-7 gap-1 px-2 text-xs"
-                                          onClick={() => toggleFamilyExpand(fid)}
-                                        >
-                                          {expandedFamilyIds.has(fid) ? (
-                                            <ChevronDown className="h-3 w-3" />
-                                          ) : (
-                                            <ChevronRight className="h-3 w-3" />
-                                          )}
-                                          {expandedFamilyIds.has(fid) ? 'إخفاء الأعضاء' : 'عرض الأعضاء'}
-                                        </Button>
-                                        {fam ? (
-                                          <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-7 gap-1 px-2 text-xs"
-                                            onClick={() => setEditFamily(fam)}
-                                          >
-                                            <Pencil className="h-3 w-3" />
-                                            تعديل العائلة
-                                          </Button>
-                                        ) : null}
-                                      </div>
-                                    );
-                                  })()}
-                                  {product.productFamilyId && !isFamilyRepresentative(product) && (
-                                    <Badge className="mx-auto mt-1 flex w-fit items-center gap-1 text-[10px] font-semibold border border-indigo-300 bg-indigo-50 text-indigo-950">
-                                      <Users className="h-3 w-3 shrink-0" aria-hidden />
-                                      عضو في عائلة
-                                    </Badge>
                                   )}
                                 </div>
                               </TableCell>
@@ -3957,7 +4296,8 @@ const AdminProducts = () => {
                               </TableRow>
                             )}
                           </Fragment>
-                        ))}
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </TooltipProvider>
@@ -3969,7 +4309,7 @@ const AdminProducts = () => {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 md:mt-6 pt-3 md:pt-4 border-t">
                   <div className="text-xs md:text-sm text-slate-600 flex flex-col sm:flex-row items-center gap-2 md:gap-3">
                     <span className="text-center sm:text-left">
-                      صفحة {currentPage} من {totalPages} • إجمالي {filteredProducts.length} منتج
+                      صفحة {currentPage} من {totalPages} • إجمالي {displayedProducts.length} منتج
                     </span>
                     {/* Mobile-friendly per-page control */}
                     <div className="flex items-center gap-1 md:gap-2">
@@ -4091,15 +4431,16 @@ const AdminProducts = () => {
               )}
 
               {/* Empty State */}
-              {filteredProducts.length === 0 && (
+              {displayedProducts.length === 0 && (
                 <div className="text-center py-12">
                   <ShoppingBag className="w-16 h-16 text-slate-300 mx-auto mb-4" />
                   <h3 className="text-lg font-medium text-slate-600 mb-2">لا توجد منتجات</h3>
                   <p className="text-slate-500 mb-4">
-                    {searchTerm || selectedCategory !== 'all'
-                      ? 'لم يتم العثور على منتجات تطابق البحث أو الفلتر المحدد'
-                      : 'لم يتم إضافة أي منتجات بعد'
-                    }
+                    {filteredProducts.length > 0 && familyTableFilter !== 'all'
+                      ? 'لا توجد نتائج ضمن فلتر العائلات الحالي. جرّب «كل المنتجات» أو غيّر البحث.'
+                      : searchTerm || selectedCategory !== 'all'
+                        ? 'لم يتم العثور على منتجات تطابق البحث أو الفلتر المحدد'
+                        : 'لم يتم إضافة أي منتجات بعد'}
                   </p>
                   {!searchTerm && selectedCategory === 'all' && (
                     <Button onClick={() => { resetForm(); setIsCreateModalOpen(true); }}>
@@ -4273,8 +4614,7 @@ const AdminProducts = () => {
               setExportProductSearch('');
               setExportCategoryFilter('all');
               setExportScope('filtered');
-              const initialPool =
-                filteredProducts;
+              const initialPool = displayedProducts;
               setExportSelectedIds(new Set(initialPool.map((p) => String(p.id))));
             }
           }}
@@ -5509,8 +5849,25 @@ const AdminProducts = () => {
             categoryId: p.categoryId ?? p.category ?? '',
           }))}
           categories={categories.map((c) => ({ id: c.id, nameAr: c.nameAr, name: c.name }))}
-          onCreated={async () => {
+          onCreated={async (created) => {
             clearStorefrontFamiliesCache();
+            if (created?._id) {
+              const famId = String(created._id);
+              setAdminFamilyDocs((prev) => {
+                if (prev.some((f) => String(f._id) === famId)) return prev;
+                return [created, ...prev];
+              });
+              const memberIds = new Set(
+                (created.memberProductIds || []).map((x) => String(x))
+              );
+              if (memberIds.size > 0) {
+                setProducts((prev) =>
+                  prev.map((p) =>
+                    memberIds.has(String(p.id)) ? { ...p, productFamilyId: famId } : p
+                  )
+                );
+              }
+            }
             await fetchAdminFamilies();
             await refetchProducts();
           }}

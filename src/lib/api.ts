@@ -98,9 +98,31 @@ async function request(input: RequestInfo, init?: RequestInit): Promise<unknown>
   }
   // Ensure cookies/session are sent if backend uses cookie-based auth
   if (!('credentials' in mergedInit)) mergedInit.credentials = 'include';
+  // Avoid stale disk cache / broken 304+empty body handling (e.g. sendJsonWithEtag on /api/products)
+  if (!('cache' in mergedInit)) mergedInit.cache = 'no-store';
   const res = await fetch(input, mergedInit);
   const ct = res.headers.get('content-type') || '';
-  const data = ct.includes('application/json') ? await res.json() : await res.text();
+  const rawText = await res.text();
+  let data: unknown;
+  if (ct.includes('application/json')) {
+    if (!rawText.trim()) {
+      data = null;
+    } else {
+      try {
+        data = JSON.parse(rawText) as unknown;
+      } catch {
+        if (!res.ok) {
+          throw new ApiHttpError(res.status, rawText.slice(0, 200) || res.statusText);
+        }
+        throw new ApiHttpError(500, 'استجابة JSON غير صالحة من الخادم');
+      }
+    }
+  } else {
+    data = rawText;
+  }
+  if (res.ok && res.status === 304 && (data === '' || data == null)) {
+    throw new ApiHttpError(304, 'استجابة غير كاملة من الخادم — أعد المحاولة');
+  }
   if (!res.ok) {
     // Emit a global permission-denied event to enable graceful UI messaging
     try {
@@ -165,6 +187,23 @@ export async function uploadFile(
   });
   const resp = data as { ok: boolean; error?: string; result?: { secure_url: string; public_id: string } };
   if (!resp.ok) throw new Error(resp.error || 'Upload failed');
+  const r = resp as { ok: true; result: { secure_url: string; public_id: string } };
+  return { secure_url: r.result.secure_url, public_id: r.result.public_id };
+}
+
+export async function uploadVideoFile(
+  file: File,
+  folder?: string
+): Promise<{ secure_url: string; public_id: string }> {
+  const fd = new FormData();
+  fd.append('file', file);
+  if (folder) fd.append('folder', folder);
+  const data = await request('/api/cloudinary/upload-video', {
+    method: 'POST',
+    body: fd,
+  });
+  const resp = data as { ok: boolean; error?: string; result?: { secure_url: string; public_id: string } };
+  if (!resp.ok) throw new Error(resp.error || 'Video upload failed');
   const r = resp as { ok: true; result: { secure_url: string; public_id: string } };
   return { secure_url: r.result.secure_url, public_id: r.result.public_id };
 }

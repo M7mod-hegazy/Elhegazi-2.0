@@ -128,7 +128,8 @@ export async function canAccessPage(pageName: string): Promise<boolean> {
     'home-config': 'home',
     'settings': 'settings',
     'history': 'history',
-    'profit': 'expenses'
+    'profit': 'expenses',
+    'latestWork': 'products',
   };
 
   const resource = pageResourceMap[pageName];
@@ -164,7 +165,8 @@ export async function getAccessiblePages(): Promise<string[]> {
       'home-config',
       'settings',
       'history',
-      'profit'
+      'profit',
+      'latestWork'
     ];
   }
 
@@ -180,7 +182,8 @@ export async function getAccessiblePages(): Promise<string[]> {
     'home-config',
     'settings',
     'history',
-    'profit'
+    'profit',
+    'latestWork'
   ];
 
   const accessible: string[] = [];

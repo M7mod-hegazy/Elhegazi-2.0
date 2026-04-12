@@ -22,6 +22,7 @@ export const defaultOwnerVisibility: OwnerVisibility = {
     contact: true,
     locations: true,
     shopBuilder: true,
+    latestWork: true,
   },
   adminModules: {
     dashboard: true,
@@ -37,6 +38,7 @@ export const defaultOwnerVisibility: OwnerVisibility = {
     history: true,
     profit: true,
     shareholders: true,
+    latestWork: true,
   },
   featureFlags: {
     rating: true,

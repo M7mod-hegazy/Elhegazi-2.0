@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/select';
 import { apiPostJson } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import type { AdminProductFamilyLean } from '@/pages/admin/ProductFamilyEditDialog';
 import { Link2, ChevronLeft, ChevronRight, Package, Plus, Trash2, Sparkles, List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { optimizeImage, applyProductImageFallback } from '@/lib/images';
@@ -53,12 +54,30 @@ export type CategoryOption = {
 
 type OptionRow = { key: string; label: string; labelAr: string };
 
+function normalizeCreatedFamily(raw: unknown): AdminProductFamilyLean | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const id = o._id != null ? String(o._id) : '';
+  if (!id) return null;
+  return {
+    _id: id,
+    name: String(o.name ?? ''),
+    nameAr: String(o.nameAr ?? ''),
+    memberProductIds: Array.isArray(o.memberProductIds)
+      ? o.memberProductIds.map((x) => String(x))
+      : [],
+    defaultProductId: o.defaultProductId != null ? String(o.defaultProductId) : undefined,
+    options: Array.isArray(o.options) ? (o.options as AdminProductFamilyLean['options']) : [],
+    members: Array.isArray(o.members) ? (o.members as AdminProductFamilyLean['members']) : [],
+  };
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   products: RowProduct[];
   categories?: CategoryOption[];
-  onCreated: () => void | Promise<void>;
+  onCreated: (created?: AdminProductFamilyLean | null) => void | Promise<void>;
 };
 
 const MAX_MEMBERS = 20;
@@ -355,7 +374,7 @@ export function ProductFamilyMergeDialog({
     }));
     setBusy(true);
     try {
-      const res = await apiPostJson('/api/product-families', {
+      const res = await apiPostJson<AdminProductFamilyLean>('/api/product-families', {
         name: n,
         nameAr: nAr,
         memberProductIds: ids,
@@ -367,9 +386,11 @@ export function ProductFamilyMergeDialog({
       if (!res.ok) {
         throw new Error('error' in res ? String(res.error) : 'فشل الإنشاء');
       }
+      const created =
+        'item' in res && res.item != null ? normalizeCreatedFamily(res.item) : null;
       toast({ title: 'تم', description: 'تم إنشاء عائلة المنتجات' });
       onOpenChange(false);
-      await onCreated();
+      await onCreated(created);
     } catch (e) {
       toast({
         title: 'فشل',

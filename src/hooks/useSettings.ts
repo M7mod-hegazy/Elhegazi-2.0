@@ -73,56 +73,7 @@ const defaultWorkHours: WorkHours = {
   currentStatus: 'مفتوح الآن'
 };
 
-const defaultLocations: LocationData[] = [
-  {
-    id: '1',
-    name: 'الفرع الرئيسي - الرياض',
-    address: 'شارع الملك فهد، حي العليا، الرياض 12211',
-    phone: '+966 11 123 4567',
-    email: 'riyadh@arabianbluebloom.com',
-    hours: 'السبت - الخميس: 9:00 ص - 10:00 م',
-    coordinates: { lat: 24.7136, lng: 46.6753 },
-    googleMapsLink: 'https://maps.google.com/?q=24.7136,46.6753',
-    googleMapsEmbed: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3624.4!2d46.6753!3d24.7136!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjRCsDQyJzQ5LjAiTiA0NsKwNDAnMzEuMSJF!5e0!3m2!1sen!2ssa!4v1234567890',
-    isActive: true
-  },
-  {
-    id: '2',
-    name: 'فرع جدة',
-    address: 'طريق الملك عبدالعزيز، حي الروضة، جدة 23432',
-    phone: '+966 12 234 5678',
-    email: 'jeddah@arabianbluebloom.com',
-    hours: 'السبت - الخميس: 10:00 ص - 11:00 م',
-    coordinates: { lat: 21.3891, lng: 39.8579 },
-    googleMapsLink: 'https://maps.google.com/?q=21.3891,39.8579',
-    googleMapsEmbed: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3710.2!2d39.8579!3d21.3891!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjHCsDIzJzIwLjgiTiAzOcKwNTEnMjguNCJF!5e0!3m2!1sen!2ssa!4v1234567891',
-    isActive: true
-  },
-  {
-    id: '3',
-    name: 'فرع الدمام',
-    address: 'الواجهة البحرية، حي الشاطئ، الدمام',
-    phone: '+966 13 345 6789',
-    email: 'dammam@arabianbluebloom.com',
-    hours: 'السبت - الخميس: 9:00 ص - 10:00 م',
-    coordinates: { lat: 26.4207, lng: 50.1063 },
-    googleMapsLink: 'https://maps.google.com/?q=26.4207,50.1063',
-    googleMapsEmbed: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3576.1!2d50.1063!3d26.4207!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjbCsDI1JzE0LjUiTiA1MMKwMDYnMjIuNyJF!5e0!3m2!1sen!2ssa!4v1234567892',
-    isActive: true
-  },
-  {
-    id: '4',
-    name: 'فرع المدينة المنورة',
-    address: 'شارع قباء، حي قربان، المدينة المنورة',
-    phone: '+966 14 456 7890',
-    email: 'medina@arabianbluebloom.com',
-    hours: 'السبت - الخميس: 9:00 ص - 10:00 م',
-    coordinates: { lat: 24.4539, lng: 39.6142 },
-    googleMapsLink: 'https://maps.google.com/?q=24.4539,39.6142',
-    googleMapsEmbed: 'https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3627.1!2d39.6142!3d24.4539!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x0%3A0x0!2zMjTCsDI3JzE0LjAiTiAzOcKwMzYnNTEuMSJF!5e0!3m2!1sen!2ssa!4v1234567893',
-    isActive: true
-  }
-];
+const defaultLocations: LocationData[] = [];
 
 const defaultSocial: Social = {
   facebookUrl: '',
@@ -234,9 +185,8 @@ export const useSettings = () => {
   };
 
   const getBranchLocations = () => {
-    // Use active locations if available; otherwise fall back to defaults
     const activeLocations = getActiveLocations();
-    const source = activeLocations.length > 0 ? activeLocations : defaultLocations;
+    const source = activeLocations.length > 0 ? activeLocations : [];
     const branchMap: Record<string, { name: string; address: string; phone: string; mapUrl: string; coordinates?: { lat: number; lng: number } }> = {};
 
     source.forEach((location, index) => {

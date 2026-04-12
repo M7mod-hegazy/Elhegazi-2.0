@@ -89,6 +89,7 @@ const SettingsSchema = new mongoose.Schema(
           contact: { type: Boolean, default: true },
           locations: { type: Boolean, default: true },
           shopBuilder: { type: Boolean, default: true },
+          latestWork: { type: Boolean, default: true },
         },
         adminModules: {
           dashboard: { type: Boolean, default: true },
@@ -104,6 +105,7 @@ const SettingsSchema = new mongoose.Schema(
           history: { type: Boolean, default: true },
           profit: { type: Boolean, default: true },
           shareholders: { type: Boolean, default: true },
+          latestWork: { type: Boolean, default: true },
         },
         featureFlags: {
           rating: { type: Boolean, default: true },

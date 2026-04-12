@@ -83,6 +83,7 @@ import BuilderAccessSession from './models/BuilderAccessSession.js';
 import BuilderProject from './models/BuilderProject.js';
 import Product3D from './models/Product3D.js';
 import BackupJob from './models/BackupJob.js';
+import PortfolioPost from './models/PortfolioPost.js';
 
 // Services
 import orderAutomationService from './services/orderAutomationService.js';
@@ -230,6 +231,7 @@ const DEFAULT_OWNER_VISIBILITY = {
     contact: true,
     locations: true,
     shopBuilder: true,
+    latestWork: true,
   },
   adminModules: {
     dashboard: true,
@@ -245,6 +247,7 @@ const DEFAULT_OWNER_VISIBILITY = {
     history: true,
     profit: true,
     shareholders: true,
+    latestWork: true,
   },
   featureFlags: {
     rating: true,
@@ -2857,6 +2860,157 @@ app.post('/api/cloudinary/upload-file', (req, res, next) => {
     return res.json({ ok: true, result });
   } catch (err) {
     console.error('Cloudinary upload_file error:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+const uploadVideo = multer({ storage: multer.memoryStorage(), limits: { fileSize: 100 * 1024 * 1024 } });
+app.post('/api/cloudinary/upload-video', (req, res, next) => {
+  uploadVideo.single('file')(req, res, (err) => {
+    if (!err) return next();
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ ok: false, error: 'Video is too large. Max size is 100MB.' });
+    }
+    return res.status(400).json({ ok: false, error: err?.message || 'Invalid upload payload' });
+  });
+}, async (req, res) => {
+  try {
+    const isAdmin = await isAdminRequest(req);
+    if (!isAdmin) {
+      return res.status(403).json({ ok: false, error: 'Admin authentication required' });
+    }
+    if (!req.file) return res.status(400).json({ ok: false, error: 'file is required' });
+    if (!String(req.file.mimetype || '').startsWith('video/')) {
+      return res.status(400).json({ ok: false, error: 'Only video files are allowed' });
+    }
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return res.status(500).json({ ok: false, error: 'Cloudinary is not configured on this server' });
+    }
+    const folder =
+      typeof req.body?.folder === 'string' && req.body.folder.trim() ? req.body.folder.trim() : 'portfolio-work';
+    if (!/^[a-zA-Z0-9/_-]+$/.test(folder)) {
+      return res.status(400).json({ ok: false, error: 'Invalid folder format' });
+    }
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { resource_type: 'video', folder, chunk_size: 6000000 },
+        (error, uploaded) => {
+          if (error) return reject(error);
+          resolve(uploaded);
+        }
+      );
+      stream.end(req.file.buffer);
+    });
+    return res.json({ ok: true, result });
+  } catch (err) {
+    console.error('Cloudinary upload_video error:', err);
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Portfolio posts — public feed + admin CRUD ("أعمالنا السابقة")
+app.get('/api/portfolio-posts', visibilityResourceMiddleware('latestWork', 'latestWork'), async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(40, Math.max(1, Number(req.query.limit) || 9));
+    const skip = (page - 1) * limit;
+    const filter = { published: true };
+    const [items, total] = await Promise.all([
+      PortfolioPost.find(filter).sort({ sortOrder: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+      PortfolioPost.countDocuments(filter),
+    ]);
+    return res.json({
+      ok: true,
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.get('/api/admin/portfolio-posts', visibilityResourceMiddleware('latestWork', 'latestWork'), async (req, res) => {
+  try {
+    if (!(await isAdminRequest(req))) return res.status(403).json({ ok: false, error: 'Forbidden' });
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      PortfolioPost.find({}).sort({ sortOrder: -1, createdAt: -1 }).skip(skip).limit(limit).lean(),
+      PortfolioPost.countDocuments({}),
+    ]);
+    return res.json({
+      ok: true,
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/admin/portfolio-posts', visibilityResourceMiddleware('latestWork', 'latestWork'), async (req, res) => {
+  try {
+    if (!(await isAdminRequest(req))) return res.status(403).json({ ok: false, error: 'Forbidden' });
+    const titleAr = String(req.body?.titleAr || '').trim();
+    const bodyAr = String(req.body?.bodyAr || '').trim();
+    const published = req.body?.published !== false;
+    const sortOrder = Number(req.body?.sortOrder) || 0;
+    const media = Array.isArray(req.body?.media) ? req.body.media : [];
+    const norm = media
+      .map((m, i) => ({
+        url: String(m?.url || '').trim(),
+        type: m?.type === 'video' ? 'video' : 'image',
+        order: Number(m?.order) || i,
+        publicId: String(m?.publicId || '').trim(),
+      }))
+      .filter((m) => m.url);
+    const doc = await PortfolioPost.create({ titleAr, bodyAr, media: norm, published, sortOrder });
+    return res.json({ ok: true, item: doc.toObject() });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.patch('/api/admin/portfolio-posts/:id', visibilityResourceMiddleware('latestWork', 'latestWork'), async (req, res) => {
+  try {
+    if (!(await isAdminRequest(req))) return res.status(403).json({ ok: false, error: 'Forbidden' });
+    const doc = await PortfolioPost.findById(req.params.id);
+    if (!doc) return res.status(404).json({ ok: false, error: 'Not found' });
+    if (req.body.titleAr !== undefined) doc.titleAr = String(req.body.titleAr || '').trim();
+    if (req.body.bodyAr !== undefined) doc.bodyAr = String(req.body.bodyAr || '').trim();
+    if (req.body.published !== undefined) doc.published = !!req.body.published;
+    if (req.body.sortOrder !== undefined) doc.sortOrder = Number(req.body.sortOrder) || 0;
+    if (Array.isArray(req.body.media)) {
+      doc.media = req.body.media
+        .map((m, i) => ({
+          url: String(m?.url || '').trim(),
+          type: m?.type === 'video' ? 'video' : 'image',
+          order: Number(m?.order) || i,
+          publicId: String(m?.publicId || '').trim(),
+        }))
+        .filter((m) => m.url);
+    }
+    await doc.save();
+    return res.json({ ok: true, item: doc.toObject() });
+  } catch (err) {
+    return res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.delete('/api/admin/portfolio-posts/:id', visibilityResourceMiddleware('latestWork', 'latestWork'), async (req, res) => {
+  try {
+    if (!(await isAdminRequest(req))) return res.status(403).json({ ok: false, error: 'Forbidden' });
+    const r = await PortfolioPost.findByIdAndDelete(req.params.id);
+    if (!r) return res.status(404).json({ ok: false, error: 'Not found' });
+    return res.json({ ok: true });
+  } catch (err) {
     return res.status(500).json({ ok: false, error: err.message });
   }
 });

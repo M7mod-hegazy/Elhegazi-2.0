@@ -13,6 +13,7 @@ import {
   RefreshCw,
   CheckCircle2,
   Globe,
+  Play,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { createPortal } from 'react-dom';
@@ -21,8 +22,12 @@ type InputMode = 'file' | 'link';
 type LinkImportMode = 'cloudinary' | 'external';
 type LinkCandidateStatus = 'checking' | 'preview_ok' | 'invalid' | 'uploading' | 'done' | 'failed';
 
+/** Typed media row for portfolio / mixed uploads (images + videos). */
+export type MediaUploadItem = { url: string; type: 'image' | 'video'; publicId?: string };
+
 interface ImageUploadProps {
-  onImagesChange: (images: string[]) => void;
+  onImagesChange?: (images: string[]) => void;
+  onMediaItemsChange?: (items: MediaUploadItem[]) => void;
   maxImages?: number;
   maxSizeKB?: number;
   acceptedTypes?: string[];
@@ -32,6 +37,11 @@ interface ImageUploadProps {
   maxHeight?: number;
   quality?: number;
   initialImages?: string[];
+  /** When set (including `[]`), seeds the grid with typed items instead of `initialImages`. */
+  initialMedia?: MediaUploadItem[];
+  allowVideo?: boolean;
+  /** Cloudinary folder for uploads and URL imports (default `products`). */
+  cloudinaryFolder?: string;
 }
 
 interface FileEntry {
@@ -43,6 +53,8 @@ interface FileEntry {
   status: 'queued' | 'compressing' | 'uploading' | 'done' | 'error';
   error?: string;
   sizeBytes?: number;
+  mediaKind?: 'image' | 'video';
+  publicId?: string;
 }
 
 interface LinkCandidate {
@@ -57,6 +69,10 @@ interface LinkCandidate {
 
 function makeId(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function isLikelyVideoUrl(url: string): boolean {
+  return /\.(mp4|webm|mov|m4v|mkv)(\?|#|$)/i.test(url);
 }
 
 async function runWithConcurrency<T, R>(
@@ -82,38 +98,46 @@ async function runWithConcurrency<T, R>(
   return results;
 }
 
-// ── Lightbox ──────────────────────────────────────────────────────────────────
-function Lightbox({
-  images,
+type LightboxMediaItem = { url: string; type: 'image' | 'video' };
+
+/** Full-screen preview for mixed image + video entries (portfolio uploads). */
+function MixedMediaLightbox({
+  items,
   startIndex,
   onClose,
 }: {
-  images: string[];
+  items: LightboxMediaItem[];
   startIndex: number;
   onClose: () => void;
 }) {
   const [current, setCurrent] = useState(startIndex);
+  useEffect(() => {
+    setCurrent(startIndex);
+  }, [startIndex]);
 
-  const prev = () => setCurrent((c) => (c - 1 + images.length) % images.length);
-  const next = () => setCurrent((c) => (c + 1) % images.length);
+  const prev = () => setCurrent((c) => (c - 1 + items.length) % items.length);
+  const next = () => setCurrent((c) => (c + 1) % items.length);
 
-  // Keyboard navigation
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') prev();
-      else if (e.key === 'ArrowRight') next();
-      else if (e.key === 'Escape') onClose();
+      if (e.key === 'ArrowLeft') {
+        setCurrent((c) => (c - 1 + items.length) % items.length);
+      } else if (e.key === 'ArrowRight') {
+        setCurrent((c) => (c + 1) % items.length);
+      } else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', handler);
     return () => window.removeEventListener('keydown', handler);
-  });
+  }, [items.length, onClose]);
+
+  const cur = items[current];
+  if (!cur) return null;
 
   return createPortal(
     <div
       className="fixed inset-0 z-[9999] bg-black/90 flex flex-col items-center justify-center"
       onClick={onClose}
     >
-      {/* Close */}
       <button
         type="button"
         className="absolute top-4 right-4 w-9 h-9 bg-white/10 hover:bg-white/20 text-white rounded-full flex items-center justify-center transition"
@@ -122,33 +146,41 @@ function Lightbox({
         <X className="w-5 h-5" />
       </button>
 
-      {/* Counter */}
       <div className="absolute top-4 left-1/2 -translate-x-1/2 text-white/60 text-sm">
-        {current + 1} / {images.length}
+        {current + 1} / {items.length}
       </div>
 
-      {/* Image */}
-      <img
-        src={images[current]}
-        alt={`preview-${current}`}
-        className="max-h-[80vh] max-w-[90vw] object-contain rounded-lg shadow-2xl select-none"
-        onClick={(e) => e.stopPropagation()}
-        draggable={false}
-      />
+      <div className="max-h-[80vh] max-w-[90vw] flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
+        {cur.type === 'video' ? (
+          <video src={cur.url} className="max-h-[80vh] max-w-[90vw] rounded-lg shadow-2xl" controls playsInline autoPlay />
+        ) : (
+          <img
+            src={cur.url}
+            alt={`preview-${current}`}
+            className="max-h-[80vh] max-w-[90vw] object-contain rounded-lg shadow-2xl select-none"
+            draggable={false}
+          />
+        )}
+      </div>
 
-      {/* Arrows */}
-      {images.length > 1 && (
+      {items.length > 1 && (
         <>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); prev(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              prev();
+            }}
             className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center transition"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); next(); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              next();
+            }}
             className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/10 hover:bg-white/25 text-white rounded-full flex items-center justify-center transition"
           >
             <ChevronRight className="w-6 h-6" />
@@ -156,17 +188,26 @@ function Lightbox({
         </>
       )}
 
-      {/* Thumbnails strip */}
-      {images.length > 1 && (
-        <div className="absolute bottom-4 flex gap-2 px-4">
-          {images.map((src, i) => (
+      {items.length > 1 && (
+        <div className="absolute bottom-4 flex gap-2 px-4 max-w-full overflow-x-auto">
+          {items.map((item, i) => (
             <button
-              key={i}
+              key={`${item.url}-${i}`}
               type="button"
-              onClick={(e) => { e.stopPropagation(); setCurrent(i); }}
-              className={`w-12 h-12 rounded-md overflow-hidden border-2 transition ${i === current ? 'border-white' : 'border-white/30 opacity-50'}`}
+              onClick={(e) => {
+                e.stopPropagation();
+                setCurrent(i);
+              }}
+              className={`w-12 h-12 rounded-md overflow-hidden border-2 shrink-0 transition ${i === current ? 'border-white' : 'border-white/30 opacity-50'}`}
             >
-              <img src={src} className="w-full h-full object-cover" alt="" />
+              {item.type === 'video' ? (
+                <div className="relative w-full h-full bg-slate-800 flex items-center justify-center">
+                  <video src={item.url} className="absolute inset-0 w-full h-full object-cover" muted playsInline />
+                  <Play className="w-4 h-4 text-white relative z-10 drop-shadow" />
+                </div>
+              ) : (
+                <img src={item.url} className="w-full h-full object-cover" alt="" />
+              )}
             </button>
           ))}
         </div>
@@ -196,6 +237,7 @@ function ProgressRing({ progress, size = 48 }: { progress: number; size?: number
 // ── Main component ─────────────────────────────────────────────────────────────
 const ImageUpload = ({
   onImagesChange,
+  onMediaItemsChange,
   maxImages = 5,
   maxSizeKB = 500,
   acceptedTypes = ['image/jpeg', 'image/png', 'image/webp'],
@@ -205,11 +247,14 @@ const ImageUpload = ({
   maxHeight = 1280,
   quality = 0.8,
   initialImages = [],
+  initialMedia,
+  allowVideo = false,
+  cloudinaryFolder = 'products',
 }: ImageUploadProps) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [entries, setEntries] = useState<FileEntry[]>([]);
-  const [lightbox, setLightbox] = useState<{ urls: string[]; index: number } | null>(null);
+  const [lightbox, setLightbox] = useState<{ items: LightboxMediaItem[]; index: number } | null>(null);
   const [inputMode, setInputMode] = useState<InputMode>('file');
   const [linkImportMode, setLinkImportMode] = useState<LinkImportMode>('cloudinary');
   const [linkInput, setLinkInput] = useState('');
@@ -220,16 +265,18 @@ const ImageUpload = ({
   const entriesRef = useRef<FileEntry[]>([]);
   entriesRef.current = entries;
 
-  // Initialise from parent `initialImages` (e.g. editing an existing product).
-  // IMPORTANT: While file uploads are in progress, the parent updates after each success — if we
-  // reset `entries` to only `initialImages`, we wipe queued/compressing/uploading rows and only
-  // the first file appears to upload. Skip syncing until nothing is in-flight.
-  const prevInitRef = useRef<string[]>([]);
+  const initSyncKey = useMemo(() => {
+    if (initialMedia !== undefined) {
+      return `m:${JSON.stringify(initialMedia.map((x) => [x.url, x.type, x.publicId || '']))}`;
+    }
+    return `i:${JSON.stringify(initialImages)}`;
+  }, [initialMedia, initialImages]);
+
+  // Initialise from `initialMedia` (portfolio) or `initialImages` (products).
+  // IMPORTANT: While uploads are in-flight, skip reset so queued rows are not wiped.
+  const prevInitKeyRef = useRef<string>('');
   useEffect(() => {
-    const prev = prevInitRef.current;
-    const same =
-      prev.length === initialImages.length && prev.every((u, i) => u === initialImages[i]);
-    if (same) return;
+    if (prevInitKeyRef.current === initSyncKey) return;
 
     setEntries((current) => {
       const busy = current.some(
@@ -239,24 +286,48 @@ const ImageUpload = ({
       if (busy) {
         return current;
       }
-      prevInitRef.current = initialImages;
+      prevInitKeyRef.current = initSyncKey;
+      if (initialMedia !== undefined) {
+        return initialMedia.map((m, i) => ({
+          id: `init-${i}-${m.url}`,
+          name: m.url.split('/').pop() || `media-${i + 1}`,
+          previewUrl: m.url,
+          remoteUrl: m.url,
+          progress: 100,
+          status: 'done' as const,
+          mediaKind: m.type,
+          publicId: m.publicId,
+        }));
+      }
       return initialImages.map((url, i) => ({
         id: `init-${i}-${url}`,
         name: url.split('/').pop() || `image-${i + 1}`,
         previewUrl: url,
         remoteUrl: url,
         progress: 100,
-        status: 'done',
+        status: 'done' as const,
+        mediaKind: 'image' as const,
       }));
     });
-  }, [initialImages]);
+  }, [initSyncKey, initialImages, initialMedia]);
 
   const syncParent = useCallback(
     (updated: FileEntry[]) => {
-      const urls = updated.filter((e) => e.status === 'done' && e.remoteUrl).map((e) => e.remoteUrl as string);
-      onImagesChange(urls);
+      const done = updated.filter((e) => e.status === 'done' && e.remoteUrl);
+      if (onMediaItemsChange) {
+        onMediaItemsChange(
+          done.map((e) => ({
+            url: e.remoteUrl as string,
+            type: e.mediaKind === 'video' ? 'video' : 'image',
+            publicId: e.publicId,
+          }))
+        );
+      }
+      if (onImagesChange) {
+        onImagesChange(done.map((e) => e.remoteUrl as string));
+      }
     },
-    [onImagesChange]
+    [onImagesChange, onMediaItemsChange]
   );
 
   /** Never call `onImagesChange` inside `setEntries` updaters — it updates the parent during the child's update and triggers React's setState-during-render warning. */
@@ -311,12 +382,14 @@ const ImageUpload = ({
     [deferSyncParent]
   );
 
-  // Open lightbox for all done images
   const openLightbox = useCallback((clickedEntry: FileEntry) => {
     const doneEntries = entries.filter((e) => e.status === 'done' && e.remoteUrl);
-    const urls = doneEntries.map((e) => e.remoteUrl!);
+    const items: LightboxMediaItem[] = doneEntries.map((e) => ({
+      url: e.remoteUrl!,
+      type: e.mediaKind === 'video' ? 'video' : 'image',
+    }));
     const index = doneEntries.findIndex((e) => e.id === clickedEntry.id);
-    if (urls.length > 0) setLightbox({ urls, index: Math.max(0, index) });
+    if (items.length > 0) setLightbox({ items, index: Math.max(0, index) });
   }, [entries]);
 
   // Compress
@@ -363,10 +436,15 @@ const ImageUpload = ({
 
   // Upload via XHR with progress
   const uploadWithProgress = useCallback(
-    (blob: Blob, fileName: string, onProgress: (pct: number) => void): Promise<string> => {
+    (
+      blob: Blob,
+      fileName: string,
+      onProgress: (pct: number) => void
+    ): Promise<{ secureUrl: string; publicId?: string }> => {
       return new Promise((resolve, reject) => {
         const fd = new FormData();
         fd.append('file', new File([blob], fileName, { type: 'image/webp' }));
+        if (cloudinaryFolder) fd.append('folder', cloudinaryFolder);
         const xhr = new XMLHttpRequest();
         xhr.open('POST', '/api/cloudinary/upload-file');
         const authHeaders = getAuthHeaders();
@@ -385,12 +463,24 @@ const ImageUpload = ({
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const resp = JSON.parse(xhr.responseText);
-              if (resp.ok && resp.result?.secure_url) { onProgress(100); resolve(resp.result.secure_url); }
-              else reject(new Error(resp.error || 'Upload failed'));
-            } catch { reject(new Error('Invalid response')); }
+              if (resp.ok && resp.result?.secure_url) {
+                onProgress(100);
+                resolve({
+                  secureUrl: resp.result.secure_url as string,
+                  publicId: resp.result.public_id as string | undefined,
+                });
+              } else reject(new Error(resp.error || 'Upload failed'));
+            } catch {
+              reject(new Error('Invalid response'));
+            }
           } else {
             let msg = `Server error ${xhr.status}`;
-            try { const r = JSON.parse(xhr.responseText); if (r.error) msg = r.error; } catch { /* */ }
+            try {
+              const r = JSON.parse(xhr.responseText);
+              if (r.error) msg = r.error;
+            } catch {
+              /* */
+            }
             reject(new Error(msg));
           }
         });
@@ -399,7 +489,60 @@ const ImageUpload = ({
         xhr.send(fd);
       });
     },
-    [getAuthHeaders]
+    [getAuthHeaders, cloudinaryFolder]
+  );
+
+  const uploadVideoWithProgress = useCallback(
+    (file: File, onProgress: (pct: number) => void): Promise<{ secureUrl: string; publicId?: string }> => {
+      return new Promise((resolve, reject) => {
+        const fd = new FormData();
+        fd.append('file', file);
+        if (cloudinaryFolder) fd.append('folder', cloudinaryFolder);
+        const xhr = new XMLHttpRequest();
+        xhr.open('POST', '/api/cloudinary/upload-video');
+        const authHeaders = getAuthHeaders();
+        Object.entries(authHeaders).forEach(([key, value]) => {
+          try {
+            xhr.setRequestHeader(key, value);
+          } catch {
+            // ignore header failures
+          }
+        });
+        xhr.withCredentials = true;
+        xhr.upload.addEventListener('progress', (e) => {
+          if (e.lengthComputable) onProgress(Math.min(99, Math.round((e.loaded / e.total) * 100)));
+        });
+        xhr.addEventListener('load', () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try {
+              const resp = JSON.parse(xhr.responseText);
+              if (resp.ok && resp.result?.secure_url) {
+                onProgress(100);
+                resolve({
+                  secureUrl: resp.result.secure_url as string,
+                  publicId: resp.result.public_id as string | undefined,
+                });
+              } else reject(new Error(resp.error || 'Upload failed'));
+            } catch {
+              reject(new Error('Invalid response'));
+            }
+          } else {
+            let msg = `Server error ${xhr.status}`;
+            try {
+              const r = JSON.parse(xhr.responseText);
+              if (r.error) msg = r.error;
+            } catch {
+              /* */
+            }
+            reject(new Error(msg));
+          }
+        });
+        xhr.addEventListener('error', () => reject(new Error('Network error')));
+        xhr.addEventListener('abort', () => reject(new Error('Aborted')));
+        xhr.send(fd);
+      });
+    },
+    [getAuthHeaders, cloudinaryFolder]
   );
 
   const uploadUrlToCloudinary = useCallback(
@@ -411,7 +554,7 @@ const ImageUpload = ({
           'Content-Type': 'application/json',
           ...getAuthHeaders(),
         },
-        body: JSON.stringify({ url, folder: 'products' }),
+        body: JSON.stringify({ url, folder: cloudinaryFolder }),
       });
 
       const body = (await response.json().catch(() => ({}))) as {
@@ -425,7 +568,7 @@ const ImageUpload = ({
       }
       return body.result.secure_url;
     },
-    [getAuthHeaders]
+    [getAuthHeaders, cloudinaryFolder]
   );
 
   const validateCloudinaryUrl = useCallback(
@@ -457,7 +600,9 @@ const ImageUpload = ({
       const currentDone = entriesRef.current.filter((e) => e.status === 'done' && e.remoteUrl).length;
       const slots = maxImages - currentDone;
       if (slots <= 0) return;
-      const toProcess = Array.from(files).filter((f) => acceptedTypes.includes(f.type)).slice(0, slots);
+      const toProcess = Array.from(files)
+        .filter((f) => acceptedTypes.includes(f.type) || (allowVideo && f.type.startsWith('video/')))
+        .slice(0, slots);
       if (toProcess.length === 0) return;
 
       const newEntries: FileEntry[] = toProcess.map((f) => ({
@@ -466,32 +611,97 @@ const ImageUpload = ({
         previewUrl: URL.createObjectURL(f),
         progress: 0,
         status: 'queued',
+        mediaKind: f.type.startsWith('video/') ? ('video' as const) : ('image' as const),
       }));
-      setEntries((prev) => { const next = [...prev, ...newEntries]; return multiple ? next : next.slice(-1); });
+      setEntries((prev) => {
+        const next = [...prev, ...newEntries];
+        return multiple ? next : next.slice(-1);
+      });
 
       for (let i = 0; i < toProcess.length; i++) {
         const file = toProcess[i];
         const entry = newEntries[i];
-        setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: 'compressing', progress: 0 } : e));
+        const isVideo = file.type.startsWith('video/');
+
+        if (isVideo) {
+          setEntries((prev) =>
+            prev.map((e) => (e.id === entry.id ? { ...e, status: 'uploading', progress: 0 } : e))
+          );
+          try {
+            const { secureUrl, publicId } = await uploadVideoWithProgress(file, (pct) => {
+              setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, progress: pct } : e)));
+            });
+            setEntries((prev) => {
+              const next = prev.map((e) =>
+                e.id === entry.id
+                  ? {
+                      ...e,
+                      status: 'done' as const,
+                      remoteUrl: secureUrl,
+                      progress: 100,
+                      mediaKind: 'video' as const,
+                      publicId,
+                    }
+                  : e
+              );
+              deferSyncParent(next);
+              return next;
+            });
+          } catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : 'Upload failed';
+            setEntries((prev) =>
+              prev.map((e) => (e.id === entry.id ? { ...e, status: 'error' as const, error: msg } : e))
+            );
+          }
+          continue;
+        }
+
+        setEntries((prev) =>
+          prev.map((e) => (e.id === entry.id ? { ...e, status: 'compressing', progress: 0 } : e))
+        );
         try {
           const blob = await compressImage(file);
           const fileName = `${file.name.replace(/\.[^.]+$/, '')}.webp`;
-          setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: 'uploading', sizeBytes: blob.size } : e));
-          const secureUrl = await uploadWithProgress(blob, fileName, (pct) => {
-            setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, progress: pct } : e));
+          setEntries((prev) =>
+            prev.map((e) => (e.id === entry.id ? { ...e, status: 'uploading', sizeBytes: blob.size } : e))
+          );
+          const { secureUrl, publicId } = await uploadWithProgress(blob, fileName, (pct) => {
+            setEntries((prev) => prev.map((e) => (e.id === entry.id ? { ...e, progress: pct } : e)));
           });
           setEntries((prev) => {
-            const next = prev.map((e) => e.id === entry.id ? { ...e, status: 'done' as const, remoteUrl: secureUrl, progress: 100 } : e);
+            const next = prev.map((e) =>
+              e.id === entry.id
+                ? {
+                    ...e,
+                    status: 'done' as const,
+                    remoteUrl: secureUrl,
+                    progress: 100,
+                    mediaKind: 'image' as const,
+                    publicId,
+                  }
+                : e
+            );
             deferSyncParent(next);
             return next;
           });
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : 'Upload failed';
-          setEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, status: 'error' as const, error: msg } : e));
+          setEntries((prev) =>
+            prev.map((e) => (e.id === entry.id ? { ...e, status: 'error' as const, error: msg } : e))
+          );
         }
       }
     },
-    [maxImages, acceptedTypes, multiple, compressImage, uploadWithProgress, deferSyncParent]
+    [
+      maxImages,
+      acceptedTypes,
+      allowVideo,
+      multiple,
+      compressImage,
+      uploadWithProgress,
+      uploadVideoWithProgress,
+      deferSyncParent,
+    ]
   );
 
   const removeEntry = useCallback(
@@ -544,6 +754,26 @@ const ImageUpload = ({
     });
   }, []);
 
+  const loadPreviewVideo = useCallback((url: string, timeoutMs = 12000): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const v = document.createElement('video');
+      v.preload = 'metadata';
+      const timeout = window.setTimeout(() => {
+        v.src = '';
+        reject(new Error('Timed out while loading video'));
+      }, timeoutMs);
+      v.onloadeddata = () => {
+        window.clearTimeout(timeout);
+        resolve();
+      };
+      v.onerror = () => {
+        window.clearTimeout(timeout);
+        reject(new Error('Video cannot be loaded'));
+      };
+      v.src = url;
+    });
+  }, []);
+
   const checkSingleLink = useCallback(
     async (url: string): Promise<{ ok: boolean; host: string; previewUrl: string; error?: string }> => {
       let host = '';
@@ -563,16 +793,37 @@ const ImageUpload = ({
           await validateCloudinaryUrl(url);
         }
         return { ok: true, host, previewUrl: url };
-      } catch (err: unknown) {
+      } catch {
+        if (allowVideo && isLikelyVideoUrl(url)) {
+          try {
+            await loadPreviewVideo(url, 12000);
+            if (linkImportMode === 'cloudinary') {
+              return {
+                ok: false,
+                host,
+                previewUrl: url,
+                error: 'استخدم وضع «رابط خارجي فقط» لروابط الفيديو، أو ارفع الملف من الجهاز',
+              };
+            }
+            return { ok: true, host, previewUrl: url };
+          } catch (err: unknown) {
+            return {
+              ok: false,
+              host,
+              previewUrl: url,
+              error: err instanceof Error ? err.message : 'Invalid video link',
+            };
+          }
+        }
         return {
           ok: false,
           host,
           previewUrl: url,
-          error: err instanceof Error ? err.message : 'Invalid image link',
+          error: 'Invalid image link',
         };
       }
     },
-    [linkImportMode, loadPreviewImage, validateCloudinaryUrl]
+    [allowVideo, linkImportMode, loadPreviewImage, loadPreviewVideo, validateCloudinaryUrl]
   );
 
   const checkLinks = useCallback(
@@ -696,6 +947,7 @@ const ImageUpload = ({
               remoteUrl: selected,
               progress: 100,
               status: 'done',
+              mediaKind: allowVideo && isLikelyVideoUrl(selected) ? ('video' as const) : ('image' as const),
             },
           ];
         } else {
@@ -710,6 +962,7 @@ const ImageUpload = ({
             remoteUrl: url,
             progress: 100,
             status: 'done',
+            mediaKind: allowVideo && isLikelyVideoUrl(url) ? ('video' as const) : ('image' as const),
           }));
           next = [...prev, ...additions];
         }
@@ -718,7 +971,7 @@ const ImageUpload = ({
         return next;
       });
     },
-    [maxImages, multiple, deferSyncParent]
+    [allowVideo, maxImages, multiple, deferSyncParent]
   );
 
   const handleAddValidLinks = useCallback(async () => {
@@ -840,6 +1093,11 @@ const ImageUpload = ({
     []
   );
 
+  const fileAcceptAttr = useMemo(
+    () => (allowVideo ? `${acceptedTypes.join(',')},video/*` : acceptedTypes.join(',')),
+    [allowVideo, acceptedTypes]
+  );
+
   return (
     <div className={`space-y-3 ${className}`}>
 
@@ -882,7 +1140,7 @@ const ImageUpload = ({
             ref={fileInputRef}
             type="file"
             multiple={multiple}
-            accept={acceptedTypes.join(',')}
+            accept={fileAcceptAttr}
             onChange={(e) => e.target.files && handleFiles(e.target.files)}
             className="hidden"
             disabled={isFull}
@@ -894,13 +1152,19 @@ const ImageUpload = ({
             <div>
               <p className="text-sm font-semibold text-slate-800">
                 {isFull
-                  ? `Reached maximum (${maxImages} images)`
-                  : multiple
-                  ? 'Drag images here or click to select'
-                  : 'Drag an image here or click to select'}
+                  ? `Reached maximum (${maxImages} items)`
+                  : allowVideo
+                    ? multiple
+                      ? 'Drag images or videos here or click to select'
+                      : 'Drag a file here or click to select'
+                    : multiple
+                      ? 'Drag images here or click to select'
+                      : 'Drag an image here or click to select'}
               </p>
               <p className="text-xs text-slate-500 mt-0.5">
-                {multiple ? `Up to ${maxImages} images` : 'Single image'} - {maxSizeKB}KB each - JPG, PNG, WebP
+                {allowVideo
+                  ? `${multiple ? `Up to ${maxImages} items` : 'Single file'} — images up to ${maxSizeKB}KB (JPG, PNG, WebP); videos up to 100MB`
+                  : `${multiple ? `Up to ${maxImages} images` : 'Single image'} - ${maxSizeKB}KB each - JPG, PNG, WebP`}
               </p>
             </div>
           </div>
@@ -935,7 +1199,9 @@ const ImageUpload = ({
 
           <p className="text-[11px] text-slate-500">
             {linkImportMode === 'cloudinary'
-              ? 'Images will be copied to Cloudinary and will consume Cloudinary storage.'
+              ? allowVideo
+                ? 'Images are copied to Cloudinary. Video links: use External mode or upload files instead.'
+                : 'Images will be copied to Cloudinary and will consume Cloudinary storage.'
               : 'Original links are saved directly and do not consume Cloudinary storage.'}
           </p>
 
@@ -943,7 +1209,15 @@ const ImageUpload = ({
             value={linkInput}
             onChange={(e) => setLinkInput(e.target.value)}
             rows={4}
-            placeholder={multiple ? 'Paste one or many image links (one per line or comma-separated)' : 'Paste one image link'}
+            placeholder={
+              allowVideo
+                ? multiple
+                  ? 'Paste image or video links (one per line or comma-separated)'
+                  : 'Paste one image or video link'
+                : multiple
+                  ? 'Paste one or many image links (one per line or comma-separated)'
+                  : 'Paste one image link'
+            }
             className="w-full rounded-md border border-slate-200 bg-white p-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30"
           />
 
@@ -1058,19 +1332,41 @@ const ImageUpload = ({
                   className={`aspect-square bg-slate-100 relative overflow-hidden ${isDone ? 'cursor-zoom-in' : ''}`}
                   onClick={() => isDone && openLightbox(entry)}
                 >
-                  <img
-                    src={entry.previewUrl}
-                    alt={entry.name}
-                    className={`w-full h-full object-cover transition-opacity duration-300 ${isDone ? 'opacity-100' : 'opacity-50'}`}
-                    draggable={false}
-                  />
+                  {entry.mediaKind === 'video' ? (
+                    <video
+                      src={entry.previewUrl}
+                      className={`w-full h-full object-cover transition-opacity duration-300 ${isDone ? 'opacity-100' : 'opacity-50'}`}
+                      muted
+                      playsInline
+                      preload="metadata"
+                    />
+                  ) : (
+                    <img
+                      src={entry.previewUrl}
+                      alt={entry.name}
+                      className={`w-full h-full object-cover transition-opacity duration-300 ${isDone ? 'opacity-100' : 'opacity-50'}`}
+                      draggable={false}
+                    />
+                  )}
+
+                  {isDone && entry.mediaKind === 'video' && (
+                    <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+                      <Play className="w-8 h-8 text-white drop-shadow-md opacity-90" />
+                    </div>
+                  )}
 
                   {/* Uploading overlay */}
                   {entry.status !== 'done' && entry.status !== 'error' && (
                     <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center gap-1">
                       <ProgressRing progress={entry.progress} size={44} />
                       <p className="text-white text-[10px] font-semibold">
-                        {entry.status === 'compressing' ? 'ضغط...' : entry.status === 'queued' ? 'انتظار' : `${entry.progress}%`}
+                        {entry.mediaKind === 'video' && entry.status === 'uploading'
+                          ? 'رفع فيديو...'
+                          : entry.status === 'compressing'
+                            ? 'ضغط...'
+                            : entry.status === 'queued'
+                              ? 'انتظار'
+                              : `${entry.progress}%`}
                       </p>
                     </div>
                   )}
@@ -1091,10 +1387,14 @@ const ImageUpload = ({
                     </div>
                   )}
 
-                  {/* Zoom hint on hover */}
+                  {/* Zoom / play hint on hover */}
                   {isDone && (
-                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                      <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center pointer-events-none">
+                      {entry.mediaKind === 'video' ? (
+                        <Play className="w-6 h-6 text-white opacity-70 group-hover:opacity-100 transition-opacity drop-shadow" />
+                      ) : (
+                        <ZoomIn className="w-5 h-5 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow" />
+                      )}
                     </div>
                   )}
 
@@ -1148,8 +1448,8 @@ const ImageUpload = ({
 
       {/* Lightbox portal */}
       {lightbox && (
-        <Lightbox
-          images={lightbox.urls}
+        <MixedMediaLightbox
+          items={lightbox.items}
           startIndex={lightbox.index}
           onClose={() => setLightbox(null)}
         />

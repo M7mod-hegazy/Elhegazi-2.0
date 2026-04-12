@@ -22,7 +22,8 @@ import {
   TrendingUp,
   Activity,
   Layers,
-  Globe
+  Globe,
+  Images
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDualAuth } from '@/hooks/useDualAuth';
@@ -56,7 +57,8 @@ const navigationGroups = [
       { name: 'المنتجات', href: '/admin/products', icon: Package },
       { name: 'نماذج 3D', href: '/admin/products-3d', icon: Box },
       { name: 'الفئات', href: '/admin/categories', icon: Grid3X3 },
-      { name: 'رموز QR', href: '/admin/qr-codes', icon: QrCode }
+      { name: 'رموز QR', href: '/admin/qr-codes', icon: QrCode },
+      { name: 'أعمالنا السابقة', href: '/admin/portfolio-work', icon: Images }
     ]
   },
   {
@@ -109,6 +111,7 @@ const AdminSidebarEnhanced = ({ collapsed, onToggle, isMobile, mobileMenuOpen, o
           item.href === '/admin/home-config' ? 'homeConfig' :
           item.href === '/admin/settings' ? 'settings' :
           item.href === '/admin/qr-codes' ? 'qrcodes' :
+          item.href === '/admin/portfolio-work' ? 'latestWork' :
           null;
         return key ? isVisible('adminModules', key) : true;
       })

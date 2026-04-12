@@ -687,7 +687,13 @@ const AdminSettings: React.FC = () => {
                                 .filter(([key]) => !controlSearch || key.toLowerCase().includes(controlSearch.toLowerCase()))
                                 .map(([key, value]) => (
                                   <div key={`${scope}-${key}`} className="flex items-center justify-between rounded-md border p-2">
-                                    <span className="text-sm">{key}</span>
+                                    <span className="text-sm">
+                                      {key === 'latestWork'
+                                        ? scope === 'publicPages'
+                                          ? 'أعمالنا السابقة (صفحة الزوار)'
+                                          : 'أعمالنا السابقة (الإدارة)'
+                                        : key}
+                                    </span>
                                     <Switch checked={Boolean(value)} onCheckedChange={(checked) => setControlCenterVisibility((prev) => ({ ...prev, [scope]: { ...prev[scope], [key]: checked } }))} />
                                   </div>
                                 ))}

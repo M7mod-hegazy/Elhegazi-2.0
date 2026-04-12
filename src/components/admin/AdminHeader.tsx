@@ -172,6 +172,7 @@ const pageLabel = (path: string) => {
   if (path.startsWith('/admin/users')) return 'المستخدمون';
   if (path.startsWith('/admin/locations')) return 'المواقع';
   if (path.startsWith('/admin/qr-codes')) return 'رموز QR';
+  if (path.startsWith('/admin/portfolio-work')) return 'أعمالنا السابقة';
   if (path.startsWith('/admin/settings')) return 'الإعدادات';
   if (path.startsWith('/admin/profit')) return 'الأرباح';
   if (path.startsWith('/admin/dashboard')) return 'لوحة التحكم';

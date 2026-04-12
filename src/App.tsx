@@ -96,6 +96,8 @@ const AdminHomeConfig = lazy(() => import("./pages/admin/HomeConfig"));
 const AdminHistory = lazy(() => import("./pages/admin/History"));
 const AdminProfit = lazy(() => import("./pages/admin/Profit"));
 const AdminShareholders = lazy(() => import("./pages/admin/Shareholders"));
+const PortfolioWork = lazyWithFallback(() => import("@/pages/PortfolioWork"), "PortfolioWork");
+const AdminPortfolioWork = lazy(() => import("./pages/admin/PortfolioWork"));
 
 const AdminOrderTracking = lazy(() => import("./pages/admin/OrderTracking"));
 const Favorites = lazy(() => import("./pages/Favorites"));
@@ -333,6 +335,7 @@ const AppInner = () => {
             <Route path="/about" element={isVisible('publicPages', 'about') ? <About /> : <NotFound />} />
             <Route path="/contact" element={isVisible('publicPages', 'contact') ? <Contact /> : <NotFound />} />
             <Route path="/locations" element={isVisible('publicPages', 'locations') ? <Locations /> : <NotFound />} />
+            <Route path="/portfolio" element={isVisible('publicPages', 'latestWork') ? <PortfolioWork /> : <NotFound />} />
             <Route path="/shop-setup" element={isVisible('publicPages', 'shopBuilder') ? <ShopSetup /> : <NotFound />} />
             <Route path="/shop-builder" element={isVisible('publicPages', 'shopBuilder') ? <ShopBuilderIntro /> : <NotFound />} />
             <Route path="/shop-builder/intro" element={isVisible('publicPages', 'shopBuilder') ? <ShopBuilderIntro /> : <NotFound />} />
@@ -387,6 +390,11 @@ const AppInner = () => {
             <Route path="/admin/qr-codes" element={
               <DualProtectedRoute requireAdmin={true}>
                 {isVisible('adminModules', 'qrcodes') ? <AdminQRCodes /> : <NotFound />}
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/portfolio-work" element={
+              <DualProtectedRoute requireAdmin={true}>
+                {isVisible('adminModules', 'latestWork') ? <AdminPortfolioWork /> : <NotFound />}
               </DualProtectedRoute>
             } />
             <Route path="/admin/home-config" element={
