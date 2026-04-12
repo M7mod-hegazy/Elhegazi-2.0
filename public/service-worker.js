@@ -3,7 +3,7 @@
  * Caches critical assets for instant load and offline support
  */
 
-const CACHE_NAME = 'app-cache-v6';
+const CACHE_NAME = 'app-cache-v7';
 const RUNTIME_CACHE = 'runtime-cache-v2';
 const IMAGE_CACHE = 'image-cache-v2';
 
@@ -87,37 +87,17 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Handle API requests - network first, cache fallback
-  if (url.pathname.startsWith('/api/')) {
+  // All API traffic: network-only (never cache). Avoids stale JSON after deploys and bad fallbacks
+  // when a previous build returned 404 HTML for /api/* before routing was fixed.
+  if (url.pathname === '/api' || url.pathname.startsWith('/api/')) {
     event.respondWith(
-      fetch(request)
-        .then((response) => {
-          // Cache successful API responses (clone before returning)
-          if (response.ok) {
-            const responseClone = response.clone();
-            caches.open(RUNTIME_CACHE).then((cache) => {
-              cache.put(request, responseClone);
-            });
-          }
-          return response;
+      fetch(request).catch(() =>
+        new Response(JSON.stringify({ ok: false, error: 'Network unavailable' }), {
+          status: 503,
+          statusText: 'Service Unavailable',
+          headers: { 'Content-Type': 'application/json' },
         })
-        .catch(() => {
-          // Fallback to cache on network error
-          return caches.match(request).then((cachedResponse) => {
-            if (cachedResponse) {
-              return cachedResponse;
-            }
-            // Return a proper error response if no cache available
-            return new Response(
-              JSON.stringify({ error: 'Network error and no cached data available' }),
-              {
-                status: 503,
-                statusText: 'Service Unavailable',
-                headers: { 'Content-Type': 'application/json' }
-              }
-            );
-          });
-        })
+      )
     );
     return;
   }

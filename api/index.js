@@ -66,13 +66,23 @@ async function probeRemoteImageUrl(url, timeoutMs = 8000) {
   }
 }
 
-/** Vercel invokes `api/index.js` only for `/api`; rewrites pass the real path in `__hono_path`. */
+/**
+ * Vercel invokes `api/index.js` for pathname `/api` only; rewrites pass the real path in `__hono_path`.
+ * Only honor that param when the incoming pathname is `/api` so a client cannot spoof paths via query.
+ */
 function vercelAwareGetPath(request) {
   try {
     const url = new URL(request.url);
-    if (url.searchParams.has('__hono_path')) {
-      const raw = url.searchParams.get('__hono_path') ?? '';
-      const segment = String(raw).replace(/^\/+/, '');
+    let pathname = url.pathname || '/';
+    if (pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.slice(0, -1);
+    if (pathname === '/api' && url.searchParams.has('__hono_path')) {
+      let raw = url.searchParams.get('__hono_path') ?? '';
+      try {
+        raw = decodeURIComponent(String(raw).replace(/\+/g, ' '));
+      } catch {
+        raw = String(raw);
+      }
+      const segment = raw.replace(/^\/+/, '');
       if (!segment) return '/api';
       return `/api/${segment}`;
     }
@@ -3403,9 +3413,12 @@ app.post('/orders/rate', async (c) => {
   }
 });
 
-// Export for Vercel
-export const GET = handle(app);
-export const POST = handle(app);
-export const PUT = handle(app);
-export const DELETE = handle(app);
-export const PATCH = handle(app);
+// Export for Vercel (HEAD/OPTIONS avoid 405 from probes, link checks, and CORS preflights)
+const honoHandler = handle(app);
+export const GET = honoHandler;
+export const HEAD = honoHandler;
+export const POST = honoHandler;
+export const PUT = honoHandler;
+export const DELETE = honoHandler;
+export const PATCH = honoHandler;
+export const OPTIONS = honoHandler;

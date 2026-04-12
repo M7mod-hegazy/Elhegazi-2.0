@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { apiDelete, apiPatchJson, apiPostJson } from '@/lib/api';
+import { apiDelete, apiGet, apiPatchJson, apiPostJson } from '@/lib/api';
 import ImageUpload from '@/components/ui/image-upload';
 import { optimizeImage } from '@/lib/imageOptimization';
 import { cn } from '@/lib/utils';
@@ -47,8 +47,9 @@ const AdminPortfolioWork = () => {
   const load = useCallback(async (p: number) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/admin/portfolio-posts?page=${p}&limit=24`, { cache: 'no-store', credentials: 'include' });
-      const data = (await res.json()) as { ok?: boolean; items?: PostRow[]; totalPages?: number };
+      const data = (await apiGet<PostRow>(
+        `/api/admin/portfolio-posts?page=${p}&limit=24`
+      )) as { ok: boolean; items?: PostRow[]; totalPages?: number };
       if (!data.ok) throw new Error('فشل التحميل');
       setPosts(Array.isArray(data.items) ? data.items : []);
       setTotalPages(Math.max(1, Number(data.totalPages) || 1));
