@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { handle } from 'hono/vercel';
+import { getPath as honoDefaultGetPath } from 'hono/utils/url';
 import mongoose from 'mongoose';
 import dotenv from 'dotenv';
 import crypto from 'crypto';
@@ -65,7 +66,23 @@ async function probeRemoteImageUrl(url, timeoutMs = 8000) {
   }
 }
 
-const app = new Hono().basePath('/api');
+/** Vercel invokes `api/index.js` only for `/api`; rewrites pass the real path in `__hono_path`. */
+function vercelAwareGetPath(request) {
+  try {
+    const url = new URL(request.url);
+    if (url.searchParams.has('__hono_path')) {
+      const raw = url.searchParams.get('__hono_path') ?? '';
+      const segment = String(raw).replace(/^\/+/, '');
+      if (!segment) return '/api';
+      return `/api/${segment}`;
+    }
+  } catch {
+    // fall through
+  }
+  return honoDefaultGetPath(request);
+}
+
+const app = new Hono({ getPath: vercelAwareGetPath }).basePath('/api');
 
 function getClientIp(c) {
   return (
@@ -1404,6 +1421,31 @@ app.get('/categories', async (c) => {
     const { default: Category } = await import('../server/models/Category.js');
     const categories = await Category.find({}).lean().maxTimeMS(8000);
     return c.json({ ok: true, items: categories });
+  } catch (err) {
+    console.error('[API] Error:', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+/** Used as img fallback when a product has no image (see Checkout, OrderHistory). */
+app.get('/categories/:slug/image', async (c) => {
+  try {
+    await connectMongoDB();
+    const { default: Category } = await import('../server/models/Category.js');
+    const slug = c.req.param('slug');
+    let category = slug ? await Category.findOne({ slug }).lean().maxTimeMS(8000) : null;
+    if (!category && slug && mongoose.Types.ObjectId.isValid(slug)) {
+      category = await Category.findById(slug).lean().maxTimeMS(8000);
+    }
+    const rawImage = category?.image && String(category.image).trim();
+    if (!rawImage) return c.text('', 404);
+    let safe;
+    try {
+      safe = assertSafeRemoteImageUrl(rawImage);
+    } catch {
+      return c.text('', 404);
+    }
+    return c.redirect(safe, 302);
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);

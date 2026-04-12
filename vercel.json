@@ -3,6 +3,14 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/api/:path*",
+      "destination": "/api?__hono_path=:path*"
+    },
+    {
+      "source": "/api",
+      "destination": "/api?__hono_path="
+    },
+    {
       "source": "/((?!api/|assets/|styles/|fonts/|favicon.ico|manifest.json|iconPng.png|service-worker.js|robots.txt).*)",
       "destination": "/index.html"
     }
