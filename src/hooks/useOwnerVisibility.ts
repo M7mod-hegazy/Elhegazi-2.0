@@ -7,6 +7,39 @@ export type OwnerVisibility = {
   featureFlags: Record<string, boolean>;
 };
 
+function coerceVisibilityBool(raw: unknown, fallback: boolean): boolean {
+  if (raw === true || raw === 'true' || raw === 1 || raw === '1') return true;
+  if (raw === false || raw === 'false' || raw === 0 || raw === '0') return false;
+  return fallback;
+}
+
+function boolifySection<K extends string>(
+  defaults: Record<K, boolean>,
+  layer: Record<string, unknown> | undefined
+): Record<K, boolean> {
+  const out = { ...defaults } as Record<K, boolean>;
+  if (!layer || typeof layer !== 'object') return out;
+  for (const key of Object.keys(defaults) as K[]) {
+    out[key] = coerceVisibilityBool(layer[key as string], defaults[key]);
+  }
+  return out;
+}
+
+/** Merge defaults + patch and coerce to real booleans (Mongo/JSON sometimes yields strings). */
+export function normalizeOwnerVisibility(vis: Partial<OwnerVisibility> | undefined | null): OwnerVisibility {
+  const v = vis || {};
+  const merged = {
+    publicPages: { ...defaultOwnerVisibility.publicPages, ...(v.publicPages || {}) },
+    adminModules: { ...defaultOwnerVisibility.adminModules, ...(v.adminModules || {}) },
+    featureFlags: { ...defaultOwnerVisibility.featureFlags, ...(v.featureFlags || {}) },
+  };
+  return {
+    publicPages: boolifySection(defaultOwnerVisibility.publicPages, merged.publicPages as Record<string, unknown>),
+    adminModules: boolifySection(defaultOwnerVisibility.adminModules, merged.adminModules as Record<string, unknown>),
+    featureFlags: boolifySection(defaultOwnerVisibility.featureFlags, merged.featureFlags as Record<string, unknown>),
+  };
+}
+
 export const defaultOwnerVisibility: OwnerVisibility = {
   publicPages: {
     home: true,
@@ -54,11 +87,7 @@ type SiteVisibilityResponse = {
 };
 
 function mergeVisibility(input?: Partial<OwnerVisibility>): OwnerVisibility {
-  return {
-    publicPages: { ...defaultOwnerVisibility.publicPages, ...(input?.publicPages || {}) },
-    adminModules: { ...defaultOwnerVisibility.adminModules, ...(input?.adminModules || {}) },
-    featureFlags: { ...defaultOwnerVisibility.featureFlags, ...(input?.featureFlags || {}) },
-  };
+  return normalizeOwnerVisibility(input);
 }
 
 export function useOwnerVisibility() {

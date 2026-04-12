@@ -42,7 +42,7 @@ const Switch = React.forwardRef<
         "peer relative inline-flex shrink-0 cursor-pointer items-center rounded-full border p-[2px] transition-all duration-200 ease-out",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         "disabled:cursor-not-allowed disabled:opacity-50",
-        "data-[state=unchecked]:bg-muted/80 data-[state=unchecked]:border-border/80 data-[state=unchecked]:shadow-inner",
+        "data-[state=unchecked]:bg-slate-300/85 data-[state=unchecked]:border-slate-400/50 data-[state=unchecked]:shadow-inner dark:data-[state=unchecked]:bg-slate-600 dark:data-[state=unchecked]:border-slate-500/60",
         "data-[state=checked]:border-primary/80 data-[state=checked]:shadow-[0_0_0_1px_hsl(var(--primary)/0.2),0_6px_16px_hsl(var(--primary)/0.28)]",
         sizeClasses[size],
         variantClasses[variant],

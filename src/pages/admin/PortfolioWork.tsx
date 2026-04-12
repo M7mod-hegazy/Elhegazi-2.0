@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import { apiDelete, apiGet, apiPatchJson, apiPostJson } from '@/lib/api';
+import { ApiHttpError, apiDelete, apiGet, apiPatchJson, apiPostJson } from '@/lib/api';
 import ImageUpload from '@/components/ui/image-upload';
 import { optimizeImage } from '@/lib/imageOptimization';
 import { cn } from '@/lib/utils';
@@ -47,15 +47,21 @@ const AdminPortfolioWork = () => {
   const load = useCallback(async (p: number) => {
     setLoading(true);
     try {
-      const data = (await apiGet<PostRow>(
+      const data = (await apiGet<unknown>(
         `/api/admin/portfolio-posts?page=${p}&limit=24`
       )) as { ok: boolean; items?: PostRow[]; totalPages?: number };
       if (!data.ok) throw new Error('فشل التحميل');
       setPosts(Array.isArray(data.items) ? data.items : []);
       setTotalPages(Math.max(1, Number(data.totalPages) || 1));
       setPage(p);
-    } catch {
-      toast({ title: 'خطأ', description: 'تعذر تحميل المنشورات', variant: 'destructive' });
+    } catch (e) {
+      const description =
+        e instanceof ApiHttpError && e.status === 403
+          ? 'تعذر التحقق من صلاحية المدير. تأكد أن الحساب مسجّل في قاعدة البيانات وأن البريد/المعرّف يُرسل مع الطلب.'
+          : e instanceof Error
+            ? e.message
+            : 'تعذر تحميل المنشورات';
+      toast({ title: 'خطأ', description, variant: 'destructive' });
       setPosts([]);
     } finally {
       setLoading(false);

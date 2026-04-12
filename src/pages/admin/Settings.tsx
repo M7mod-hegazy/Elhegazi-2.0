@@ -12,7 +12,7 @@ import { Settings as SettingsIcon, ShieldCheck } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { apiGet, apiPostJson, apiPutJson, uploadFile } from '@/lib/api';
 import { clearThemeCache } from '@/lib/themeInit';
-import { defaultOwnerVisibility } from '@/hooks/useOwnerVisibility';
+import { defaultOwnerVisibility, normalizeOwnerVisibility } from '@/hooks/useOwnerVisibility';
 import { LOGO_IMAGE_FALLBACK, applyLogoImageFallback } from '@/lib/images';
 
 type OwnerVisibility = {
@@ -201,11 +201,7 @@ const AdminSettings: React.FC = () => {
     const visData = await visRes.json();
     if (!visRes.ok || !visData?.ok) throw new Error(visData?.error || 'Failed to load Control Center data');
     setControlCenterEnabled(visData.item?.enabled !== false);
-    setControlCenterVisibility({
-      publicPages: { ...defaultOwnerVisibility.publicPages, ...(visData.item?.visibility?.publicPages || {}) },
-      adminModules: { ...defaultOwnerVisibility.adminModules, ...(visData.item?.visibility?.adminModules || {}) },
-      featureFlags: { ...defaultOwnerVisibility.featureFlags, ...(visData.item?.visibility?.featureFlags || {}) },
-    });
+    setControlCenterVisibility(normalizeOwnerVisibility(visData.item?.visibility));
   }, [controlCenterToken, controlHeaders]);
 
   useEffect(() => {
@@ -333,6 +329,12 @@ const AdminSettings: React.FC = () => {
       });
       const data = await res.json();
       if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed');
+      if (data.item?.visibility) {
+        setControlCenterVisibility(normalizeOwnerVisibility(data.item.visibility));
+      }
+      if (data.item && 'enabled' in data.item) {
+        setControlCenterEnabled(data.item.enabled !== false);
+      }
       toast({ title: 'Control Center', description: 'تم حفظ سياسات الإظهار والإخفاء' });
     } catch (error) {
       toast({ title: 'Control Center', description: error instanceof Error ? error.message : 'Error', variant: 'destructive' });
@@ -694,7 +696,15 @@ const AdminSettings: React.FC = () => {
                                           : 'أعمالنا السابقة (الإدارة)'
                                         : key}
                                     </span>
-                                    <Switch checked={Boolean(value)} onCheckedChange={(checked) => setControlCenterVisibility((prev) => ({ ...prev, [scope]: { ...prev[scope], [key]: checked } }))} />
+                                    <Switch
+                                      checked={Boolean(value)}
+                                      onCheckedChange={(checked) =>
+                                        setControlCenterVisibility((prev) => ({
+                                          ...prev,
+                                          [scope]: { ...prev[scope], [key]: checked },
+                                        }))
+                                      }
+                                    />
                                   </div>
                                 ))}
                             </div>

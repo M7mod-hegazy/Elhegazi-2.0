@@ -193,22 +193,6 @@ const AdminUsers = () => {
     }
   };
 
-  // Load data
-  useEffect(() => {
-    // Global permission-denied UX handler
-    const onDenied = (e: Event) => {
-      const ev = e as CustomEvent<{ status: number; error?: string; resource?: string; action?: string; url?: unknown; userId?: string }>;
-      const msg = ev.detail?.error || (ev.detail?.status === 401 ? 'غير مصرح: يرجى تسجيل الدخول' : 'تم رفض الإذن لهذه العملية');
-      toast({
-        title: ev.detail?.status === 401 ? 'غير مصرح' : 'صلاحيات غير كافية',
-        description: `${msg}${ev.detail?.resource ? ` (المورد: ${ev.detail.resource}, العملية: ${ev.detail.action})` : ''}`,
-        variant: 'destructive'
-      });
-    };
-    window.addEventListener('permission-denied', onDenied as EventListener);
-    return () => window.removeEventListener('permission-denied', onDenied as EventListener);
-  }, [toast]);
-
   // Load RBAC resources for the modal
   const loadResources = async () => {
     try {

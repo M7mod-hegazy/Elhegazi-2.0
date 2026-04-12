@@ -115,11 +115,20 @@ async function isAdminRequest(c) {
   const adminSecret = c.req.header('x-admin-secret') || '';
   if (process.env.ADMIN_SECRET && adminSecret === process.env.ADMIN_SECRET) return true;
 
-  const userId = c.req.header('x-user-id');
-  if (!userId) return false;
+  const userId = String(c.req.header('x-user-id') || '').trim();
+  const userEmail = String(c.req.header('x-user-email') || '').trim().toLowerCase();
+  if (!userId && !userEmail) return false;
   try {
     const { default: User } = await import('../server/models/User.js');
-    const user = await User.findById(userId).select('role').lean().maxTimeMS(8000);
+    let user = null;
+    if (userId && mongoose.isValidObjectId(userId)) {
+      user = await User.findById(userId).select('role').lean().maxTimeMS(8000);
+    }
+    if (!user && userEmail) {
+      user = await User.findOne({ email: userEmail }).select('role').lean().maxTimeMS(8000);
+    }
+    // Login allows a session when email is not in DB (demo / legacy); honor that for API parity
+    if (!user && userId.startsWith('temp-admin-')) return true;
     return !!(user && (user.role === 'admin' || user.role === 'SuperAdmin' || user.role === 'super_admin'));
   } catch {
     return false;
@@ -168,11 +177,30 @@ const DEFAULT_OWNER_VISIBILITY = {
   },
 };
 
+function coerceVisibilityBool(raw, fallback) {
+  if (raw === true || raw === 'true' || raw === 1 || raw === '1') return true;
+  if (raw === false || raw === 'false' || raw === 0 || raw === '0') return false;
+  return fallback;
+}
+
+function boolifyOwnerSection(defaults, layer) {
+  const out = {};
+  for (const key of Object.keys(defaults)) {
+    out[key] = coerceVisibilityBool(layer?.[key], defaults[key]);
+  }
+  return out;
+}
+
 function mergeOwnerVisibility(visibility = {}) {
-  return {
+  const merged = {
     publicPages: { ...DEFAULT_OWNER_VISIBILITY.publicPages, ...(visibility.publicPages || {}) },
     adminModules: { ...DEFAULT_OWNER_VISIBILITY.adminModules, ...(visibility.adminModules || {}) },
     featureFlags: { ...DEFAULT_OWNER_VISIBILITY.featureFlags, ...(visibility.featureFlags || {}) },
+  };
+  return {
+    publicPages: boolifyOwnerSection(DEFAULT_OWNER_VISIBILITY.publicPages, merged.publicPages),
+    adminModules: boolifyOwnerSection(DEFAULT_OWNER_VISIBILITY.adminModules, merged.adminModules),
+    featureFlags: boolifyOwnerSection(DEFAULT_OWNER_VISIBILITY.featureFlags, merged.featureFlags),
   };
 }
 

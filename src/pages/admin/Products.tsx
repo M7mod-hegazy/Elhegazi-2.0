@@ -889,7 +889,7 @@ const AdminProducts = () => {
     | 'price_desc'
     | 'sku_asc';
   const [tableSort, setTableSort] = useState<AdminTableSort>('newest');
-  type FamilyTableFilter = 'all' | 'no_family' | 'family_rep';
+  type FamilyTableFilter = 'all' | 'no_family' | 'in_family' | 'family_rep';
   const [familyTableFilter, setFamilyTableFilter] = useState<FamilyTableFilter>('all');
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   // Inline edit state
@@ -1237,6 +1237,8 @@ const AdminProducts = () => {
     let list = filteredProducts;
     if (familyTableFilter === 'no_family') {
       list = list.filter((p) => !p.productFamilyId);
+    } else if (familyTableFilter === 'in_family') {
+      list = list.filter((p) => !!p.productFamilyId);
     } else if (familyTableFilter === 'family_rep') {
       list = list.filter((p) => {
         const fid = p.productFamilyId ? String(p.productFamilyId) : '';
@@ -1277,46 +1279,55 @@ const AdminProducts = () => {
     return arr;
   }, [filteredProducts, familyTableFilter, familyRepIdByFamilyId, tableSort]);
 
+  /** Rows used for “per page” when family mode is on: one slot per family (representative) + standalone products. */
+  const paginationSourceProducts = useMemo(() => {
+    if (!familyCardsInListings) return displayedProducts;
+    const seenFam = new Set<string>();
+    const rows: Product[] = [];
+    for (const p of displayedProducts) {
+      const fid = p.productFamilyId ? String(p.productFamilyId) : '';
+      if (!fid) {
+        rows.push(p);
+        continue;
+      }
+      if (seenFam.has(fid)) continue;
+      seenFam.add(fid);
+      const repId = familyRepIdByFamilyId.get(fid);
+      const rep = (repId ? displayedProducts.find((x) => String(x.id) === repId) : undefined) || p;
+      rows.push(rep);
+    }
+    return rows;
+  }, [displayedProducts, familyCardsInListings, familyRepIdByFamilyId]);
+
   const totalPages = useMemo(() => {
-    return Math.ceil(displayedProducts.length / itemsPerPage);
-  }, [displayedProducts.length, itemsPerPage]);
+    const n = paginationSourceProducts.length;
+    return Math.max(1, Math.ceil(n / itemsPerPage));
+  }, [paginationSourceProducts.length, itemsPerPage]);
 
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
-    const endIndex = startIndex + itemsPerPage;
-    return displayedProducts.slice(startIndex, endIndex);
-  }, [displayedProducts, currentPage, itemsPerPage]);
-
-  const familyRepsOnPage = useMemo(() => {
-    const pageIds = new Set(paginatedProducts.map((p) => String(p.id)));
-    const map = new Map<string, string>();
-    const seenFam = new Set<string>();
-    for (const p of paginatedProducts) {
-      const fid = p.productFamilyId;
-      if (!fid) continue;
-      const fs = String(fid);
-      if (seenFam.has(fs)) continue;
-      seenFam.add(fs);
-      const fam = adminFamilyDocs.find((f) => String(f._id) === fs);
-      const ids = (fam?.memberProductIds || []).map((x) => String(x));
-      const def = fam?.defaultProductId ? String(fam.defaultProductId) : '';
-      const rep =
-        (def && pageIds.has(def) ? def : ids.find((id) => pageIds.has(id))) || String(p.id);
-      map.set(fs, rep);
-    }
-    return map;
-  }, [paginatedProducts, adminFamilyDocs]);
+    return paginationSourceProducts.slice(startIndex, startIndex + itemsPerPage);
+  }, [paginationSourceProducts, currentPage, itemsPerPage]);
 
   const visiblePaginatedProducts = useMemo(() => {
     if (!familyCardsInListings) return paginatedProducts;
-    return paginatedProducts.filter((p) => {
-      const fid = p.productFamilyId;
-      if (!fid) return true;
-      if (expandedFamilyIds.has(String(fid))) return true;
-      const rep = familyRepsOnPage.get(String(fid));
-      return rep != null && String(p.id) === rep;
-    });
-  }, [paginatedProducts, expandedFamilyIds, familyRepsOnPage, familyCardsInListings]);
+    const out: Product[] = [];
+    for (const p of paginatedProducts) {
+      const fid = p.productFamilyId ? String(p.productFamilyId) : '';
+      if (!fid) {
+        out.push(p);
+        continue;
+      }
+      if (expandedFamilyIds.has(fid)) {
+        displayedProducts.forEach((m) => {
+          if (String(m.productFamilyId || '') === fid) out.push(m);
+        });
+      } else {
+        out.push(p);
+      }
+    }
+    return out;
+  }, [paginatedProducts, displayedProducts, expandedFamilyIds, familyCardsInListings]);
 
   /** First/last row per expanded family for rounded “container” corners */
   const expandedFamilyEdges = useMemo(() => {
@@ -1340,9 +1351,9 @@ const AdminProducts = () => {
     (p: Product) => {
       const fid = p.productFamilyId;
       if (!fid) return false;
-      return familyRepsOnPage.get(String(fid)) === String(p.id);
+      return familyRepIdByFamilyId.get(String(fid)) === String(p.id);
     },
-    [familyRepsOnPage]
+    [familyRepIdByFamilyId]
   );
 
   const toggleFamilyExpand = useCallback((familyId: string) => {
@@ -1396,6 +1407,10 @@ const AdminProducts = () => {
   useEffect(() => {
     if (!familyCardsInListings) setExpandedFamilyIds(new Set());
   }, [familyCardsInListings]);
+
+  useEffect(() => {
+    setCurrentPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
 
   // Toggle row expansion
   const toggleRowExpansion = useCallback((productId: string) => {
@@ -3287,7 +3302,8 @@ const AdminProducts = () => {
                     <SelectContent>
                       <SelectItem value="all">كل المنتجات</SelectItem>
                       <SelectItem value="no_family">بدون عائلة</SelectItem>
-                      <SelectItem value="family_rep">عائلات فقط (ممثل)</SelectItem>
+                      <SelectItem value="in_family">منتجات ضمن عائلات (كل الأفراد)</SelectItem>
+                      <SelectItem value="family_rep">عائلات فقط (صف ممثل لكل عائلة)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -3609,16 +3625,30 @@ const AdminProducts = () => {
                   </div>
                   <div>
                     <CardTitle className="text-lg md:text-2xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                      جدول المنتجات ({displayedProducts.length})
+                      جدول المنتجات ({displayedProducts.length}
+                      {familyCardsInListings && paginationSourceProducts.length !== displayedProducts.length
+                        ? ` · ${paginationSourceProducts.length} صفاً للترقيم`
+                        : ''}
+                      )
                     </CardTitle>
                     <div className="text-sm md:text-lg text-slate-600 font-medium space-y-2">
                       <p className="text-sm md:text-lg text-slate-600">
                         <span className="hidden sm:inline">
-                          عرض {(currentPage - 1) * itemsPerPage + 1} -{' '}
-                          {Math.min(currentPage * itemsPerPage, displayedProducts.length)} من أصل {displayedProducts.length}{' '}
-                          منتج
+                          {paginationSourceProducts.length === 0
+                            ? 'لا صفوف في هذه الصفحة'
+                            : <>
+                                عرض {(currentPage - 1) * itemsPerPage + 1} -{' '}
+                                {Math.min(currentPage * itemsPerPage, paginationSourceProducts.length)} من أصل{' '}
+                                {paginationSourceProducts.length}
+                                {familyCardsInListings ? ' صفاً (عائلات مدمجة)' : ' منتج'}
+                              </>}
+                          {familyCardsInListings && visiblePaginatedProducts.length > paginatedProducts.length ? (
+                            <span className="text-slate-500"> — معروض الآن {visiblePaginatedProducts.length} صفاً (عائلة موسّعة)</span>
+                          ) : null}
                         </span>
-                        <span className="sm:hidden">{displayedProducts.length} منتج</span>
+                        <span className="sm:hidden">
+                          {paginationSourceProducts.length} {familyCardsInListings ? 'صف' : 'منتج'}
+                        </span>
                       </p>
                       {familyCardsInListings && familyListingStats.memberRows > 0 ? (
                         <p className="text-xs text-slate-500 md:text-sm">
@@ -4347,7 +4377,8 @@ const AdminProducts = () => {
                 <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-4 md:mt-6 pt-3 md:pt-4 border-t">
                   <div className="text-xs md:text-sm text-slate-600 flex flex-col sm:flex-row items-center gap-2 md:gap-3">
                     <span className="text-center sm:text-left">
-                      صفحة {currentPage} من {totalPages} • إجمالي {displayedProducts.length} منتج
+                      صفحة {currentPage} من {totalPages} • إجمالي {paginationSourceProducts.length}
+                      {familyCardsInListings ? ' صفاً للترقيم' : ' منتج'}
                     </span>
                     {/* Mobile-friendly per-page control */}
                     <div className="flex items-center gap-1 md:gap-2">
