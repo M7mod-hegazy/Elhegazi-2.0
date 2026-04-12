@@ -3,7 +3,7 @@
  * Caches critical assets for instant load and offline support
  */
 
-const CACHE_NAME = 'app-cache-v5';
+const CACHE_NAME = 'app-cache-v6';
 const RUNTIME_CACHE = 'runtime-cache-v2';
 const IMAGE_CACHE = 'image-cache-v2';
 
@@ -118,6 +118,27 @@ self.addEventListener('fetch', (event) => {
             );
           });
         })
+    );
+    return;
+  }
+
+  // Hashed Vite chunks under /assets/: always hit network first so a new deploy
+  // never serves a stale cached chunk name that no longer exists (404 + failed dynamic import).
+  if (url.pathname.startsWith('/assets/')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          if (response.ok) {
+            const responseClone = response.clone();
+            caches.open(RUNTIME_CACHE).then((cache) => {
+              cache.put(request, responseClone);
+            });
+          }
+          return response;
+        })
+        .catch(() =>
+          caches.match(request).then((cached) => cached || new Response('Offline', { status: 503 }))
+        )
     );
     return;
   }

@@ -324,6 +324,19 @@ async function hydrateProductFamilyPayloadVercel(fam) {
   };
 }
 
+async function findProductFamilyLeanForProductIdVercel(productId) {
+  if (!mongoose.Types.ObjectId.isValid(String(productId))) return null;
+  const { default: Product } = await import('../server/models/Product.js');
+  const { default: ProductFamily } = await import('../server/models/ProductFamily.js');
+  const pid = new mongoose.Types.ObjectId(String(productId));
+  let fam = await ProductFamily.findOne({ memberProductIds: pid }).lean().maxTimeMS(8000);
+  if (!fam) {
+    const p = await Product.findById(pid).select('productFamilyId').lean().maxTimeMS(8000);
+    if (p && p.productFamilyId) fam = await ProductFamily.findById(p.productFamilyId).lean().maxTimeMS(8000);
+  }
+  return fam;
+}
+
 const BUILDER_PROJECT_SCHEMA_VERSION = 1;
 const parseBool = (value, fallback = false) => {
   if (value === undefined || value === null || value === '') return fallback;
@@ -825,6 +838,159 @@ app.get('/product-families/storefront', async (c) => {
   }
 });
 
+async function visibilityLatestWorkAllowed(c) {
+  const admin = await isAdminRequest(c);
+  const payload = await getOwnerVisibilityRead();
+  if (!payload.enabled) return true;
+  if (admin) return Boolean(payload.visibility?.adminModules?.latestWork ?? true);
+  return Boolean(payload.visibility?.publicPages?.latestWork ?? true);
+}
+
+app.get('/portfolio-posts', async (c) => {
+  try {
+    if (!(await visibilityLatestWorkAllowed(c))) {
+      return c.json({ ok: false, error: 'Not found' }, 404);
+    }
+    const { default: PortfolioPost } = await import('../server/models/PortfolioPost.js');
+    const page = Math.max(1, Number(c.req.query('page')) || 1);
+    const limit = Math.min(40, Math.max(1, Number(c.req.query('limit')) || 9));
+    const skip = (page - 1) * limit;
+    const filter = { published: true };
+    const [items, total] = await Promise.all([
+      PortfolioPost.find(filter)
+        .sort({ sortOrder: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .maxTimeMS(15000),
+      PortfolioPost.countDocuments(filter).maxTimeMS(15000),
+    ]);
+    return c.json({
+      ok: true,
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (err) {
+    console.error('[API portfolio-posts]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/admin/portfolio-posts', async (c) => {
+  try {
+    if (!(await visibilityLatestWorkAllowed(c))) {
+      return c.json({ ok: false, error: 'Not found' }, 404);
+    }
+    if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+    const { default: PortfolioPost } = await import('../server/models/PortfolioPost.js');
+    const page = Math.max(1, Number(c.req.query('page')) || 1);
+    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit')) || 20));
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      PortfolioPost.find({})
+        .sort({ sortOrder: -1, createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean()
+        .maxTimeMS(15000),
+      PortfolioPost.countDocuments({}).maxTimeMS(15000),
+    ]);
+    return c.json({
+      ok: true,
+      items,
+      total,
+      page,
+      limit,
+      totalPages: Math.max(1, Math.ceil(total / limit)),
+    });
+  } catch (err) {
+    console.error('[API admin/portfolio-posts]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/admin/portfolio-posts', async (c) => {
+  try {
+    if (!(await visibilityLatestWorkAllowed(c))) {
+      return c.json({ ok: false, error: 'Not found' }, 404);
+    }
+    if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+    const body = await c.req.json().catch(() => ({}));
+    const titleAr = String(body?.titleAr || '').trim();
+    const bodyAr = String(body?.bodyAr || '').trim();
+    const published = body?.published !== false;
+    const sortOrder = Number(body?.sortOrder) || 0;
+    const media = Array.isArray(body?.media) ? body.media : [];
+    const norm = media
+      .map((m, i) => ({
+        url: String(m?.url || '').trim(),
+        type: m?.type === 'video' ? 'video' : 'image',
+        order: Number(m?.order) || i,
+        publicId: String(m?.publicId || '').trim(),
+      }))
+      .filter((m) => m.url);
+    const { default: PortfolioPost } = await import('../server/models/PortfolioPost.js');
+    const doc = await PortfolioPost.create({ titleAr, bodyAr, media: norm, published, sortOrder });
+    return c.json({ ok: true, item: doc.toObject() });
+  } catch (err) {
+    console.error('[API admin/portfolio-posts POST]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.patch('/admin/portfolio-posts/:id', async (c) => {
+  try {
+    if (!(await visibilityLatestWorkAllowed(c))) {
+      return c.json({ ok: false, error: 'Not found' }, 404);
+    }
+    if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+    const { default: PortfolioPost } = await import('../server/models/PortfolioPost.js');
+    const id = c.req.param('id');
+    const doc = await PortfolioPost.findById(id).maxTimeMS(8000);
+    if (!doc) return c.json({ ok: false, error: 'Not found' }, 404);
+    const body = await c.req.json().catch(() => ({}));
+    if (body.titleAr !== undefined) doc.titleAr = String(body.titleAr || '').trim();
+    if (body.bodyAr !== undefined) doc.bodyAr = String(body.bodyAr || '').trim();
+    if (body.published !== undefined) doc.published = !!body.published;
+    if (body.sortOrder !== undefined) doc.sortOrder = Number(body.sortOrder) || 0;
+    if (Array.isArray(body.media)) {
+      doc.media = body.media
+        .map((m, i) => ({
+          url: String(m?.url || '').trim(),
+          type: m?.type === 'video' ? 'video' : 'image',
+          order: Number(m?.order) || i,
+          publicId: String(m?.publicId || '').trim(),
+        }))
+        .filter((m) => m.url);
+    }
+    await doc.save();
+    return c.json({ ok: true, item: doc.toObject() });
+  } catch (err) {
+    console.error('[API admin/portfolio-posts PATCH]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.delete('/admin/portfolio-posts/:id', async (c) => {
+  try {
+    if (!(await visibilityLatestWorkAllowed(c))) {
+      return c.json({ ok: false, error: 'Not found' }, 404);
+    }
+    if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+    const { default: PortfolioPost } = await import('../server/models/PortfolioPost.js');
+    const id = c.req.param('id');
+    const r = await PortfolioPost.findByIdAndDelete(id).maxTimeMS(8000);
+    if (!r) return c.json({ ok: false, error: 'Not found' }, 404);
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[API admin/portfolio-posts DELETE]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 async function canReadProductsResource(c) {
   if (await isAdminRequest(c)) return true;
   const userId = c.req.header('x-user-id');
@@ -838,6 +1004,49 @@ async function canReadProductsResource(c) {
   }
 }
 
+async function requireProductsMutationPermission(c, action) {
+  if (await isAdminRequest(c)) return null;
+  const userId = c.req.header('x-user-id');
+  if (!userId) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { getPermissionContext } = await import('../server/rbac/permissions.js');
+    const ctx = await getPermissionContext(userId, 'products', action);
+    if (!ctx?.allowed) return c.json({ ok: false, error: 'Forbidden' }, 403);
+    return null;
+  } catch {
+    return c.json({ ok: false, error: 'Forbidden' }, 403);
+  }
+}
+
+async function detachProductFromItsFamilyVercel(productIdStr) {
+  const pid = String(productIdStr);
+  if (!mongoose.Types.ObjectId.isValid(pid)) return;
+  const { default: Product } = await import('../server/models/Product.js');
+  const { default: ProductFamily } = await import('../server/models/ProductFamily.js');
+  const p = await Product.findById(pid).select('productFamilyId').lean().maxTimeMS(8000);
+  if (!p || !p.productFamilyId) return;
+  const fid = String(p.productFamilyId);
+  const fam = await ProductFamily.findById(fid).maxTimeMS(8000);
+  if (!fam) {
+    await Product.updateOne({ _id: pid }, { $unset: { productFamilyId: 1 } }).maxTimeMS(8000);
+    return;
+  }
+  const mids = (fam.memberProductIds || []).map((x) => String(x));
+  const remaining = mids.filter((id) => id !== pid);
+  fam.memberProductIds = remaining.map((id) => new mongoose.Types.ObjectId(id));
+  fam.members = (fam.members || []).filter((m) => String(m.productId) !== pid);
+  if (remaining.length < 2) {
+    await Product.updateMany(
+      { _id: { $in: mids.map((id) => new mongoose.Types.ObjectId(id)) } },
+      { $unset: { productFamilyId: 1 } }
+    ).maxTimeMS(15000);
+    await ProductFamily.findByIdAndDelete(fid).maxTimeMS(8000);
+  } else {
+    await fam.save();
+    await Product.updateOne({ _id: pid }, { $unset: { productFamilyId: 1 } }).maxTimeMS(8000);
+  }
+}
+
 app.get('/product-families', async (c) => {
   try {
     const allowed = await canReadProductsResource(c);
@@ -848,6 +1057,172 @@ app.get('/product-families', async (c) => {
   } catch (err) {
     console.error('[API product-families]', err.message);
     return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/product-families', async (c) => {
+  const denied = await requireProductsMutationPermission(c, 'create');
+  if (denied) return denied;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: ProductFamily } = await import('../server/models/ProductFamily.js');
+    const body = await c.req.json().catch(() => ({}));
+    let name = String(body.name || '').trim();
+    let nameAr = String(body.nameAr || '').trim();
+    if (!nameAr && name) nameAr = name;
+    if (!name && nameAr) name = nameAr;
+    const memberProductIds = Array.isArray(body.memberProductIds) ? body.memberProductIds : [];
+    const options = Array.isArray(body.options) ? body.options : [];
+    const membersRaw = Array.isArray(body.members) ? body.members : [];
+    const members = membersRaw
+      .map((m) => ({
+        productId: mongoose.Types.ObjectId.isValid(String(m.productId))
+          ? new mongoose.Types.ObjectId(String(m.productId))
+          : null,
+        values: m.values && typeof m.values === 'object' ? m.values : {},
+      }))
+      .filter((m) => m.productId);
+    if (!nameAr && !name) return c.json({ ok: false, error: 'اسم العائلة مطلوب' }, 400);
+    if (!nameAr) nameAr = name;
+    if (!name) name = nameAr;
+    if (memberProductIds.length < 2 || memberProductIds.length > 20) {
+      return c.json({ ok: false, error: 'Between 2 and 20 products required' }, 400);
+    }
+    const ids = memberProductIds
+      .filter((id) => mongoose.Types.ObjectId.isValid(String(id)))
+      .map((id) => new mongoose.Types.ObjectId(String(id)));
+    let prods = await Product.find({ _id: { $in: ids } }).lean().maxTimeMS(15000);
+    if (prods.length !== ids.length) return c.json({ ok: false, error: 'One or more products not found' }, 400);
+    const transfer = body.transferFromOtherFamilies === true;
+    for (const p of prods) {
+      if (p.productFamilyId) {
+        if (!transfer) {
+          return c.json({ ok: false, error: `Product ${p._id} already belongs to a family` }, 400);
+        }
+        await detachProductFromItsFamilyVercel(String(p._id));
+      }
+    }
+    prods = await Product.find({ _id: { $in: ids } }).lean().maxTimeMS(15000);
+    const defaultProductId =
+      body.defaultProductId && mongoose.Types.ObjectId.isValid(String(body.defaultProductId))
+        ? new mongoose.Types.ObjectId(String(body.defaultProductId))
+        : null;
+    const doc = await ProductFamily.create({
+      name,
+      nameAr,
+      memberProductIds: ids,
+      options,
+      members,
+      defaultProductId,
+    });
+    let defaultId = doc.defaultProductId;
+    if (!defaultId) {
+      let best = null;
+      let bestPrice = Infinity;
+      for (const p of prods) {
+        if (p.active === false) continue;
+        const pr = Number(p.price);
+        if (Number.isFinite(pr) && pr < bestPrice) {
+          bestPrice = pr;
+          best = p._id;
+        }
+      }
+      defaultId = best || prods[0]._id;
+      doc.defaultProductId = defaultId;
+      await doc.save();
+    }
+    await Product.updateMany({ _id: { $in: ids } }, { $set: { productFamilyId: doc._id } }).maxTimeMS(15000);
+    return c.json({ ok: true, item: doc.toObject() }, 201);
+  } catch (err) {
+    console.error('[API product-families POST]', err.message);
+    return c.json({ ok: false, error: err.message }, 400);
+  }
+});
+
+app.put('/product-families/:id', async (c) => {
+  const denied = await requireProductsMutationPermission(c, 'update');
+  if (denied) return denied;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: ProductFamily } = await import('../server/models/ProductFamily.js');
+    const id = c.req.param('id');
+    if (!mongoose.Types.ObjectId.isValid(id)) return c.json({ ok: false, error: 'Invalid id' }, 400);
+    const existing = await ProductFamily.findById(id).maxTimeMS(8000);
+    if (!existing) return c.json({ ok: false, error: 'Not found' }, 404);
+    const body = await c.req.json().catch(() => ({}));
+    if (body.name != null) existing.name = String(body.name).trim();
+    if (body.nameAr != null) existing.nameAr = String(body.nameAr).trim();
+    if (Array.isArray(body.options)) existing.options = body.options;
+    if (Array.isArray(body.members)) {
+      existing.members = body.members
+        .map((m) => ({
+          productId: mongoose.Types.ObjectId.isValid(String(m.productId))
+            ? new mongoose.Types.ObjectId(String(m.productId))
+            : null,
+          values: m.values && typeof m.values === 'object' ? m.values : {},
+        }))
+        .filter((m) => m.productId);
+    }
+    if (Array.isArray(body.memberProductIds) && body.memberProductIds.length >= 2) {
+      const transfer = body.transferFromOtherFamilies === true;
+      const oldIds = (existing.memberProductIds || []).map(String);
+      const newIds = body.memberProductIds
+        .filter((x) => mongoose.Types.ObjectId.isValid(String(x)))
+        .map((x) => new mongoose.Types.ObjectId(String(x)));
+      if (newIds.length > 20) return c.json({ ok: false, error: 'Max 20 members' }, 400);
+      const removed = oldIds.filter((oid) => !newIds.map(String).includes(oid));
+      if (removed.length) {
+        const removedOids = removed
+          .filter((oid) => mongoose.Types.ObjectId.isValid(oid))
+          .map((oid) => new mongoose.Types.ObjectId(oid));
+        await Product.updateMany({ _id: { $in: removedOids } }, { $unset: { productFamilyId: 1 } }).maxTimeMS(15000);
+      }
+      for (const oid of newIds) {
+        const p = await Product.findById(oid).select('productFamilyId').lean().maxTimeMS(8000);
+        if (!p) return c.json({ ok: false, error: 'Invalid member list' }, 400);
+        const pf = p.productFamilyId ? String(p.productFamilyId) : '';
+        if (pf && pf !== String(existing._id)) {
+          if (!transfer) {
+            return c.json({ ok: false, error: `Product ${p._id} in another family` }, 400);
+          }
+          await detachProductFromItsFamilyVercel(String(p._id));
+        }
+      }
+      const prods = await Product.find({ _id: { $in: newIds } }).lean().maxTimeMS(15000);
+      if (prods.length !== newIds.length) return c.json({ ok: false, error: 'Invalid member list' }, 400);
+      existing.memberProductIds = newIds;
+      await Product.updateMany({ _id: { $in: newIds } }, { $set: { productFamilyId: existing._id } }).maxTimeMS(
+        15000
+      );
+    }
+    if (body.defaultProductId && mongoose.Types.ObjectId.isValid(String(body.defaultProductId))) {
+      existing.defaultProductId = new mongoose.Types.ObjectId(String(body.defaultProductId));
+    }
+    await existing.save();
+    return c.json({ ok: true, item: existing.toObject() });
+  } catch (err) {
+    console.error('[API product-families PUT]', err.message);
+    return c.json({ ok: false, error: err.message }, 400);
+  }
+});
+
+app.delete('/product-families/:id', async (c) => {
+  const denied = await requireProductsMutationPermission(c, 'delete');
+  if (denied) return denied;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: ProductFamily } = await import('../server/models/ProductFamily.js');
+    const id = c.req.param('id');
+    if (!mongoose.Types.ObjectId.isValid(id)) return c.json({ ok: false, error: 'Invalid id' }, 400);
+    const fam = await ProductFamily.findById(id).maxTimeMS(8000);
+    if (!fam) return c.json({ ok: true, deleted: false });
+    const ids = (fam.memberProductIds || []).map((x) => x);
+    await Product.updateMany({ _id: { $in: ids } }, { $unset: { productFamilyId: 1 } }).maxTimeMS(15000);
+    await ProductFamily.findByIdAndDelete(id).maxTimeMS(8000);
+    return c.json({ ok: true, deleted: true });
+  } catch (err) {
+    console.error('[API product-families DELETE]', err.message);
+    return c.json({ ok: false, error: err.message }, 400);
   }
 });
 
@@ -939,7 +1314,15 @@ app.get('/products/:id', async (c) => {
     const id = c.req.param('id');
     const product = await Product.findById(id).lean().maxTimeMS(8000);
     if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
-    return c.json({ ok: true, item: product });
+    const [itemWithStats] = await attachRatingStatsToProductsVercel([product]);
+    let productFamily = null;
+    try {
+      const fam = await findProductFamilyLeanForProductIdVercel(product._id);
+      if (fam) productFamily = await hydrateProductFamilyPayloadVercel(fam);
+    } catch (e) {
+      console.warn('[API products/:id] productFamily hydrate failed', e?.message);
+    }
+    return c.json({ ok: true, item: itemWithStats, productFamily });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
