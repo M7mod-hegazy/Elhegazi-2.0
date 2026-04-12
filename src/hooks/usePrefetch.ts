@@ -154,14 +154,7 @@ export const usePrefetchNextPage = (nextPageUrl: string | null) => {
  */
 export const usePreloadCritical = () => {
   useEffect(() => {
-    // Preload critical fonts
-    const fontLink = document.createElement('link');
-    fontLink.rel = 'preload';
-    fontLink.as = 'font';
-    fontLink.href = '/fonts/main.woff2';
-    fontLink.type = 'font/woff2';
-    fontLink.crossOrigin = 'anonymous';
-    document.head.appendChild(fontLink);
+    // Cairo is loaded via index.html (fonts.googleapis.com); avoid preloading a missing /fonts/main.woff2.
 
     // Preload critical CSS
     const cssLink = document.createElement('link');

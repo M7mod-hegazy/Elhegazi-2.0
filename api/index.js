@@ -159,6 +159,88 @@ async function getOwnerVisibilityRead() {
   };
 }
 
+/** Matches server/index.js owner vault session length. */
+const OWNER_VAULT_SESSION_MINUTES = 15;
+
+function hashOwnerPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `scrypt$${salt}$${derived}`;
+}
+
+function verifyOwnerPassword(password, encoded) {
+  if (!encoded || !encoded.startsWith('scrypt$')) return false;
+  const parts = String(encoded).split('$');
+  if (parts.length !== 3) return false;
+  const salt = parts[1];
+  const storedHex = parts[2];
+  const incomingHex = crypto.scryptSync(password, salt, 64).toString('hex');
+  const stored = Buffer.from(storedHex, 'hex');
+  const incoming = Buffer.from(incomingHex, 'hex');
+  if (stored.length !== incoming.length) return false;
+  return crypto.timingSafeEqual(stored, incoming);
+}
+
+function hashOwnerToken(token) {
+  return crypto.createHash('sha256').update(String(token || '')).digest('hex');
+}
+
+function getOwnerTokenFromHono(c) {
+  const auth = String(c.req.header('authorization') || '');
+  if (auth.toLowerCase().startsWith('bearer ')) return auth.slice(7).trim();
+  return String(c.req.header('x-owner-vault-token') || '').trim();
+}
+
+async function getOwnerVaultConfigHono() {
+  const { default: Settings } = await import('../server/models/Settings.js');
+  let settings = await Settings.findOne().maxTimeMS(8000);
+  if (!settings) settings = await Settings.create({});
+  if (!settings.ownerVault) settings.ownerVault = {};
+  if (!settings.ownerVault.passwordHash) {
+    const bootstrapPassword = process.env.OWNER_VAULT_PASSWORD || process.env.ADMIN_PASSWORD || '';
+    if (bootstrapPassword) settings.ownerVault.passwordHash = hashOwnerPassword(bootstrapPassword);
+  }
+  if (!settings.ownerVault.visibility) settings.ownerVault.visibility = DEFAULT_OWNER_VISIBILITY;
+  settings.ownerVault.visibility = mergeOwnerVisibility(settings.ownerVault.visibility);
+  if (settings.isModified()) await settings.save();
+  return settings;
+}
+
+function createOwnerVaultSession() {
+  const token = crypto.randomBytes(32).toString('hex');
+  const expiresAt = new Date(Date.now() + OWNER_VAULT_SESSION_MINUTES * 60 * 1000);
+  return { token, tokenHash: hashOwnerToken(token), expiresAt };
+}
+
+/** Returns null if OK, or a JSON Response if auth failed. */
+async function requireOwnerVaultSessionHono(c) {
+  try {
+    const token = getOwnerTokenFromHono(c);
+    if (!token) return c.json({ ok: false, error: 'Owner vault authentication required' }, 401);
+    const settings = await getOwnerVaultConfigHono();
+    const session = settings.ownerVault?.session || {};
+    if (!session.tokenHash || !session.expiresAt) {
+      return c.json({ ok: false, error: 'Owner vault session missing' }, 401);
+    }
+    const expected = String(session.tokenHash);
+    const incoming = hashOwnerToken(token);
+    const same =
+      expected.length === incoming.length &&
+      crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(incoming));
+    if (!same) return c.json({ ok: false, error: 'Invalid owner vault session' }, 401);
+    const now = Date.now();
+    const exp = new Date(session.expiresAt).getTime();
+    if (!Number.isFinite(exp) || exp < now) return c.json({ ok: false, error: 'Owner vault session expired' }, 401);
+
+    settings.ownerVault.session.lastActivityAt = new Date(now);
+    settings.ownerVault.session.expiresAt = new Date(now + OWNER_VAULT_SESSION_MINUTES * 60 * 1000);
+    await settings.save();
+    return null;
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+}
+
 async function attachRatingStatsToProductsVercel(items) {
   if (!Array.isArray(items) || items.length === 0) return [];
   const { default: Rating } = await import('../server/models/Rating.js');
@@ -178,7 +260,7 @@ async function attachRatingStatsToProductsVercel(items) {
         reviews: { $sum: 1 },
       },
     },
-  ]).maxTimeMS(8000);
+  ]).option({ maxTimeMS: 8000 });
 
   const statsMap = new Map(
     stats.map((s) => [String(s._id), { rating: Number(s.avgRating || 0), reviews: Number(s.reviews || 0) }])
@@ -543,6 +625,187 @@ app.get('/site-visibility', async (c) => {
   } catch (err) {
     console.error('[API site-visibility]', err.message);
     return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// Owner vault (parity with server/index.js for Vercel Hono API)
+app.post('/owner-vault/login', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const password = String(body?.password || '');
+    if (!password) return c.json({ ok: false, error: 'Password is required' }, 400);
+
+    const settings = await getOwnerVaultConfigHono();
+    const hash = String(settings.ownerVault?.passwordHash || '');
+    if (!hash) return c.json({ ok: false, error: 'Owner Vault password is not initialized' }, 400);
+
+    const valid = verifyOwnerPassword(password, hash);
+    if (!valid) return c.json({ ok: false, error: 'Invalid password' }, 401);
+
+    const session = createOwnerVaultSession();
+    settings.ownerVault.session = {
+      tokenHash: session.tokenHash,
+      expiresAt: session.expiresAt,
+      lastActivityAt: new Date(),
+    };
+    await settings.save();
+
+    return c.json({
+      ok: true,
+      item: {
+        token: session.token,
+        expiresAt: session.expiresAt,
+        timeoutMinutes: OWNER_VAULT_SESSION_MINUTES,
+      },
+    });
+  } catch (err) {
+    console.error('[API owner-vault/login]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/owner-vault/logout', async (c) => {
+  const authErr = await requireOwnerVaultSessionHono(c);
+  if (authErr) return authErr;
+  try {
+    const settings = await getOwnerVaultConfigHono();
+    settings.ownerVault.session = {
+      tokenHash: '',
+      expiresAt: null,
+      lastActivityAt: null,
+    };
+    await settings.save();
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[API owner-vault/logout]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/owner-vault/status', async (c) => {
+  try {
+    const token = getOwnerTokenFromHono(c);
+    if (!token) return c.json({ ok: true, item: { authenticated: false } });
+    const settings = await getOwnerVaultConfigHono();
+    const session = settings.ownerVault?.session || {};
+    const tokenHash = String(session.tokenHash || '');
+    if (!tokenHash || !session.expiresAt) return c.json({ ok: true, item: { authenticated: false } });
+    const same = tokenHash === hashOwnerToken(token);
+    const exp = new Date(session.expiresAt).getTime();
+    if (!same || !Number.isFinite(exp) || exp < Date.now()) {
+      return c.json({ ok: true, item: { authenticated: false } });
+    }
+    return c.json({
+      ok: true,
+      item: {
+        authenticated: true,
+        expiresAt: session.expiresAt,
+        timeoutMinutes: OWNER_VAULT_SESSION_MINUTES,
+      },
+    });
+  } catch (err) {
+    console.error('[API owner-vault/status]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/owner-vault/password', async (c) => {
+  const authErr = await requireOwnerVaultSessionHono(c);
+  if (authErr) return authErr;
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const currentPassword = String(body?.currentPassword || '');
+    const newPassword = String(body?.newPassword || '');
+    if (!newPassword || newPassword.length < 8) {
+      return c.json({ ok: false, error: 'New password must be at least 8 characters' }, 400);
+    }
+    const settings = await getOwnerVaultConfigHono();
+    const currentHash = String(settings.ownerVault?.passwordHash || '');
+    if (currentHash && !verifyOwnerPassword(currentPassword, currentHash)) {
+      return c.json({ ok: false, error: 'Current password is invalid' }, 401);
+    }
+    settings.ownerVault.passwordHash = hashOwnerPassword(newPassword);
+    settings.ownerVault.updatedBy = 'owner-vault';
+    settings.ownerVault.updatedAt = new Date();
+    await settings.save();
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[API owner-vault/password]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/owner-vault/password/reset-emergency', async (c) => {
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const resetKey = String(body?.resetKey || '').trim();
+    const recoveryEmail = String(body?.email || '').trim().toLowerCase();
+    const newPassword = String(body?.newPassword || '');
+    if (!process.env.OWNER_VAULT_EMERGENCY_RESET_KEY) {
+      return c.json({ ok: false, error: 'Emergency reset is disabled' }, 403);
+    }
+    if (!resetKey || resetKey !== process.env.OWNER_VAULT_EMERGENCY_RESET_KEY) {
+      return c.json({ ok: false, error: 'Invalid emergency key' }, 403);
+    }
+    const expectedRecoveryEmail = String(process.env.OWNER_VAULT_RECOVERY_EMAIL || '').trim().toLowerCase();
+    if (expectedRecoveryEmail && recoveryEmail !== expectedRecoveryEmail) {
+      return c.json({ ok: false, error: 'Invalid recovery email' }, 403);
+    }
+    if (!newPassword || newPassword.length < 8) {
+      return c.json({ ok: false, error: 'New password must be at least 8 characters' }, 400);
+    }
+    const settings = await getOwnerVaultConfigHono();
+    settings.ownerVault.passwordHash = hashOwnerPassword(newPassword);
+    settings.ownerVault.session = {
+      tokenHash: '',
+      expiresAt: null,
+      lastActivityAt: null,
+    };
+    settings.ownerVault.updatedBy = 'emergency-reset';
+    settings.ownerVault.updatedAt = new Date();
+    await settings.save();
+    return c.json({ ok: true });
+  } catch (err) {
+    console.error('[API owner-vault/password/reset-emergency]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/owner-vault/visibility', async (c) => {
+  const authErr = await requireOwnerVaultSessionHono(c);
+  if (authErr) return authErr;
+  try {
+    const payload = await getOwnerVisibilityRead();
+    return c.json({ ok: true, item: payload });
+  } catch (err) {
+    console.error('[API owner-vault/visibility GET]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/owner-vault/visibility', async (c) => {
+  const authErr = await requireOwnerVaultSessionHono(c);
+  if (authErr) return authErr;
+  try {
+    const body = await c.req.json().catch(() => ({}));
+    const visibility = mergeOwnerVisibility(body?.visibility || {});
+    const enabled = body?.enabled !== false;
+    const settings = await getOwnerVaultConfigHono();
+    settings.ownerVault.visibility = visibility;
+    settings.ownerVault.enabled = enabled;
+    settings.ownerVault.updatedBy = 'owner-vault';
+    settings.ownerVault.updatedAt = new Date();
+    await settings.save();
+    return c.json({
+      ok: true,
+      item: {
+        enabled: settings.ownerVault.enabled !== false,
+        visibility: mergeOwnerVisibility(settings.ownerVault.visibility || {}),
+      },
+    });
+  } catch (err) {
+    console.error('[API owner-vault/visibility PUT]', err.message);
+    return c.json({ ok: false, error: err.message }, 400);
   }
 });
 
