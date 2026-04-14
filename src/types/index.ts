@@ -63,6 +63,7 @@ export interface Category {
   // Product preview settings
   useRandomPreview?: boolean;
   previewProducts?: string[];
+  productDisplayOrder?: string[];
   
   // Timestamps
   createdAt?: string;

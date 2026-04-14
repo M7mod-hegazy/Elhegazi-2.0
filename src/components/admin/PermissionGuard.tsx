@@ -1,5 +1,5 @@
 import { useEffect, useState, ReactNode } from 'react';
-import { canAccessPage, isSuperAdmin } from '@/lib/permissions';
+import { canAccessPage, hasFullAdminAccess } from '@/lib/permissions';
 import UnauthorizedAccess from './UnauthorizedAccess';
 import { LoadingSpinner } from '@/components/ui/loading';
 
@@ -17,8 +17,7 @@ const PermissionGuard = ({ children, pageName, resource }: PermissionGuardProps)
     const checkPermission = async () => {
       setIsChecking(true);
       
-      // SuperAdmin always has access
-      if (isSuperAdmin()) {
+      if (hasFullAdminAccess()) {
         setHasAccess(true);
         setIsChecking(false);
         return;

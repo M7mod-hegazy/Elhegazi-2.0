@@ -2,15 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Search, X } from 'lucide-react';
+import { ChevronDown, Search, X } from 'lucide-react';
 import { applyGenericImageFallback, optimizeImage } from '@/lib/images';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 export type SelectionModalResultRow = {
   id: string;
@@ -45,22 +38,41 @@ interface SelectionModalProps {
 
 export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   
   useEffect(() => {
     setFocusedIndex(0);
   }, [props.results]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+    setFocusedIndex(0);
+  }, [props.search, props.categoryFilter, props.open]);
   
+  const pageSize = Math.max(1, Number(props.visibleCount) || 10);
+  const totalPages = Math.max(1, Math.ceil(props.results.length / pageSize));
+  const safePage = Math.min(currentPage, totalPages);
+  const pageStart = (safePage - 1) * pageSize;
+  const visible = props.results.slice(pageStart, pageStart + pageSize);
+  const suggestions = props.search ? props.results.slice(0, 5) : props.results.slice(0, 5);
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
   const onKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!props.results.length) return;
+    if (!visible.length) return;
     if (e.key === 'ArrowDown') {
       e.preventDefault();
-      setFocusedIndex((i) => (i + 1) % props.results.length);
+      setFocusedIndex((i) => (i + 1) % visible.length);
     } else if (e.key === 'ArrowUp') {
       e.preventDefault();
-      setFocusedIndex((i) => (i - 1 + props.results.length) % props.results.length);
+      setFocusedIndex((i) => (i - 1 + visible.length) % visible.length);
     } else if (e.key === 'Enter') {
       e.preventDefault();
-      const item = props.results[focusedIndex];
+      const item = visible[focusedIndex];
       if (item) props.onToggle(item.id);
     }
   };
@@ -75,9 +87,6 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
     return props.selectionMeta?.[id]?.familyName || props.results.find((r) => r.id === id)?.familyName;
   };
   
-  const visible = props.results.slice(0, props.visibleCount);
-  const suggestions = props.search ? visible.slice(0, 5) : props.results.slice(0, 5);
-  
   return (
     <Dialog open={props.open} onOpenChange={(open) => !open && props.onClose()}>
       <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
@@ -87,7 +96,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
             {props.title}
           </DialogTitle>
           <DialogDescription>
-            ابحث واختر العناصر المطلوبة من القائمة أدناه
+            {'ابحث واختر العناصر المطلوبة من القائمة أدناه'}
           </DialogDescription>
         </DialogHeader>
         
@@ -99,35 +108,34 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
               value={props.search} 
               onChange={(e) => props.onSearch(e.target.value)} 
               onKeyDown={onKeyDown} 
-              placeholder="ابحث بالاسم أو الكود..." 
+              placeholder={'ابحث بالاسم أو الكود...'} 
             />
             <Search className="w-4 h-4 absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
           </div>
           {props.categoryOptions && props.categoryOptions.length > 0 && props.onCategoryFilterChange ? (
-            <Select
-              value={props.categoryFilter ?? 'all'}
-              onValueChange={props.onCategoryFilterChange}
-            >
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="الفئة" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">كل الفئات</SelectItem>
+            <div className="relative w-full sm:w-[200px]">
+              <select
+                value={props.categoryFilter ?? 'all'}
+                onChange={(e) => props.onCategoryFilterChange?.(e.target.value)}
+                className="h-10 w-full appearance-none rounded-md border border-slate-300 bg-white px-3 pl-8 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-primary/50"
+              >
+                <option value="all">{'كل الفئات'}</option>
                 {props.categoryOptions.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
+                  <option key={c.id} value={c.id}>
                     {c.label}
-                  </SelectItem>
+                  </option>
                 ))}
-              </SelectContent>
-            </Select>
+              </select>
+              <ChevronDown className="pointer-events-none absolute left-2 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+            </div>
           ) : null}
           {props.search ? (
             <Button type="button" variant="ghost" size="sm" onClick={() => props.onSearch('')}>
-              مسح
+              {'مسح'}
             </Button>
           ) : null}
           <Button type="button" onClick={props.onApply} disabled={props.loading}>
-            تطبيق
+            {'تطبيق'}
           </Button>
         </div>
         
@@ -188,7 +196,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
                   <button 
                     className="hover:text-red-600 shrink-0" 
                     onClick={() => props.onToggle(id)} 
-                    aria-label="إزالة"
+                    aria-label={'إزالة'}
                   >
                     <X className="w-3 h-3" />
                   </button>
@@ -200,9 +208,9 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
         
         <div className="max-h-80 overflow-auto border rounded">
           {props.loading ? (
-            <div className="p-4 text-center text-slate-500">جاري البحث...</div>
+            <div className="p-4 text-center text-slate-500">{'جاري البحث...'}</div>
           ) : props.results.length === 0 ? (
-            <div className="p-4 text-center text-slate-500">لا توجد نتائج</div>
+            <div className="p-4 text-center text-slate-500">{'لا توجد نتائج'}</div>
           ) : (
             <ul className="divide-y">
               {visible.map((item, idx) => (
@@ -221,7 +229,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
                           onError={applyGenericImageFallback}
                         />
                       ) : (
-                        <div className="h-full w-full flex items-center justify-center text-[10px] text-slate-400">—</div>
+                        <div className="h-full w-full flex items-center justify-center text-[10px] text-slate-400">-</div>
                       )}
                     </div>
                     <div className="min-w-0 text-right flex-1">
@@ -231,7 +239,7 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
                       ) : null}
                       {showFam && item.familyName ? (
                         <div className="truncate text-[11px] text-indigo-600 font-medium mt-0.5">
-                          عائلة: {item.familyName}
+                          {'عائلة:'} {item.familyName}
                         </div>
                       ) : null}
                     </div>
@@ -249,20 +257,58 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
           )}
         </div>
         
-        {props.results.length > props.visibleCount ? (
-          <div className="flex justify-center">
-            <Button variant="outline" size="sm" onClick={props.onLoadMore}>
-              عرض 10 المزيد
+                {totalPages > 1 ? (
+          <div className="flex items-center justify-center gap-1.5 flex-wrap">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={safePage === 1}
+            >
+              {'السابق'}
+            </Button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((p) => p === 1 || p === totalPages || Math.abs(p - safePage) <= 1)
+              .reduce<number[]>((acc, p, i, arr) => {
+                if (i > 0 && p - arr[i - 1] > 1) acc.push(-1);
+                acc.push(p);
+                return acc;
+              }, [])
+              .map((p, i) =>
+                p === -1 ? (
+                  <span key={`dots-${i}`} className="px-1 text-slate-400">...</span>
+                ) : (
+                  <Button
+                    key={p}
+                    type="button"
+                    variant={p === safePage ? 'default' : 'outline'}
+                    size="sm"
+                    className="min-w-9"
+                    onClick={() => setCurrentPage(p)}
+                  >
+                    {p}
+                  </Button>
+                )
+              )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={safePage === totalPages}
+            >
+              {'التالي'}
             </Button>
           </div>
         ) : null}
         
         <div className="flex justify-end gap-2">
           <Button variant="outline" onClick={props.onClose}>
-            إلغاء
+            {'إلغاء'}
           </Button>
           <Button onClick={props.onApply}>
-            حفظ
+            {'حفظ'}
           </Button>
         </div>
         </div>
@@ -270,3 +316,4 @@ export const SelectionModal: React.FC<SelectionModalProps> = (props) => {
     </Dialog>
   );
 };
+

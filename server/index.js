@@ -3203,7 +3203,7 @@ app.post('/api/categories', requirePermission('categories', 'create', { attach: 
       name, nameAr, description, descriptionAr, slug,
       categoryType, icon, color, parentCategory,
       featured, image, order, isActive, showInMenu,
-      metaTitle, metaDescription, useRandomPreview, previewProducts
+      metaTitle, metaDescription, useRandomPreview, previewProducts, productDisplayOrder
     } = req.body;
 
     // Create category with enhanced fields
@@ -3222,6 +3222,7 @@ app.post('/api/categories', requirePermission('categories', 'create', { attach: 
       metaDescription: metaDescription || '',
       useRandomPreview: useRandomPreview !== undefined ? useRandomPreview : true,
       previewProducts: previewProducts || [],
+      productDisplayOrder: Array.isArray(productDisplayOrder) ? productDisplayOrder : [],
       productCount: 0 // Initialize to 0
     };
 
@@ -3242,7 +3243,7 @@ app.put('/api/categories/:id', requirePermission('categories', 'update', { attac
       name, nameAr, description, descriptionAr, slug,
       categoryType, icon, color, parentCategory,
       featured, image, order, isActive, showInMenu,
-      metaTitle, metaDescription, useRandomPreview, previewProducts
+      metaTitle, metaDescription, useRandomPreview, previewProducts, productDisplayOrder
     } = req.body;
 
     // Prepare update data (only include defined fields)
@@ -3265,6 +3266,7 @@ app.put('/api/categories/:id', requirePermission('categories', 'update', { attac
     if (metaDescription !== undefined) updateData.metaDescription = metaDescription;
     if (useRandomPreview !== undefined) updateData.useRandomPreview = useRandomPreview;
     if (previewProducts !== undefined) updateData.previewProducts = previewProducts;
+    if (productDisplayOrder !== undefined) updateData.productDisplayOrder = Array.isArray(productDisplayOrder) ? productDisplayOrder : [];
 
     const updated = await Category.findByIdAndUpdate(req.params.id, updateData, { new: true });
     if (!updated) return res.status(404).json({ ok: false, error: 'Not found' });
@@ -5034,6 +5036,9 @@ app.patch('/api/users/:id', requirePermission('users', 'update', { attach: true 
     const allowed = {};
     if (typeof req.body.isActive === 'boolean') allowed.isActive = req.body.isActive;
     if (typeof req.body.role === 'string') allowed.role = req.body.role;
+    if (typeof req.body.firstName === 'string') allowed.firstName = String(req.body.firstName).trim().slice(0, 120);
+    if (typeof req.body.lastName === 'string') allowed.lastName = String(req.body.lastName).trim().slice(0, 120);
+    if (typeof req.body.phone === 'string') allowed.phone = String(req.body.phone).trim().slice(0, 40);
     const updated = await User.findByIdAndUpdate(req.params.id, allowed, { new: true });
     if (!updated) return res.status(404).json({ ok: false, error: 'Not found' });
     res.json({ ok: true, item: updated });

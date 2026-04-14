@@ -114,14 +114,7 @@ const SlideContent: React.FC<SlideContentProps> = ({ slide, isActive, isMobile }
           </Link>
         </Button>
         
-        <Button
-          variant="outline"
-          size={isMobile ? "default" : "lg"}
-          className="btn-hero-secondary backdrop-blur-md font-bold rounded-2xl hover:scale-105 transition-all duration-300 min-w-[130px] sm:min-w-[150px] md:min-w-[160px]"
-        >
-          <Eye className={`w-4 h-4 mr-2 sm:w-5 sm:h-5 sm:mr-2 md:w-6 md:h-6 md:mr-3 text-white`} />
-          <span className="text-white font-semibold">استكشف المزيد</span>
-        </Button>
+  
       </div>
 
       {/* Stats removed */}

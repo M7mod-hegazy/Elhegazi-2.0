@@ -39,6 +39,8 @@ const CategorySchema = new mongoose.Schema(
     // Product preview settings
     useRandomPreview: { type: Boolean, default: true },
     previewProducts: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
+    // Manual storefront ordering for products inside this category page
+    productDisplayOrder: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
   },
   { timestamps: true }
 );

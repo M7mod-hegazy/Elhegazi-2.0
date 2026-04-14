@@ -1507,7 +1507,11 @@ app.post('/categories', async (c) => {
   try {
     const { default: Category } = await import('../server/models/Category.js');
     const body = await c.req.json();
-    const category = new Category(body);
+    const category = new Category({
+      ...body,
+      previewProducts: Array.isArray(body?.previewProducts) ? body.previewProducts : [],
+      productDisplayOrder: Array.isArray(body?.productDisplayOrder) ? body.productDisplayOrder : [],
+    });
     await category.save();
     return c.json({ ok: true, item: category });
   } catch (err) {
@@ -1521,7 +1525,14 @@ app.put('/categories/:id', async (c) => {
     const { default: Category } = await import('../server/models/Category.js');
     const id = c.req.param('id');
     const body = await c.req.json();
-    const updated = await Category.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    const updatePayload = { ...body };
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'previewProducts')) {
+      updatePayload.previewProducts = Array.isArray(body?.previewProducts) ? body.previewProducts : [];
+    }
+    if (Object.prototype.hasOwnProperty.call(body || {}, 'productDisplayOrder')) {
+      updatePayload.productDisplayOrder = Array.isArray(body?.productDisplayOrder) ? body.productDisplayOrder : [];
+    }
+    const updated = await Category.findByIdAndUpdate(id, updatePayload, { new: true }).maxTimeMS(8000);
     if (!updated) return c.json({ ok: false, error: 'Category not found' }, 404);
     return c.json({ ok: true, item: updated });
   } catch (err) {
@@ -2316,10 +2327,20 @@ app.get('/users/:id/orders', async (c) => {
 
 app.patch('/users/:id', async (c) => {
   try {
+    if (!(await isAdminRequest(c))) {
+      return c.json({ ok: false, error: 'Forbidden' }, 403);
+    }
     const { default: User } = await import('../server/models/User.js');
     const id = c.req.param('id');
-    const body = await c.req.json();
-    const updated = await User.findByIdAndUpdate(id, body, { new: true }).maxTimeMS(8000);
+    const body = await c.req.json().catch(() => ({}));
+    const allowed = {};
+    if (typeof body.isActive === 'boolean') allowed.isActive = body.isActive;
+    if (typeof body.role === 'string' && ['customer', 'admin'].includes(body.role)) allowed.role = body.role;
+    if (typeof body.firstName === 'string') allowed.firstName = String(body.firstName).trim().slice(0, 120);
+    if (typeof body.lastName === 'string') allowed.lastName = String(body.lastName).trim().slice(0, 120);
+    if (typeof body.phone === 'string') allowed.phone = String(body.phone).trim().slice(0, 40);
+    const updated = await User.findByIdAndUpdate(id, { $set: allowed }, { new: true }).maxTimeMS(8000);
+    if (!updated) return c.json({ ok: false, error: 'Not found' }, 404);
     return c.json({ ok: true, item: updated });
   } catch (err) {
     console.error('[API] Error:', err.message);
@@ -2360,20 +2381,6 @@ app.get('/search/track', async (c) => {
       .lean()
       .maxTimeMS(8000);
     return c.json({ ok: true, items: results });
-  } catch (err) {
-    console.error('[API] Error:', err.message);
-    return c.json({ ok: false, error: err.message }, 500);
-  }
-});
-
-// ===== ADMIN =====
-app.post('/admin/users', async (c) => {
-  try {
-    const { default: User } = await import('../server/models/User.js');
-    const body = await c.req.json();
-    const user = new User({ ...body, role: 'admin' });
-    await user.save();
-    return c.json({ ok: true, item: user });
   } catch (err) {
     console.error('[API] Error:', err.message);
     return c.json({ ok: false, error: err.message }, 500);
@@ -3010,17 +3017,44 @@ app.delete('/users/:id/favorites', async (c) => {
   }
 });
 
-// ===== ADMIN USERS =====
+// ===== ADMIN USERS (promote / create; requires admin session) =====
 app.post('/admin/users', async (c) => {
   try {
+    if (!(await isAdminRequest(c))) {
+      return c.json({ ok: false, error: 'Forbidden' }, 403);
+    }
     const { default: User } = await import('../server/models/User.js');
-    const body = await c.req.json();
-    const user = new User({ ...body, role: body.role || 'admin' });
-    await user.save();
-    return c.json({ ok: true, user: { id: user._id, email: user.email } });
+    const body = await c.req.json().catch(() => ({}));
+    const email = String(body?.email || '').trim().toLowerCase();
+    const password = String(body?.password || '');
+    const firstName = typeof body?.firstName === 'string' ? body.firstName.trim() : '';
+    const lastName = typeof body?.lastName === 'string' ? body.lastName.trim() : '';
+    const phone = typeof body?.phone === 'string' ? body.phone.trim() : '';
+    if (!email || !password) {
+      return c.json({ ok: false, error: 'email and password are required' }, 400);
+    }
+    let user = await User.findOne({ email }).maxTimeMS(8000);
+    if (user) {
+      await User.updateOne(
+        { _id: user._id },
+        { $set: { role: 'admin', isActive: true, firstName, lastName, phone } }
+      ).maxTimeMS(8000);
+      user = await User.findById(user._id).maxTimeMS(8000);
+    } else {
+      user = await User.create({
+        email,
+        password,
+        firstName,
+        lastName,
+        phone,
+        role: 'admin',
+        isActive: true,
+      });
+    }
+    return c.json({ ok: true, user: { id: String(user._id), email: user.email } }, 201);
   } catch (err) {
     console.error('[API] Error:', err.message);
-    return c.json({ ok: false, error: err.message }, 500);
+    return c.json({ ok: false, error: err.message }, 400);
   }
 });
 

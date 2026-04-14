@@ -59,6 +59,7 @@ type ApiCategory = {
   image?: string;
   order?: number;
   productCount?: number;
+  productDisplayOrder?: string[];
 };
 
 type ApiProduct = {
@@ -296,6 +297,7 @@ const CategoryPage = () => {
           productCount: typeof c.productCount === 'number' ? c.productCount : 0,
           featured: !!c.featured,
           order: typeof c.order === 'number' ? c.order : 0,
+          productDisplayOrder: Array.isArray(c.productDisplayOrder) ? c.productDisplayOrder.map(String) : [],
         }));
 
         const prodItems = (prodRes as Extract<ApiResponse<ApiProduct>, { ok: true }>).items ?? [];
@@ -504,6 +506,11 @@ const CategoryPage = () => {
   }, [dynMin, dynMax, baseFiltered.length, priceTouched]);
 
   // عند إخفاء الأسعار لا نفلتر ولا نعتمد على نطاق السعر
+  const manualOrderIndex = useMemo(() => {
+    const order = Array.isArray(category?.productDisplayOrder) ? category.productDisplayOrder : [];
+    return new Map(order.map((pid, idx) => [String(pid), idx] as const));
+  }, [category?.productDisplayOrder]);
+
   const filteredAndSortedProducts = useMemo(() => {
     const withinPrice = hidePrices
       ? baseFiltered
@@ -522,13 +529,25 @@ const CategoryPage = () => {
           comparison = a.rating - b.rating;
           break;
         case 'newest':
-          comparison = new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+          {
+            const ai = manualOrderIndex.get(String(a.id));
+            const bi = manualOrderIndex.get(String(b.id));
+            const aRanked = ai !== undefined;
+            const bRanked = bi !== undefined;
+            if (aRanked || bRanked) {
+              if (aRanked && bRanked) comparison = (ai as number) - (bi as number);
+              else comparison = aRanked ? -1 : 1;
+            } else {
+              comparison = new Date(b.createdAt || '').getTime() - new Date(a.createdAt || '').getTime();
+            }
+          }
           break;
       }
+      if (sortBy === 'newest') return comparison;
       return sortOrder === 'asc' ? comparison : -comparison;
     });
     return sorted;
-  }, [baseFiltered, priceRange, sortBy, sortOrder, hidePrices]);
+  }, [baseFiltered, priceRange, sortBy, sortOrder, hidePrices, manualOrderIndex]);
 
   // Reset page on filter/sort changes
   useEffect(() => {
@@ -1614,4 +1633,3 @@ const CategoryPage = () => {
 };
 
 export default CategoryPage;
-

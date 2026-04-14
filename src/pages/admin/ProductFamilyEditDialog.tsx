@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/select';
 import { apiGet, apiPutJson, apiDelete } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
-import { Pencil, Plus, Trash2, Users, Package, AlertTriangle } from 'lucide-react';
+import { Pencil, Plus, Trash2, Users, Package, AlertTriangle, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { optimizeImage, applyProductImageFallback } from '@/lib/images';
 
@@ -292,6 +292,20 @@ export function ProductFamilyEditDialog({
     setDefaultProductId((d) => (d === id ? memberIds.find((x) => x !== id) || '' : d));
   };
 
+  const moveMember = (id: string, direction: -1 | 1) => {
+    setMemberIds((prev) => {
+      const idx = prev.indexOf(id);
+      if (idx < 0) return prev;
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= prev.length) return prev;
+      const next = [...prev];
+      const swap = next[nextIdx];
+      next[nextIdx] = next[idx];
+      next[idx] = swap;
+      return next;
+    });
+  };
+
   const setValue = (productId: string, key: string, val: string) => {
     setValuesByProduct((prev) => ({
       ...prev,
@@ -504,13 +518,38 @@ export function ProductFamilyEditDialog({
                       بطاقة لكل منتج في المجموعة. «إزالة» تُخرجه من العائلة فقط ولا تحذف المنتج من المتجر.
                     </p>
                     <div className="flex flex-wrap gap-3">
-                  {memberIds.map((id) => {
+                  {memberIds.map((id, idx) => {
                     const d = memberDetails[id] || productById.get(id);
                     return (
                       <div
                         key={id}
                         className="relative flex w-[140px] flex-col rounded-xl border bg-white p-2 shadow-sm"
                       >
+                        <div className="mb-1 flex items-center justify-between gap-1">
+                          <span className="text-[10px] font-semibold text-slate-500">#{idx + 1}</span>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => moveMember(id, -1)}
+                              disabled={idx === 0}
+                            >
+                              <ArrowUp className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="h-6 w-6 p-0"
+                              onClick={() => moveMember(id, 1)}
+                              disabled={idx === memberIds.length - 1}
+                            >
+                              <ArrowDown className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        </div>
                         <div className="aspect-square w-full overflow-hidden rounded-lg bg-slate-100">
                           {d?.image ? (
                             <img
@@ -540,6 +579,7 @@ export function ProductFamilyEditDialog({
                     );
                   })}
                     </div>
+                    <p className="text-[11px] text-slate-500">هذا الترتيب يحدد ترتيب أزرار الخيارات في تفاصيل المنتج وكرت العائلة.</p>
                   </div>
                 </div>
               </section>

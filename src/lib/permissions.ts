@@ -1,6 +1,6 @@
 /**
- * Permission Management Utility
- * Handles role-based access control (RBAC) for admin users
+ * Admin access helpers. All authenticated admin-panel sessions get full access;
+ * RBAC matrix is no longer required for day-to-day admin operations.
  */
 
 export interface Permission {
@@ -14,51 +14,51 @@ export interface UserPermissions {
   permissions: Permission[];
 }
 
-// Cache for user permissions
 let permissionsCache: UserPermissions | null = null;
-let cacheTimestamp: number = 0;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+let cacheTimestamp = 0;
+const CACHE_DURATION = 5 * 60 * 1000;
 
-/**
- * Check if user is SuperAdmin
- */
-export function isSuperAdmin(): boolean {
-  // Check admin email first
-  const adminEmail = localStorage.getItem('admin.auth.userEmail');
-  if (adminEmail === 'admin@example.com') {
-    return true;
+/** True when the current browser session is an admin with full dashboard access. */
+export function hasFullAdminAccess(): boolean {
+  try {
+    if (typeof window === 'undefined') return false;
+    const mode = localStorage.getItem('AUTH_MODE');
+    if (mode === 'admin') return true;
+    const adminRole = (localStorage.getItem('admin.auth.role') || '').toLowerCase();
+    if (['admin', 'superadmin', 'super_admin'].includes(adminRole)) return true;
+    const authRole = (localStorage.getItem('auth.role') || '').toLowerCase();
+    if (['admin', 'superadmin', 'super_admin'].includes(authRole)) return true;
+    const adminEmail = localStorage.getItem('admin.auth.userEmail');
+    if (adminEmail === 'admin@example.com') return true;
+    return false;
+  } catch {
+    return false;
   }
-
-  // Check role
-  const adminRole = localStorage.getItem('admin.auth.role');
-  const role = localStorage.getItem('auth.role');
-  return adminRole === 'SuperAdmin' || adminRole === 'super_admin' ||
-    role === 'SuperAdmin' || role === 'super_admin';
 }
 
 /**
- * Get user permissions from cache or fetch from server
+ * Legacy name: treated as “full admin capabilities” for the dashboard and guards.
  */
+export function isSuperAdmin(): boolean {
+  return hasFullAdminAccess();
+}
+
 export async function getUserPermissions(forceRefresh = false): Promise<UserPermissions> {
-  // Check cache first
   if (!forceRefresh && permissionsCache && Date.now() - cacheTimestamp < CACHE_DURATION) {
     return permissionsCache;
   }
 
-  // SuperAdmin has all permissions
-  if (isSuperAdmin()) {
-    const superAdminPerms: UserPermissions = {
-      isSuperAdmin: true,
-      permissions: []
-    };
-    permissionsCache = superAdminPerms;
+  if (hasFullAdminAccess()) {
+    const all: UserPermissions = { isSuperAdmin: true, permissions: [] };
+    permissionsCache = all;
     cacheTimestamp = Date.now();
-    return superAdminPerms;
+    return all;
   }
 
-  // Fetch permissions from server for regular admin
   try {
-    const userId = localStorage.getItem('auth.userId');
+    const userId =
+      localStorage.getItem('admin.auth.userId') ||
+      localStorage.getItem('auth.userId');
     if (!userId) {
       return { isSuperAdmin: false, permissions: [] };
     }
@@ -66,16 +66,19 @@ export async function getUserPermissions(forceRefresh = false): Promise<UserPerm
     const response = await fetch(`/api/rbac/my-permissions`, {
       headers: {
         'x-user-id': userId,
-        'x-user-email': localStorage.getItem('auth.userEmail') || '',
-        'Authorization': `Bearer ${localStorage.getItem('auth.token') || ''}`
-      }
+        'x-user-email':
+          localStorage.getItem('admin.auth.userEmail') ||
+          localStorage.getItem('auth.userEmail') ||
+          '',
+        Authorization: `Bearer ${localStorage.getItem('admin.auth.token') || localStorage.getItem('auth.token') || ''}`,
+      },
     });
 
     if (response.ok) {
       const data = await response.json();
       const userPerms: UserPermissions = {
         isSuperAdmin: false,
-        permissions: data.permissions || []
+        permissions: data.permissions || [],
       };
       permissionsCache = userPerms;
       cacheTimestamp = Date.now();
@@ -88,110 +91,68 @@ export async function getUserPermissions(forceRefresh = false): Promise<UserPerm
   return { isSuperAdmin: false, permissions: [] };
 }
 
-/**
- * Check if user has permission for a specific resource and action
- */
 export async function hasPermission(resource: string, action: string): Promise<boolean> {
+  if (hasFullAdminAccess()) return true;
   const perms = await getUserPermissions();
-
-  // SuperAdmin has all permissions
-  if (perms.isSuperAdmin) {
-    return true;
-  }
-
-  // Check specific permission
+  if (perms.isSuperAdmin) return true;
   return perms.permissions.some(
-    p => p.resource === resource && p.action === action && p.allowed
+    (p) => p.resource === resource && p.action === action && p.allowed
   );
 }
 
-/**
- * Check if user can access a specific admin page
- */
 export async function canAccessPage(pageName: string): Promise<boolean> {
+  if (hasFullAdminAccess()) return true;
   const perms = await getUserPermissions();
+  if (perms.isSuperAdmin) return true;
 
-  // SuperAdmin can access everything
-  if (perms.isSuperAdmin) {
-    return true;
-  }
-
-  // Map page names to resources
   const pageResourceMap: Record<string, string> = {
-    'dashboard': 'dashboard',
-    'products': 'products',
-    'categories': 'categories',
-    'orders': 'orders',
-    'users': 'users',
-    'locations': 'branches',
+    dashboard: 'dashboard',
+    products: 'products',
+    categories: 'categories',
+    orders: 'orders',
+    users: 'users',
+    locations: 'branches',
     'qr-codes': 'qr',
     'home-config': 'home',
-    'settings': 'settings',
-    'history': 'history',
-    'profit': 'expenses',
-    'latestWork': 'products',
+    settings: 'settings',
+    history: 'history',
+    profit: 'expenses',
+    latestWork: 'products',
   };
 
   const resource = pageResourceMap[pageName];
   if (!resource) return false;
-
   return hasPermission(resource, 'read');
 }
 
-/**
- * Clear permissions cache (call on logout)
- */
 export function clearPermissionsCache() {
   permissionsCache = null;
   cacheTimestamp = 0;
 }
 
-/**
- * Get list of accessible pages for navigation
- */
+const ALL_ADMIN_PAGES = [
+  'dashboard',
+  'products',
+  'categories',
+  'orders',
+  'users',
+  'locations',
+  'qr-codes',
+  'home-config',
+  'settings',
+  'history',
+  'profit',
+  'latestWork',
+] as const;
+
 export async function getAccessiblePages(): Promise<string[]> {
+  if (hasFullAdminAccess()) return [...ALL_ADMIN_PAGES];
   const perms = await getUserPermissions();
-
-  // SuperAdmin can access all pages
-  if (perms.isSuperAdmin) {
-    return [
-      'dashboard',
-      'products',
-      'categories',
-      'orders',
-      'users',
-      'locations',
-      'qr-codes',
-      'home-config',
-      'settings',
-      'history',
-      'profit',
-      'latestWork'
-    ];
-  }
-
-  // Filter pages based on permissions
-  const pages = [
-    'dashboard',
-    'products',
-    'categories',
-    'orders',
-    'users',
-    'locations',
-    'qr-codes',
-    'home-config',
-    'settings',
-    'history',
-    'profit',
-    'latestWork'
-  ];
+  if (perms.isSuperAdmin) return [...ALL_ADMIN_PAGES];
 
   const accessible: string[] = [];
-  for (const page of pages) {
-    if (await canAccessPage(page)) {
-      accessible.push(page);
-    }
+  for (const page of ALL_ADMIN_PAGES) {
+    if (await canAccessPage(page)) accessible.push(page);
   }
-
   return accessible;
 }

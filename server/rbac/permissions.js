@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Role from '../models/Role.js';
 import User from '../models/User.js';
 import UserRole from '../models/UserRole.js';
@@ -65,9 +66,25 @@ export function mergeConditions(conds) {
   return out;
 }
 
+/** Users with role `admin` in the User collection get full API access (no UserRole matrix required). */
+async function isAppAdminUser(userId) {
+  if (!userId || !mongoose.Types.ObjectId.isValid(String(userId))) return false;
+  try {
+    const u = await User.findById(userId).select('role').lean();
+    if (!u) return false;
+    const r = String(u.role || '').toLowerCase();
+    return r === 'admin' || r === 'superadmin' || r === 'super_admin';
+  } catch {
+    return false;
+  }
+}
+
 export async function getPermissionContext(userId, resource, action) {
   // Dev-only super override
   if (await isDevSuper(userId)) {
+    return { allowed: true, conditions: {} };
+  }
+  if (await isAppAdminUser(userId)) {
     return { allowed: true, conditions: {} };
   }
   const perms = await getUserPermissions(userId);

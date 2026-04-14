@@ -290,19 +290,27 @@ const AdminHomeConfig = () => {
           images?: string[];
           thumbnail?: string;
         };
-        const params = new URLSearchParams();
-        params.set('limit', '50');
-        params.set('search', pickerSearch || '');
-        if (pickerCategoryFilter && pickerCategoryFilter !== 'all') {
-          params.set('categoryId', pickerCategoryFilter);
-        }
-        params.set(
-          'fields',
-          '_id,name,nameAr,sku,image,images,thumbnail'
-        );
-        const res = await apiGet<Product>(`/api/products?${params.toString()}`);
-        if (res.ok === false) throw new Error(res.error);
-        const list: Product[] = res.items ?? [];
+        const list: Product[] = [];
+        const pageSize = 100;
+        let page = 1;
+        let pages = 1;
+        do {
+          const params = new URLSearchParams();
+          params.set('limit', String(pageSize));
+          params.set('page', String(page));
+          params.set('search', pickerSearch || '');
+          if (pickerCategoryFilter && pickerCategoryFilter !== 'all') {
+            params.set('categoryId', pickerCategoryFilter);
+          }
+          params.set('fields', '_id,name,nameAr,sku,image,images,thumbnail');
+
+          const res = await apiGet<Product>(`/api/products?${params.toString()}`);
+          if (res.ok === false) throw new Error(res.error);
+          list.push(...(res.items ?? []));
+          pages = Math.max(1, Number((res as { pages?: number }).pages ?? 1));
+          page += 1;
+        } while (page <= pages);
+
         const mapped = list.map((p) => {
           const pid = String(p._id || p.id || '');
           return {

@@ -31,7 +31,7 @@ import {
 import { apiPostJson } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
 import type { AdminProductFamilyLean } from '@/pages/admin/ProductFamilyEditDialog';
-import { Link2, ChevronLeft, ChevronRight, Package, Plus, Trash2, Sparkles, List } from 'lucide-react';
+import { Link2, ChevronLeft, ChevronRight, Package, Plus, Trash2, Sparkles, List, ArrowUp, ArrowDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { optimizeImage, applyProductImageFallback } from '@/lib/images';
 import { buildFamilySuggestions, type SuggestionCluster } from '@/lib/productFamilySuggestions';
@@ -195,6 +195,20 @@ export function ProductFamilyMergeDialog({
       .map((id) => products.find((p) => p._id === id))
       .filter((p): p is RowProduct => !!p);
   }, [selected, products]);
+
+  const moveSelectedMember = useCallback((productId: string, direction: -1 | 1) => {
+    setSelected((prev) => {
+      const ids = [...prev];
+      const idx = ids.indexOf(productId);
+      if (idx < 0) return prev;
+      const nextIdx = idx + direction;
+      if (nextIdx < 0 || nextIdx >= ids.length) return prev;
+      const swap = ids[nextIdx];
+      ids[nextIdx] = ids[idx];
+      ids[idx] = swap;
+      return new Set(ids);
+    });
+  }, []);
 
   const needsTransfer = useMemo(
     () => selectedMembers.some((p) => p.productFamilyId && String(p.productFamilyId).length > 0),
@@ -877,18 +891,36 @@ export function ProductFamilyMergeDialog({
                 </div>
                 <div>
                   <p className="text-xs font-medium text-slate-600 mb-2">معاينة الأزرار</p>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedMembers.map((p) => {
+                  <div className="space-y-2">
+                    {selectedMembers.map((p, idx) => {
                       const lbl = labelPreview(valuesByProduct[p._id] || {}, options, p.nameAr || '', p.name);
                       const isDef = p._id === defaultProductId;
                       return (
-                        <span
+                        <div
                           key={p._id}
-                          className={cn(
-                            'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs',
-                            isDef ? 'border-primary bg-primary text-primary-foreground' : 'bg-white'
-                          )}
+                          className={cn('flex items-center gap-2 rounded-xl border px-2 py-1.5', isDef ? 'border-primary bg-primary/5' : 'bg-white')}
                         >
+                          <span className="w-6 text-center text-[11px] text-slate-500 font-semibold">{idx + 1}</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0"
+                            onClick={() => moveSelectedMember(p._id, -1)}
+                            disabled={idx === 0}
+                          >
+                            <ArrowUp className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="h-7 w-7 p-0"
+                            onClick={() => moveSelectedMember(p._id, 1)}
+                            disabled={idx === selectedMembers.length - 1}
+                          >
+                            <ArrowDown className="h-3.5 w-3.5" />
+                          </Button>
                           {p.image ? (
                             <img
                               src={optimizeImage(p.image, { w: 48 })}
@@ -897,11 +929,12 @@ export function ProductFamilyMergeDialog({
                               onError={applyProductImageFallback}
                             />
                           ) : null}
-                          <span className="truncate max-w-[140px]">{lbl}</span>
-                        </span>
+                          <span className={cn('truncate max-w-[240px] text-xs', isDef ? 'text-primary font-semibold' : 'text-slate-700')}>{lbl}</span>
+                        </div>
                       );
                     })}
                   </div>
+                  <p className="text-[11px] text-slate-500 mt-2">هذا الترتيب هو نفسه ترتيب أزرار الخيارات في تفاصيل المنتج وكروت العائلة.</p>
                 </div>
               </div>
             )}

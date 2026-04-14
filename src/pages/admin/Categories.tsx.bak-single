@@ -1,7 +1,5 @@
-﻿import { useState, useEffect, useCallback, memo } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import { Plus, Edit, Trash2, Search, Filter, Grid, List, Image, Star, Package, Eye, Download, TrendingUp, Tag, FileText, Link2, CheckCircle, Sparkles, Settings, Globe, FolderTree, ToggleLeft, ToggleRight, RefreshCw, ArrowUp, ArrowDown } from 'lucide-react';
-import { useMemo } from 'react';
-import { motion } from 'framer-motion';
 import { SelectionModal } from '@/components/admin/home-config/SelectionModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,18 +9,16 @@ import { LoadingSpinner } from '@/components/ui/loading';
 import ImageUpload from '@/components/ui/image-upload';
 import { useToast } from '@/hooks/use-toast';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { usePricingSettings } from '@/hooks/usePricingSettings';
 import useDeviceDetection from '@/hooks/useDeviceDetection';
 import { optimizeImage, buildSrcSet, applyCategoryImageFallback, applyProductImageFallback } from '@/lib/images';
 import { apiGet, apiPostJson, apiPutJson, apiDelete } from '@/lib/api';
 import { logHistory } from '@/lib/history';
 import { useAutosave } from '@/hooks/useAutosave';
-import { usePricingSettings } from '@/hooks/usePricingSettings';
+import { fetchStorefrontProductFamilies, type StorefrontProductFamily } from '@/lib/productFamilyListings';
 import type { Category } from '@/types';
 import AdminLayout from '@/components/admin/AdminLayout';
-import {
-  fetchStorefrontProductFamilies,
-  type StorefrontProductFamily,
-} from '@/lib/productFamilyListings';
+import { motion } from 'framer-motion';
 import {
   Dialog,
   DialogContent,
@@ -39,13 +35,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 interface BackendCategory {
   _id: string;
@@ -101,12 +90,12 @@ interface CategoryFormData {
   image: string;
   featured: boolean;
   previewProducts: string[]; // Array of product IDs for preview
-  productDisplayOrder: string[]; // Card order keys saved as product IDs
+  productDisplayOrder: string[];
 }
 
 const Categories = () => {
   // Set page title
-  usePageTitle('إدارة الفئات');
+  usePageTitle('Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„ÙØ¦Ø§Øª');
 
   const { isMobile, isTablet } = useDeviceDetection();
   const [categoriesList, setCategoriesList] = useState<Category[]>([]);
@@ -126,7 +115,7 @@ const Categories = () => {
     image: '',
     featured: false,
     previewProducts: [],
-    productDisplayOrder: []
+    productDisplayOrder: [],
   });
   const { toast } = useToast();
 
@@ -181,7 +170,7 @@ const Categories = () => {
         if (res && res.ok && res.items) {
           const items = res.items;
           const mapped: Category[] = items.map((c) => {
-            console.log('📥 LOADING CATEGORY FROM API:', {
+            console.log('ðŸ“¥ LOADING CATEGORY FROM API:', {
               id: c._id,
               name: c.nameAr,
               useRandomPreview: c.useRandomPreview,
@@ -189,7 +178,7 @@ const Categories = () => {
               previewProductsLength: c.previewProducts?.length || 0
             });
 
-            console.log('📥 RAW API CATEGORY DATA:', JSON.stringify({
+            console.log('ðŸ“¥ RAW API CATEGORY DATA:', JSON.stringify({
               id: c._id,
               nameAr: c.nameAr,
               useRandomPreview: c.useRandomPreview,
@@ -221,7 +210,7 @@ const Categories = () => {
               // Product preview settings
               useRandomPreview: c.useRandomPreview !== undefined ? c.useRandomPreview : false,
               previewProducts: c.previewProducts || [],
-              productDisplayOrder: c.productDisplayOrder || [],
+              productDisplayOrder: Array.isArray(c.productDisplayOrder) ? c.productDisplayOrder.map(String) : [],
 
               createdAt: c.createdAt,
               updatedAt: c.updatedAt
@@ -259,7 +248,7 @@ const Categories = () => {
           // Product preview settings - MISSING FIELDS ADDED!
           useRandomPreview: c.useRandomPreview !== undefined ? c.useRandomPreview : false,
           previewProducts: c.previewProducts || [],
-          productDisplayOrder: c.productDisplayOrder || [],
+          productDisplayOrder: Array.isArray(c.productDisplayOrder) ? c.productDisplayOrder.map(String) : [],
 
           // Enhanced category features
           categoryType: c.categoryType || 'product',
@@ -314,7 +303,7 @@ const Categories = () => {
 
   const handleProductToggle = (productId: string) => {
     const currentProducts = formData.previewProducts;
-    console.log('🔄 TOGGLING PRODUCT:', {
+    console.log('ðŸ”„ TOGGLING PRODUCT:', {
       productId,
       currentProducts,
       isSelected: currentProducts.includes(productId),
@@ -341,8 +330,8 @@ const Categories = () => {
       // Show toast when trying to select more than 3
 
       toast({
-        title: "تحذير",
-        description: "يمكن اختيار 3 منتجات كحد أقصى للمعاينة",
+        title: "ØªØ­Ø°ÙŠØ±",
+        description: "ÙŠÙ…ÙƒÙ† Ø§Ø®ØªÙŠØ§Ø± 3 Ù…Ù†ØªØ¬Ø§Øª ÙƒØ­Ø¯ Ø£Ù‚ØµÙ‰ Ù„Ù„Ù…Ø¹Ø§ÙŠÙ†Ø©",
         variant: "destructive"
       });
     }
@@ -365,14 +354,14 @@ const Categories = () => {
       image: '',
       featured: false,
       previewProducts: [], // Always start with empty array
-      productDisplayOrder: []
+      productDisplayOrder: [],
     });
     setEditingCategory(null);
     setShowForm(false);
   };
 
   const handleEdit = (category: Category) => {
-    console.log('🔍 LOADING CATEGORY FOR EDIT:', {
+    console.log('ðŸ” LOADING CATEGORY FOR EDIT:', {
       id: category.id,
       nameAr: category.nameAr,
       useRandomPreview: category.useRandomPreview,
@@ -381,29 +370,22 @@ const Categories = () => {
       fullCategory: category
     });
 
-    console.log('🔍 DETAILED CATEGORY DATA:', JSON.stringify({
+    console.log('ðŸ” DETAILED CATEGORY DATA:', JSON.stringify({
       id: category.id,
       nameAr: category.nameAr,
       useRandomPreview: category.useRandomPreview,
       previewProducts: category.previewProducts
     }, null, 2));
 
-    // Ensure we never load more than 3 products from existing preview data
+    // Ensure we never load more than 3 products from existing data
     const existingProducts = category.previewProducts || [];
     const limitedProducts = existingProducts.slice(0, 3);
-    const categoryProductIds = availableProducts
-      .filter((product) =>
-        product.category === category.id ||
-        product.categoryId === category.id ||
-        product.categorySlug === category.slug
-      )
-      .map((product) => String(product._id));
-    const validIds = new Set(categoryProductIds);
-    const initialDisplayOrder = Array.isArray(category.productDisplayOrder)
-      ? category.productDisplayOrder.map(String).filter((id) => (validIds.size ? validIds.has(id) : true))
-      : [];
+    const categoryProductsForOrder = getCategoryProducts(category);
+    const categoryProductIdSet = new Set(categoryProductsForOrder.map((p) => String(p._id)));
+    const existingDisplayOrder = Array.isArray(category.productDisplayOrder) ? category.productDisplayOrder.map(String) : [];
+    const validDisplayOrder = existingDisplayOrder.filter((pid) => categoryProductIdSet.has(String(pid)));
 
-    console.log('📝 SETTING FORM DATA:', {
+    console.log('ðŸ“ SETTING FORM DATA:', {
       nameAr: category.nameAr,
       previewProducts: limitedProducts,
       limitedProductsLength: limitedProducts.length,
@@ -418,7 +400,7 @@ const Categories = () => {
       image: category.image,
       featured: category.featured,
       previewProducts: limitedProducts,
-      productDisplayOrder: initialDisplayOrder
+      productDisplayOrder: validDisplayOrder,
     });
     setEditingCategory(category);
     setShowForm(true);
@@ -452,8 +434,7 @@ const Categories = () => {
       if (!quiet) {
         console.log('Auto-saving category with preview settings:', {
           useRandomPreview: payload.useRandomPreview,
-          previewProducts: payload.previewProducts,
-          productDisplayOrder: payload.productDisplayOrder
+          previewProducts: payload.previewProducts
         });
       }
       const headers: Record<string, string> = {};
@@ -462,11 +443,11 @@ const Categories = () => {
       try {
         await apiPutJson<CategoryItemResponse, typeof payload>(`/api/categories/${editingCategory.id}`, payload, headers);
         if (!quiet) {
-          toast({ title: 'تم الحفظ', description: 'تم تحديث الفئة تلقائياً' });
+          toast({ title: 'ØªÙ… Ø§Ù„Ø­ÙØ¸', description: 'ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„ÙØ¦Ø© ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹' });
         }
       } catch (error) {
         if (!quiet) {
-          toast({ title: 'خطأ', description: 'تعذر حفظ التغييرات تلقائياً', variant: 'destructive' });
+          toast({ title: 'Ø®Ø·Ø£', description: 'ØªØ¹Ø°Ø± Ø­ÙØ¸ Ø§Ù„ØªØºÙŠÙŠØ±Ø§Øª ØªÙ„Ù‚Ø§Ø¦ÙŠØ§Ù‹', variant: 'destructive' });
         }
       }
     },
@@ -511,7 +492,7 @@ const Categories = () => {
 
         if (response && response.ok) {
           const item = (response as any).item;
-          console.log('📦 Saved category data from API:', {
+          console.log('ðŸ“¦ Saved category data from API:', {
             id: item._id,
             previewProducts: item.previewProducts,
             useRandomPreview: item.useRandomPreview
@@ -528,8 +509,8 @@ const Categories = () => {
         await refetch();
 
         toast({
-          title: "تم التحديث بنجاح",
-          description: "تم تحديث الفئة بنجاح",
+          title: "ØªÙ… Ø§Ù„ØªØ­Ø¯ÙŠØ« Ø¨Ù†Ø¬Ø§Ø­",
+          description: "ØªÙ… ØªØ­Ø¯ÙŠØ« Ø§Ù„ÙØ¦Ø© Ø¨Ù†Ø¬Ø§Ø­",
         });
         // audit: category updated
         void logHistory({ section: 'categories', action: 'category_updated', note: `Updated category ${editingCategory.id}`, meta: { id: editingCategory.id, nameAr: formData.nameAr, featured: formData.featured } });
@@ -555,8 +536,8 @@ const Categories = () => {
         await apiPostJson<CategoryItemResponse, typeof payload>('/api/categories', payload);
         await refetch();
         toast({
-          title: "تم الإضافة بنجاح",
-          description: "تم إضافة الفئة الجديدة بنجاح",
+          title: "ØªÙ… Ø§Ù„Ø¥Ø¶Ø§ÙØ© Ø¨Ù†Ø¬Ø§Ø­",
+          description: "ØªÙ… Ø¥Ø¶Ø§ÙØ© Ø§Ù„ÙØ¦Ø© Ø§Ù„Ø¬Ø¯ÙŠØ¯Ø© Ø¨Ù†Ø¬Ø§Ø­",
         });
         // audit: category created
         void logHistory({ section: 'categories', action: 'category_created', note: `Created category ${formData.nameAr}`, meta: { nameAr: formData.nameAr, featured: formData.featured } });
@@ -565,8 +546,8 @@ const Categories = () => {
       resetForm();
     } catch (error) {
       toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء حفظ الفئة",
+        title: "Ø®Ø·Ø£",
+        description: "Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø­ÙØ¸ Ø§Ù„ÙØ¦Ø©",
         variant: "destructive"
       });
     } finally {
@@ -575,22 +556,22 @@ const Categories = () => {
   };
 
   const handleDelete = async (categoryId: string) => {
-    if (!confirm('هل أنت متأكد من حذف هذه الفئة؟')) return;
+    if (!confirm('Ù‡Ù„ Ø£Ù†Øª Ù…ØªØ£ÙƒØ¯ Ù…Ù† Ø­Ø°Ù Ù‡Ø°Ù‡ Ø§Ù„ÙØ¦Ø©ØŸ')) return;
 
     setLoading(true);
     try {
       await apiDelete(`/api/categories/${categoryId}`);
       await refetch();
       toast({
-        title: "تم الحذف بنجاح",
-        description: "تم حذف الفئة بنجاح",
+        title: "ØªÙ… Ø§Ù„Ø­Ø°Ù Ø¨Ù†Ø¬Ø§Ø­",
+        description: "ØªÙ… Ø­Ø°Ù Ø§Ù„ÙØ¦Ø© Ø¨Ù†Ø¬Ø§Ø­",
       });
       // audit: category deleted
       void logHistory({ section: 'categories', action: 'category_deleted', note: `Deleted category ${categoryId}`, meta: { id: categoryId } });
     } catch (error) {
       toast({
-        title: "خطأ",
-        description: "حدث خطأ أثناء حذف الفئة",
+        title: "Ø®Ø·Ø£",
+        description: "Ø­Ø¯Ø« Ø®Ø·Ø£ Ø£Ø«Ù†Ø§Ø¡ Ø­Ø°Ù Ø§Ù„ÙØ¦Ø©",
         variant: "destructive"
       });
     } finally {
@@ -620,9 +601,9 @@ const Categories = () => {
         <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 sm:gap-6 mb-6 sm:mb-8">
           <div>
             <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black text-slate-900 bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-              إدارة الفئات
+              Ø¥Ø¯Ø§Ø±Ø© Ø§Ù„ÙØ¦Ø§Øª
             </h1>
-            <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-medium mt-1 sm:mt-2">إدارة فئات المنتجات والتصنيفات</p>
+            <p className="text-sm sm:text-base lg:text-lg text-slate-600 font-medium mt-1 sm:mt-2">Ø¥Ø¯Ø§Ø±Ø© ÙØ¦Ø§Øª Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª ÙˆØ§Ù„ØªØµÙ†ÙŠÙØ§Øª</p>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto">
             <Button
@@ -631,8 +612,8 @@ const Categories = () => {
               className="flex-1 sm:flex-none bg-gradient-to-r from-green-50 to-green-100 border-green-200 text-green-700 hover:from-green-100 hover:to-green-200 shadow-md text-xs sm:text-sm"
             >
               <Download className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">تصدير الفئات</span>
-              <span className="sm:hidden">تصدير</span>
+              <span className="hidden sm:inline">ØªØµØ¯ÙŠØ± Ø§Ù„ÙØ¦Ø§Øª</span>
+              <span className="sm:hidden">ØªØµØ¯ÙŠØ±</span>
             </Button>
             <Button
               onClick={openCreateForm}
@@ -640,8 +621,8 @@ const Categories = () => {
               className="flex-1 sm:flex-none bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary shadow-lg text-xs sm:text-sm"
             >
               <Plus className="w-3 h-3 sm:w-4 sm:h-4 mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">إضافة فئة جديدة</span>
-              <span className="sm:hidden">إضافة</span>
+              <span className="hidden sm:inline">Ø¥Ø¶Ø§ÙØ© ÙØ¦Ø© Ø¬Ø¯ÙŠØ¯Ø©</span>
+              <span className="sm:hidden">Ø¥Ø¶Ø§ÙØ©</span>
             </Button>
           </div>
         </div>
@@ -651,13 +632,13 @@ const Categories = () => {
           <div className="group bg-gradient-to-br from-primary/5 via-white to-primary/10 border border-primary/20 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm font-medium text-primary mb-1">إجمالي الفئات</p>
+                <p className="text-xs md:text-sm font-medium text-primary mb-1">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ÙØ¦Ø§Øª</p>
                 <p className="text-2xl md:text-3xl font-black text-slate-900">
                   {categoriesList.length.toLocaleString()}
                 </p>
                 <p className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                   <TrendingUp className="w-3 h-3 text-green-500" />
-                  +{((categoriesList.length / Math.max(categoriesList.length - 1, 1)) * 100 - 100).toFixed(1)}% هذا الشهر
+                  +{((categoriesList.length / Math.max(categoriesList.length - 1, 1)) * 100 - 100).toFixed(1)}% Ù‡Ø°Ø§ Ø§Ù„Ø´Ù‡Ø±
                 </p>
               </div>
               <div className="p-2 md:p-3 bg-primary/10 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -669,12 +650,12 @@ const Categories = () => {
           <div className="group bg-gradient-to-br from-green-50 via-white to-green-50/30 border border-green-200/50 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm font-medium text-green-600 mb-1">الفئات المميزة</p>
+                <p className="text-xs md:text-sm font-medium text-green-600 mb-1">Ø§Ù„ÙØ¦Ø§Øª Ø§Ù„Ù…Ù…ÙŠØ²Ø©</p>
                 <p className="text-2xl md:text-3xl font-black text-slate-900">
                   {categoriesList.filter(c => c.featured).length}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  {((categoriesList.filter(c => c.featured).length / Math.max(categoriesList.length, 1)) * 100).toFixed(1)}% من إجمالي الفئات
+                  {((categoriesList.filter(c => c.featured).length / Math.max(categoriesList.length, 1)) * 100).toFixed(1)}% Ù…Ù† Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„ÙØ¦Ø§Øª
                 </p>
               </div>
               <div className="p-2 md:p-3 bg-green-100 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -686,12 +667,12 @@ const Categories = () => {
           <div className="group bg-gradient-to-br from-purple-50 via-white to-purple-50/30 border border-purple-200/50 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm font-medium text-purple-600 mb-1">إجمالي المنتجات</p>
+                <p className="text-xs md:text-sm font-medium text-purple-600 mb-1">Ø¥Ø¬Ù…Ø§Ù„ÙŠ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª</p>
                 <p className="text-2xl md:text-3xl font-black text-slate-900">
                   {categoriesList.reduce((sum, cat) => sum + cat.productCount, 0).toLocaleString()}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  في جميع الفئات
+                  ÙÙŠ Ø¬Ù…ÙŠØ¹ Ø§Ù„ÙØ¦Ø§Øª
                 </p>
               </div>
               <div className="p-2 md:p-3 bg-purple-100 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -703,12 +684,12 @@ const Categories = () => {
           <div className="group bg-gradient-to-br from-orange-50 via-white to-orange-50/30 border border-orange-200/50 rounded-xl md:rounded-2xl p-4 md:p-6 shadow-lg hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-xs md:text-sm font-medium text-orange-600 mb-1">متوسط المنتجات</p>
+                <p className="text-xs md:text-sm font-medium text-orange-600 mb-1">Ù…ØªÙˆØ³Ø· Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª</p>
                 <p className="text-2xl md:text-3xl font-black text-slate-900">
                   {categoriesList.length > 0 ? Math.round(categoriesList.reduce((sum, cat) => sum + cat.productCount, 0) / categoriesList.length) : 0}
                 </p>
                 <p className="text-xs text-slate-500 mt-1">
-                  منتج لكل فئة
+                  Ù…Ù†ØªØ¬ Ù„ÙƒÙ„ ÙØ¦Ø©
                 </p>
               </div>
               <div className="p-2 md:p-3 bg-orange-100 rounded-xl group-hover:scale-110 transition-transform duration-300">
@@ -724,7 +705,7 @@ const Categories = () => {
             <div className="flex-1 relative order-2 lg:order-1">
               <Search className="absolute right-3 top-1/2 transform -translate-y-1/2 text-primary w-4 h-4 md:w-5 md:h-5" />
               <Input
-                placeholder="البحث في الفئات..."
+                placeholder="Ø§Ù„Ø¨Ø­Ø« ÙÙŠ Ø§Ù„ÙØ¦Ø§Øª..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pr-10 md:pr-12 h-10 md:h-12 bg-white/80 border-primary/20 focus:border-primary focus:ring-primary/20 shadow-md text-sm md:text-base"
@@ -736,8 +717,8 @@ const Categories = () => {
                 className="h-10 md:h-12 px-3 md:px-4 bg-gradient-to-r from-purple-50 to-purple-100 border-purple-200 text-purple-700 hover:from-purple-100 hover:to-purple-200 shadow-md text-xs md:text-sm"
               >
                 <Filter className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" />
-                <span className="hidden sm:inline">تصفية</span>
-                <span className="sm:hidden">فلتر</span>
+                <span className="hidden sm:inline">ØªØµÙÙŠØ©</span>
+                <span className="sm:hidden">ÙÙ„ØªØ±</span>
               </Button>
               <div className="flex items-center bg-slate-100 rounded-lg p-1">
                 <Button
@@ -747,7 +728,7 @@ const Categories = () => {
                   className={`${viewMode === 'grid' ? 'bg-white shadow-md' : ''} text-xs md:text-sm px-2 md:px-3`}
                 >
                   <Grid className="w-3 h-3 md:w-4 md:h-4" />
-                  <span className="hidden sm:inline ml-1">شبكة</span>
+                  <span className="hidden sm:inline ml-1">Ø´Ø¨ÙƒØ©</span>
                 </Button>
                 <Button
                   size="sm"
@@ -756,7 +737,7 @@ const Categories = () => {
                   className={`${viewMode === 'table' ? 'bg-white shadow-md' : ''} text-xs md:text-sm px-2 md:px-3`}
                 >
                   <List className="w-3 h-3 md:w-4 md:h-4" />
-                  <span className="hidden sm:inline ml-1">جدول</span>
+                  <span className="hidden sm:inline ml-1">Ø¬Ø¯ÙˆÙ„</span>
                 </Button>
               </div>
             </div>
@@ -795,7 +776,7 @@ const Categories = () => {
                       {category.featured && (
                         <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-2 py-1 rounded-full text-xs font-bold shadow-md">
                           <Star className="w-3 h-3 inline mr-1" />
-                          مميزة
+                          Ù…Ù…ÙŠØ²Ø©
                         </div>
                       )}
                       <Button
@@ -817,7 +798,7 @@ const Categories = () => {
                     <div className="bg-slate-50 rounded-xl p-3">
                       <div className="flex items-center gap-2 mb-2">
                         <FileText className="w-4 h-4 text-slate-600" />
-                        <span className="text-xs font-semibold text-slate-600">الوصف</span>
+                        <span className="text-xs font-semibold text-slate-600">Ø§Ù„ÙˆØµÙ</span>
                       </div>
                       <div className="text-sm text-slate-700 leading-relaxed line-clamp-2">
                         {category.descriptionAr || category.description}
@@ -829,11 +810,11 @@ const Categories = () => {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-3 text-center">
                       <div className="text-lg font-bold text-primary">{category.productCount}</div>
-                      <div className="text-xs text-primary">عدد المنتجات</div>
+                      <div className="text-xs text-primary">Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª</div>
                     </div>
                     <div className="bg-gradient-to-br from-purple-50 to-purple-100 rounded-xl p-3 text-center">
                       <div className="text-sm font-bold text-purple-800 truncate">{category.slug}</div>
-                      <div className="text-xs text-purple-600">الرابط</div>
+                      <div className="text-xs text-purple-600">Ø§Ù„Ø±Ø§Ø¨Ø·</div>
                     </div>
                   </div>
 
@@ -845,7 +826,7 @@ const Categories = () => {
                       className="flex-1 bg-gradient-to-r from-primary to-secondary hover:from-primary hover:to-secondary text-xs h-8"
                     >
                       <Edit className="w-3 h-3 mr-1" />
-                      تعديل
+                      ØªØ¹Ø¯ÙŠÙ„
                     </Button>
                     <Button
                       size="sm"
@@ -854,7 +835,7 @@ const Categories = () => {
                       className="flex-1 bg-white hover:bg-red-50 border-red-200 text-red-700 text-xs h-8"
                     >
                       <Trash2 className="w-3 h-3 mr-1" />
-                      حذف
+                      Ø­Ø°Ù
                     </Button>
                   </div>
                 </div>
@@ -866,11 +847,11 @@ const Categories = () => {
                 <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
                   <Package className="w-8 h-8 text-slate-400" />
                 </div>
-                <h3 className="text-lg font-semibold text-slate-900 mb-2">لا توجد فئات</h3>
-                <p className="text-slate-600 mb-4">قم بإضافة فئة جديدة لبدء تنظيم منتجاتك</p>
+                <h3 className="text-lg font-semibold text-slate-900 mb-2">Ù„Ø§ ØªÙˆØ¬Ø¯ ÙØ¦Ø§Øª</h3>
+                <p className="text-slate-600 mb-4">Ù‚Ù… Ø¨Ø¥Ø¶Ø§ÙØ© ÙØ¦Ø© Ø¬Ø¯ÙŠØ¯Ø© Ù„Ø¨Ø¯Ø¡ ØªÙ†Ø¸ÙŠÙ… Ù…Ù†ØªØ¬Ø§ØªÙƒ</p>
                 <Button onClick={openCreateForm} className="bg-gradient-to-r from-primary to-secondary">
                   <Plus className="w-4 h-4 mr-2" />
-                  إضافة فئة جديدة
+                  Ø¥Ø¶Ø§ÙØ© ÙØ¦Ø© Ø¬Ø¯ÙŠØ¯Ø©
                 </Button>
               </div>
             )}
@@ -884,11 +865,11 @@ const Categories = () => {
                   <Table>
                     <TableHeader className="bg-gradient-to-r from-slate-100 via-blue-50/30 to-indigo-50/30">
                       <TableRow className="border-b-2 border-slate-200/50">
-                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm">الاسم</TableHead>
-                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm hidden md:table-cell">الوصف</TableHead>
-                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm">عدد المنتجات</TableHead>
-                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm">الحالة</TableHead>
-                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm">الإجراءات</TableHead>
+                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm">Ø§Ù„Ø§Ø³Ù…</TableHead>
+                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm hidden md:table-cell">Ø§Ù„ÙˆØµÙ</TableHead>
+                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm">Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª</TableHead>
+                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm">Ø§Ù„Ø­Ø§Ù„Ø©</TableHead>
+                        <TableHead className="text-right font-bold text-slate-700 text-xs md:text-sm">Ø§Ù„Ø¥Ø¬Ø±Ø§Ø¡Ø§Øª</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -930,17 +911,17 @@ const Categories = () => {
                           </TableCell>
                           <TableCell>
                             <Badge variant="secondary" className="font-medium text-xs md:text-sm">
-                              {category.productCount} منتج
+                              {category.productCount} Ù…Ù†ØªØ¬
                             </Badge>
                           </TableCell>
                           <TableCell>
                             {category.featured ? (
                               <Badge className="bg-gradient-to-r from-yellow-500 to-yellow-600 text-white border-0 shadow-md text-xs md:text-sm">
                                 <Star className="w-2 h-2 md:w-3 md:h-3 mr-1" />
-                                مميزة
+                                Ù…Ù…ÙŠØ²Ø©
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="border-slate-300 text-xs md:text-sm">عادية</Badge>
+                              <Badge variant="outline" className="border-slate-300 text-xs md:text-sm">Ø¹Ø§Ø¯ÙŠØ©</Badge>
                             )}
                           </TableCell>
                           <TableCell>
@@ -952,7 +933,7 @@ const Categories = () => {
                                 className="bg-white hover:bg-primary/5 border-primary/20 text-primary shadow-md px-2 md:px-3 text-xs md:text-sm"
                               >
                                 <Edit className="w-3 h-3 md:w-4 md:h-4 md:mr-2" />
-                                <span className="hidden md:inline">تعديل</span>
+                                <span className="hidden md:inline">ØªØ¹Ø¯ÙŠÙ„</span>
                               </Button>
                               <Button
                                 size="sm"
@@ -995,12 +976,12 @@ const Categories = () => {
                     {category.featured && (
                       <div className="absolute top-3 right-3 bg-gradient-to-r from-yellow-500 to-yellow-600 text-white px-3 py-1 rounded-full text-xs font-bold shadow-lg">
                         <Star className="w-3 h-3 inline mr-1" />
-                        مميزة
+                        Ù…Ù…ÙŠØ²Ø©
                       </div>
                     )}
                     <div className="absolute bottom-3 left-3">
                       <Badge className="bg-white/90 text-slate-700 border-0 shadow-md">
-                        {category.productCount} منتج
+                        {category.productCount} Ù…Ù†ØªØ¬
                       </Badge>
                     </div>
                   </div>
@@ -1009,7 +990,7 @@ const Categories = () => {
                       {category.nameAr}
                     </h3>
                     <p className="text-sm text-slate-600 line-clamp-2 mb-4">
-                      {category.descriptionAr || 'لا يوجد وصف'}
+                      {category.descriptionAr || 'Ù„Ø§ ÙŠÙˆØ¬Ø¯ ÙˆØµÙ'}
                     </p>
                     <div className="flex items-center justify-between pt-4 border-t border-slate-100">
                       <div className="flex gap-2">
@@ -1054,10 +1035,10 @@ const Categories = () => {
                 <div className="w-12 h-12 bg-gradient-to-r from-primary via-purple-500 to-secondary rounded-2xl flex items-center justify-center shadow-xl">
                   {editingCategory ? <Edit className="w-6 h-6 text-white" /> : <Plus className="w-6 h-6 text-white" />}
                 </div>
-                {editingCategory ? 'تعديل الفئة' : 'إضافة فئة جديدة'}
+                {editingCategory ? 'ØªØ¹Ø¯ÙŠÙ„ Ø§Ù„ÙØ¦Ø©' : 'Ø¥Ø¶Ø§ÙØ© ÙØ¦Ø© Ø¬Ø¯ÙŠØ¯Ø©'}
               </DialogTitle>
               <DialogDescription className="text-lg text-slate-600 font-medium mt-2 mr-15">
-                {editingCategory ? 'تعديل بيانات الفئة المحددة' : 'إضافة فئة جديدة لتنظيم المنتجات'}
+                {editingCategory ? 'ØªØ¹Ø¯ÙŠÙ„ Ø¨ÙŠØ§Ù†Ø§Øª Ø§Ù„ÙØ¦Ø© Ø§Ù„Ù…Ø­Ø¯Ø¯Ø©' : 'Ø¥Ø¶Ø§ÙØ© ÙØ¦Ø© Ø¬Ø¯ÙŠØ¯Ø© Ù„ØªÙ†Ø¸ÙŠÙ… Ø§Ù„Ù…Ù†ØªØ¬Ø§Øª'}
               </DialogDescription>
             </DialogHeader>
 
@@ -1107,18 +1088,6 @@ interface CategoryFormProps {
   handleProductToggle: (productId: string) => void;
 }
 
-type OrderRow = {
-  key: string;
-  kind: 'family' | 'product';
-  anchorProductId: string;
-  title: string;
-  subtitle: string;
-  image: string;
-  sku: string;
-  familySize?: number;
-  searchText: string;
-};
-
 const CategoryForm = memo(function CategoryForm({
   formData,
   setFormData,
@@ -1142,211 +1111,203 @@ const CategoryForm = memo(function CategoryForm({
       <div className="flex items-center justify-center p-8">
         <div className="flex items-center gap-3 text-slate-600">
           <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-          جاري تحميل البيانات...
+          Ø¬Ø§Ø±ÙŠ ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª...
         </div>
       </div>
     );
   }
 
-  // Filter helper
-  const filteredProducts = availableProducts.filter(p => {
-    const inCategory = editingCategory
-      ? (p.category === editingCategory.id || p.categoryId === editingCategory.id || p.categorySlug === editingCategory.slug)
-      : true;
-    const matchesSearch = inlineProductSearch
-      ? (p.nameAr || p.name || '').toLowerCase().includes(inlineProductSearch.toLowerCase())
-      : true;
-    return inCategory && matchesSearch;
-  });
-
+  const [orderSearch, setOrderSearch] = useState('');
+  const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({});
   const { familyCardsInListings } = usePricingSettings();
   const [storefrontFamilies, setStorefrontFamilies] = useState<StorefrontProductFamily[]>([]);
-  const [orderSearch, setOrderSearch] = useState('');
-  const [orderFilter, setOrderFilter] = useState<'all' | 'family' | 'product'>('all');
-  const [orderDrafts, setOrderDrafts] = useState<Record<string, string>>({});
-  const [lastMovedKey, setLastMovedKey] = useState<string | null>(null);
 
   useEffect(() => {
+    let mounted = true;
     if (!familyCardsInListings) {
       setStorefrontFamilies([]);
       return;
     }
-    let alive = true;
     (async () => {
       try {
-        const families = await fetchStorefrontProductFamilies();
-        if (alive) setStorefrontFamilies(Array.isArray(families) ? families : []);
+        const allFamilies = await fetchStorefrontProductFamilies();
+        if (!mounted) return;
+        const categorySet = new Set((categoryProducts || []).map((p) => String(p._id)));
+        const filteredFamilies = allFamilies.filter((f) =>
+          (f.variants || []).some((v) => categorySet.has(String(v.productId)))
+        );
+        setStorefrontFamilies(filteredFamilies);
       } catch {
-        if (alive) setStorefrontFamilies([]);
+        if (mounted) setStorefrontFamilies([]);
       }
     })();
     return () => {
-      alive = false;
+      mounted = false;
     };
-  }, [familyCardsInListings]);
+  }, [familyCardsInListings, categoryProducts]);
 
-  const allCategoryProducts = useMemo(
-    () => categoryProducts.filter((product) => !!product?._id).map((product) => ({ ...product, _id: String(product._id) })),
-    [categoryProducts]
-  );
+  type OrderRow = {
+    key: string;
+    type: 'family' | 'product';
+    representativeId: string;
+    title: string;
+    subtitle: string;
+    image?: string;
+  };
 
-  const productById = useMemo(
-    () => new Map(allCategoryProducts.map((product) => [String(product._id), product] as const)),
-    [allCategoryProducts]
-  );
-
-  const orderedProductIds = useMemo(() => {
-    const fromSaved = Array.isArray(formData.productDisplayOrder)
-      ? formData.productDisplayOrder.map(String).filter((id) => productById.has(id))
-      : [];
-    const seen = new Set(fromSaved);
-    for (const product of allCategoryProducts) {
-      const pid = String(product._id);
-      if (!seen.has(pid)) {
-        seen.add(pid);
-        fromSaved.push(pid);
+  const productToFamilyId = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const fam of storefrontFamilies || []) {
+      for (const v of fam.variants || []) {
+        map.set(String(v.productId), String(fam.id));
       }
     }
-    return fromSaved;
-  }, [formData.productDisplayOrder, allCategoryProducts, productById]);
+    return map;
+  }, [storefrontFamilies]);
 
-  const rowsByOrder = useMemo<OrderRow[]>(() => {
-    const seenFamilies = new Set<string>();
-    const familyByProduct = new Map<string, StorefrontProductFamily>();
-    const familyProductIdsByFamily = new Map<string, string[]>();
-
-    if (familyCardsInListings) {
-      for (const family of storefrontFamilies) {
-        const inCategoryIds = (family.variants || [])
-          .map((variant) => String(variant.productId))
-          .filter((pid) => productById.has(pid));
-        if (inCategoryIds.length === 0) continue;
-        familyProductIdsByFamily.set(family.id, inCategoryIds);
-        for (const pid of inCategoryIds) {
-          familyByProduct.set(pid, family);
-        }
-      }
+  const orderRows = useMemo<OrderRow[]>(() => {
+    const list = [...(categoryProducts || [])].sort((a, b) =>
+      String(a.nameAr || a.name || '').localeCompare(String(b.nameAr || b.name || ''), 'ar')
+    );
+    if (!familyCardsInListings) {
+      return list.map((p) => ({
+        key: `product:${String(p._id)}`,
+        type: 'product',
+        representativeId: String(p._id),
+        title: String(p.nameAr || p.name || 'Ù…Ù†ØªØ¬'),
+        subtitle: p.sku ? `SKU: ${p.sku}` : 'Ù…Ù†ØªØ¬ Ù…Ù†ÙØ±Ø¯',
+        image: p.image,
+      }));
     }
-
-    const out: OrderRow[] = [];
-    for (const pid of orderedProductIds) {
-      const product = productById.get(pid);
-      if (!product) continue;
-
-      if (familyCardsInListings) {
-        const family = familyByProduct.get(pid);
-        if (family) {
-          if (seenFamilies.has(family.id)) continue;
-          seenFamilies.add(family.id);
-          const familyIds = familyProductIdsByFamily.get(family.id) || [];
-          const defaultId = String(family.defaultProductId || '');
-          const anchorProductId =
-            (defaultId && familyIds.includes(defaultId) ? defaultId : '') ||
-            familyIds.find((id) => orderedProductIds.includes(id)) ||
-            familyIds[0] ||
-            pid;
-          const representative = productById.get(anchorProductId) || product;
-          const title = family.nameAr || family.name || representative.nameAr || representative.name || 'عائلة';
-          const subtitle = `${familyIds.length} منتج داخل العائلة`;
-          out.push({
-            key: `family:${family.id}`,
-            kind: 'family',
-            anchorProductId,
-            title,
-            subtitle,
-            image: representative.image || '',
-            sku: representative.sku || '',
-            familySize: familyIds.length,
-            searchText: `${title} ${representative.sku || ''} family`.toLowerCase(),
-          });
-          continue;
-        }
+    const byId = new Map(list.map((p) => [String(p._id), p] as const));
+    const familyDone = new Set<string>();
+    const rows: OrderRow[] = [];
+    for (const p of list) {
+      const pid = String(p._id);
+      const familyId = productToFamilyId.get(pid);
+      if (!familyId) {
+        rows.push({
+          key: `product:${pid}`,
+          type: 'product',
+          representativeId: pid,
+          title: String(p.nameAr || p.name || 'Ù…Ù†ØªØ¬'),
+          subtitle: p.sku ? `SKU: ${p.sku}` : 'Ù…Ù†ØªØ¬ Ù…Ù†ÙØ±Ø¯',
+          image: p.image,
+        });
+        continue;
       }
-
-      const title = product.nameAr || product.name || 'منتج';
-      const sku = product.sku || '';
-      out.push({
-        key: `product:${pid}`,
-        kind: 'product',
-        anchorProductId: pid,
-        title,
-        subtitle: sku ? `SKU: ${sku}` : 'بدون كود',
-        image: product.image || '',
-        sku,
-        searchText: `${title} ${sku} product`.toLowerCase(),
+      if (familyDone.has(familyId)) continue;
+      familyDone.add(familyId);
+      const fam = storefrontFamilies.find((f) => String(f.id) === familyId);
+      if (!fam) continue;
+      const categoryMembers = (fam.variants || []).filter((v) => byId.has(String(v.productId)));
+      if (!categoryMembers.length) continue;
+      const defaultInCategory = categoryMembers.find((v) => String(v.productId) === String(fam.defaultProductId));
+      const representativeId = String((defaultInCategory || categoryMembers[0]).productId);
+      const representative = byId.get(representativeId);
+      rows.push({
+        key: `family:${familyId}`,
+        type: 'family',
+        representativeId,
+        title: String(fam.nameAr || fam.name || representative?.nameAr || representative?.name || 'Ø¹Ø§Ø¦Ù„Ø©'),
+        subtitle: `Ø¨Ø·Ø§Ù‚Ø© Ø¹Ø§Ø¦Ù„Ø© â€¢ ${categoryMembers.length} Ù…Ù†ØªØ¬`,
+        image: representative?.image || categoryMembers[0]?.image,
       });
     }
-    return out;
-  }, [familyCardsInListings, storefrontFamilies, orderedProductIds, productById]);
+    return rows;
+  }, [categoryProducts, familyCardsInListings, productToFamilyId, storefrontFamilies]);
 
-  useEffect(() => {
-    const canonical = rowsByOrder.map((row) => row.anchorProductId);
-    const current = Array.isArray(formData.productDisplayOrder) ? formData.productDisplayOrder.map(String) : [];
-    const isSameLength = canonical.length === current.length;
-    const isSame =
-      isSameLength && canonical.every((id, idx) => id === current[idx]);
-    if (!isSame) {
-      setFormData((prev) => ({ ...prev, productDisplayOrder: canonical }));
+  const rowByKey = useMemo(() => new Map(orderRows.map((r) => [r.key, r] as const)), [orderRows]);
+  const rowKeyForProductId = useCallback((productId: string) => {
+    if (!familyCardsInListings) return `product:${String(productId)}`;
+    const familyId = productToFamilyId.get(String(productId));
+    return familyId ? `family:${familyId}` : `product:${String(productId)}`;
+  }, [familyCardsInListings, productToFamilyId]);
+
+  const orderedRowKeys = useMemo(() => {
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const pid of formData.productDisplayOrder || []) {
+      const key = rowKeyForProductId(String(pid));
+      if (seen.has(key) || !rowByKey.has(key)) continue;
+      seen.add(key);
+      out.push(key);
     }
-  }, [rowsByOrder, formData.productDisplayOrder, setFormData]);
+    for (const row of orderRows) {
+      if (seen.has(row.key)) continue;
+      seen.add(row.key);
+      out.push(row.key);
+    }
+    return out;
+  }, [formData.productDisplayOrder, rowKeyForProductId, rowByKey, orderRows]);
 
-  const visibleRows = useMemo(() => {
-    const needle = orderSearch.trim().toLowerCase();
-    return rowsByOrder.filter((row) => {
-      const filterMatch = orderFilter === 'all' ? true : row.kind === orderFilter;
-      const searchMatch = needle ? row.searchText.includes(needle) : true;
-      return filterMatch && searchMatch;
+  const orderRowsFiltered = useMemo(() => {
+    const q = orderSearch.trim().toLowerCase();
+    const orderedRows = orderedRowKeys.map((k) => rowByKey.get(k)).filter((r): r is OrderRow => !!r);
+    if (!q) return orderedRows;
+    return orderedRows.filter((r) =>
+      r.title.toLowerCase().includes(q) || r.subtitle.toLowerCase().includes(q)
+    );
+  }, [orderedRowKeys, rowByKey, orderSearch]);
+
+  const setOrderedRows = useCallback((keys: string[]) => {
+    const seen = new Set<string>();
+    const normalized: string[] = [];
+    for (const k of keys) {
+      if (!rowByKey.has(k) || seen.has(k)) continue;
+      seen.add(k);
+      normalized.push(k);
+    }
+    for (const row of orderRows) {
+      if (seen.has(row.key)) continue;
+      seen.add(row.key);
+      normalized.push(row.key);
+    }
+    const nextProductIds = normalized
+      .map((k) => rowByKey.get(k)?.representativeId || '')
+      .filter(Boolean);
+    setFormData((prev) => ({ ...prev, productDisplayOrder: nextProductIds }));
+  }, [rowByKey, orderRows, setFormData]);
+
+  const moveOrderItem = useCallback((rowKey: string, direction: -1 | 1) => {
+    const current = [...orderedRowKeys];
+    const idx = current.indexOf(rowKey);
+    if (idx < 0) return;
+    const nextIdx = idx + direction;
+    if (nextIdx < 0 || nextIdx >= current.length) return;
+    const swap = current[nextIdx];
+    current[nextIdx] = current[idx];
+    current[idx] = swap;
+    setOrderedRows(current);
+  }, [orderedRowKeys, setOrderedRows]);
+
+  const moveOrderItemToPosition = useCallback((rowKey: string, positionOneBased: number) => {
+    const current = [...orderedRowKeys];
+    const idx = current.indexOf(rowKey);
+    if (idx < 0 || current.length === 0) return;
+    const clamped = Math.max(1, Math.min(current.length, Math.round(positionOneBased || 1)));
+    const nextIdx = clamped - 1;
+    if (idx === nextIdx) return;
+    current.splice(idx, 1);
+    current.splice(nextIdx, 0, rowKey);
+    setOrderedRows(current);
+  }, [orderedRowKeys, setOrderedRows]);
+
+  const applyInlineOrder = useCallback((rowKey: string, fallbackPosition: number) => {
+    const raw = (orderDrafts[rowKey] ?? String(fallbackPosition)).trim();
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed)) moveOrderItemToPosition(rowKey, parsed);
+    setOrderDrafts((prev) => {
+      const next = { ...prev };
+      delete next[rowKey];
+      return next;
     });
-  }, [rowsByOrder, orderFilter, orderSearch]);
-
-  const applyOrderRows = useCallback(
-    (nextRows: OrderRow[], highlightKey?: string) => {
-      setFormData((prev) => ({
-        ...prev,
-        productDisplayOrder: nextRows.map((row) => row.anchorProductId),
-      }));
-      setOrderDrafts({});
-      if (highlightKey) {
-        setLastMovedKey(highlightKey);
-        window.setTimeout(() => setLastMovedKey((current) => (current === highlightKey ? null : current)), 700);
-      }
-    },
-    [setFormData]
-  );
-
-  const moveOrderItem = useCallback(
-    (rowKey: string, delta: -1 | 1) => {
-      const current = [...rowsByOrder];
-      const index = current.findIndex((row) => row.key === rowKey);
-      if (index < 0) return;
-      const target = index + delta;
-      if (target < 0 || target >= current.length) return;
-      const [moved] = current.splice(index, 1);
-      current.splice(target, 0, moved);
-      applyOrderRows(current, rowKey);
-    },
-    [rowsByOrder, applyOrderRows]
-  );
-
-  const moveOrderItemToPosition = useCallback(
-    (rowKey: string, oneBasedPosition: number) => {
-      const current = [...rowsByOrder];
-      const from = current.findIndex((row) => row.key === rowKey);
-      if (from < 0) return;
-      const clamped = Math.max(1, Math.min(current.length, oneBasedPosition));
-      const to = clamped - 1;
-      if (to === from) return;
-      const [moved] = current.splice(from, 1);
-      current.splice(to, 0, moved);
-      applyOrderRows(current, rowKey);
-    },
-    [rowsByOrder, applyOrderRows]
-  );
+  }, [orderDrafts, moveOrderItemToPosition]);
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-0">
 
-      {/* ── Two-column body ────────────────────────────────────────── */}
+      {/* â”€â”€ Two-column body â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-6 p-6">
 
         {/* LEFT: text fields */}
@@ -1356,7 +1317,7 @@ const CategoryForm = memo(function CategoryForm({
           <div className="space-y-1.5">
             <Label htmlFor="nameAr" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
               <Tag className="w-3.5 h-3.5 text-primary" />
-              اسم الفئة <span className="text-red-500">*</span>
+              Ø§Ø³Ù… Ø§Ù„ÙØ¦Ø© <span className="text-red-500">*</span>
             </Label>
             <Input
               id="nameAr"
@@ -1365,7 +1326,7 @@ const CategoryForm = memo(function CategoryForm({
                 handleInputChange('nameAr', e.target.value);
                 if (!formData.slug) handleInputChange('slug', generateSlug(e.target.value));
               }}
-              placeholder="اكتب اسم الفئة"
+              placeholder="Ø§ÙƒØªØ¨ Ø§Ø³Ù… Ø§Ù„ÙØ¦Ø©"
               required
               className="h-11 bg-white border-slate-200 focus:border-primary focus:ring-primary/20 shadow-sm"
             />
@@ -1375,7 +1336,7 @@ const CategoryForm = memo(function CategoryForm({
           <div className="space-y-1.5">
             <Label htmlFor="slug" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
               <Link2 className="w-3.5 h-3.5 text-slate-500" />
-              الرابط (Slug) <span className="text-red-500">*</span>
+              Ø§Ù„Ø±Ø§Ø¨Ø· (Slug) <span className="text-red-500">*</span>
             </Label>
             <div className="flex gap-2">
               <Input
@@ -1392,26 +1353,26 @@ const CategoryForm = memo(function CategoryForm({
                 variant="outline"
                 onClick={() => handleInputChange('slug', generateSlug(formData.nameAr))}
                 className="h-11 px-3 border-slate-200 text-slate-600 hover:border-primary hover:text-primary shrink-0"
-                title="توليد تلقائي من الاسم"
+                title="ØªÙˆÙ„ÙŠØ¯ ØªÙ„Ù‚Ø§Ø¦ÙŠ Ù…Ù† Ø§Ù„Ø§Ø³Ù…"
               >
                 <RefreshCw className="w-4 h-4" />
               </Button>
             </div>
-            <p className="text-[10px] text-slate-400">أحرف إنجليزية وأرقام وشرطات فقط</p>
+            <p className="text-[10px] text-slate-400">Ø£Ø­Ø±Ù Ø¥Ù†Ø¬Ù„ÙŠØ²ÙŠØ© ÙˆØ£Ø±Ù‚Ø§Ù… ÙˆØ´Ø±Ø·Ø§Øª ÙÙ‚Ø·</p>
           </div>
 
           {/* Description */}
           <div className="space-y-1.5">
             <Label htmlFor="descriptionAr" className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
               <FileText className="w-3.5 h-3.5 text-slate-500" />
-              وصف الفئة
+              ÙˆØµÙ Ø§Ù„ÙØ¦Ø©
             </Label>
             <textarea
               id="descriptionAr"
               value={formData.descriptionAr}
               onChange={(e) => handleInputChange('descriptionAr', e.target.value)}
               className="w-full h-28 px-3 py-2.5 border border-slate-200 rounded-lg text-sm bg-white shadow-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition"
-              placeholder="وصف مختصر للفئة..."
+              placeholder="ÙˆØµÙ Ù…Ø®ØªØµØ± Ù„Ù„ÙØ¦Ø©..."
             />
           </div>
         </div>
@@ -1423,7 +1384,7 @@ const CategoryForm = memo(function CategoryForm({
           <div className="space-y-2">
             <Label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
               <Image className="w-3.5 h-3.5 text-green-600" />
-              صورة الفئة
+              ØµÙˆØ±Ø© Ø§Ù„ÙØ¦Ø©
             </Label>
             <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-3">
               <ImageUpload
@@ -1433,7 +1394,7 @@ const CategoryForm = memo(function CategoryForm({
                 initialImages={formData.image ? [formData.image] : []}
               />
             </div>
-            <p className="text-[10px] text-slate-400">تظهر في قائمة الفئات والصفحة الرئيسية</p>
+            <p className="text-[10px] text-slate-400">ØªØ¸Ù‡Ø± ÙÙŠ Ù‚Ø§Ø¦Ù…Ø© Ø§Ù„ÙØ¦Ø§Øª ÙˆØ§Ù„ØµÙØ­Ø© Ø§Ù„Ø±Ø¦ÙŠØ³ÙŠØ©</p>
           </div>
 
           {/* Featured toggle */}
@@ -1442,8 +1403,8 @@ const CategoryForm = memo(function CategoryForm({
               <div className="flex items-center gap-2.5">
                 <Star className="w-4 h-4 text-yellow-500" />
                 <div>
-                  <p className="text-sm font-medium text-slate-800">فئة مميزة</p>
-                  <p className="text-[11px] text-slate-400">تظهر في أقسام الفئات المميزة</p>
+                  <p className="text-sm font-medium text-slate-800">ÙØ¦Ø© Ù…Ù…ÙŠØ²Ø©</p>
+                  <p className="text-[11px] text-slate-400">ØªØ¸Ù‡Ø± ÙÙŠ Ø£Ù‚Ø³Ø§Ù… Ø§Ù„ÙØ¦Ø§Øª Ø§Ù„Ù…Ù…ÙŠØ²Ø©</p>
                 </div>
               </div>
               <input
@@ -1458,156 +1419,111 @@ const CategoryForm = memo(function CategoryForm({
         </div>
       </div>
 
-     
-
-      {/* ── Card Order In Category Page ───────────────────────────── */ }
-      <div className="mx-6 mb-4 rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
+      {/* â”€â”€ Product Preview (full-width below) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
+            <div className="mx-6 mb-4 rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm">
         <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/60 flex items-center justify-between">
           <h4 className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
             <Package className="w-3.5 h-3.5 text-primary" />
             ترتيب عرض البطاقات في صفحة الفئة
           </h4>
           <span className="text-xs text-slate-500">
-            المرتّب: {rowsByOrder.length} / {rowsByOrder.length}
+            مرتب: {orderedRowKeys.length} / {orderRows.length}
           </span>
         </div>
 
         <div className="p-4 space-y-3">
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-[170px_1fr]">
-            <Select value={orderFilter} onValueChange={(value: 'all' | 'family' | 'product') => setOrderFilter(value)}>
-              <SelectTrigger className="h-9">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">كل البطاقات</SelectItem>
-                <SelectItem value="family">بطاقات العائلات</SelectItem>
-                <SelectItem value="product">بطاقات المنتجات</SelectItem>
-              </SelectContent>
-            </Select>
-
-            <div className="relative">
-              <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <Input
-                placeholder="ابحث بالاسم أو الكود أو النوع..."
-                value={orderSearch}
-                onChange={(e) => setOrderSearch(e.target.value)}
-                className="pr-10 h-9 text-sm bg-white border-slate-200"
-              />
-            </div>
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
+            <Input
+              placeholder="ابحث بالاسم أو SKU..."
+              value={orderSearch}
+              onChange={(e) => setOrderSearch(e.target.value)}
+              className="pr-10 h-9 text-sm bg-white border-slate-200"
+            />
           </div>
 
-          <div className="max-h-[360px] overflow-y-auto border border-slate-200 rounded-lg bg-white">
-            {productsLoading && rowsByOrder.length === 0 ? (
-              <div className="p-4 text-center text-sm text-slate-500">جاري التحميل...</div>
-            ) : rowsByOrder.length === 0 ? (
-              <div className="p-4 text-center text-sm text-slate-400">لا توجد بطاقات داخل هذه الفئة حتى الآن</div>
-            ) : visibleRows.length === 0 ? (
-              <div className="p-4 text-center text-sm text-slate-400">لا توجد نتائج مطابقة للبحث الحالي</div>
+          <div className="max-h-72 overflow-y-auto border border-slate-200 rounded-lg bg-white">
+            {orderRows.length === 0 ? (
+              <div className="p-4 text-center text-sm text-slate-400">لا توجد بطاقات داخل هذه الفئة حالياً.</div>
+            ) : orderRowsFiltered.length === 0 ? (
+              <div className="p-4 text-center text-sm text-slate-400">لا توجد نتائج مطابقة.</div>
             ) : (
-              <div className="space-y-1 p-1">
-                {visibleRows.map((row) => {
-                  const fullIndex = rowsByOrder.findIndex((item) => item.key === row.key);
-                  const position = fullIndex + 1;
-                  const isFirst = fullIndex <= 0;
-                  const isLast = fullIndex >= rowsByOrder.length - 1;
-                  const inputValue = orderDrafts[row.key] ?? String(position);
-
-                  return (
-                    <motion.div
-                      key={row.key}
-                      layout
-                      transition={{ type: 'spring', stiffness: 520, damping: 34, mass: 0.42 }}
-                      className={`group flex items-center gap-3 rounded-lg border px-2 py-2 ${lastMovedKey === row.key ? 'border-primary/50 bg-primary/5 shadow-sm' : 'border-slate-200 bg-white'}`}
-                    >
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8"
-                          disabled={isFirst}
-                          onClick={() => moveOrderItem(row.key, -1)}
-                          title="نقل لأعلى"
-                        >
-                          <ArrowUp className="h-3.5 w-3.5" />
-                        </Button>
-                        <Input
-                          value={inputValue}
-                          inputMode="numeric"
-                          className="h-8 w-14 text-center px-1"
-                          onChange={(e) => setOrderDrafts((prev) => ({ ...prev, [row.key]: e.target.value.replace(/[^\d]/g, '') }))}
-                          onBlur={() => {
-                            const numeric = Number.parseInt((orderDrafts[row.key] ?? String(position)).trim(), 10);
-                            if (Number.isFinite(numeric) && numeric > 0) {
-                              moveOrderItemToPosition(row.key, numeric);
-                            } else {
-                              setOrderDrafts((prev) => {
-                                const next = { ...prev };
-                                delete next[row.key];
-                                return next;
-                              });
-                            }
-                          }}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                              e.preventDefault();
-                              const numeric = Number.parseInt((orderDrafts[row.key] ?? String(position)).trim(), 10);
-                              if (Number.isFinite(numeric) && numeric > 0) {
-                                moveOrderItemToPosition(row.key, numeric);
-                              }
-                            }
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="outline"
-                          className="h-8 w-8"
-                          disabled={isLast}
-                          onClick={() => moveOrderItem(row.key, 1)}
-                          title="نقل لأسفل"
-                        >
-                          <ArrowDown className="h-3.5 w-3.5" />
-                        </Button>
+              orderRowsFiltered.map((row) => {
+                const orderIndex = orderedRowKeys.indexOf(row.key) + 1;
+                return (
+                  <motion.div
+                    key={row.key}
+                    layout
+                    transition={{ type: 'spring', stiffness: 420, damping: 34, mass: 0.8 }}
+                    whileHover={{ scale: 1.002 }}
+                    className="flex items-center gap-3 px-3 py-2.5 border-b last:border-b-0 bg-primary/5 hover:bg-primary/10 transition-colors duration-300"
+                  >
+                    <div className="w-9 text-center text-xs font-bold text-primary">{orderIndex}</div>
+                    {row.image ? (
+                      <img
+                        src={optimizeImage(row.image, { w: 64 })}
+                        alt={row.title}
+                        className="w-9 h-9 object-cover rounded border border-slate-200"
+                        onError={applyProductImageFallback}
+                      />
+                    ) : (
+                      <div className="w-9 h-9 rounded border border-slate-200 bg-slate-100 flex items-center justify-center">
+                        <Package className="w-4 h-4 text-slate-400" />
                       </div>
-
-                      <div className="flex-1 min-w-0 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <span className="text-sm font-semibold text-slate-800 truncate">{row.title}</span>
-                          <Badge variant="outline" className={row.kind === 'family' ? 'text-[10px] border-purple-300 text-purple-700 bg-purple-50' : 'text-[10px]'}>
-                            {row.kind === 'family' ? 'عائلة' : 'منتج'}
-                          </Badge>
-                        </div>
-                        <div className="text-xs text-slate-500 truncate">
-                          {row.subtitle}
-                        </div>
-                      </div>
-
-                      <div className="shrink-0">
-                        {row.image ? (
-                          <img
-                            src={row.image}
-                            alt={row.title}
-                            className="h-10 w-10 rounded-md object-cover border border-slate-200"
-                            onError={applyProductImageFallback}
-                          />
-                        ) : (
-                          <div className="h-10 w-10 rounded-md border border-dashed border-slate-300 bg-slate-50" />
-                        )}
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </div>
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm text-slate-800 truncate">{row.title}</p>
+                      <p className="text-[11px] text-slate-500 truncate">{row.subtitle}</p>
+                    </div>
+                    <Badge variant="secondary" className="h-6 text-[10px] px-2 shrink-0">
+                      {row.type === 'family' ? 'بطاقة عائلة' : 'بطاقة منتج'}
+                    </Badge>
+                    <div className="flex items-center gap-1.5">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => moveOrderItem(row.key, -1)}
+                        disabled={orderIndex === 1}
+                      >
+                        <ArrowUp className="w-4 h-4" />
+                      </Button>
+                      <Input
+                        value={orderDrafts[row.key] ?? String(orderIndex)}
+                        onChange={(e) => setOrderDrafts((prev) => ({ ...prev, [row.key]: e.target.value.replace(/[^\d]/g, '') }))}
+                        onBlur={() => applyInlineOrder(row.key, orderIndex)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            applyInlineOrder(row.key, orderIndex);
+                          }
+                        }}
+                        inputMode="numeric"
+                        className="h-8 w-14 text-center text-xs font-bold border-primary/30 focus:border-primary"
+                        title="الترتيب الحالي"
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => moveOrderItem(row.key, 1)}
+                        disabled={orderIndex === orderedRowKeys.length}
+                      >
+                        <ArrowDown className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </motion.div>
+                );
+              })
             )}
           </div>
         </div>
       </div>
-
-      {/* ── Footer ─────────────────────────────────────────────────── */}
-      <div className="px-6 pb-6 pt-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-3">
+<div className="px-6 pb-6 pt-3 border-t border-slate-100 bg-slate-50/60 flex items-center justify-end gap-3">
         <Button type="button" variant="outline" onClick={resetForm} disabled={loading} className="h-11 px-6">
-          إلغاء
+          Ø¥Ù„ØºØ§Ø¡
         </Button>
         <Button
           type="submit"
@@ -1617,12 +1533,12 @@ const CategoryForm = memo(function CategoryForm({
           {loading ? (
             <span className="flex items-center gap-2">
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              جاري الحفظ...
+              Ø¬Ø§Ø±ÙŠ Ø§Ù„Ø­ÙØ¸...
             </span>
           ) : editingCategory ? (
-            <><Edit className="w-4 h-4" /> تحديث الفئة</>
+            <><Edit className="w-4 h-4" /> ØªØ­Ø¯ÙŠØ« Ø§Ù„ÙØ¦Ø©</>
           ) : (
-            <><Plus className="w-4 h-4" /> إضافة الفئة</>
+            <><Plus className="w-4 h-4" /> Ø¥Ø¶Ø§ÙØ© Ø§Ù„ÙØ¦Ø©</>
           )}
         </Button>
       </div>

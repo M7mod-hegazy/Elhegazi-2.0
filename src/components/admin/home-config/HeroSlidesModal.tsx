@@ -272,6 +272,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
   const [pickerLoading, setPickerLoading] = useState(false);
   const [pickerResults, setPickerResults] = useState<Array<{ id: string; label: string; image?: string }>>([]);
   const [pickerVisibleCount, setPickerVisibleCount] = useState(10);
+  const [pickerCategoryFilter, setPickerCategoryFilter] = useState('all');
 
   // Cache for selected product previews across slides (to show thumbnails in main modal)
   const [productPreviewMap, setProductPreviewMap] = useState<Record<string, { label: string; image?: string }>>({});
@@ -340,16 +341,19 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
         type Category = { _id?: string; slug?: string; name?: string; nameAr?: string };
         const res = await apiGet<Category>('/api/categories?page=1&limit=300');
         if (res.ok && mounted) {
-          const arr: Array<{ id: string; label: string; link: string }> = (res.items || []).map((c: Category) => ({
-            id: c._id || c.slug || c.name || '',
-            label: c.nameAr || c.name || c.slug || c._id || '',
-            link: buildCategoryPath({
-              slug: c.slug,
-              nameAr: c.nameAr,
-              name: c.name,
-              id: c._id,
-            }),
-          }));
+          const arr: Array<{ id: string; label: string; link: string }> = (res.items || [])
+            .map((c: Category) => ({
+              id: String(c._id || c.slug || c.name || '').trim(),
+              label: String(c.nameAr || c.name || c.slug || c._id || '').trim(),
+              link: buildCategoryPath({
+                slug: c.slug,
+                nameAr: c.nameAr,
+                name: c.name,
+                id: c._id,
+              }),
+            }))
+            .filter((c) => c.id.length > 0 && c.label.length > 0)
+            .filter((c, i, all) => all.findIndex((x) => x.id === c.id) === i);
           setCategories(arr);
         }
       } catch {
@@ -464,9 +468,25 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
     try {
       setPickerLoading(true);
       type Product = { _id?: string; id?: string; name?: string; title?: string; slug?: string; image?: string; images?: string[]; thumbnail?: string };
-      const res = await apiGet<Product>(`/api/products?search=${encodeURIComponent(pickerSearch || '')}`);
-      if (res.ok === false) throw new Error(res.error);
-      const list: Product[] = res.items ?? [];
+      const list: Product[] = [];
+      const pageSize = 100;
+      let page = 1;
+      let pages = 1;
+      do {
+        const params = new URLSearchParams();
+        params.set('search', pickerSearch || '');
+        params.set('limit', String(pageSize));
+        params.set('page', String(page));
+        if (pickerCategoryFilter !== 'all') {
+          params.set('categoryId', pickerCategoryFilter);
+        }
+        const res = await apiGet<Product>(`/api/products?${params.toString()}`);
+        if (res.ok === false) throw new Error(res.error);
+        list.push(...(res.items ?? []));
+        pages = Math.max(1, Number((res as { pages?: number }).pages ?? 1));
+        page += 1;
+      } while (page <= pages);
+
       const mapped = list.map((p) => ({ id: (p._id || p.id || '') as string, label: p.name || p.title || p.slug || '', image: p.image || (p.images && p.images[0]) || p.thumbnail }));
       setPickerResults(mapped);
     } catch (e) {
@@ -474,13 +494,13 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
     } finally {
       setPickerLoading(false);
     }
-  }, [pickerSearch]);
+  }, [pickerSearch, pickerCategoryFilter]);
 
   useEffect(() => {
     if (pickerOpenIdx === null) return;
     const t = setTimeout(fetchPicker, 300);
     return () => clearTimeout(t);
-  }, [pickerOpenIdx, pickerSearch, fetchPicker]);
+  }, [pickerOpenIdx, pickerSearch, pickerCategoryFilter, fetchPicker]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1283,6 +1303,15 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                       </div>
 
                       {/* Product Picker */}
+                      <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => { setPickerOpenIdx(idx); setPickerVisibleCount(10); }}
+                              className="gap-2 shrink-0 border-teal-200 text-teal-600 hover:bg-teal-50 hover:border-teal-300 transition-all duration-200"
+                            >
+                              <Search className="w-4 h-4" /> اختيار المنتجات لهذه الشريحة
+                            </Button>
                       <div className="space-y-4">
                         <Label className="flex items-center gap-2 text-base font-semibold text-slate-700">
                           <span className="w-2 h-2 bg-teal-500 rounded-full" />
@@ -1322,15 +1351,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                                 );
                               })
                             )}
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              onClick={() => { setPickerOpenIdx(idx); setPickerVisibleCount(10); }}
-                              className="gap-2 shrink-0 border-teal-200 text-teal-600 hover:bg-teal-50 hover:border-teal-300 transition-all duration-200"
-                            >
-                              <Search className="w-4 h-4" /> اختيار المنتجات لهذه الشريحة
-                            </Button>
+                            
                           </div>
 
                           <div className="bg-gradient-to-r from-slate-50 to-teal-50/50 p-4 rounded-xl border border-slate-200/60">
@@ -1486,9 +1507,17 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
           results={pickerResults}
           visibleCount={pickerVisibleCount}
           onLoadMore={() => setPickerVisibleCount((c) => c + 10)}
+          categoryFilter={pickerCategoryFilter}
+          onCategoryFilterChange={setPickerCategoryFilter}
+          categoryOptions={categories.map((c) => ({ id: c.id, label: c.label }))}
           selected={pickerSelected}
           onToggle={togglePick}
-          onClose={() => { setPickerOpenIdx(null); setPickerSearch(''); setPickerResults([]); }}
+          onClose={() => {
+            setPickerOpenIdx(null);
+            setPickerSearch('');
+            setPickerCategoryFilter('all');
+            setPickerResults([]);
+          }}
           onApply={() => { setPickerOpenIdx(null); }}
         />
       </DialogContent>
