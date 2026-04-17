@@ -13,6 +13,8 @@ interface HomeProduct {
   name: string;
   nameAr: string;
   image: string;
+  categoryId?: string;
+  categorySlug?: string;
 }
 import { motion } from 'framer-motion';
 import { optimizeImage, applyCategoryImageFallback, applyProductImageFallback } from '@/lib/images';
@@ -67,17 +69,22 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
     }, 16);
   };
 
-  // Get preview products for a category - ONLY manually selected products
   const getCategoryPreviewProducts = (category: Category): HomeProduct[] => {
-    if (!products.length || !category.previewProducts?.length) return [];
+    if (!products.length) return [];
     
-    // Only show manually selected products from admin
-    const selectedProducts = category.previewProducts
-      .map(productId => products.find(p => p.id === productId))
-      .filter(product => product !== undefined)
-      .slice(0, 4);
+    let selectedProducts: HomeProduct[] = [];
+    if (category.previewProducts && category.previewProducts.length > 0) {
+      selectedProducts = category.previewProducts
+        .map(productId => products.find(p => p.id === productId))
+        .filter((product): product is HomeProduct => product !== undefined);
+    } else {
+      // Fallback: Pick products belonging to this category
+      selectedProducts = products.filter(p => 
+        p.categoryId === category.id || p.categorySlug === category.slug
+      );
+    }
     
-    return selectedProducts;
+    return selectedProducts.slice(0, 4);
   };
 
   type ApiCategory = {
@@ -154,7 +161,9 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
           id: p._id,
           name: p.name || '',
           nameAr: p.nameAr || p.name || '',
-          image: p.image || ''
+          image: p.image || '',
+          categoryId: p.categoryId || p.category,
+          categorySlug: p.categorySlug
         }));
         
         if (mounted) {
@@ -461,27 +470,28 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                   {(() => {
                     const previewProducts = getCategoryPreviewProducts(category);
                     const totalProducts = category.productCount || 0;
-                    const selectedProducts = previewProducts.length;
                     
-                    // Always show at least 1 product if available, reserve space for +X more
-                    const maxVisibleProducts = selectedProducts > 0 ? Math.min(selectedProducts, 3) : 0;
-                    const shouldShowMoreSlot = totalProducts > selectedProducts && selectedProducts > 0;
-                    const remainingCount = totalProducts - selectedProducts; // Total - Selected = Remaining
-                    const showFullWidthMore = selectedProducts === 2 && totalProducts > selectedProducts;
-
+                    const showMore = totalProducts > previewProducts.length || totalProducts > 4;
+                    const maxVisibleProducts = showMore ? 3 : 4;
+                    const visibleProducts = previewProducts.slice(0, maxVisibleProducts);
+                    
+                    const visibleCount = visibleProducts.length;
+                    const remainingCount = totalProducts > visibleCount ? totalProducts - visibleCount : 0;
+                    const shouldShowMoreSlot = remainingCount > 0;
+                    const showFullWidthMore = visibleCount === 2 && shouldShowMoreSlot;
 
                     return (
                       <div className="h-full relative">
                         <div className={`grid gap-1 h-full ${
-                          selectedProducts === 0 ? 'grid-cols-1' :
-                          selectedProducts === 1 && shouldShowMoreSlot ? 'grid-cols-2' :
-                          selectedProducts === 1 ? 'grid-cols-1' : 
-                          selectedProducts === 2 && shouldShowMoreSlot ? 'grid-cols-2 grid-rows-2' :
-                          selectedProducts === 2 ? 'grid-cols-2' : 
+                          visibleCount === 0 ? 'grid-cols-1' :
+                          visibleCount === 1 && shouldShowMoreSlot ? 'grid-cols-2' :
+                          visibleCount === 1 ? 'grid-cols-1' : 
+                          visibleCount === 2 && shouldShowMoreSlot ? 'grid-cols-2 grid-rows-2' :
+                          visibleCount === 2 ? 'grid-cols-2' : 
                           'grid-cols-2 grid-rows-2'
                         }`}>
                           {/* Display only selected products */}
-                          {previewProducts.map((product, idx) => (
+                          {visibleProducts.map((product, idx) => (
                             <div key={product.id} className="relative overflow-hidden rounded-lg bg-white shadow-sm transition-all duration-300">
                               <img
                                 src={optimizeImage(product.image || '', { w: 200 })}
@@ -510,7 +520,7 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
                           )}
 
                           {/* Show placeholder if no products selected but category has products */}
-                          {selectedProducts === 0 && totalProducts > 0 && (
+                          {visibleCount === 0 && totalProducts > 0 && (
                             <div className="bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center rounded-lg">
                               <div className="text-slate-500 text-center">
                                 <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />

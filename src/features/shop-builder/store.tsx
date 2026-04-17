@@ -221,35 +221,33 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
 
   // Auto-save to localStorage whenever layout changes
   useEffect(() => {
-    saveToStorage(layout);
+    const timeout = setTimeout(() => {
+      saveToStorage(layout);
+    }, 800);
+    return () => clearTimeout(timeout);
   }, [layout]);
 
-  // When walls form a closed loop containing the layout centroid, apply a default interior floor tint
-  // unless the user has pinned their own color.
-  useEffect(() => {
-    const hit = findShopEnclosurePolygon(layout.walls);
-    setLayout((prev) => {
-      if (hit) {
-        if (prev.interiorFloorColorUserOverride) return prev;
-        if (prev.interiorFloorColor !== undefined && prev.interiorFloorColor !== '') return prev;
-        return { ...prev, interiorFloorColor: AUTO_INTERIOR_FLOOR_HEX, updatedAt: now() };
-      }
-      if (prev.interiorFloorColorUserOverride) return prev;
-      if (prev.interiorFloorColor === undefined) return prev;
-      return { ...prev, interiorFloorColor: undefined, updatedAt: now() };
-    });
-  }, [layout.walls]);
+  // Helper to compute interior floor tint dynamically during wall updates
+  const computeNextLayoutWithFloorTint = useCallback((prev: ShopBuilderLayout, newWalls: ShopBuilderWall[]): ShopBuilderLayout => {
+    let nextColor = prev.interiorFloorColor;
+    if (!prev.interiorFloorColorUserOverride) {
+      const hit = findShopEnclosurePolygon(newWalls);
+      nextColor = hit ? AUTO_INTERIOR_FLOOR_HEX : undefined;
+    }
+    return { ...prev, walls: newWalls, interiorFloorColor: nextColor, updatedAt: now() };
+  }, []);
 
   const setWalls = useCallback((walls: ShopBuilderWall[]) => {
-    setLayout((prev) => ({ ...prev, walls, updatedAt: now() }));
-  }, []);
+    setLayout((prev) => computeNextLayoutWithFloorTint(prev, walls));
+  }, [computeNextLayoutWithFloorTint]);
 
   const setProducts = useCallback((products: ShopBuilderProduct[]) => {
     setLayout((prev) => ({ ...prev, products, updatedAt: now() }));
   }, []);
 
   const setCamera = useCallback((camera: ShopBuilderCameraState) => {
-    setLayout((prev) => ({ ...prev, camera, updatedAt: now() }));
+    // Camera is ephemeral — do NOT set updatedAt to avoid triggering save chains
+    setLayout((prev) => ({ ...prev, camera }));
   }, []);
 
   const setFloorTexture = useCallback((texture: string) => {
@@ -305,24 +303,23 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
         ...wall,          // Then apply updates
       } as ShopBuilderWall;
 
-      const walls = existingWall
+      const newWalls = existingWall 
         ? prev.walls.map((w) => (w.id === id ? nextWall : w))
         : [...prev.walls, nextWall];
-
-      return { ...prev, walls, updatedAt: now() };
+        
+      return computeNextLayoutWithFloorTint(prev, newWalls);
     });
     setSelectedWallId(id);
     return id;
-  }, []);
+  }, [computeNextLayoutWithFloorTint]);
 
   const removeWall = useCallback((id: string) => {
-    setLayout((prev) => ({
-      ...prev,
-      walls: prev.walls.filter((w) => w.id !== id),
-      updatedAt: now(),
-    }));
+    setLayout((prev) => {
+      const newWalls = prev.walls.filter((w) => w.id !== id);
+      return computeNextLayoutWithFloorTint(prev, newWalls);
+    });
     setSelectedWallId((current) => (current === id ? null : current));
-  }, []);
+  }, [computeNextLayoutWithFloorTint]);
 
   const upsertProduct = useCallback((product: Partial<ShopBuilderProduct> & { id?: string }) => {
     const id = product.id ?? crypto.randomUUID();

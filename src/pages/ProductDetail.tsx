@@ -650,7 +650,8 @@ const MobileProductDetail = ({
   setShowCommentsModal,
   social,
   hidePrices,
-  onRatingSubmit
+  isAdminViewing = false,
+  onRatingSubmit,
 }: {
   product: ApiProduct;
   productFamily: StorefrontProductFamily | null;
@@ -670,6 +671,7 @@ const MobileProductDetail = ({
   setShowCommentsModal: (show: boolean) => void;
   social: any;
   hidePrices: boolean;
+  isAdminViewing?: boolean;
   onRatingSubmit: () => void;
 }) => {
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -915,6 +917,21 @@ const MobileProductDetail = ({
           </div>
         )}
 
+        {/* Admin-only price badge — always visible regardless of hidePrices setting */}
+        {isAdminViewing && (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 shadow-sm">
+            <span className="text-xs font-semibold text-amber-700">🛡 سعر الإدارة</span>
+            <span className="text-base font-bold text-amber-900 tabular-nums">
+              {product.price.toLocaleString('ar-EG')} ج.م
+            </span>
+            {product.originalPrice && product.originalPrice > product.price && (
+              <span className="text-sm text-amber-600 line-through tabular-nums">
+                {product.originalPrice.toLocaleString('ar-EG')}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* Action Hub - Completely redesigned for better integration */}
         <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
 
@@ -931,6 +948,21 @@ const MobileProductDetail = ({
             </div>
           )}
         </div>
+
+        {/* Admin-only price badge — always visible regardless of hidePrices setting */}
+        {isAdminViewing && (
+          <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 shadow-sm">
+            <span className="text-xs font-semibold text-amber-700">🛡 سعر الإدارة</span>
+            <span className="text-base font-bold text-amber-900 tabular-nums">
+              {product.price.toLocaleString('ar-EG')} ج.م
+            </span>
+            {product.originalPrice && product.originalPrice > product.price && (
+              <span className="text-sm text-amber-600 line-through tabular-nums">
+                {product.originalPrice.toLocaleString('ar-EG')}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Price and Quantity - Only show when hidePrices is false */}
         {!hidePrices && (
@@ -1069,14 +1101,15 @@ const MobileProductDetail = ({
                 <ProductFamilyCurrentOptionDetails product={product} productFamily={productFamily} />
               ) : null}
 
+              {product.descriptionAr?.trim() ? (
               <div>
                 <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
                 <p className="text-sm text-slate-700 leading-relaxed">
                   {showFullDescription
-                    ? (product.descriptionAr || product.description)
-                    : (product.descriptionAr || product.description)?.slice(0, 150) + '...'}
+                    ? product.descriptionAr
+                    : product.descriptionAr.slice(0, 150) + '...'}
                 </p>
-                {(product.descriptionAr || product.description)?.length > 150 && (
+                {product.descriptionAr.length > 150 && (
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1087,7 +1120,9 @@ const MobileProductDetail = ({
                   </Button>
                 )}
               </div>
+              ) : null}
 
+              {((product.weight != null && product.weight > 0) || product.dimensions) ? (
               <div className="space-y-3 pt-2 border-t border-slate-100">
                 <h3 className="font-bold text-slate-900">مواصفات إضافية</h3>
                 <div className="space-y-3">
@@ -1107,6 +1142,7 @@ const MobileProductDetail = ({
                   )}
                 </div>
               </div>
+              ) : null}
             </div>
           )}
 
@@ -1269,7 +1305,8 @@ const DesktopProductDetail = ({
   setShowCommentsModal,
   social,
   hidePrices,
-  onRatingSubmit
+  isAdminViewing = false,
+  onRatingSubmit,
 }: {
   product: ApiProduct;
   productFamily: StorefrontProductFamily | null;
@@ -1289,6 +1326,7 @@ const DesktopProductDetail = ({
   setShowCommentsModal: (show: boolean) => void;
   social: any;
   hidePrices: boolean;
+  isAdminViewing?: boolean;
   onRatingSubmit: () => void;
 }) => {
   const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
@@ -1495,6 +1533,21 @@ const DesktopProductDetail = ({
               </div>
             )}
 
+            {/* Admin-only price badge — always visible regardless of hidePrices setting */}
+            {isAdminViewing && (
+              <div className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 shadow-sm">
+                <span className="text-xs font-semibold text-amber-700">🛡 سعر الإدارة</span>
+                <span className="text-base font-bold text-amber-900 tabular-nums">
+                  {product.price.toLocaleString('ar-EG')} ج.م
+                </span>
+                {product.originalPrice && product.originalPrice > product.price && (
+                  <span className="text-sm text-amber-600 line-through tabular-nums">
+                    {product.originalPrice.toLocaleString('ar-EG')}
+                  </span>
+                )}
+              </div>
+            )}
+
             {/* Price and Quantity - Only show when hidePrices is false */}
             {!hidePrices && (
               <div className="bg-white rounded-xl border border-slate-200 shadow-sm">
@@ -1631,14 +1684,15 @@ const DesktopProductDetail = ({
                     <ProductFamilyCurrentOptionDetails product={product} productFamily={productFamily} />
                   ) : null}
 
+                  {product.descriptionAr?.trim() ? (
                   <div>
                     <h3 className="font-bold text-slate-900 mb-2">وصف المنتج</h3>
                     <p className="text-sm text-slate-700 leading-relaxed">
                       {showFullDescription
-                        ? (product.descriptionAr || product.description)
-                        : (product.descriptionAr || product.description)?.slice(0, 150) + '...'}
+                        ? product.descriptionAr
+                        : product.descriptionAr.slice(0, 150) + '...'}
                     </p>
-                    {(product.descriptionAr || product.description)?.length > 150 && (
+                    {product.descriptionAr.length > 150 && (
                       <Button
                         variant="ghost"
                         size="sm"
@@ -1649,7 +1703,9 @@ const DesktopProductDetail = ({
                       </Button>
                     )}
                   </div>
+                  ) : null}
 
+                  {((product.weight != null && product.weight > 0) || product.dimensions) ? (
                   <div className="space-y-3 pt-2 border-t border-slate-100">
                     <h3 className="font-bold text-slate-900">مواصفات إضافية</h3>
                     <div className="space-y-3">
@@ -1669,6 +1725,7 @@ const DesktopProductDetail = ({
                       )}
                     </div>
                   </div>
+                  ) : null}
                 </div>
               )}
 
@@ -1821,7 +1878,8 @@ const ProductDetail = () => {
   const { toast } = useToast();
   const { isMobile } = useDeviceDetection();
   const { social } = useSettings();
-  const { isAuthenticated } = useDualAuth();
+  const { isAuthenticated, isAdmin, isAdminAuthenticated } = useDualAuth();
+  const isAdminViewing = isAdmin || isAdminAuthenticated;
   const { hidePrices, contactMessage, familyCardsInListings } = usePricingSettings();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showCommentsModal, setShowCommentsModal] = useState(false);
@@ -2293,6 +2351,7 @@ const ProductDetail = () => {
           setShowCommentsModal={setShowCommentsModal}
           social={social}
           hidePrices={hidePrices}
+          isAdminViewing={isAdminViewing}
           onRatingSubmit={refreshRatings}
         />
       ) : (
@@ -2315,6 +2374,7 @@ const ProductDetail = () => {
           setShowCommentsModal={setShowCommentsModal}
           social={social}
           hidePrices={hidePrices}
+          isAdminViewing={isAdminViewing}
           onRatingSubmit={refreshRatings}
         />
       )}

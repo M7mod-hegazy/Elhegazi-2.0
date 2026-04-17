@@ -2275,6 +2275,29 @@ app.post('/api/builder/projects', async (req, res) => {
       }
     }
 
+    // Anti-duplicate rule: Check if a project with identical content already exists
+    const recentDuplicate = await BuilderProject.findOne({
+      ownerActorKey,
+      title,
+      'stats.wallsCount': stats.wallsCount,
+      'stats.productsCount': stats.productsCount,
+      isDeleted: false
+    }).sort({ createdAt: -1 });
+
+    if (recentDuplicate) {
+      const clone1 = JSON.parse(JSON.stringify(layout));
+      delete clone1.updatedAt;
+      delete clone1.createdAt;
+      
+      const clone2 = JSON.parse(JSON.stringify(recentDuplicate.layout || {}));
+      delete clone2.updatedAt;
+      delete clone2.createdAt;
+
+      if (JSON.stringify(clone1) === JSON.stringify(clone2)) {
+         return res.status(200).json({ ok: true, item: mapBuilderProjectListItem(recentDuplicate.toObject()) });
+      }
+    }
+
     const created = await BuilderProject.create({
       ownerUserId,
       ownerActorKey,

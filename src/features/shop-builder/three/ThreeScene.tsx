@@ -19,6 +19,7 @@ import { useShopBuilder } from '../store';
 import type { ShopBuilderProduct, ShopBuilderWall, ShopBuilderColumn, ShopBuilderSlatWall } from '../types';
 import type { CameraMode } from '../store';
 import { createProceduralHangGroup } from './proceduralProducts';
+import { computeSupermarketLayouts } from '../utils/supermarketSections';
 import { findShopEnclosurePolygon } from '../utils/enclosedShopPolygon';
 
 
@@ -1503,7 +1504,7 @@ const ThreeScene = forwardRef<ThreeSceneHandle, { transformMode: TransformMode; 
       shape.closePath();
 
       const geom = new THREE.ShapeGeometry(shape);
-      geom.rotateX(-Math.PI / 2);
+      geom.rotateX(Math.PI / 2); // Map 2D Y to 3D Z correctly
       const mat = new THREE.MeshStandardMaterial({
         color: new THREE.Color(tint),
         roughness: 0.88,
@@ -2589,8 +2590,33 @@ function createSupermarketShelvesMesh(group: THREE.Group, slat: ShopBuilderSlatW
       const segWidth = seg.end - seg.start;
       if (segWidth < 0.1) return;
       
-      const baysCount = Math.ceil(segWidth / uprightSpacing);
-      const bayWidth = segWidth / baysCount;
+      let baysCount = Math.ceil(segWidth / uprightSpacing);
+      let bayWidths: number[] = Array.from({ length: baysCount }).fill(segWidth / baysCount) as number[];
+      
+      // If we have a computed layout AND this is the complete system (close enough to the intended width), use sections
+      if (slat.supermarketLayout) {
+         const sections = slat.supermarketLayout.sections;
+         const totalLayoutWidth = sections.reduce((acc, s) => acc + s.widthCm / 100, 0);
+         
+         if (Math.abs(segWidth - totalLayoutWidth) < 0.2) {
+             baysCount = sections.length;
+             bayWidths = sections.map(s => s.widthCm / 100);
+         } else {
+             // Segment is split by architectural columns
+             const subLayouts = computeSupermarketLayouts(segWidth * 100);
+             if (subLayouts.length > 0) {
+                 baysCount = subLayouts[0].sections.length;
+                 bayWidths = subLayouts[0].sections.map(s => s.widthCm / 100);
+             }
+         }
+      } else {
+         // Fallback to auto-best if no global layout chosen
+         const subLayouts = computeSupermarketLayouts(segWidth * 100);
+         if (subLayouts.length > 0) {
+             baysCount = subLayouts[0].sections.length;
+             bayWidths = subLayouts[0].sections.map(s => s.widthCm / 100);
+         }
+      }
       
       const segCenter = (seg.start + seg.end) / 2;
       const segLocalX = (segCenter - (slatPosCenter * wallLength)) * sideFlip;
@@ -2608,27 +2634,33 @@ function createSupermarketShelvesMesh(group: THREE.Group, slat: ShopBuilderSlatW
       const uprightDepth = 0.04;
       const uprightGeom = new THREE.BoxGeometry(uprightWidth, sysHeight, uprightDepth);
       
-      for(let i = 0; i <= baysCount; i++) {
-         const upX = -segWidth/2 + i * bayWidth;
-         const upright = new THREE.Mesh(uprightGeom, uprightMaterial);
-         upright.position.set(upX, 0, 0.02 + 0.01);
-         segGroup.add(upright);
-      }
+      let currentUprightX = -segWidth/2;
+      
+      // Draw first upright
+      const firstUpright = new THREE.Mesh(uprightGeom, uprightMaterial);
+      firstUpright.position.set(currentUprightX, 0, 0.02 + 0.01);
+      segGroup.add(firstUpright);
       
       for(let i = 0; i < baysCount; i++) {
-         const bayCenterX = -segWidth/2 + (i + 0.5) * bayWidth;
+         const bWidth = bayWidths[i];
+         const bayCenterX = currentUprightX + bWidth / 2;
+         currentUprightX += bWidth;
+         
+         const upright = new THREE.Mesh(uprightGeom, uprightMaterial);
+         upright.position.set(currentUprightX, 0, 0.02 + 0.01);
+         segGroup.add(upright);
          
          for(let j = 0; j < shelfCount; j++) {
              const isBaseShelf = j === 0;
              const sDepth = isBaseShelf ? shelfDepth + 0.05 : shelfDepth;
              const shelfY = 0.15 + j * ((sysHeight - 0.3) / Math.max(1, shelfCount - 1));
              
-             const shelfGeom = new THREE.BoxGeometry(bayWidth - 0.01, 0.02, sDepth);
+             const shelfGeom = new THREE.BoxGeometry(bWidth - 0.01, 0.02, sDepth);
              const shelfMesh = new THREE.Mesh(shelfGeom, shelfMaterial);
              shelfMesh.position.set(bayCenterX, shelfY - sysHeight/2, sDepth/2 + 0.01);
              segGroup.add(shelfMesh);
              
-             const accentGeom = new THREE.BoxGeometry(bayWidth - 0.01, 0.03, 0.01);
+             const accentGeom = new THREE.BoxGeometry(bWidth - 0.01, 0.03, 0.01);
              const accentMesh = new THREE.Mesh(accentGeom, accentMaterial);
              accentMesh.position.set(bayCenterX, shelfY - sysHeight/2 - 0.005, sDepth + 0.015);
              segGroup.add(accentMesh);
@@ -2636,17 +2668,17 @@ function createSupermarketShelvesMesh(group: THREE.Group, slat: ShopBuilderSlatW
              if (!isBaseShelf) {
                  const bracketGeom = new THREE.BoxGeometry(0.01, 0.1, sDepth - 0.02);
                  const leftBracket = new THREE.Mesh(bracketGeom, uprightMaterial);
-                 leftBracket.position.set(bayCenterX - bayWidth/2 + 0.02, shelfY - sysHeight/2 - 0.05, sDepth/2 + 0.01);
+                 leftBracket.position.set(bayCenterX - bWidth/2 + 0.02, shelfY - sysHeight/2 - 0.05, sDepth/2 + 0.01);
                  const rightBracket = new THREE.Mesh(bracketGeom, uprightMaterial);
-                 rightBracket.position.set(bayCenterX + bayWidth/2 - 0.02, shelfY - sysHeight/2 - 0.05, sDepth/2 + 0.01);
+                 rightBracket.position.set(bayCenterX + bWidth/2 - 0.02, shelfY - sysHeight/2 - 0.05, sDepth/2 + 0.01);
                  segGroup.add(leftBracket);
                  segGroup.add(rightBracket);
              } else {
                  const legGeom = new THREE.BoxGeometry(0.04, 0.14, sDepth);
                  const legLeft = new THREE.Mesh(legGeom, uprightMaterial);
-                 legLeft.position.set(bayCenterX - bayWidth/2 + 0.02, -sysHeight/2 + 0.07, sDepth/2 + 0.01);
+                 legLeft.position.set(bayCenterX - bWidth/2 + 0.02, -sysHeight/2 + 0.07, sDepth/2 + 0.01);
                  const legRight = new THREE.Mesh(legGeom, uprightMaterial);
-                 legRight.position.set(bayCenterX + bayWidth/2 - 0.02, -sysHeight/2 + 0.07, sDepth/2 + 0.01);
+                 legRight.position.set(bayCenterX + bWidth/2 - 0.02, -sysHeight/2 + 0.07, sDepth/2 + 0.01);
                  segGroup.add(legLeft);
                  segGroup.add(legRight);
              }

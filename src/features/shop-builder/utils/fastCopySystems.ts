@@ -53,6 +53,8 @@ export const copySourceWallSystemsToAllWalls = (
 
   const nextWalls = walls.map((wall) => {
     if (wall.id === sourceWallId) return wall;
+    // Skip doors — they can't host display systems
+    if (wall.texture?.startsWith('door_')) return wall;
     copiedWallsCount += 1;
 
     const kept = (wall.slatWalls || []).filter((s) => !isWallFaceSide(s.side));
@@ -113,6 +115,8 @@ export const copySourceWallSystemsToTargets = (
 
   const nextWalls = walls.map((wall) => {
     if (!validTargets.has(wall.id)) return wall;
+    // Skip doors — they can't host display systems
+    if (wall.texture?.startsWith('door_')) return wall;
     copiedWallsCount += 1;
 
     const targetWallLength = Math.max(0.001, wallLength(wall));

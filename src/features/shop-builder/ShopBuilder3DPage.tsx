@@ -15,6 +15,7 @@ import {
   wallSegmentWithLength,
   type DoorMaterial,
 } from './utils/wallKind';
+import { computeSupermarketLayouts } from './utils/supermarketSections';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Maximize2, Minimize2, Trash2, X, Focus, Palette, Edit2, RotateCcw, ArrowDown, Store, MapPin, Phone, Clock, Plus, ChevronUp, Grid3x3, Info, Save, ArrowRight, CheckCircle2, AlertTriangle, Loader2, Copy, Package } from 'lucide-react';
@@ -511,9 +512,8 @@ function InteractiveSlatNode({
               const outer = normalizeHexColor(slat.outerColor || base, base);
               return {
                 backgroundColor: rgbaFromHex(base, 0.22),
-                backgroundImage: `repeating-linear-gradient(90deg, ${rgbaFromHex(outer, 0.86)} 0px, ${rgbaFromHex(outer, 0.86)} 4px, transparent 4px, transparent ${Math.max(1, ((slat.uprightSpacing || 1.0) / width) * 100)}%), 
-                repeating-linear-gradient(0deg, transparent, transparent calc(${100 / (slat.shelfCount || 5)}% - 4px), ${rgbaFromHex(outer, 1)} calc(${100 / (slat.shelfCount || 5)}% - 4px), ${rgbaFromHex(outer, 1)} ${100 / (slat.shelfCount || 5)}%)`,
-                backgroundSize: '100% 100%, 100% 100%',
+                backgroundImage: `repeating-linear-gradient(0deg, transparent, transparent calc(${100 / (slat.shelfCount || 5)}% - 4px), ${rgbaFromHex(outer, 1)} calc(${100 / (slat.shelfCount || 5)}% - 4px), ${rgbaFromHex(outer, 1)} ${100 / (slat.shelfCount || 5)}%)`,
+                backgroundSize: '100% 100%',
               };
             })()
           : {
@@ -584,10 +584,64 @@ function InteractiveSlatNode({
           {Array.from({ length: primoBaysCount + 1 }).map((_, idx) => (
             <div
               key={`primo-upright-${idx}`}
-              className="absolute top-0 bottom-0 border-r border-slate-500/45"
-              style={{ left: `${(idx / primoBaysCount) * 100}%` }}
+              className="absolute top-0 bottom-0 border-r-4"
+              style={{ 
+                 left: `${(idx / primoBaysCount) * 100}%`,
+                 borderColor: 'rgba(30,41,59,0.45)',
+                 transform: 'translateX(-50%)'
+              }}
             />
           ))}
+        </div>
+      )}
+
+      {slat.systemType === 'supermarket_shelves' && (
+        <div className="absolute inset-0 pointer-events-none">
+          {(() => {
+             const base = normalizeHexColor(slat.color || '#dc2626');
+             const outer = normalizeHexColor(slat.outerColor || base, base);
+             if (slat.supermarketLayout) {
+                 const cols = [];
+                 let currentCm = 0;
+                 const sectionWidths = slat.supermarketLayout.sections.map(s => s.widthCm);
+                 const totalCm = sectionWidths.reduce((a,b)=>a+b, 0); 
+                 
+                 // Add first column
+                 cols.push(0);
+                 
+                 for (let i = 0; i < sectionWidths.length; i++) {
+                     currentCm += sectionWidths[i];
+                     cols.push(currentCm / totalCm * 100);
+                 }
+                 
+                 return cols.map((pct, idx) => (
+                    <div
+                      key={`sm-upright-${idx}`}
+                      className="absolute top-0 bottom-0 border-r-4 shadow-sm"
+                      style={{ 
+                         left: `${pct}%`,
+                         borderColor: outer,
+                         transform: 'translateX(-50%)'
+                      }}
+                    />
+                 ));
+             } else {
+                // Fallback to uprightSpacing
+                const spacing = Math.max(0.2, slat.uprightSpacing || 1.0);
+                const count = Math.max(1, Math.round(width / spacing));
+                return Array.from({ length: count + 1 }).map((_, idx) => (
+                    <div
+                      key={`sm-upright-fb-${idx}`}
+                      className="absolute top-0 bottom-0 border-r-4 shadow-sm"
+                      style={{ 
+                         left: `${(idx / count) * 100}%`,
+                         borderColor: outer,
+                         transform: 'translateX(-50%)'
+                      }}
+                    />
+                ));
+             }
+          })()}
         </div>
       )}
     </div>
@@ -795,6 +849,12 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
   }, [activeSide, copyBothSides, layout.walls, setWalls, sourceWallNumber, targetId, targetWallIds, toast, type]);
 
   const areAllTargetsSelected = availableTargetWalls.length > 0 && targetWallIds.length === availableTargetWalls.length;
+
+  const supermarketOptions = useMemo(() => {
+    if (selectedSlat?.systemType !== 'supermarket_shelves') return [];
+    const widthCm = Math.round((selectedSlat.fillType === 'full' ? wallLength : (selectedSlat.width || 1)) * 100);
+    return computeSupermarketLayouts(widthCm);
+  }, [selectedSlat?.systemType, selectedSlat?.fillType, selectedSlat?.width, wallLength]);
    
   return (
     <div ref={managerRootRef} className="mt-4 w-full h-full flex flex-col gap-3" style={{ minHeight: 'calc(85vh - 150px)' }}>
@@ -1290,9 +1350,45 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                         <input type="number" step="0.05" min="0.2" value={selectedSlat.shelfDepth || 0.4} onChange={e => updateSlatWall(targetId, selectedSlat.id, {shelfDepth: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                      </div>
                    </div>
-                   <div className="flex flex-col gap-1.5">
-                      <label className="text-xs font-semibold text-zinc-600">المسافة بين الأعمدة (م)</label>
-                      <input type="number" step="0.1" min="0.6" value={selectedSlat.uprightSpacing || 1.0} onChange={e => updateSlatWall(targetId, selectedSlat.id, {uprightSpacing: Number(e.target.value)})} className="w-full p-1.5 border border-zinc-200 rounded-md text-sm outline-none focus:border-blue-500"/>
+                   <div className="flex flex-col gap-1.5 mt-2 border-t border-zinc-100 pt-2">
+                      <label className="text-xs font-semibold text-zinc-600">تكوين النظام (تلقائي)</label>
+                      {supermarketOptions.length === 0 ? (
+                        <p className="text-[10px] text-zinc-500 bg-zinc-50 p-2 rounded border border-zinc-200">العرض صغير جداً لإضافة أرفف</p>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {supermarketOptions.map((opt, i) => {
+                             const isSelected = selectedSlat.supermarketLayout?.label === opt.label || 
+                                               (i === 0 && !selectedSlat.supermarketLayout);
+                             return (
+                               <button 
+                                 key={i}
+                                 onClick={() => updateSlatWall(targetId, selectedSlat.id, { supermarketLayout: opt })}
+                                 className={`p-3 text-right rounded-xl border flex flex-col gap-1 transition-all ${isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary/20 shadow-sm' : 'border-zinc-200 bg-zinc-50 hover:bg-zinc-100'}`}
+                               >
+                                 <div className="flex justify-between items-center w-full">
+                                    <div className="flex items-center gap-2">
+                                      {isSelected ? <CheckCircle2 className="w-4 h-4 text-primary" /> : <div className="w-4 h-4 rounded-full border border-zinc-300" />}
+                                      <span className="text-xs font-bold text-zinc-900">{opt.label.split(' | ')[0]}</span>
+                                    </div>
+                                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${opt.emptySpaceCm < 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'}`}>
+                                      {opt.emptySpaceCm < 0 ? `تجاوز ${Math.abs(opt.emptySpaceCm)}سم` : `فراغ ${opt.emptySpaceCm}سم`}
+                                    </span>
+                                 </div>
+                                 <div className="flex items-center gap-3 mr-6">
+                                   <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                                      {opt.columnCount} أعمدة
+                                   </span>
+                                   <span className="text-[10px] text-zinc-500 flex items-center gap-1">
+                                      <div className="w-1.5 h-1.5 rounded-full bg-zinc-400" />
+                                      {opt.sections.length} أقسام
+                                   </span>
+                                 </div>
+                               </button>
+                             );
+                          })}
+                        </div>
+                      )}
                    </div>
                 </>
               )}
@@ -1756,26 +1852,35 @@ const ShopBuilderContent = () => {
   }, []);
 
   // Save state to history when layout changes (but not during undo/redo)
+  // DEBOUNCED to prevent expensive JSON.stringify on every micro-change
   useEffect(() => {
     if (isUndoRedoingRef.current || history.length === 0) return;
 
-    const newStateStr = JSON.stringify(layout);
-
-    // Only save if state actually changed
-    if (newStateStr !== lastSavedStateRef.current) {
-      const newState = JSON.parse(newStateStr);
-      setHistory(prev => {
-        const branched = prev.slice(0, historyIndex + 1);
-        branched.push(newState);
-        const trimmed = branched.slice(-100); // Keep last 100 states
-        setHistoryIndex(trimmed.length - 1);
-        return trimmed;
-      });
-      lastSavedStateRef.current = newStateStr;
-    }
+    const timeout = setTimeout(() => {
+      const newStateStr = JSON.stringify(layout);
+      if (newStateStr !== lastSavedStateRef.current) {
+        const newState = JSON.parse(newStateStr);
+        setHistory(prev => {
+          const branched = prev.slice(0, historyIndex + 1);
+          branched.push(newState);
+          const trimmed = branched.slice(-50); // Keep last 50 states
+          setHistoryIndex(trimmed.length - 1);
+          return trimmed;
+        });
+        lastSavedStateRef.current = newStateStr;
+      }
+    }, 500);
+    return () => clearTimeout(timeout);
   }, [layout, historyIndex, history.length]);
 
-  const serializedLayout = useMemo(() => JSON.stringify(layout), [layout]);
+  // Debounced serialized layout to prevent expensive stringify on every interaction
+  const [serializedLayout, setSerializedLayout] = useState(() => JSON.stringify(layout));
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSerializedLayout(JSON.stringify(layout));
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, [layout]);
 
   const persistProject = useCallback(async (mode: 'auto' | 'manual' = 'manual') => {
     if (!projectId || !hasLoadedProjectRef.current) return;
@@ -1814,7 +1919,6 @@ const ShopBuilderContent = () => {
 
   useEffect(() => {
     if (projectId || hasLoadedProjectRef.current || isCreatingProjectRef.current) return;
-    let cancelled = false;
     isCreatingProjectRef.current = true;
     (async () => {
       try {
@@ -1822,24 +1926,18 @@ const ShopBuilderContent = () => {
           title: layout.shopName ? `مشروع ${layout.shopName}` : 'مشروع جديد',
           layout,
         });
-        if (cancelled) return;
         hasLoadedProjectRef.current = true;
         navigate(`/shop-builder/editor/${created._id}`, { replace: true });
       } catch (err) {
-        if (cancelled) return;
         toast({
           title: 'تعذر إنشاء مشروع جديد',
           description: err instanceof Error ? err.message : 'حدث خطأ غير متوقع',
           variant: 'destructive',
         });
         navigate('/shop-builder/projects', { replace: true });
-      } finally {
         isCreatingProjectRef.current = false;
       }
     })();
-    return () => {
-      cancelled = true;
-    };
   }, [actions.createProject, layout, navigate, projectId, toast]);
 
   useEffect(() => {
@@ -1881,7 +1979,7 @@ const ShopBuilderContent = () => {
     if (saveTimerRef.current) window.clearTimeout(saveTimerRef.current);
     saveTimerRef.current = window.setTimeout(() => {
       void persistProject('auto');
-    }, 1800);
+    }, 5000);
     return () => {
       if (saveTimerRef.current) {
         window.clearTimeout(saveTimerRef.current);

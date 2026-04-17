@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildProductPath } from '@/lib/product-link';
 import {
@@ -17,6 +18,7 @@ type Props = {
 export function FamilyListingCard({ family, className = '' }: Props) {
   const navigate = useNavigate();
   const { hidePrices, familyCardsInListings } = usePricingSettings();
+  const [hoveredImg, setHoveredImg] = useState<string | null>(null);
 
   const def = family.variants.find((v) => v.productId === family.defaultProductId) || family.variants[0];
   const activeVariants = family.variants.filter((v) => v.active !== false);
@@ -27,6 +29,7 @@ export function FamilyListingCard({ family, className = '' }: Props) {
   const showSingle = !hidePrices && prices.length > 0;
 
   const img = def?.image || '';
+  const displayImg = hoveredImg || img;
   const familyTitle = String(family.nameAr || family.name || '').trim() || 'مجموعة منتجات';
   const legacyTitle = def?.nameAr || familyTitle;
   const defaultDetailPath = buildProductPath(family.defaultProductId);
@@ -62,16 +65,30 @@ export function FamilyListingCard({ family, className = '' }: Props) {
       >
         <div className="relative aspect-[10/7] overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 sm:aspect-[4/3]">
           {img ? (
-            <img
-              src={optimizeImage(img, { w: 320 })}
-              alt={familyTitle}
-              className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
-              loading="lazy"
-              decoding="async"
-              srcSet={buildSrcSet(img, 320)}
-              sizes="(max-width: 640px) 50vw, 320px"
-              onError={applyProductImageFallback}
-            />
+            <>
+              {/* base image */}
+              <img
+                src={optimizeImage(img, { w: 320 })}
+                alt={familyTitle}
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                loading="lazy"
+                decoding="async"
+                srcSet={buildSrcSet(img, 320)}
+                sizes="(max-width: 640px) 50vw, 320px"
+                onError={applyProductImageFallback}
+              />
+              {/* hovered variant overlay — crossfade */}
+              {hoveredImg && hoveredImg !== img && (
+                <img
+                  key={hoveredImg}
+                  src={optimizeImage(hoveredImg, { w: 320 })}
+                  alt={familyTitle}
+                  className="absolute inset-0 h-full w-full object-cover animate-[fadeIn_0.28s_ease_forwards]"
+                  style={{ animation: 'familyCardFadeIn 0.28s ease forwards' }}
+                  onError={applyProductImageFallback}
+                />
+              )}
+            </>
           ) : (
             <div className="flex h-full w-full items-center justify-center text-sm text-slate-400">بدون صورة</div>
           )}
@@ -127,6 +144,10 @@ export function FamilyListingCard({ family, className = '' }: Props) {
                       e.stopPropagation();
                       navigate(path);
                     }}
+                    onMouseEnter={() => {
+                      if (v.image) setHoveredImg(v.image);
+                    }}
+                    onMouseLeave={() => setHoveredImg(null)}
                     className="max-w-[11rem] truncate rounded-lg border-2 border-slate-200 bg-white px-3 py-1.5 text-center text-xs font-semibold text-slate-800 shadow-sm transition-all hover:border-primary hover:bg-primary/5 hover:text-primary sm:text-sm"
                     aria-label={`${familyTitle} — ${chip}`}
                   >

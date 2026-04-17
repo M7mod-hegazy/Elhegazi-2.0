@@ -1,18 +1,19 @@
 import type { ShopBuilderWall } from '../types';
 
-function quantKey(x: number, y: number): string {
-  const qx = Math.round(x * 100) / 100;
-  const qy = Math.round(y * 100) / 100;
-  return `${qx.toFixed(2)},${qy.toFixed(2)}`;
-}
+// Distance threshold for snapping endpoints to close loops (10cm)
+const SNAP_TOLERANCE = 0.1;
 
-function mergeVertex(map: Map<string, { x: number; y: number }>, key: string, p: { x: number; y: number }) {
-  const cur = map.get(key);
-  if (!cur) {
-    map.set(key, { x: p.x, y: p.y });
-  } else {
-    map.set(key, { x: (cur.x + p.x) / 2, y: (cur.y + p.y) / 2 });
+export function getMergedVertexKey(x: number, y: number, posMap: Map<string, { x: number; y: number }>): string {
+  for (const [k, p] of posMap.entries()) {
+    if (Math.hypot(x - p.x, y - p.y) <= SNAP_TOLERANCE) {
+      // Small drift: merge towards average
+      posMap.set(k, { x: (p.x + x) / 2, y: (p.y + y) / 2 });
+      return k;
+    }
   }
+  const newKey = `${x.toFixed(4)},${y.toFixed(4)}`;
+  posMap.set(newKey, { x, y });
+  return newKey;
 }
 
 function polygonArea(poly: { x: number; y: number }[]): number {
@@ -66,11 +67,9 @@ export function findShopEnclosurePolygon(
   const edges: Edge[] = [];
 
   for (const w of walls) {
-    const a = quantKey(w.start.x, w.start.y);
-    const b = quantKey(w.end.x, w.end.y);
+    const a = getMergedVertexKey(w.start.x, w.start.y, pos);
+    const b = getMergedVertexKey(w.end.x, w.end.y, pos);
     if (a === b) continue;
-    mergeVertex(pos, a, w.start);
-    mergeVertex(pos, b, w.end);
     edges.push({ id: w.id, a, b });
   }
 
@@ -90,7 +89,7 @@ export function findShopEnclosurePolygon(
     return e.a === v ? e.b : e.a;
   }
 
-  let best: { verts: { x: number; y: number }[]; area: number } | null = null;
+  let best: { vertices: { x: number; y: number }[]; area: number } | null = null;
 
   function dfs(start: string, curr: string, path: string[], used: Set<string>) {
     if (path.length > maxN) return;

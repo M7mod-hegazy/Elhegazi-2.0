@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Ruler, Rotate3D, Scan, Save, Upload, Search, Package, Eye, EyeOff, SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, TrendingUp, Star, Clock, Settings, Download, FileUp, RotateCcw, X, Palette, Edit2, Printer, LogOut, Camera } from 'lucide-react';
+import { Plus, Ruler, Rotate3D, Scan, Save, Upload, Search, Package, Eye, EyeOff, SlidersHorizontal, Grid3x3, List, ChevronLeft, ChevronRight, TrendingUp, Star, Clock, Settings, Download, FileUp, RotateCcw, X, Palette, Edit2, Printer, LogOut, Camera, Info, BarChart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import { WALL_TEXTURES, FLOOR_TEXTURES } from '../three/ThreeScene';
 import { createDoorWallDraft, type DoorMaterial } from '../utils/wallKind';
 import { findShopEnclosurePolygon } from '../utils/enclosedShopPolygon';
 import { generateAutoHungProductsList, MAX_AUTO_HUNG_PRODUCTS } from '../three/proceduralProducts';
+import { computeSupermarketLayouts } from '../utils/supermarketSections';
 
 // Wall texture options - mapped from WALL_TEXTURES
 const WALL_TEXTURE_OPTIONS = [
@@ -139,6 +140,7 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
   const [wallSettingsOpen, setWallSettingsOpen] = useState(false);
   const [floorTextureOpen, setFloorTextureOpen] = useState(false);
   const [wallTextureOpen, setWallTextureOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
 
   // 3D Products from database
   const [products3D, setProducts3D] = useState<Product3D[]>([]);
@@ -470,16 +472,17 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
     }
   }, []);
 
-  const estimateFootprint = useCallback((candidate: Product3D | { scale?: { x: number; z: number } }) => {
-    if ('dimensions' in candidate && candidate.dimensions) {
+  const estimateFootprint = useCallback((candidate: any) => {
+    if (candidate.dimensions) {
       return {
         width: Math.max(0.9, candidate.dimensions.width || 1),
         depth: Math.max(0.9, candidate.dimensions.depth || 1),
       };
     }
+    const scale = candidate.scale || { x: 1, z: 1 };
     return {
-      width: Math.max(0.9, candidate.scale?.x || 1),
-      depth: Math.max(0.9, candidate.scale?.z || 1),
+      width: Math.max(0.9, scale.x || 1),
+      depth: Math.max(0.9, scale.z || 1),
     };
   }, []);
 
@@ -813,6 +816,176 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
+          
+          <div className="hidden sm:block w-px h-7 bg-zinc-200" />
+          
+          {/* Shop Info Panel Button */}
+          <Dialog open={infoOpen} onOpenChange={setInfoOpen}>
+            <DialogTrigger asChild>
+              <Button
+                variant="outline"
+                className="h-11 sm:h-11 px-4 gap-2 font-bold text-base sm:text-sm border-0 bg-white hover:bg-zinc-50"
+              >
+                <BarChart className="h-5 w-5 sm:h-4 sm:w-4 text-emerald-600" />
+                <span className="hidden sm:inline">معلومات المحل</span>
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg" dir="rtl">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                  <BarChart className="w-5 h-5 text-emerald-600" />
+                  ملخص بيانات المحل
+                </DialogTitle>
+                <DialogDescription>
+                  إحصائيات تفصيلية لمكونات المحل والتصميم الحالي.
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-3 py-2 max-h-[65vh] overflow-y-auto pr-1">
+
+                {/* ── Quick stats ── */}
+                <div className="grid grid-cols-4 gap-2">
+                  {[
+                    { label: 'الجدران',    value: layout.walls.length },
+                    { label: 'الأبواب',    value: layout.walls.filter((w: any) => w.texture?.startsWith('door_')).length },
+                    { label: 'المنتجات',   value: layout.products.filter((p: any) => !(p.metadata as any)?.autoHangFill).length },
+                    { label: 'الأرضية',    value: `${floorAreaSquareMeters}م²` },
+                  ].map(({ label, value }) => (
+                    <div key={label} className="bg-slate-50 rounded-xl border border-slate-200 p-2 text-center">
+                      <p className="text-[10px] text-slate-500 mb-0.5">{label}</p>
+                      <p className="text-lg font-black text-slate-800">{value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* ── Shop status ── */}
+                <div className={`rounded-xl border px-3 py-2 flex items-center justify-between ${
+                  shopEnclosure ? 'bg-emerald-50 border-emerald-200' : 'bg-amber-50 border-amber-200'
+                }`}>
+                  <span className="text-xs font-semibold text-slate-600">حالة المتجر</span>
+                  <span className={`text-sm font-black ${
+                    shopEnclosure ? 'text-emerald-700' : 'text-amber-700'
+                  }`}>
+                    {shopEnclosure ? '✅ مغلق ومكتمل' : '⚠️ مفتوح / غير مكتمل'}
+                  </span>
+                </div>
+
+                {/* ── Per-wall supermarket cart ── */}
+                {(() => {
+                  const superWalls = layout.walls
+                    .map((w: any, idx: number) => ({
+                      wall: w,
+                      wallNum: idx + 1,
+                      systems: (w.slatWalls || []).filter((s: any) => s.systemType === 'supermarket_shelves'),
+                    }))
+                    // Exclude door walls
+                    .filter((x: any) => !x.wall.texture?.startsWith('door_') && x.systems.length > 0);
+
+                  if (superWalls.length === 0) return (
+                    <p className="text-xs text-center text-slate-400 py-4">لا يوجد أرفف سوبر ماركت مضافة بعد.</p>
+                  );
+
+                  let totalCols = 0, totalSec = 0, totalShelves = 0, t100 = 0, t70 = 0, t50 = 0;
+
+                  const cards = superWalls.map(({ wall, wallNum, systems }: any) => {
+                    const wallLen = Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y);
+                    return (
+                      <div key={wall.id} className="rounded-xl border border-emerald-200 bg-white overflow-hidden shadow-sm">
+                        <div className="bg-emerald-600 text-white px-3 py-1.5 flex items-center justify-between">
+                          <span className="text-xs font-black">جدار #{wallNum}</span>
+                          <span className="text-[10px] opacity-75">{(wallLen * 100).toFixed(0)} سم</span>
+                        </div>
+                        {systems.map((sys: any, si: number) => {
+                          const wallLenCm = Math.round(wallLen * 100);
+                          // Use saved layout if available, otherwise auto-compute best match
+                          const lyt = sys.supermarketLayout
+                            ?? computeSupermarketLayouts(
+                                sys.fillType === 'full' ? wallLenCm : Math.round((sys.width || 1) * 100)
+                               )[0] ?? null;
+                          const cols     = lyt?.columnCount ?? 0;
+                          const sections: any[] = lyt?.sections ?? [];
+                          const c100 = sections.filter((s) => s.widthCm === 100).length;
+                          const c70  = sections.filter((s) => s.widthCm === 70).length;
+                          const c50  = sections.filter((s) => s.widthCm === 50).length;
+                          const shelfRows = sys.shelfCount ?? 5;
+                          const wallShelves = sections.length * shelfRows;
+                          totalCols += cols; totalSec += sections.length; totalShelves += wallShelves;
+                          t100 += c100; t70 += c70; t50 += c50;
+                          return (
+                            <div key={sys.id} className={`px-3 py-2.5 ${si > 0 ? 'border-t border-emerald-100' : ''}`}>
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded">
+                                  {sys.side === 'front' ? 'أمامي' : 'خلفي'}
+                                </span>
+                                {lyt && <span className="text-[10px] text-slate-400">{lyt.label.split(' | ')[0]}</span>}
+                              </div>
+                              <div className="grid grid-cols-4 gap-1.5">
+                                {[
+                                  { label: 'أعمدة', val: cols,  cls: 'bg-slate-50  border-slate-100  text-slate-800' },
+                                  { label: '1م',    val: c100,  cls: 'bg-blue-50   border-blue-100   text-blue-700'  },
+                                  { label: '70سم',  val: c70,   cls: 'bg-violet-50 border-violet-100 text-violet-700' },
+                                  { label: '50سم',  val: c50,   cls: 'bg-orange-50 border-orange-100 text-orange-700' },
+                                ].map(({ label, val, cls }) => (
+                                  <div key={label} className={`${cls} rounded-lg p-1.5 text-center border`}>
+                                    <p className="text-[9px] opacity-60 leading-tight">{label}</p>
+                                    <p className="text-base font-black">{val}</p>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-500">
+                                <span>{sections.length} قسم × {shelfRows} = <strong className="text-slate-700">{wallShelves} رف</strong></span>
+                                {lyt && (
+                                  <span className={`font-bold ${
+                                    lyt.emptySpaceCm < 0 ? 'text-red-500' : 'text-emerald-600'
+                                  }`}>
+                                    {lyt.emptySpaceCm < 0
+                                      ? `تجاوز ${Math.abs(lyt.emptySpaceCm)}سم`
+                                      : `فراغ ${lyt.emptySpaceCm}سم`}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  });
+
+                  return (
+                    <div className="space-y-2">
+                      <p className="text-xs font-black text-emerald-700 flex items-center gap-1.5">
+                        <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
+                        أرفف السوبر ماركت — تفصيل بالجدار
+                      </p>
+                      {cards}
+                      {/* totals */}
+                      <div className="rounded-xl border-2 border-emerald-400 bg-emerald-600 text-white p-3">
+                        <p className="text-xs font-black mb-2 opacity-90">الإجمالي الكلي</p>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { label: 'أعمدة', val: totalCols },
+                            { label: '1م',    val: t100 },
+                            { label: '70سم',  val: t70 },
+                            { label: '50سم',  val: t50 },
+                          ].map(({ label, val }) => (
+                            <div key={label} className="bg-white/20 rounded-lg p-1.5 text-center">
+                              <p className="text-[9px] opacity-70">{label}</p>
+                              <p className="text-lg font-black">{val}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-2 pt-2 border-t border-white/20 flex justify-between text-xs">
+                          <span className="opacity-80">الأقسام: <strong>{totalSec}</strong></span>
+                          <span className="opacity-80">إجمالي الأرفف: <strong>{totalShelves}</strong></span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
 
@@ -1491,11 +1664,14 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
             if (onSnapshot && !isCapturing) {
               setIsCapturing(true);
               try {
-                const dataUrl = await onSnapshot();
+                const res = onSnapshot() as any;
+                const dataUrl = res instanceof Promise ? await res : res;
                 if (dataUrl) {
                   setPreviewImage(dataUrl);
                   setPreviewOpen(true);
                 }
+              } catch (e) {
+                console.error('Snapshot failed', e);
               } finally {
                 setIsCapturing(false);
               }

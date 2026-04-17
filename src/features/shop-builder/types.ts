@@ -85,6 +85,12 @@ export interface ShopBuilderSlatWall {
   shelfDepth?: number; // for supermarket shelves
   uprightSpacing?: number; // for primo stands (المسافة بين الأعمدة) - DEPRECATED
   accessories?: ShopBuilderSlatAccessory[];
+  supermarketLayout?: {
+    sections: { widthCm: number }[];
+    columnCount: number;
+    emptySpaceCm: number;
+    label: string;
+  };
 }
 
 export interface ShopBuilderPrimoAccessory {
