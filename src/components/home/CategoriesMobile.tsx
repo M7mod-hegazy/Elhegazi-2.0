@@ -66,21 +66,12 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
   };
 
   const getCategoryPreviewProducts = (category: Category): HomeProduct[] => {
+    // Use server-embedded products (guaranteed to belong to this category)
+    const embedded = (category as any).embeddedPreviewProducts as HomeProduct[] | undefined;
+    if (embedded && embedded.length > 0) return embedded.slice(0, 4);
+    // Fallback: filter by categoryId
     if (!products.length) return [];
-    
-    let selectedProducts: HomeProduct[] = [];
-    if (category.previewProducts && category.previewProducts.length > 0) {
-      selectedProducts = category.previewProducts
-        .map(productId => products.find(p => p.id === productId))
-        .filter((product): product is HomeProduct => product !== undefined);
-    } else {
-      // Fallback: Pick products belonging to this category
-      selectedProducts = products.filter(p => 
-        p.categoryId === category.id || p.categorySlug === category.slug
-      );
-    }
-    
-    return selectedProducts.slice(0, 4); // Mobile shows max 4 products like desktop
+    return products.filter(p => p.categoryId === category.id).slice(0, 4);
   };
 
   type ApiCategory = {
@@ -96,6 +87,7 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
     productCount?: number;
     useRandomPreview?: boolean;
     previewProducts?: string[];
+    embeddedPreviewProducts?: Array<{ _id: string; name: string; nameAr: string; image: string }>;
   };
 
   type ApiProduct = {
@@ -148,8 +140,9 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
             featured: !!c.featured,
             order: typeof c.order === 'number' ? c.order : 0,
             useRandomPreview: c.useRandomPreview ?? true,
-            previewProducts: c.previewProducts || []
-          };
+            previewProducts: c.previewProducts || [],
+            embeddedPreviewProducts: c.embeddedPreviewProducts || [],
+          } as any;
         });
 
         const products: HomeProduct[] = productItems.map((p: ApiProduct) => ({

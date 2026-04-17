@@ -58,39 +58,17 @@ const Categories = () => {
       id: category.id,
     });
 
-  const getCategoryPreviewProducts = (category: Category): Product[] => {
-    if (!products.length) return [];
-    
-    // Get products from this category only - be more specific with filtering
-    const categoryProducts = products.filter(product => {
-      const matchesId = product.categoryId === category.id;
-      const matchesSlug = product.categorySlug === category.slug;
-      const matchesCategory = product.category === category.id;
-      
-      return matchesId || matchesSlug || matchesCategory;
-    });
-    
-    
-    if (category.useRandomPreview === false && category.previewProducts?.length) {
-      // Use manually selected products - but ensure they're from this category
-      const selectedProducts = category.previewProducts
-        .map(productId => products.find(p => p._id === productId))
-        .filter(product => {
-          if (!product) return false;
-          // Double-check that selected products are from this category
-          return product.categoryId === category.id || 
-                 product.categorySlug === category.slug || 
-                 product.category === category.id;
-        })
-        .slice(0, 4);
-      
-      return selectedProducts;
-    } else {
-      // Use random products from category only
-      const shuffled = [...categoryProducts].sort(() => 0.5 - Math.random());
-      const randomProducts = shuffled.slice(0, 4);
-      return randomProducts;
+  const getCategoryPreviewProducts = (category: any): any[] => {
+    // Use server-embedded products (guaranteed to belong to this category)
+    if (category.embeddedPreviewProducts && category.embeddedPreviewProducts.length > 0) {
+      return category.embeddedPreviewProducts.slice(0, 4);
     }
+    // Fallback: filter from locally loaded products
+    if (!products.length) return [];
+    return products.filter((p: any) => 
+      p.categoryId === category.id || p.categoryId === category._id ||
+      p.category === category.id || p.category === category._id
+    ).slice(0, 4);
   };
 
   useEffect(() => {
@@ -121,17 +99,10 @@ const Categories = () => {
             // Update category product counts manually if they're showing 0
             if (categoryItems.length > 0) {
               const updatedCategories = categoryItems.map((category: any) => {
-                const categoryProductCount = productItems.filter((product: any) => 
-                  product.categoryId === category._id || 
-                  product.categorySlug === category.slug || 
-                  product.category === category._id
-                ).length;
-                
-                
                 return {
                   ...category,
                   id: category._id,
-                  productCount: categoryProductCount > 0 ? categoryProductCount : category.productCount
+                  productCount: category.productCount || 0
                 };
               });
               
@@ -495,17 +466,27 @@ const Categories = () => {
                           <div className="h-full p-2 sm:p-3 relative z-10">
                             {(() => {
                               const previewProducts = getCategoryPreviewProducts(category);
-                              const totalProducts = category.productCount || 0;
-                              const selectedProducts = previewProducts.length;
                               
-                              // Show "+X more" only if there are more products than what we can show
-                              const maxVisibleProducts = 3; // We show max 3 products, 4th slot for "+X more"
-                              const showMoreIndicator = totalProducts > maxVisibleProducts;
-                              const moreCount = Math.max(0, totalProducts - maxVisibleProducts);
+                              const categoryProductsCount = products.filter(p => 
+                                p.categoryId === category.id || 
+                                p.categorySlug === category.slug || 
+                                p.category === category.id || 
+                                (p.category && p.category._id === category.id)
+                              ).length;
                               
+                              const totalProducts = Math.max(category.productCount || 0, categoryProductsCount);
                               
-                              // If we have selected products, show them first, then "+X more" if needed
-                              const visibleProducts = Math.min(selectedProducts, maxVisibleProducts);
+                              const showMore = totalProducts > previewProducts.length || totalProducts > 4;
+                              const maxVisibleProducts = showMore ? 3 : 4;
+                              const visibleProducts = previewProducts.slice(0, maxVisibleProducts);
+                              
+                              const visibleCount = visibleProducts.length;
+                              const remainingCount = totalProducts > visibleCount ? totalProducts - visibleCount : 0;
+                              const shouldShowMoreSlot = remainingCount > 0;
+                              const showFullWidthMore = visibleCount === 2 && shouldShowMoreSlot;
+                              
+                              const actualSlotsNeeded = visibleCount + (shouldShowMoreSlot && !showFullWidthMore ? 1 : 0);
+                              const gridClass = 'grid-cols-2';
                               
                               const colors = [
                                 'from-primary/20 to-primary/40',
@@ -513,26 +494,7 @@ const Categories = () => {
                                 'from-purple-100 to-purple-300',
                                 'from-rose-100 to-rose-300'
                               ];
-                              
-                              // Dynamic grid based on available products
-                              const hasProducts = selectedProducts > 0;
-                              
-                              // SIMPLIFIED LOGIC: Show "+X more" if there are more products in category than selected
-                              const categoryProductsCount = products.filter(p => 
-                                p.categoryId === category.id || 
-                                p.categorySlug === category.slug || 
-                                p.category === category.id
-                              ).length;
-                              
-                              const shouldShowMoreSlot = categoryProductsCount > selectedProducts && selectedProducts > 0;
-                              const actualSlotsNeeded = selectedProducts + (shouldShowMoreSlot ? 1 : 0);
-                              const remainingCount = categoryProductsCount - selectedProducts;
-                              
-                              // Special case: if exactly 2 products selected and more available, show full-width "+X more"
-                              const showFullWidthMore = selectedProducts === 2 && categoryProductsCount > 2;
-                              
-                              const gridClass = actualSlotsNeeded <= 2 ? 'grid-cols-2' : 'grid-cols-2';
-                              
+
                               return (
                                 <div className="h-full relative">
                                   {/* Dynamic Floating Network Background */}
@@ -607,10 +569,10 @@ const Categories = () => {
                                   
                                   {/* Show selected products */}
                                   <div className={`grid ${gridClass} ${showFullWidthMore ? 'h-3/4' : 'h-full'} gap-2 relative`} style={{zIndex: 1}}>
-                                  {Array.from({ length: showFullWidthMore ? selectedProducts : actualSlotsNeeded }, (_, index) => {
+                                  {Array.from({ length: showFullWidthMore ? visibleCount : actualSlotsNeeded }, (_, index) => {
                                     const isLastSlot = index === actualSlotsNeeded - 1;
                                     const shouldShowMore = shouldShowMoreSlot && isLastSlot && !showFullWidthMore;
-                                    const product = shouldShowMore ? null : previewProducts[index];
+                                    const product = shouldShowMore ? null : visibleProducts[index];
                                     const animationDelay = index * 200; // Stagger timing
                                     
                                     // Different slide directions for treasure box effect
@@ -776,23 +738,32 @@ const Categories = () => {
                         <div className="w-48 bg-gradient-to-br from-slate-50 to-slate-100 p-3 relative">
                           {(() => {
                             const previewProducts = getCategoryPreviewProducts(category);
-                            const totalProducts = category.productCount || 0;
-                            const selectedProducts = previewProducts.length;
-                            const maxVisibleProducts = 3;
-                            const showMoreIndicator = totalProducts > maxVisibleProducts;
-                            const moreCount = Math.max(0, totalProducts - maxVisibleProducts);
-                            const visibleProducts = Math.min(selectedProducts, maxVisibleProducts);
-                            const shouldShowMoreSlot = totalProducts > selectedProducts && selectedProducts > 0;
-                            const remainingCount = totalProducts - selectedProducts;
-                            const showFullWidthMore = selectedProducts === 2 && totalProducts > 2;
+                            
+                            const categoryProductsCount = products.filter(p => 
+                              p.categoryId === category.id || 
+                              p.categorySlug === category.slug || 
+                              p.category === category.id || 
+                              (p.category && p.category._id === category.id)
+                            ).length;
+                            
+                            const totalProducts = Math.max(category.productCount || 0, categoryProductsCount);
+                            
+                            const showMore = totalProducts > previewProducts.length || totalProducts > 4;
+                            const maxVisibleProducts = showMore ? 3 : 4;
+                            const visibleProducts = previewProducts.slice(0, maxVisibleProducts);
+                            
+                            const visibleCount = visibleProducts.length;
+                            const remainingCount = totalProducts > visibleCount ? totalProducts - visibleCount : 0;
+                            const shouldShowMoreSlot = remainingCount > 0;
+                            const showFullWidthMore = visibleCount === 2 && shouldShowMoreSlot;
 
                             return (
                               <div className="h-full relative">
                                 <div className={`grid gap-1 h-full ${
-                                  visibleProducts <= 2 ? 'grid-cols-2 grid-rows-2' : 'grid-cols-2 grid-rows-2'
+                                  visibleCount <= 2 ? 'grid-cols-2 grid-rows-2' : 'grid-cols-2 grid-rows-2'
                                 }`}>
                                   {/* Display visible products */}
-                                  {previewProducts.slice(0, maxVisibleProducts).map((product, idx) => (
+                                  {visibleProducts.map((product, idx) => (
                                     <div key={product._id} className="relative overflow-hidden rounded-lg bg-white shadow-sm">
                                       <img
                                         src={optimizeImage(product.image || '', { w: 100 })}

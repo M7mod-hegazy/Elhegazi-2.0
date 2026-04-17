@@ -3197,12 +3197,32 @@ app.get('/api/categories', async (req, res) => {
     }
 
     // Attach live productCount to each item (fallback to stored productCount or 0)
+    const categoryIds = rawItems.map((c) => c._id);
+
+    // Fetch up to 4 preview products per category (server-side, correct by categoryId)
+    let previewProductsByCategory = new Map(); // categoryId string -> product[]
+    if (categoryIds.length > 0) {
+      const previewDocs = await Product.find(
+        { categoryId: { $in: categoryIds }, active: { $ne: false } },
+        { _id: 1, name: 1, nameAr: 1, image: 1, categoryId: 1 }
+      ).sort({ createdAt: -1 }).limit(categoryIds.length * 4).lean();
+
+      // Group by categoryId (up to 4 per category)
+      for (const p of previewDocs) {
+        const key = String(p.categoryId);
+        if (!previewProductsByCategory.has(key)) previewProductsByCategory.set(key, []);
+        const arr = previewProductsByCategory.get(key);
+        if (arr.length < 4) arr.push({ _id: String(p._id), name: p.name || '', nameAr: p.nameAr || p.name || '', image: p.image || '' });
+      }
+    }
+
     const items = rawItems.map((c) => {
       const item = {
         ...c,
         productCount: typeof countMap.get(c.slug) === 'number' ? countMap.get(c.slug) : (typeof c.productCount === 'number' ? c.productCount : 0),
+        // Embed correct preview products directly in category response
+        embeddedPreviewProducts: previewProductsByCategory.get(String(c._id)) || [],
       };
-      
       
       return item;
     });

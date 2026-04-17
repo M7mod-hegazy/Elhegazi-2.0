@@ -70,21 +70,12 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
   };
 
   const getCategoryPreviewProducts = (category: Category): HomeProduct[] => {
+    // Use server-embedded products (guaranteed to belong to this category)
+    const embedded = (category as any).embeddedPreviewProducts as HomeProduct[] | undefined;
+    if (embedded && embedded.length > 0) return embedded.slice(0, 4);
+    // Fallback: filter from loaded products by categoryId
     if (!products.length) return [];
-    
-    let selectedProducts: HomeProduct[] = [];
-    if (category.previewProducts && category.previewProducts.length > 0) {
-      selectedProducts = category.previewProducts
-        .map(productId => products.find(p => p.id === productId))
-        .filter((product): product is HomeProduct => product !== undefined);
-    } else {
-      // Fallback: Pick products belonging to this category
-      selectedProducts = products.filter(p => 
-        p.categoryId === category.id || p.categorySlug === category.slug
-      );
-    }
-    
-    return selectedProducts.slice(0, 4);
+    return products.filter(p => p.categoryId === category.id).slice(0, 4);
   };
 
   type ApiCategory = {
@@ -100,6 +91,7 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
     productCount?: number;
     useRandomPreview?: boolean;
     previewProducts?: string[];
+    embeddedPreviewProducts?: Array<{ _id: string; name: string; nameAr: string; image: string }>;
   };
 
   type ApiProduct = {
@@ -153,8 +145,10 @@ const CategoriesDesktop = ({ selectedSlugs }: CategoriesDesktopProps) => {
             featured: !!c.featured,
             order: typeof c.order === 'number' ? c.order : 0,
             useRandomPreview: c.useRandomPreview ?? true,
-            previewProducts: c.previewProducts || []
-          };
+            previewProducts: c.previewProducts || [],
+            // Pass through server-embedded correct preview products
+            embeddedPreviewProducts: c.embeddedPreviewProducts || [],
+          } as any;
         });
 
         const products: HomeProduct[] = productItems.map((p: ApiProduct) => ({
