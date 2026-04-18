@@ -1827,6 +1827,26 @@ app.put('/api/home-config', async (req, res) => {
     if (typeof body.promoIcon === 'string') payload.promoIcon = body.promoIcon;
     if (typeof body.seoTitle === 'string') payload.seoTitle = body.seoTitle;
     if (typeof body.seoDescription === 'string') payload.seoDescription = body.seoDescription;
+    
+    // Feature sections order
+    if (Array.isArray(body.sectionsOrder)) payload.sectionsOrder = body.sectionsOrder.map(String);
+    if (body.sections && typeof body.sections === 'object') {
+      payload.sections = Object.keys(body.sections).reduce((acc, k) => {
+        const s = body.sections[k];
+        if (s && typeof s === 'object') {
+          acc[k] = {
+            title: s.title || '',
+            subtitle: s.subtitle || '',
+            icon: s.icon || ''
+          };
+        }
+        return acc;
+      }, {});
+    }
+    
+    if (body.heroDesign && typeof body.heroDesign === 'object') {
+      payload.heroDesign = body.heroDesign;
+    }
 
     // Accept moved homepage content into HomeConfig
     if (body.aboutUsContent && typeof body.aboutUsContent === 'object') {

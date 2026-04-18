@@ -13,7 +13,7 @@ const SlideSchema = new mongoose.Schema(
     // Enhanced design controls
     theme: { type: String, enum: ['premium', 'sale', 'quality', 'custom'], default: 'premium' },
     bgGradient: { type: String, default: '' },
-    pattern: { type: String, enum: ['grid', 'circles', 'waves', 'dots', 'diagonals', 'custom'], default: undefined },
+    pattern: { type: String, default: undefined },
     buttonColor: { type: String, default: '' },
   bgColor: { type: String, default: '' },
     textColor: { type: String, default: '' },

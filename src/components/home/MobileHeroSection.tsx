@@ -603,7 +603,9 @@ const MobileHeroSection: React.FC = () => {
               if (key === 'custom') return null;
               const map: Record<string, number> = { 
                 grid: 0, circles: 1, waves: 2, dots: 3, diagonals: 4,
-                lines: 5, cross: 6, checker: 7, noise: 8, scan: 9, mesh: 10, ripples: 11
+                lines: 5, cross: 6, checker: 7, noise: 8, scan: 9, mesh: 10, ripples: 11,
+                aurora: 12, neon_grid: 13, cyber_lines: 14, hex_comb: 15, starfield: 16,
+                rings: 17, circuit: 18, prism: 19, fluid: 20, sparkles: 21,
               };
               const pIndex = key && map[key] !== undefined ? map[key] : index % 3;
               return (

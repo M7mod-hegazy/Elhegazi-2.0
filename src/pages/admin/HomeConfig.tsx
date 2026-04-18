@@ -553,7 +553,7 @@ const AdminHomeConfig = () => {
       });
 
       // Show success toast for About content saves
-      toast({ title: 'تم الحفظ', description: 'تم تحديث محتوى صفحة من نحن بنجاح' });
+      toast({ title: 'تم الحفظ', description: 'تم تحديث الإعدادات بنجاح' });
       dbg('Save selections ok');
       void logHistory({ section: 'home_config', action: 'selections_saved' });
       // Notify other pages to refresh
@@ -1792,6 +1792,7 @@ const AdminHomeConfig = () => {
           cfg={cfg}
           setCfg={setCfg}
           toggleMap={toggleMap}
+          onSave={async (latestCfg) => { await saveSelections(latestCfg); }}
         />
 
         {/* Products Management Modal */}

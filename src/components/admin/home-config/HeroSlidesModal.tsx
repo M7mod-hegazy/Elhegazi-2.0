@@ -246,6 +246,111 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
       )
     },
     {
+      key: 'aurora', label: 'الشفق (Aurora)', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-indigo-900/60">
+           <div className="absolute -inset-[50%] bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.8)_0%,transparent_50%)] blur-lg animate-[pv-aurora-1_3s_ease-in-out_infinite_alternate]" />
+           <div className="absolute -inset-[50%] bg-[radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.6)_0%,transparent_50%)] blur-md animate-[pv-aurora-2_4s_ease-in-out_infinite_alternate]" />
+           <style>{`@keyframes pv-aurora-1 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(20%, -10%) scale(1.2); } } @keyframes pv-aurora-2 { 0% { transform: translate(0, 0) scale(1); } 100% { transform: translate(-20%, 20%) scale(0.8); } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'neon_grid', label: 'شبكة نيون', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-neutral-900 perspective-[100px]">
+           <div className="absolute w-[200%] h-[200%] left-[-50%] top-[40%] bg-[linear-gradient(rgba(168,85,247,0.4)_1px,transparent_1px),linear-gradient(90deg,rgba(168,85,247,0.4)_1px,transparent_1px)] bg-[length:10px_10px] animate-[pv-laser-grid_1s_linear_infinite]" style={{ transform: 'rotateX(75deg)' }} />
+           <style>{`@keyframes pv-laser-grid { 0% { background-position: 0 0; } 100% { background-position: 0 10px; } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'cyber_lines', label: 'خطوط سيبرانية', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-blue-900">
+           <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(255,255,255,0.1)_1px,transparent_2px)] bg-[length:100%_4px]" />
+           <div className="absolute inset-x-0 top-0 h-1 bg-cyan-300 shadow-[0_0_10px_2px_rgba(34,211,238,0.8)] animate-[pv-cyber-scan_2s_linear_infinite]" />
+           <style>{`@keyframes pv-cyber-scan { 0% { transform: translateY(-10px); } 100% { transform: translateY(48px); } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'hex_comb', label: 'خلية سداسية', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-emerald-950">
+           <svg className="w-full h-full opacity-60 animate-[pv-hex-pulse_2s_ease-in-out_infinite_alternate]" xmlns="http://www.w3.org/2000/svg">
+             <defs>
+               <pattern id="pv-hex" width="14" height="24" patternUnits="userSpaceOnUse" patternTransform="scale(0.8)">
+                 <path d="M7 0L14 4v8L7 16 0 12V4z M7 24L14 20V12L7 8 0 12v8z" fill="none" stroke="white" strokeWidth="1" />
+               </pattern>
+             </defs>
+             <rect width="100%" height="100%" fill="url(#pv-hex)" />
+           </svg>
+           <style>{`@keyframes pv-hex-pulse { 0% { opacity: 0.3; transform: scale(1); } 100% { opacity: 1; transform: scale(1.1); } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'starfield', label: 'فضاء النجوم', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-slate-900">
+           {Array.from({length: 10}).map((_, i) => (
+             <div key={i} className="absolute rounded-full bg-white shadow-[0_0_4px_white] animate-[pv-float-up_3s_linear_infinite]" style={{
+               width: '2px', height: '2px', left: `${10+i*8}%`,
+               animationDelay: `${Math.random()*3}s`, animationDuration: `${2+Math.random()*2}s`
+             }} />
+           ))}
+           <style>{`@keyframes pv-float-up { 0% { transform: translateY(48px); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(-10px); opacity: 0; } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'rings', label: 'حلقات מתداخلة', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-indigo-950">
+           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-8 h-8 border border-white/40 rounded-full animate-[ping_2s_infinite]" />
+           <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-16 h-16 border border-white/20 rounded-full animate-[ping_2.5s_infinite]" />
+        </div>
+      )
+    },
+    {
+      key: 'circuit', label: 'دوائر إلكترونية', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-teal-950">
+           {Array.from({length: 4}).map((_, i) => (
+             <div key={i} className="absolute w-[2px] bg-white animate-[pv-digital-drop_1.5s_linear_infinite]" style={{
+               left: `${20+i*20}%`, top: '-50%', height: '30px', animationDelay: `${i*0.3}s`
+             }} />
+           ))}
+           <style>{`@keyframes pv-digital-drop { 0% { transform: translateY(0); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(80px); opacity: 0; } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'prism', label: 'منشور ضوئي', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-slate-800 flex items-center justify-center">
+           <div className="absolute w-12 h-12 bg-white rounded-full blur-[10px] animate-[pv-morph-blob_2s_ease-in-out_infinite_alternate]" />
+           <style>{`@keyframes pv-morph-blob { 0% { transform: scale(1) translate(0, 0); border-radius: 40% 60% 70% 30% / 40% 50% 60% 50%; opacity: 0.5; } 100% { transform: scale(1.5) translate(5px, -5px); border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; opacity: 1; } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'fluid', label: 'كرات مضيئة', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-stone-900">
+           <div className="absolute left-[20%] top-[30%] w-12 h-12 bg-rose-500/60 rounded-full blur-[8px] animate-[pv-orb-float-1_2s_ease-in-out_infinite_alternate]" />
+           <div className="absolute right-[20%] bottom-[20%] w-16 h-16 bg-orange-500/60 rounded-full blur-[12px] animate-[pv-orb-float-2_2.5s_ease-in-out_infinite_alternate]" />
+           <style>{`@keyframes pv-orb-float-1 { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(15px,-10px) scale(1.2); } } @keyframes pv-orb-float-2 { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(-20px,10px) scale(0.9); } }`}</style>
+        </div>
+      )
+    },
+    {
+      key: 'sparkles', label: 'بريق فخم', preview: (
+        <div className="w-full h-12 relative overflow-hidden rounded-md bg-amber-950">
+           {Array.from({length: 6}).map((_, i) => (
+             <div key={i} className="absolute bg-white rounded-full animate-[pv-bokeh-fade_2s_ease-in-out_infinite_alternate] mix-blend-overlay" style={{
+               width: `${Math.random()*15+5}px`, height: `${Math.random()*15+5}px`,
+               left: `${15+i*15}%`, top: `${Math.random()*80}%`,
+               animationDelay: `${Math.random()}s`
+             }} />
+           ))}
+           <style>{`@keyframes pv-bokeh-fade { 0% { opacity: 0.1; transform: scale(0.8); } 100% { opacity: 0.8; transform: scale(1.2); } }`}</style>
+        </div>
+      )
+    },
+    {
       key: 'custom', label: 'Custom', preview: (
         <div className="w-full h-12 rounded-md bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600" />
       )
@@ -263,7 +368,17 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
     noise: 8,
     scan: 9,
     mesh: 10,
-    ripples: 11
+    ripples: 11,
+    aurora: 12,
+    neon_grid: 13,
+    cyber_lines: 14,
+    hex_comb: 15,
+    starfield: 16,
+    rings: 17,
+    circuit: 18,
+    prism: 19,
+    fluid: 20,
+    sparkles: 21
   };
 
   // Per-slide product picker state

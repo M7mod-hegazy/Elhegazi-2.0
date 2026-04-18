@@ -318,7 +318,7 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
               }}
             >
               {[...displayCategories, ...displayCategories, ...displayCategories, ...displayCategories].map((category, categoryIndex) => (
-                <SwiperSlide key={`${category.id}-${Math.floor(categoryIndex / displayCategories.length)}`} className="!h-auto">
+                <SwiperSlide key={`${category.id || category.slug || 'cat'}-${categoryIndex}`} className="!h-auto">
                   <motion.div
                     className="h-full"
                     initial={{ opacity: 0, y: 20 }}

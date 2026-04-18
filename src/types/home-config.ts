@@ -28,6 +28,16 @@ export interface Slide {
     | 'scan'
     | 'mesh'
     | 'ripples'
+    | 'aurora'
+    | 'neon_grid'
+    | 'cyber_lines'
+    | 'hex_comb'
+    | 'starfield'
+    | 'rings'
+    | 'circuit'
+    | 'prism'
+    | 'fluid'
+    | 'sparkles'
     | 'custom';
   buttonColor?: string;
   textColor?: string;

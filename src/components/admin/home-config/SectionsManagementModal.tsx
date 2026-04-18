@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -26,6 +26,7 @@ interface SectionsManagementModalProps {
   cfg: HomeConfig;
   setCfg: (cfg: HomeConfig) => void;
   toggleMap: (section: 'featuredProducts' | 'bestSellers' | 'sale' | 'newArrivals') => void;
+  onSave?: (cfg: HomeConfig) => Promise<void>;
 }
 
 type SectionMeta = {
@@ -94,7 +95,9 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
   onOpenChange,
   cfg,
   setCfg,
+  onSave,
 }) => {
+  const [saving, setSaving] = useState(false);
   const order = cfg.sectionsOrder?.length ? cfg.sectionsOrder : DEFAULT_ORDER;
 
   const move = (fromIndex: number, direction: number) => {
@@ -256,7 +259,7 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
             })}
           </div>
 
-          <div className="pt-2 flex justify-end">
+          <div className="pt-2 flex justify-between items-center gap-2">
             <Button
               type="button"
               variant="outline"
@@ -264,6 +267,20 @@ export const SectionsManagementModal: React.FC<SectionsManagementModalProps> = (
             >
               إعادة ترتيب افتراضي
             </Button>
+            {onSave && (
+              <Button
+                type="button"
+                disabled={saving}
+                onClick={async () => {
+                  setSaving(true);
+                  try { await onSave(cfg); } finally { setSaving(false); }
+                }}
+                className="bg-primary text-primary-foreground hover:bg-primary/90 min-w-[120px]"
+              >
+                {saving && <div className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin ml-1" />}
+                حفظ التغييرات
+              </Button>
+            )}
           </div>
         </div>
       </DialogContent>

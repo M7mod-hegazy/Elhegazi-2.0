@@ -199,6 +199,119 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
           `}</style>
         )}
       </div>
+    ),
+    // 12 - Aurora
+    () => (
+      <div className="absolute inset-0 overflow-hidden">
+        <div className={`absolute -inset-[100%] opacity-40 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.4)_0%,transparent_50%)] ${isActive ? 'animate-[spin_20s_linear_infinite]' : ''}`} />
+        <div className={`absolute -inset-[100%] opacity-30 bg-[radial-gradient(circle_at_bottom_left,rgba(255,255,255,0.3)_0%,transparent_50%)] ${isActive ? 'animate-[spin_25s_linear_infinite_reverse]' : ''}`} />
+      </div>
+    ),
+    // 13 - Neon Grid
+    () => (
+      <div className="absolute inset-0 overflow-hidden perspective-[1000px] bg-black/20">
+        <div className={`absolute w-[200%] h-[200%] left-[-50%] top-[20%] opacity-30 bg-[linear-gradient(rgba(255,255,255,0.2)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.2)_1px,transparent_1px)] bg-[length:40px_40px] ${isActive ? 'animate-[neon-grid_3s_linear_infinite]' : ''}`} style={{ transform: 'rotateX(75deg)' }} />
+        {isActive && (
+          <style>{`@keyframes neon-grid { 0% { transform: rotateX(75deg) translateY(0); } 100% { transform: rotateX(75deg) translateY(40px); } }`}</style>
+        )}
+      </div>
+    ),
+    // 14 - Cyber Lines
+    () => (
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute inset-0 bg-[linear-gradient(0deg,rgba(255,255,255,0.05)_1px,transparent_1px)] bg-[length:100%_4px]" />
+        <div className={`absolute top-1/2 left-0 right-0 h-[2px] bg-white opacity-40 shadow-[0_0_20px_4px_rgba(255,255,255,0.8)] ${isActive ? 'animate-[cyber-pulse_4s_ease-in-out_infinite]' : ''}`} />
+        {isActive && (
+          <style>{`@keyframes cyber-pulse { 0%, 100% { opacity: 0.2; transform: translateY(-20px); } 50% { opacity: 0.8; transform: translateY(20px); } }`}</style>
+        )}
+      </div>
+    ),
+    // 15 - Hex Comb
+    () => (
+      <div className="absolute inset-0 overflow-hidden opacity-20">
+         <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <pattern id="hex-bg" width="28" height="48" patternUnits="userSpaceOnUse" patternTransform="scale(1.5)">
+                <path d="M14 0L28 8v16L14 32 0 24V8z M14 48L28 40V24L14 16 0 24v16z" fill="none" stroke="white" strokeWidth="1" />
+              </pattern>
+            </defs>
+            <rect width="100%" height="100%" fill="url(#hex-bg)" />
+         </svg>
+      </div>
+    ),
+    // 16 - Starfield
+    () => (
+      <div className="absolute inset-0 overflow-hidden bg-black/10">
+        {Array.from({length: 30}).map((_, i) => (
+          <div key={i} className="absolute rounded-full bg-white shadow-[0_0_5px_rgba(255,255,255,0.8)]" style={{
+            width: `${Math.random()*2+1}px`, height: `${Math.random()*2+1}px`,
+            left: `${Math.random()*100}%`, top: `${Math.random()*100}%`,
+            animation: isActive ? `star-twinkle ${1+Math.random()*3}s infinite alternate` : 'none'
+          }} />
+        ))}
+        {isActive && <style>{`@keyframes star-twinkle { 0% { opacity: 0.1; transform: scale(0.8); } 100% { opacity: 1; transform: scale(1.2); } }`}</style>}
+      </div>
+    ),
+    // 17 - Abstract Rings
+    () => (
+      <div className="absolute inset-0 overflow-hidden">
+        {Array.from({length: 5}).map((_, i) => (
+          <div key={i} className={`absolute border border-white/20 rounded-full left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 ${isActive ? 'animate-[spin_linear_infinite]' : ''}`} style={{
+            width: `${(i+1)*30}vmin`, height: `${(i+1)*30}vmin`,
+            animationDuration: `${30 + i*10}s`,
+            animationDirection: i%2===0 ? 'normal' : 'reverse'
+          }} />
+        ))}
+      </div>
+    ),
+    // 18 - Circuit Board
+    () => (
+      <div className="absolute inset-0 overflow-hidden opacity-15">
+        <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <pattern id="circuit" width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="scale(1.5)">
+              <path d="M10 10 L 20 10 L 30 20 L 30 40 M 10 10 A 2 2 0 1 1 6 10 M 30 40 A 2 2 0 1 1 30 44 L 40 44 L 50 34" fill="none" stroke="white" strokeWidth="1" />
+              <circle cx="8" cy="10" r="1.5" fill="white" />
+              <circle cx="30" cy="42" r="1.5" fill="white" />
+              <circle cx="50" cy="34" r="1.5" fill="white" />
+            </pattern>
+          </defs>
+          <rect width="100%" height="100%" fill="url(#circuit)" />
+        </svg>
+      </div>
+    ),
+    // 19 - Prism
+    () => (
+      <div className="absolute inset-0 overflow-hidden opacity-10">
+        <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+          <polygon points="0,0 100,0 50,50" fill="white" opacity="0.1" />
+          <polygon points="100,0 100,100 50,50" fill="white" opacity="0.05" />
+          <polygon points="100,100 0,100 50,50" fill="white" opacity="0.15" />
+          <polygon points="0,100 0,0 50,50" fill="white" opacity="0.2" />
+        </svg>
+      </div>
+    ),
+    // 20 - Fluid
+    () => (
+      <div className="absolute inset-0 overflow-hidden opacity-20 bg-white/5">
+        <div className={`absolute -inset-[50%] bg-[radial-gradient(circle_at_50%_50%,rgba(255,255,255,0.4)_0%,transparent_50%)] mix-blend-overlay ${isActive ? 'animate-[fluid_10s_ease-in-out_infinite_alternate]' : ''}`} />
+        <div className={`absolute -inset-[50%] bg-[radial-gradient(circle_at_30%_70%,rgba(255,255,255,0.3)_0%,transparent_50%)] mix-blend-overlay ${isActive ? 'animate-[fluid_15s_ease-in-out_infinite_alternate-reverse]' : ''}`} />
+        {isActive && <style>{`@keyframes fluid { 0% { transform: scale(0.8) translate(10%, 10%); } 100% { transform: scale(1.2) translate(-10%, -10%); } }`}</style>}
+      </div>
+    ),
+    // 21 - Sparkles
+    () => (
+      <div className="absolute inset-0 overflow-hidden">
+        {Array.from({length: 15}).map((_, i) => (
+          <div key={i} className={`absolute bg-white rounded-full ${isActive ? 'animate-[sparkle-ping_2s_infinite]' : ''}`} style={{
+            width: '2px', height: '2px',
+            boxShadow: '0 0 8px 2px rgba(255,255,255,0.8)',
+            left: `${Math.random()*100}%`, top: `${Math.random()*100}%`,
+            animationDelay: `${Math.random()*3}s`
+          }} />
+        ))}
+        {isActive && <style>{`@keyframes sparkle-ping { 0%, 100% { opacity: 0; transform: scale(0.5); } 50% { opacity: 1; transform: scale(1.5); } }`}</style>}
+      </div>
     )
   ];
 
