@@ -303,6 +303,14 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
         ...wall,          // Then apply updates
       } as ShopBuilderWall;
 
+      // Keep wall-attached columns visually in sync with the owning wall color.
+      if (nextWall.columns?.length) {
+        nextWall.columns = nextWall.columns.map((column) => ({
+          ...column,
+          color: nextWall.color,
+        }));
+      }
+
       const newWalls = existingWall 
         ? prev.walls.map((w) => (w.id === id ? nextWall : w))
         : [...prev.walls, nextWall];

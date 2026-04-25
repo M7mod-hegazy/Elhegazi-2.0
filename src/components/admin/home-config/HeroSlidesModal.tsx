@@ -380,6 +380,18 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
     fluid: 20,
     sparkles: 21
   };
+  const renderPatternPreview = (key: Slide['pattern']) => {
+    if (key === 'custom') {
+      return <div className="w-full h-12 rounded-md bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600" />;
+    }
+    const patternKey = (key && key !== 'custom' ? key : 'grid') as Exclude<NonNullable<Slide['pattern']>, 'custom'>;
+    const slideIndex = patternToIndex[patternKey] ?? 0;
+    return (
+      <div className="w-full h-12 relative overflow-hidden rounded-md bg-gradient-to-br from-indigo-900 via-purple-900 to-fuchsia-900">
+        <BackgroundPattern slideIndex={slideIndex} isActive={true} />
+      </div>
+    );
+  };
 
   // Per-slide product picker state
   const [pickerOpenIdx, setPickerOpenIdx] = useState<number | null>(null);
@@ -1316,7 +1328,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                                   }`}
                                 onClick={() => updateSlide(idx, { pattern: opt.key as Slide['pattern'] })}
                               >
-                                {opt.preview}
+                                {renderPatternPreview(opt.key as Slide['pattern'])}
                                 <div className="px-2 py-1 text-center">{opt.label}</div>
                               </button>
                             ))}
@@ -1585,7 +1597,7 @@ export const HeroSlidesModal: React.FC<HeroSlidesModalProps> = ({
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     {patternOptions.map((opt) => (
                       <button key={opt.key} type="button" aria-pressed={editorSlide.pattern === opt.key} className={`border rounded-lg overflow-hidden text-xs transition-all ${editorSlide.pattern === opt.key ? 'ring-2 ring-pink-500 border-pink-500 bg-pink-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`} onClick={() => updateSlide(editorOpenIdx, { pattern: opt.key as Slide['pattern'] })}>
-                        {opt.preview}
+                        {renderPatternPreview(opt.key as Slide['pattern'])}
                         <div className="px-2 py-1 text-center">{opt.label}</div>
                       </button>
                     ))}

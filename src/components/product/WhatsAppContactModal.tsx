@@ -1,14 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { MessageCircle, Send, AlertCircle } from 'lucide-react';
+import { MessageCircle, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Input } from '@/components/ui/input';
-import { useDualAuth } from '@/hooks/useDualAuth';
 import { apiGet } from '@/lib/api';
 import { buildProductPath } from '@/lib/product-link';
 import { applyProductImageFallback, optimizeImage, PRODUCT_IMAGE_FALLBACK } from '@/lib/images';
-import type { User } from '@/types';
 import whatsappIcon from '@/assets/whatsapp.png';
 import messengerIcon from '@/assets/messenger.png';
 
@@ -21,12 +18,6 @@ const WhatsAppIcon = () => (
 const MessengerIcon = () => (
   <img src={messengerIcon} alt="Messenger" className="w-4 h-4" />
 );
-
-function formatProfileAddress(u: User): string {
-  const a = u.address;
-  if (!a || typeof a !== 'object') return '';
-  return [a.street, a.city, a.state, a.postalCode, a.country].filter(Boolean).join('، ');
-}
 
 interface WhatsAppContactModalProps {
   isOpen: boolean;
@@ -47,60 +38,26 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
   productImage,
   defaultMessage = 'السلام عليكم، أود معرفة سعر المنتج',
 }) => {
-  const { user, isAuthenticated, isAdmin } = useDualAuth();
-  const isCustomerSession = Boolean(isAuthenticated && user && !isAdmin);
   const [message, setMessage] = useState(defaultMessage);
-  const [userName, setUserName] = useState('');
-  const [userPhone, setUserPhone] = useState('');
-  const [userAddress, setUserAddress] = useState('');
+  const [isEditingMessage, setIsEditingMessage] = useState(false);
   const [isSending, setIsSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
-    if (isCustomerSession && user) {
-      const name =
-        [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
-        user.email?.split('@')[0] ||
-        '';
-      setUserName(name);
-      setUserPhone((user.phone || '').trim());
-      setUserAddress(formatProfileAddress(user));
-    } else if (!isAuthenticated) {
-      setUserName('');
-      setUserPhone('');
-      setUserAddress('');
-    }
-  }, [isOpen, isCustomerSession, user, isAuthenticated]);
+    setMessage(defaultMessage);
+    setIsEditingMessage(false);
+  }, [isOpen, defaultMessage]);
 
   // Build product details link
   const productDetailsLink = `${window.location.origin}${buildProductPath(productId)}`;
   
-  // Build full message with product code if available
-  const displayName = userName.trim() || (isCustomerSession ? '—' : '');
-  const displayPhone = userPhone.trim() || (isCustomerSession ? 'غير مسجل في الحساب' : '');
-  const displayAddress = userAddress.trim() || (isCustomerSession ? 'غير مسجل في الحساب' : '');
-  const fullMessage = `${message}\n\n👤 الاسم: ${displayName}\n📱 الهاتف: ${displayPhone}\n📍 العنوان: ${displayAddress}\n\n📦 المنتج: ${productName}${productCode ? `\nالكود: ${productCode}` : ''}\n🔗 الرابط: ${productDetailsLink}`;
+  // Build full message with product details only (no user data inputs)
+  const fullMessage = `${message}\n\nالمنتج: ${productName}${productCode ? `\nالكود: ${productCode}` : ''}\nالرابط: ${productDetailsLink}`;
 
   const handleSend = async () => {
     try {
       setError(null);
-
-      if (!isCustomerSession) {
-        if (!userName.trim()) {
-          setError('يرجى إدخال اسمك');
-          return;
-        }
-        if (!userPhone.trim()) {
-          setError('يرجى إدخال رقم هاتفك');
-          return;
-        }
-        if (!userAddress.trim()) {
-          setError('يرجى إدخال عنوانك');
-          return;
-        }
-      }
-
       setIsSending(true);
 
       try {
@@ -109,14 +66,14 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
         const whatsappUrl = settingsRes?.item?.social?.whatsappUrl;
         
         if (!whatsappUrl) {
-          setError('رقم الواتس غير متوفر. يرجى التواصل مع الدعم الفني.');
+          setError('رقم الواتساب غير متوفر. يرجى التواصل مع الدعم الفني.');
           setIsSending(false);
           return;
         }
 
         // Build message with image URL
         const messageWithImage = productImage 
-          ? `${fullMessage}\n\n🔗 رابط الصورة: ${productImage}`
+          ? `${fullMessage}\n\nرابط الصورة: ${productImage}`
           : fullMessage;
 
         const encodedMessage = encodeURIComponent(messageWithImage);
@@ -175,7 +132,7 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
           }
         }, 50);
       } catch (err) {
-        setError('خطأ في جلب بيانات الواتس. يرجى المحاولة مرة أخرى.');
+        setError('تعذر تحميل إعدادات الواتساب. يرجى المحاولة مرة أخرى.');
         console.error('Error fetching WhatsApp settings:', err);
         setIsSending(false);
         return;
@@ -190,22 +147,6 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
   const handleSendMessenger = async () => {
     try {
       setError(null);
-
-      if (!isCustomerSession) {
-        if (!userName.trim()) {
-          setError('يرجى إدخال اسمك');
-          return;
-        }
-        if (!userPhone.trim()) {
-          setError('يرجى إدخال رقم هاتفك');
-          return;
-        }
-        if (!userAddress.trim()) {
-          setError('يرجى إدخال عنوانك');
-          return;
-        }
-      }
-
       setIsSending(true);
 
       try {
@@ -221,7 +162,7 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
 
         // Build message with image URL
         const messageWithImage = productImage 
-          ? `${fullMessage}\n\n🔗 رابط الصورة: ${productImage}`
+          ? `${fullMessage}\n\nرابط الصورة: ${productImage}`
           : fullMessage;
 
         const encodedMessage = encodeURIComponent(messageWithImage);
@@ -259,7 +200,7 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
           window.open(finalLink, '_blank', 'noopener,noreferrer');
         }, 50);
       } catch (err) {
-        setError('خطأ في جلب بيانات الماسنجر. يرجى المحاولة مرة أخرى.');
+        setError('تعذر تحميل إعدادات الماسنجر. يرجى المحاولة مرة أخرى.');
         console.error('Error fetching Messenger settings:', err);
         setIsSending(false);
         return;
@@ -277,7 +218,7 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <MessageCircle className="w-5 h-5 text-green-500" />
-            لمعرفة السعر عبر الواتس
+            لمعرفة السعر عبر الواتساب
           </DialogTitle>
         </DialogHeader>
 
@@ -299,80 +240,42 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
               </div>
             </div>
           </div>
-
-          {/* User Information — للزوار فقط؛ للعميل المسجّل تُؤخذ البيانات من الحساب دون إدخال */}
-          {!isCustomerSession ? (
-            <div className="space-y-3 rounded-lg border border-blue-200 bg-blue-50 p-4">
-              <h3 className="text-sm font-semibold text-slate-900">معلوماتك</h3>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">الاسم *</label>
-                <Input
-                  value={userName}
-                  onChange={(e) => setUserName(e.target.value)}
-                  placeholder="أدخل اسمك"
-                  disabled={isSending}
-                  className="text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">رقم الهاتف *</label>
-                <Input
-                  value={userPhone}
-                  onChange={(e) => setUserPhone(e.target.value)}
-                  placeholder="أدخل رقم هاتفك"
-                  disabled={isSending}
-                  className="text-sm"
-                />
-              </div>
-
-              <div>
-                <label className="mb-1 block text-xs font-medium text-slate-700">العنوان *</label>
-                <Input
-                  value={userAddress}
-                  onChange={(e) => setUserAddress(e.target.value)}
-                  placeholder="أدخل عنوانك"
-                  disabled={isSending}
-                  className="text-sm"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50/80 p-3 text-sm text-emerald-900">
-              سيتم إرفاق بيانات التواصل من حسابك تلقائياً مع الرسالة. يمكنك تعديل نص الاستفسار أدناه فقط.
-            </div>
-          )}
-
-          {/* Message Editor */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-slate-900">
-              رسالتك (اختياري)
-            </label>
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              placeholder="أضف رسالة إضافية..."
-              className="min-h-20 resize-none text-sm"
-              disabled={isSending}
-            />
-          </div>
-
           {/* Message Preview */}
           <div className="bg-green-50 rounded-lg p-4 border border-green-200">
-            <h3 className="font-semibold text-sm text-slate-900 mb-2 flex items-center gap-2">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="font-semibold text-sm text-slate-900 flex items-center gap-2">
               <MessageCircle className="w-4 h-4 text-green-600" />
               معاينة الرسالة
-            </h3>
-            <div className="bg-white rounded p-3 text-xs text-slate-700 whitespace-pre-wrap break-words max-h-40 overflow-y-auto border border-green-100 font-mono space-y-2">
+              </h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditingMessage((prev) => !prev)}
+                disabled={isSending}
+                className="h-8 px-3 text-xs"
+              >
+                {isEditingMessage ? 'إنهاء التعديل' : 'تعديل الرسالة'}
+              </Button>
+            </div>
+            {isEditingMessage ? (
+              <Textarea
+                value={message}
+                onChange={(e) => setMessage(e.target.value)}
+                placeholder="اكتب رسالتك..."
+                className="min-h-24 resize-none text-sm bg-white"
+                disabled={isSending}
+              />
+            ) : null}
+            <div className="bg-white rounded p-3 mt-2 text-xs text-slate-700 whitespace-pre-wrap break-words max-h-40 overflow-y-auto border border-green-100 font-mono space-y-2">
               <div>{fullMessage}</div>
               <div className="border-t border-green-100 pt-2 mt-2 space-y-1">
-                <div className="font-semibold">📦 {productName}</div>
-                {productCode && <div className="text-blue-600">🏷️ {productCode}</div>}
+                <div className="font-semibold">المنتج: {productName}</div>
+                {productCode && <div className="text-blue-600">الكود: {productCode}</div>}
               </div>
               {productImage && (
                 <div className="border-t border-green-100 pt-2 mt-2">
-                  <div>🔗 رابط الصورة:</div>
+                  <div>رابط الصورة:</div>
                   <div className="text-blue-600 break-all">{productImage}</div>
                 </div>
               )}
@@ -400,15 +303,12 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
             <Button
               onClick={handleSendMessenger}
               className="flex-1 min-w-20 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-              disabled={
-                isSending ||
-                (!isCustomerSession && (!userName.trim() || !userPhone.trim() || !userAddress.trim()))
-              }
+              disabled={isSending}
             >
               {isSending ? (
                 <>
-                  <span className="animate-spin">⏳</span>
-                  جاري...
+                  <span className="animate-spin"></span>
+                  جارٍ الإرسال...
                 </>
               ) : (
                 <>
@@ -420,20 +320,17 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
             <Button
               onClick={handleSend}
               className="flex-1 min-w-20 bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2"
-              disabled={
-                isSending ||
-                (!isCustomerSession && (!userName.trim() || !userPhone.trim() || !userAddress.trim()))
-              }
+              disabled={isSending}
             >
               {isSending ? (
                 <>
-                  <span className="animate-spin">⏳</span>
-                  جاري...
+                  <span className="animate-spin"></span>
+                  جارٍ الإرسال...
                 </>
               ) : (
                 <>
                   <WhatsAppIcon />
-                  <span className="ml-2">واتس</span>
+                  <span className="ml-2">واتساب</span>
                 </>
               )}
             </Button>
@@ -441,10 +338,11 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
 
           {/* Info */}
           <p className="text-xs text-slate-500 text-center pb-2">
-            سيتم فتح الواتس تلقائياً برسالتك الجاهزة للإرسال
+            سيتم فتح التطبيق المحدد مباشرة مع الرسالة الجاهزة.
           </p>
         </div>
       </DialogContent>
     </Dialog>
   );
 };
+

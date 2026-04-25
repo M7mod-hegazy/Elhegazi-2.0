@@ -2988,8 +2988,7 @@ const ShopBuilderContent = () => {
                           removeWall(wall.id);
                           selectWall(null);
                         }}
-                        className="h-9 px-3 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-                        style={{ background: `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)` }}
+                        className="h-9 px-3 text-xs font-semibold border border-red-200 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 transition-colors shadow-sm hover:bg-red-500 hover:text-white"
                       >
                         <Trash2 className="h-4 w-4" />
                         <span>حذف</span>
@@ -3096,8 +3095,7 @@ const ShopBuilderContent = () => {
                         onClick={() => {
                           removeSlatWall(wall.id, slatWall.id);
                         }}
-                        className="h-9 px-3 text-xs font-semibold text-white rounded-lg flex items-center gap-2 transition-all shadow-md hover:shadow-lg"
-                        style={{ background: `linear-gradient(135deg, #ef4444 0%, #dc2626 100%)` }}
+                        className="h-9 px-3 text-xs font-semibold border border-red-200 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 transition-colors shadow-sm hover:bg-red-500 hover:text-white"
                       >
                         <Trash2 className="h-4 w-4" />
                         <span>حذف</span>
@@ -3457,7 +3455,7 @@ const ShopBuilderContent = () => {
                       selectProduct(null);
                     }
                   }}
-                  className="h-9 px-4 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                  className="h-9 px-4 text-xs font-semibold border border-red-200 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 transition-colors shadow-sm hover:bg-red-500 hover:text-white"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>حذف</span>
@@ -4105,9 +4103,12 @@ const ShopBuilderContent = () => {
                 <button
                   onClick={() => {
                     if (confirm('هل تريد حذف هذا العمود؟')) {
+                      removeColumn(wall.id, column.id);
+                      selectColumn(null);
+                      selectWall(wall.id);
                     }
                   }}
-                  className="h-9 px-4 text-xs font-semibold bg-red-500 hover:bg-red-600 text-white rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                  className="h-9 px-4 text-xs font-semibold border border-red-200 bg-red-50 text-red-600 rounded-lg flex items-center gap-2 transition-colors shadow-sm hover:bg-red-500 hover:text-white"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>حذف</span>

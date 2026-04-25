@@ -402,16 +402,17 @@ const FloorplanCanvas: React.FC<FloorplanCanvasProps> = ({ showMapNavigation = f
           const wallAngle = Math.atan2(wall.end.y - wall.start.y, wall.end.x - wall.start.x);
           const perpAngle = wallAngle + Math.PI / 2;
 
-          // Apply side offset (perpendicular to wall)
+          // Apply side offset (perpendicular to wall).
+          // Must match 3D math where depth is the outward axis from the wall face.
           let sideOffset = 0;
           const normalizedSide =
             column.side === 'back' || (column as any).side === 'right'
               ? 'back'
               : 'front';
           if (normalizedSide === 'front') {
-            sideOffset = column.width / 2;
+            sideOffset = (column.depth || 0.4) / 2;
           } else if (normalizedSide === 'back') {
-            sideOffset = -column.width / 2;
+            sideOffset = -(column.depth || 0.4) / 2;
           }
 
           const columnWorldPos = {
@@ -428,7 +429,7 @@ const FloorplanCanvas: React.FC<FloorplanCanvasProps> = ({ showMapNavigation = f
           if (column.shape === 'round') {
             // Round column
             const isColumnSelected = column.id === selectedColumnId || multiSelectedColumnsSet.has(column.id);
-            ctx.fillStyle = isColumnSelected ? secondaryColor : column.color;
+            ctx.fillStyle = isColumnSelected ? secondaryColor : (wall.color || column.color || '#94a3b8');
             ctx.strokeStyle = isColumnSelected ? primaryColor : '#64748b';
             ctx.lineWidth = isColumnSelected ? 3 : 2;
             ctx.beginPath();
@@ -442,12 +443,14 @@ const FloorplanCanvas: React.FC<FloorplanCanvasProps> = ({ showMapNavigation = f
             ctx.rotate(wallAngle);
             
             const isColumnSelected = column.id === selectedColumnId || multiSelectedColumnsSet.has(column.id);
-            ctx.fillStyle = isColumnSelected ? secondaryColor : column.color;
+            ctx.fillStyle = isColumnSelected ? secondaryColor : (wall.color || column.color || '#94a3b8');
             ctx.strokeStyle = isColumnSelected ? primaryColor : '#64748b';
             ctx.lineWidth = isColumnSelected ? 3 : 2;
             
-            ctx.fillRect(-columnDepthPx / 2, -columnWidthPx / 2, columnDepthPx, columnWidthPx);
-            ctx.strokeRect(-columnDepthPx / 2, -columnWidthPx / 2, columnDepthPx, columnWidthPx);
+            // Keep 2D orientation aligned with 3D:
+            // width runs along the wall axis, depth extends out from wall face.
+            ctx.fillRect(-columnWidthPx / 2, -columnDepthPx / 2, columnWidthPx, columnDepthPx);
+            ctx.strokeRect(-columnWidthPx / 2, -columnDepthPx / 2, columnWidthPx, columnDepthPx);
             
             ctx.restore();
           }

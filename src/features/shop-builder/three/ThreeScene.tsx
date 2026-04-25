@@ -2820,7 +2820,7 @@ function updateColumnMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, column: ShopB
   const textureConfig = WALL_TEXTURES[textureType as keyof typeof WALL_TEXTURES] || WALL_TEXTURES.painted_white;
   
   mesh.material = new THREE.MeshStandardMaterial({ 
-    color: new THREE.Color(column.color),
+    color: new THREE.Color(wall.color || column.color),
     roughness: 0.7,
     metalness: 0.0,
   });
@@ -2861,4 +2861,3 @@ function updateColumnMesh(mesh: THREE.Mesh, wall: ShopBuilderWall, column: ShopB
     mesh.rotation.y = 0;
   }
 }
-

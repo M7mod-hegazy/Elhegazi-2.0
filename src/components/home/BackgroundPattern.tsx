@@ -6,6 +6,8 @@ interface BackgroundPatternProps {
 }
 
 const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isActive }) => {
+  const patternIdPrefix = React.useId().replace(/:/g, '');
+  const patternId = (name: string) => `${name}-${patternIdPrefix}`;
   const patterns = [
     // 0 - Grid
     () => (
@@ -13,11 +15,11 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
         <div className="absolute inset-0 opacity-15">
           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <defs>
-              <pattern id="bg-grid" width="10" height="10" patternUnits="userSpaceOnUse">
+              <pattern id={patternId('bg-grid')} width="10" height="10" patternUnits="userSpaceOnUse">
                 <path d="M 10 0 L 0 0 0 10" fill="none" stroke="white" strokeWidth="0.5" />
               </pattern>
             </defs>
-            <rect width="100%" height="100%" fill="url(#bg-grid)" />
+            <rect width="100%" height="100%" fill={`url(#${patternId('bg-grid')})`} />
           </svg>
         </div>
       </div>
@@ -55,11 +57,11 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
         <div className="absolute inset-0 opacity-25">
           <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
             <defs>
-              <pattern id="bg-dots" width="8" height="8" patternUnits="userSpaceOnUse">
+              <pattern id={patternId('bg-dots')} width="8" height="8" patternUnits="userSpaceOnUse">
                 <circle cx="2" cy="2" r="1" fill="white" />
               </pattern>
             </defs>
-            <rect width="100%" height="100%" fill="url(#bg-dots)" />
+            <rect width="100%" height="100%" fill={`url(#${patternId('bg-dots')})`} />
           </svg>
         </div>
       </div>
@@ -70,7 +72,7 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
         <div className="absolute inset-0 opacity-20">
           <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <pattern id="bg-diag-moving" width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+              <pattern id={patternId('bg-diag-moving')} width="40" height="40" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
                 {isActive && (
                   <>
                     <animateTransform attributeName="patternTransform" type="translate" from="0 0" to="0 40" dur="4s" repeatCount="indefinite" />
@@ -79,7 +81,7 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
                 <line x1="0" y1="0" x2="0" y2="40" stroke="white" strokeWidth="2" />
               </pattern>
             </defs>
-            <rect width="100%" height="100%" fill="url(#bg-diag-moving)" />
+            <rect width="100%" height="100%" fill={`url(#${patternId('bg-diag-moving')})`} />
           </svg>
         </div>
       </div>
@@ -101,13 +103,13 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
       <div className="absolute inset-0 overflow-hidden opacity-25">
          <svg className="w-full h-full text-white" fill="none" stroke="currentColor">
           <defs>
-            <pattern id="bg-cross-moving" width="40" height="40" patternUnits="userSpaceOnUse">
+            <pattern id={patternId('bg-cross-moving')} width="40" height="40" patternUnits="userSpaceOnUse">
               <g className={isActive ? "origin-center animate-[spin_8s_linear_infinite]" : ""} style={{ transformOrigin: "20px 20px" }}>
                 <path d="M20 10v20M10 20h20" strokeWidth="1.5" strokeLinecap="round" />
               </g>
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#bg-cross-moving)" />
+          <rect width="100%" height="100%" fill={`url(#${patternId('bg-cross-moving')})`} />
         </svg>
       </div>
     ),
@@ -116,7 +118,7 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
       <div className="absolute inset-0 overflow-hidden opacity-20">
         <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <pattern id="bg-checker-moving" width="60" height="60" patternUnits="userSpaceOnUse">
+            <pattern id={patternId('bg-checker-moving')} width="60" height="60" patternUnits="userSpaceOnUse">
               <rect x="0" y="0" width="30" height="30" fill="white">
                 {isActive && <animate attributeName="opacity" values="0.1;0.9;0.1" dur="3s" repeatCount="indefinite" />}
               </rect>
@@ -127,7 +129,7 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
               <rect x="0" y="30" width="30" height="30" fill="white" opacity="0.05" />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#bg-checker-moving)" />
+          <rect width="100%" height="100%" fill={`url(#${patternId('bg-checker-moving')})`} />
         </svg>
       </div>
     ),
@@ -231,11 +233,11 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
       <div className="absolute inset-0 overflow-hidden opacity-20">
          <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
             <defs>
-              <pattern id="hex-bg" width="28" height="48" patternUnits="userSpaceOnUse" patternTransform="scale(1.5)">
+              <pattern id={patternId('hex-bg')} width="28" height="48" patternUnits="userSpaceOnUse" patternTransform="scale(1.5)">
                 <path d="M14 0L28 8v16L14 32 0 24V8z M14 48L28 40V24L14 16 0 24v16z" fill="none" stroke="white" strokeWidth="1" />
               </pattern>
             </defs>
-            <rect width="100%" height="100%" fill="url(#hex-bg)" />
+            <rect width="100%" height="100%" fill={`url(#${patternId('hex-bg')})`} />
          </svg>
       </div>
     ),
@@ -269,14 +271,14 @@ const BackgroundPattern: React.FC<BackgroundPatternProps> = ({ slideIndex, isAct
       <div className="absolute inset-0 overflow-hidden opacity-15">
         <svg className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <pattern id="circuit" width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="scale(1.5)">
+            <pattern id={patternId('circuit')} width="60" height="60" patternUnits="userSpaceOnUse" patternTransform="scale(1.5)">
               <path d="M10 10 L 20 10 L 30 20 L 30 40 M 10 10 A 2 2 0 1 1 6 10 M 30 40 A 2 2 0 1 1 30 44 L 40 44 L 50 34" fill="none" stroke="white" strokeWidth="1" />
               <circle cx="8" cy="10" r="1.5" fill="white" />
               <circle cx="30" cy="42" r="1.5" fill="white" />
               <circle cx="50" cy="34" r="1.5" fill="white" />
             </pattern>
           </defs>
-          <rect width="100%" height="100%" fill="url(#circuit)" />
+          <rect width="100%" height="100%" fill={`url(#${patternId('circuit')})`} />
         </svg>
       </div>
     ),
