@@ -3,21 +3,37 @@ export function optimizeImage(url: string, opts?: { w?: number; q?: number }): s
   const w = opts?.w || 280;
   const q = opts?.q || 80;
   try {
+    const raw = String(url).trim();
+    if (!raw) return raw;
+    if (
+      raw.startsWith('data:') ||
+      raw.startsWith('blob:') ||
+      raw.startsWith('/') ||
+      raw.startsWith('file:') ||
+      raw.includes('/api/image-proxy?')
+    ) {
+      return raw;
+    }
+
     // Cloudinary delivery URL pattern: /image/upload/... => insert transformations after upload/
-    if (url.includes('/image/upload/')) {
-      const [head, tail] = url.split('/image/upload/');
+    if (raw.includes('/image/upload/')) {
+      const [head, tail] = raw.split('/image/upload/');
       const trans = `image/upload/f_auto,q_auto,w_${w}/`;
       return `${head}/${trans}${tail}`;
     }
     // Unsplash patterns: append w and q
-    if (url.includes('images.unsplash.com')) {
-      const u = new URL(url);
+    if (raw.includes('images.unsplash.com')) {
+      const u = new URL(raw);
       u.searchParams.set('w', String(w * 2)); // retina
       u.searchParams.set('q', String(q));
       u.searchParams.set('auto', 'format');
       return u.toString();
     }
-    return url;
+    const parsed = new URL(raw);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+      return `/api/image-proxy?url=${encodeURIComponent(raw)}`;
+    }
+    return raw;
   } catch {
     return url;
   }

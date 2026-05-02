@@ -29,6 +29,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import multer from 'multer';
 import net from 'node:net';
+import dns from 'node:dns/promises';
 import { requirePermission, applyReadConditions, validateWriteAgainstConditions, getUserPermissions, clearUserPermissionCache } from './rbac/permissions.js';
 
 const ORDER_STATUS_TRANSITIONS = {
@@ -186,6 +187,49 @@ function getActorKey(req) {
   const ip = getClientIp(req);
   const anonHash = crypto.createHash('sha1').update(`${ip}|${ua}`).digest('hex').slice(0, 24);
   return `anon:${anonHash}`;
+}
+
+function isPrivateIpAddress(ip) {
+  const normalized = String(ip || '').trim();
+  if (!normalized) return true;
+  const v4 = normalized.startsWith('::ffff:') ? normalized.slice(7) : normalized;
+  const family = net.isIP(v4);
+  if (family === 4) {
+    const parts = v4.split('.').map((x) => Number(x));
+    if (parts.length !== 4 || parts.some((n) => Number.isNaN(n))) return true;
+    if (parts[0] === 10) return true;
+    if (parts[0] === 127) return true;
+    if (parts[0] === 0) return true;
+    if (parts[0] === 169 && parts[1] === 254) return true;
+    if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) return true;
+    if (parts[0] === 192 && parts[1] === 168) return true;
+    return false;
+  }
+  if (family === 6) {
+    const lower = normalized.toLowerCase();
+    if (lower === '::1') return true;
+    if (lower.startsWith('fc') || lower.startsWith('fd')) return true; // ULA
+    if (lower.startsWith('fe8') || lower.startsWith('fe9') || lower.startsWith('fea') || lower.startsWith('feb')) return true; // link local
+    return false;
+  }
+  return true;
+}
+
+async function isSafePublicImageUrl(rawUrl) {
+  try {
+    const parsed = new URL(String(rawUrl || ''));
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    const host = parsed.hostname.toLowerCase();
+    if (!host || host === 'localhost' || host.endsWith('.localhost')) return false;
+    // If hostname is already an IP literal, block private/local ranges directly.
+    if (net.isIP(host) && isPrivateIpAddress(host)) return false;
+    const records = await dns.lookup(host, { all: true });
+    if (!Array.isArray(records) || records.length === 0) return false;
+    if (records.some((r) => isPrivateIpAddress(r.address))) return false;
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function getBuilderPricingConfig() {
@@ -1103,6 +1147,56 @@ app.use((req, res, next) => {
     res.set('Cache-Control', 'public, max-age=30');
   }
   next();
+});
+
+// Proxy remote images to avoid browser-side 403/hotlink/CORS issues for external hosts.
+app.get('/api/image-proxy', async (req, res) => {
+  try {
+    const src = String(req.query?.url || '').trim();
+    if (!src) return res.status(400).json({ ok: false, error: 'url is required' });
+
+    const safe = await isSafePublicImageUrl(src);
+    if (!safe) return res.status(400).json({ ok: false, error: 'Blocked image url' });
+
+    // Build headers that mimic a real browser to avoid hotlink/403 blocks
+    const srcUrl = new URL(src);
+    const srcHost = srcUrl.hostname.toLowerCase();
+    // Facebook CDN expects Referer from facebook.com, not from the CDN itself
+    const isFacebook = srcHost.includes('fbcdn.net') || srcHost.includes('facebook.com');
+    const referer = isFacebook ? 'https://www.facebook.com/' : srcUrl.origin + '/';
+
+    const upstream = await fetch(src, {
+      redirect: 'follow',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
+        Accept: 'image/avif,image/webp,image/apng,image/*,*/*;q=0.8',
+        Referer: referer,
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Sec-Fetch-Dest': 'image',
+        'Sec-Fetch-Mode': 'no-cors',
+        'Sec-Fetch-Site': isFacebook ? 'same-site' : 'cross-site',
+      },
+    });
+
+    if (!upstream.ok) {
+      return res.status(upstream.status || 502).json({ ok: false, error: `Upstream returned ${upstream.status}` });
+    }
+
+    const contentType = upstream.headers.get('content-type') || '';
+    if (!contentType.toLowerCase().startsWith('image/')) {
+      return res.status(415).json({ ok: false, error: 'Upstream is not an image' });
+    }
+
+    const data = Buffer.from(await upstream.arrayBuffer());
+    res.set('Content-Type', contentType);
+    res.set('Cache-Control', 'public, max-age=86400, stale-while-revalidate=604800');
+    const etag = crypto.createHash('sha1').update(data).digest('hex');
+    res.set('ETag', `"img-${etag}"`);
+    return res.status(200).send(data);
+  } catch (error) {
+    return res.status(500).json({ ok: false, error: error.message || 'Image proxy failed' });
+  }
 });
 
 // --- Branches CRUD ---

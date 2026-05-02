@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { ComprehensiveEditModal } from '@/components/admin/ComprehensiveEditModal';
 import { Button } from '@/components/ui/button';
-import { calculateFinalBalance, calculateNetProfit, calculateProfitPerPound, calculateShareholderDelta, calculateCompareLastMonth } from '@/lib/profitCalculations';
+import { calculateFinalBalance, calculateNetProfit, calculateProfitPerPound, calculateShareholderDelta, calculateCompareLastMonth, rebuildHistoryChain } from '@/lib/profitCalculations';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { DateRange } from 'react-day-picker';
@@ -99,6 +99,7 @@ type CashBreakdown = {
   bank: number;
   drawer: number;
   vodafone: number;
+  etisalat: number;
   customRows?: CustomCashRow[];
 };
 type ProfitTotals = {
@@ -289,7 +290,7 @@ export default function AdminProfit() {
   const [wizardStep, setWizardStep] = useState(0);
   const [prevRange, setPrevRange] = useState<DateRange | undefined>();
   const [editMode, setEditMode] = useState(true);
-  const [cashBreakdown, setCashBreakdown] = useState<CashBreakdown>({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] });
+  const [cashBreakdown, setCashBreakdown] = useState<CashBreakdown>({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] });
   const [expenseTypes, setExpenseTypes] = useState<Map<string, ExpenseType>>(new Map());
   // Auto-update outletExpenses with personal expenses total (ALWAYS auto-calculated)
   useEffect(() => {
@@ -329,7 +330,7 @@ export default function AdminProfit() {
         return !name.includes('vodafone') && !name.includes('فودافون');
       })
       .reduce((sum, row) => sum + Number(row.amount || 0), 0);
-    return Number(cashBreakdown.outletExpenses || 0) + Number(cashBreakdown.home || 0) + Number(cashBreakdown.bank || 0) + Number(cashBreakdown.drawer || 0) + Number(cashBreakdown.vodafone || 0) + customRowsTotal;
+    return Number(cashBreakdown.outletExpenses || 0) + Number(cashBreakdown.home || 0) + Number(cashBreakdown.bank || 0) + Number(cashBreakdown.drawer || 0) + Number(cashBreakdown.vodafone || 0) + Number(cashBreakdown.etisalat || 0) + customRowsTotal;
   }, [cashBreakdown]);
   const [showPreview, setShowPreview] = useState(false);
   const [showSimplePreview, setShowSimplePreview] = useState(false);
@@ -492,9 +493,10 @@ export default function AdminProfit() {
               bank: Number(item.cashBreakdown.bank || 0),
               drawer: Number(item.cashBreakdown.drawer || 0),
               vodafone: Number(item.cashBreakdown.vodafone || 0),
+              etisalat: Number(item.cashBreakdown.etisalat || 0),
               customRows: Array.isArray(item.cashBreakdown.customRows) ? item.cashBreakdown.customRows : []
             }
-            : { outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] };
+            : { outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] };
 
           setGlobalBranches(loadedBranches);
           setGlobalExpenses(loadedExpenses);
@@ -513,7 +515,7 @@ export default function AdminProfit() {
           setShareholders([]);
           setShareHistory({});
           setExpenseTypes(new Map());
-          setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] });
+          setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] });
         }
       } catch (e: unknown) {
         console.error('Error loading profit settings:', e);
@@ -523,7 +525,7 @@ export default function AdminProfit() {
         setShareholders([]);
         setShareHistory({});
         setExpenseTypes(new Map());
-        setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] });
+        setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] });
       } finally {
         setProfitSettingsLoaded(true);
       }
@@ -780,30 +782,27 @@ export default function AdminProfit() {
         if (!isSelected) {
           const inactiveTxn: ShareTxn = {
             id: existingTxn?.id || crypto.randomUUID(),
-            date: new Date().toISOString(),
+            // Preserve the original date when updating so chronological sort keeps the report in its correct month slot.
+            // Using new Date() here would push a January edit to today, sorting it after February.
+            date: existingTxn ? existingTxn.date : new Date().toISOString(),
             reportId: effectiveReportId,
-            delta: 0, // ✅ No change when inactive
+            delta: 0,
             fromAmount: balanceBeforeReport,
-            toAmount: balanceBeforeReport, // ✅ Balance stays same
+            toAmount: balanceBeforeReport,
             netProfit: np,
             finalBalance: fb,
             source: 'auto',
-            active: false, // ✅ Mark as inactive
+            active: false,
             note: `غير مشمول في هذا التقرير`
           };
 
-          // Update or create transaction
-          setShareHistory(h => {
-            if (existingTxn) {
-              // Update existing
-              return { ...h, [s.id]: existingHistory.map(t => t.id === existingTxn.id ? inactiveTxn : t) };
-            } else {
-              // Create new
-              return { ...h, [s.id]: [...existingHistory, inactiveTxn] };
-            }
-          });
-
-          return { ...s, amount: balanceBeforeReport }; // No change to balance
+          const rawHistory = existingTxn
+            ? existingHistory.map(t => t.id === existingTxn.id ? inactiveTxn : t)
+            : [...existingHistory, inactiveTxn];
+          const rebuilt = rebuildHistoryChain(rawHistory);
+          setShareHistory(h => ({ ...h, [s.id]: rebuilt }));
+          const finalAmt = rebuilt.length > 0 ? rebuilt[rebuilt.length - 1].toAmount : balanceBeforeReport;
+          return { ...s, amount: finalAmt };
         }
 
         // Processing selected shareholder
@@ -813,7 +812,7 @@ export default function AdminProfit() {
           const rec: ShareTxn = {
             id: crypto.randomUUID(),
             date: new Date().toISOString(),
-            reportId: effectiveReportId, // Use clean reportId
+            reportId: effectiveReportId,
             delta: 0,
             fromAmount: Number(s.amount),
             toAmount: Number(s.amount),
@@ -822,21 +821,20 @@ export default function AdminProfit() {
             source: 'auto',
             note: `لم يحدث تغيير: المساهم أضيف بعد تاريخ التقرير (${s.createdAt ? new Date(s.createdAt).toLocaleString('ar-EG') : '—'} > ${new Date(resultsAt).toLocaleString('ar-EG')})`
           };
-          // Always add new transaction (never update existing ones)
-          setShareHistory(h => {
-            return { ...h, [s.id]: [...(h[s.id] || []), rec] };
-          });
-          return s;
+          const rebuilt = rebuildHistoryChain([...(shareHistory[s.id] || []), rec]);
+          setShareHistory(h => ({ ...h, [s.id]: rebuilt }));
+          const finalAmt = rebuilt.length > 0 ? rebuilt[rebuilt.length - 1].toAmount : Number(s.amount);
+          return { ...s, amount: finalAmt };
         }
 
         const pct = Number(s.percentage || 0);
         const delta = balanceBeforeReport * ppp * (pct / 100);
         const targetBalance = balanceBeforeReport + delta;
 
-        // ✅ Create ACTIVE transaction for selected shareholder
         const activeTxn: ShareTxn = {
           id: existingTxn?.id || crypto.randomUUID(),
-          date: new Date().toISOString(),
+          // Preserve original date on update so the transaction stays in its correct month position after sort
+          date: existingTxn ? existingTxn.date : new Date().toISOString(),
           reportId: effectiveReportId,
           delta,
           fromAmount: balanceBeforeReport,
@@ -844,22 +842,18 @@ export default function AdminProfit() {
           netProfit: np,
           finalBalance: fb,
           source: 'auto',
-          active: true, // ✅ Mark as active
+          active: true,
           note: `توزيع أرباح: ${ppp.toFixed(4)} × ${pct}% = ${Number(delta).toLocaleString()}`
         };
 
-        // Update or create transaction
-        setShareHistory(h => {
-          if (existingTxn) {
-            // Update existing
-            return { ...h, [s.id]: existingHistory.map(t => t.id === existingTxn.id ? activeTxn : t) };
-          } else {
-            // Create new
-            return { ...h, [s.id]: [...existingHistory, activeTxn] };
-          }
-        });
-
-        return { ...s, amount: targetBalance };
+        // Rebuild full chain — edits to an early report ripple forward into all later transactions
+        const rawHistory = existingTxn
+          ? existingHistory.map(t => t.id === existingTxn.id ? activeTxn : t)
+          : [...existingHistory, activeTxn];
+        const rebuilt = rebuildHistoryChain(rawHistory);
+        setShareHistory(h => ({ ...h, [s.id]: rebuilt }));
+        const finalAmt = rebuilt.length > 0 ? rebuilt[rebuilt.length - 1].toAmount : targetBalance;
+        return { ...s, amount: finalAmt };
       });
     });
   }
@@ -900,38 +894,36 @@ export default function AdminProfit() {
         if (!isSelected) {
           const inactiveTxn: ShareTxn = {
             id: existingTxn?.id || crypto.randomUUID(),
-            date: new Date().toISOString(),
+            // Preserve original date so sort keeps this transaction in its correct month position
+            date: existingTxn ? existingTxn.date : new Date().toISOString(),
             reportId: reportId,
-            delta: 0, // ✅ No change when inactive
+            delta: 0,
             fromAmount: balanceBeforeReport,
-            toAmount: balanceBeforeReport, // ✅ Balance stays same
+            toAmount: balanceBeforeReport,
             netProfit,
             finalBalance,
             source: 'auto',
-            active: false, // ✅ Mark as inactive
+            active: false,
             note: `غير مشمول في هذا التقرير`
           };
 
-          // Update or create transaction
-          setShareHistory(h => {
-            if (existingTxn) {
-              return { ...h, [s.id]: existingHistory.map(t => t.id === existingTxn.id ? inactiveTxn : t) };
-            } else {
-              return { ...h, [s.id]: [...existingHistory, inactiveTxn] };
-            }
-          });
-
-          return { ...s, amount: balanceBeforeReport }; // No change to balance
+          const rawHistory = existingTxn
+            ? existingHistory.map(t => t.id === existingTxn.id ? inactiveTxn : t)
+            : [...existingHistory, inactiveTxn];
+          const rebuilt = rebuildHistoryChain(rawHistory);
+          setShareHistory(h => ({ ...h, [s.id]: rebuilt }));
+          const finalAmt = rebuilt.length > 0 ? rebuilt[rebuilt.length - 1].toAmount : balanceBeforeReport;
+          return { ...s, amount: finalAmt };
         }
 
-        // ✅ Shareholder is selected: set active=true, calculate delta
         const pct = Number(s.percentage || 0);
         const delta = calculateShareholderDelta(balanceBeforeReport, profitPerPound, pct);
         const targetBalance = balanceBeforeReport + delta;
 
         const activeTxn: ShareTxn = {
           id: existingTxn?.id || crypto.randomUUID(),
-          date: new Date().toISOString(),
+          // Preserve original date on update so the transaction stays in its correct month position after sort
+          date: existingTxn ? existingTxn.date : new Date().toISOString(),
           reportId: reportId,
           delta,
           fromAmount: balanceBeforeReport,
@@ -939,20 +931,18 @@ export default function AdminProfit() {
           netProfit,
           finalBalance,
           source: 'auto',
-          active: true, // ✅ Mark as active
+          active: true,
           note: `توزيع أرباح: ${profitPerPound.toFixed(4)} × ${pct}% = ${Number(delta).toLocaleString()}`
         };
 
-        // Update or create transaction
-        setShareHistory(h => {
-          if (existingTxn) {
-            return { ...h, [s.id]: existingHistory.map(t => t.id === existingTxn.id ? activeTxn : t) };
-          } else {
-            return { ...h, [s.id]: [...existingHistory, activeTxn] };
-          }
-        });
-
-        return { ...s, amount: targetBalance };
+        // Rebuild full chain — editing an early report must ripple forward into all later transactions
+        const rawHistory = existingTxn
+          ? existingHistory.map(t => t.id === existingTxn.id ? activeTxn : t)
+          : [...existingHistory, activeTxn];
+        const rebuilt = rebuildHistoryChain(rawHistory);
+        setShareHistory(h => ({ ...h, [s.id]: rebuilt }));
+        const finalAmt = rebuilt.length > 0 ? rebuilt[rebuilt.length - 1].toAmount : targetBalance;
+        return { ...s, amount: finalAmt };
       });
     });
   }
@@ -966,6 +956,9 @@ export default function AdminProfit() {
   const [showResults, setShowResults] = useState(false);
   // prevent duplicate auto-saves when reaching final results
   const autoSavedRef = useRef(false);
+  // prevent selectedShareholders effect from re-running applyShareholderDistribution
+  // when handleQuickEditSave programmatically updates the selection
+  const skipDistributionOnSelectChangeRef = useRef(false);
   const [showImpactModal, setShowImpactModal] = useState(false);
   const [source, setSource] = useState<'manual' | 'report'>('manual');
   const [showQuickEditModal, setShowQuickEditModal] = useState(false);
@@ -1025,6 +1018,7 @@ export default function AdminProfit() {
         if (updatedReport.branchRows) setBranchRows(updatedReport.branchRows);
         if (updatedReport.totals?.cashBreakdown) setCashBreakdown(updatedReport.totals.cashBreakdown);
         if (updatedReport.affectedShareholders !== undefined) {
+          skipDistributionOnSelectChangeRef.current = true;
           setSelectedShareholders(new Set(updatedReport.affectedShareholders));
         }
       }
@@ -1095,6 +1089,7 @@ export default function AdminProfit() {
                 bank: Number(tb.cashBreakdown?.bank || 0),
                 drawer: Number(tb.cashBreakdown?.drawer || 0),
                 vodafone: Number(tb.cashBreakdown?.vodafone || 0),
+                etisalat: Number(tb.cashBreakdown?.etisalat || 0),
                 customRows: mergedCustomRows
               };
               setCashBreakdown(reportCashBreakdown);
@@ -1186,6 +1181,7 @@ export default function AdminProfit() {
                 bank: Number(tb.cashBreakdown?.bank || 0),
                 drawer: Number(tb.cashBreakdown?.drawer || 0),
                 vodafone: Number(tb.cashBreakdown?.vodafone || 0),
+                etisalat: Number(tb.cashBreakdown?.etisalat || 0),
                 customRows: mergedCustomRows
               };
               setCashBreakdown(reportCashBreakdown);
@@ -1533,6 +1529,9 @@ export default function AdminProfit() {
       if (Number(cashBreakdown.vodafone || 0) > 0) {
         summary.push(['فودافون', Number(cashBreakdown.vodafone || 0)]);
       }
+      if (Number(cashBreakdown.etisalat || 0) > 0) {
+        summary.push(['اتصالات', Number(cashBreakdown.etisalat || 0)]);
+      }
       (cashBreakdown.customRows || []).filter(row => Number(row.amount || 0) > 0).forEach(row => {
         summary.push([row.name || 'مخصص', Number(row.amount || 0)]);
       });
@@ -1588,6 +1587,12 @@ export default function AdminProfit() {
   // Re-apply distribution when shareholder selection changes while results are shown
   useEffect(() => {
     if (showResults && distributionAppliedRef.current) {
+      // Skip when handleQuickEditSave programmatically changes the selection —
+      // that path already calls applyShareholderDistributionForExistingReport directly.
+      if (skipDistributionOnSelectChangeRef.current) {
+        skipDistributionOnSelectChangeRef.current = false;
+        return;
+      }
       // Re-apply distribution with new selection
       applyShareholderDistribution(currentReportId, selectedShareholders);
 
@@ -1975,7 +1980,7 @@ export default function AdminProfit() {
                     shareholders: [],
                     shareHistory: {},
                     expenseTypes: {},
-                    cashBreakdown: { outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] }
+                    cashBreakdown: { outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] }
                   };
                   const resp = await apiPutJson('/api/profit-settings', resetPayload);
 
@@ -1986,7 +1991,7 @@ export default function AdminProfit() {
                     setShareholders([]);
                     setShareHistory({});
                     setExpenseTypes(new Map());
-                    setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] });
+                    setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] });
                     toast({ title: 'تم', description: 'تم إعادة تعيين البيانات إلى القيم الافتراضية' });
                   }
                 } catch (e) {
@@ -2019,7 +2024,7 @@ export default function AdminProfit() {
                 setReportName('');
                 setRange(undefined);
                 setLastMonthClosing(0); setManualLastMonthValue(false);
-                setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] });
+                setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] });
                 setShowResults(false);
                 setEditMode(true);
                 setPrefillLock(false);
@@ -2160,7 +2165,7 @@ export default function AdminProfit() {
                     setDescription('');
                     setRange(undefined);
                     setLastMonthClosing(0); setManualLastMonthValue(false);
-                    setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] });
+                    setCashBreakdown({ outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] });
                     setShowResults(false);
                     setEditMode(true);
                     setPrefillLock(false);
@@ -2260,7 +2265,7 @@ export default function AdminProfit() {
                               }));
                               setRange({ from: new Date(doc.startDate), to: new Date(doc.endDate) }); setCurrentReportId(doc._id);
                               const tb: ProfitTotals = (doc?.totals || {}) as ProfitTotals;
-                              setCashBreakdown({ outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0), home: Number(tb.cashBreakdown?.home || 0), bank: Number(tb.cashBreakdown?.bank || 0), drawer: Number(tb.cashBreakdown?.drawer || 0), vodafone: Number(tb.cashBreakdown?.vodafone || 0), customRows: tb.cashBreakdown?.customRows || [] });
+                              setCashBreakdown({ outletExpenses: Number(tb.cashBreakdown?.outletExpenses || 0), home: Number(tb.cashBreakdown?.home || 0), bank: Number(tb.cashBreakdown?.bank || 0), drawer: Number(tb.cashBreakdown?.drawer || 0), vodafone: Number(tb.cashBreakdown?.vodafone || 0), etisalat: Number(tb.cashBreakdown?.etisalat || 0), customRows: tb.cashBreakdown?.customRows || [] });
                               setPrefillLock(true);
                               // Ensure only simple preview opens
                               setShowWizard(false);
@@ -2319,6 +2324,7 @@ export default function AdminProfit() {
                                     bank: Number(tb.cashBreakdown?.bank || 0),
                                     drawer: Number(tb.cashBreakdown?.drawer || 0),
                                     vodafone: Number(tb.cashBreakdown?.vodafone || 0),
+                                    etisalat: Number(tb.cashBreakdown?.etisalat || 0),
                                     customRows: mergedCustomRows
                                   };
                                   setCashBreakdown(reportCashBreakdown);
@@ -2351,6 +2357,7 @@ export default function AdminProfit() {
                                     bank: Number(tb.cashBreakdown?.bank || 0),
                                     drawer: Number(tb.cashBreakdown?.drawer || 0),
                                     vodafone: Number(tb.cashBreakdown?.vodafone || 0),
+                                    etisalat: Number(tb.cashBreakdown?.etisalat || 0),
                                     customRows: mergedCustomRows2
                                   };
                                   setCashBreakdown(reportCashBreakdown2);
@@ -3622,6 +3629,9 @@ export default function AdminProfit() {
                           ];
                           if (Number(cashBreakdown.vodafone || 0) > 0) {
                             cashItems.push({ name: 'فودافون', value: Number(cashBreakdown.vodafone || 0), icon: '📱' });
+                          }
+                          if (Number(cashBreakdown.etisalat || 0) > 0) {
+                            cashItems.push({ name: 'اتصالات', value: Number(cashBreakdown.etisalat || 0), icon: '📞' });
                           }
                           (cashBreakdown.customRows || [])
                             .filter(row => {
@@ -5410,6 +5420,17 @@ export default function AdminProfit() {
                                 />
                               </td>
                             </tr>
+                            <tr className="bg-white">
+                              <td className="border p-3 font-semibold text-right">اتصالات</td>
+                              <td className="border p-3 text-center">
+                                <Input
+                                  type="text"
+                                  value={formatNumber(Number(cashBreakdown.etisalat || 0))}
+                                  onChange={e => { const v = e.target.value; if (!validateNumericInput(v)) return; setCashBreakdown(prev => ({ ...prev, etisalat: parseNumber(v) })); }}
+                                  className="bg-white border-primary/30 focus:border-primary focus:ring-primary/20 text-center"
+                                />
+                              </td>
+                            </tr>
                             {/* Custom Cash Rows */}
                             {(cashBreakdown.customRows || []).map((row, index) => (
                               <tr key={row.id} className={index % 2 === 0 ? "bg-white" : "bg-slate-50"}>
@@ -5937,6 +5958,15 @@ export default function AdminProfit() {
                               </td>
                             </tr>
                           )}
+                          {/* Explicit Etisalat Row - only show if value > 0 */}
+                          {Number(cashBreakdown.etisalat || 0) > 0 && (
+                            <tr className="bg-gray-100">
+                              <td className="border border-slate-300 p-2 text-center font-semibold">اتصالات</td>
+                              <td className="border border-slate-300 p-2 text-center border-r-0">
+                                {Number(cashBreakdown.etisalat || 0).toLocaleString()}
+                              </td>
+                            </tr>
+                          )}
                           {/* Custom Cash Rows - filter out any vodafone-related rows */}
                           {(cashBreakdown.customRows || [])
                             .filter(row => {
@@ -6417,6 +6447,18 @@ export default function AdminProfit() {
                     <div className="text-xs text-blue-600">الدرج</div>
                     <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.drawer || 0).toLocaleString()}</div>
                   </div>
+                  {Number(cashBreakdown.vodafone || 0) > 0 && (
+                    <div className="text-center">
+                      <div className="text-xs text-blue-600">فودافون</div>
+                      <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.vodafone || 0).toLocaleString()}</div>
+                    </div>
+                  )}
+                  {Number(cashBreakdown.etisalat || 0) > 0 && (
+                    <div className="text-center">
+                      <div className="text-xs text-blue-600">اتصالات</div>
+                      <div className="text-lg font-bold text-blue-800">{Number(cashBreakdown.etisalat || 0).toLocaleString()}</div>
+                    </div>
+                  )}
                 </div>
                 {(cashBreakdown.customRows || []).filter(row => Number(row.amount || 0) > 0).length > 0 && (
                   <div className="mt-3 pt-3 border-t border-blue-200">

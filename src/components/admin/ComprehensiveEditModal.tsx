@@ -30,6 +30,7 @@ type cashBreakdown = {
   bank: number;
   drawer: number;
   vodafone: number;
+  etisalat: number;
   customRows?: Array<{ id: string; name: string; amount: number }>;
 };
 
@@ -135,7 +136,7 @@ export function ComprehensiveEditModal({
   const [expenses, setExpenses] = useState<string[]>([]);
   const [branchRows, setBranchRows] = useState<BranchRow[]>([]);
   const [cashBreakdown, setCashBreakdown] = useState<CashBreakdown>({
-    outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: []
+    outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: []
   });
   const [selectedShareholders, setSelectedShareholders] = useState<Set<string>>(new Set());
   const [lastMonthClosing, setLastMonthClosing] = useState('0');
@@ -205,7 +206,7 @@ export function ComprehensiveEditModal({
       setBranches(report.branches || []);
       setExpenses(report.expenses || []);
       setBranchRows(report.branchRows || []);
-      const loadedCashBreakdown = report.totals?.cashBreakdown || { outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, customRows: [] };
+      const loadedCashBreakdown = report.totals?.cashBreakdown || { outletExpenses: 0, home: 0, bank: 0, drawer: 0, vodafone: 0, etisalat: 0, customRows: [] };
       // Ensure custom rows have IDs
       if (loadedCashBreakdown.customRows) {
         loadedCashBreakdown.customRows = loadedCashBreakdown.customRows.map(row => ({
@@ -247,10 +248,12 @@ export function ComprehensiveEditModal({
       const debtsOnUs = sumByExpense['ديون عليه'] || 0;
       
       // Calculate cash total (including custom rows)
-      const cashTotal = (cashBreakdown.outletExpenses || 0) + 
-                       (cashBreakdown.home || 0) + 
-                       (cashBreakdown.bank || 0) + 
+      const cashTotal = (cashBreakdown.outletExpenses || 0) +
+                       (cashBreakdown.home || 0) +
+                       (cashBreakdown.bank || 0) +
                        (cashBreakdown.drawer || 0) +
+                       (cashBreakdown.vodafone || 0) +
+                       (cashBreakdown.etisalat || 0) +
                        (cashBreakdown.customRows?.reduce((sum, row) => sum + (row.amount || 0), 0) || 0);
       
       // Calculate expenses (excluding fixed items)
@@ -1114,6 +1117,7 @@ export function ComprehensiveEditModal({
                       cashBreakdown.bank +
                       cashBreakdown.drawer +
                       (cashBreakdown.vodafone || 0) +
+                      (cashBreakdown.etisalat || 0) +
                       (cashBreakdown.customRows?.reduce((sum, row) => sum + row.amount, 0) || 0)
                     ).toLocaleString()}
                   </Badge>
@@ -1214,7 +1218,24 @@ export function ComprehensiveEditModal({
                           />
                         </td>
                       </tr>
-                      
+
+                      {/* اتصالات */}
+                      <tr className="bg-slate-50">
+                        <td className="border border-slate-300 p-3 text-right font-semibold">اتصالات</td>
+                        <td className="border border-slate-300 p-2">
+                          <Input
+                            type="text"
+                            value={(cashBreakdown.etisalat || 0).toLocaleString()}
+                            onChange={(e) => {
+                              const cleaned = e.target.value.replace(/,/g, '');
+                              const value = cleaned === '' || cleaned === '-' ? 0 : parseFloat(cleaned);
+                              if (!isNaN(value)) setCashBreakdown(prev => ({ ...prev, etisalat: value }));
+                            }}
+                            className="text-center font-mono border-0"
+                          />
+                        </td>
+                      </tr>
+
                       {/* Subtotal Row */}
                       <tr className="bg-gradient-to-r from-blue-100 to-indigo-100 font-bold">
                         <td className="border border-slate-300 p-3 text-right text-blue-900">إجمالي الحسابات الأساسية</td>
@@ -1224,7 +1245,8 @@ export function ComprehensiveEditModal({
                             cashBreakdown.home +
                             cashBreakdown.bank +
                             cashBreakdown.drawer +
-                            (cashBreakdown.vodafone || 0)
+                            (cashBreakdown.vodafone || 0) +
+                            (cashBreakdown.etisalat || 0)
                           ).toLocaleString()}
                         </td>
                       </tr>
@@ -1335,6 +1357,7 @@ export function ComprehensiveEditModal({
                         cashBreakdown.bank +
                         cashBreakdown.drawer +
                         (cashBreakdown.vodafone || 0) +
+                        (cashBreakdown.etisalat || 0) +
                         (cashBreakdown.customRows?.reduce((sum, row) => sum + row.amount, 0) || 0)
                       ).toLocaleString()}
                     </span>

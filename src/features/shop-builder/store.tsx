@@ -282,7 +282,12 @@ export const ShopBuilderProvider = ({ children, initialShopData }: ShopBuilderPr
   const setGlobalWallTexture = useCallback((texture: string) => {
     setLayout((prev) => ({
       ...prev,
-      walls: prev.walls.map(wall => ({ ...wall, texture: texture as any })),
+      // Keep door walls as doors; only apply global texture to regular walls.
+      walls: prev.walls.map((wall) =>
+        wall.texture?.startsWith('door_')
+          ? wall
+          : ({ ...wall, texture: texture as any })
+      ),
       defaultWallTexture: texture, // Store as default for new walls
       updatedAt: now()
     }));

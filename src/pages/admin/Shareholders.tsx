@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useToast } from '@/hooks/use-toast';
 import { ToastAction } from '@/components/ui/toast';
 import { apiGet, apiPutJson } from '@/lib/api';
-import { calculateProfitPerPound, calculateShareholderDelta, calculateCompareLastMonth } from '@/lib/profitCalculations';
+import { calculateProfitPerPound, calculateShareholderDelta, calculateCompareLastMonth, rebuildHistoryChain } from '@/lib/profitCalculations';
 
 // Keep the same storage format used in Profit.tsx
 export type Shareholder = { id: string; name: string; amount: number; percentage: number; createdAt?: number; initialAmount?: number };
@@ -91,33 +91,19 @@ function TransactionRow({
   globalCashBreakdown: { outletExpenses?: number };
   onShowDetails: (txn: ShareTxn) => void;
 }) {
-  // Check if this is the creation transaction (non-deletable)
-  const isCreationTxn = txn.note?.includes('إنشاء مساهم جديد') || txn.fromAmount === 0;
+  // Only the explicit creation note marks a non-deletable transaction.
+  // Relying on fromAmount===0 would block deleting any txn where the prior balance happened to be zero.
+  const isCreationTxn = !!txn.note?.includes('إنشاء مساهم جديد');
 
   // Recalculate correct values for display
   const relatedReport = profitReports.find(r =>
     r._id === txn.reportId || txn.reportId?.startsWith(r._id + '_')
   );
 
-  let displayDelta = txn.delta;
-  let displayToAmount = txn.toAmount;
-
-  if (txn.source === 'auto' && relatedReport?.totals) {
-    const shareholder = shareholders.find(s => s.id === selectedId);
-    if (shareholder) {
-      const lastMonthClosing = relatedReport.cashBreakdown?.lastMonthClosing;
-      const finalBalance = relatedReport.totals.finalBalance;
-
-      if (lastMonthClosing !== undefined && finalBalance !== undefined) {
-        // ✅ Using centralized formulas from profitCalculations.ts
-        const currentDifference = calculateCompareLastMonth(finalBalance, lastMonthClosing);
-        const profitPerPound = calculateProfitPerPound(currentDifference, finalBalance);
-
-        displayDelta = calculateShareholderDelta(txn.fromAmount, profitPerPound, shareholder.percentage);
-        displayToAmount = txn.fromAmount + displayDelta;
-      }
-    }
-  }
+  // Use stored values — they are authoritative (calculated at distribution time).
+  // Re-deriving delta from report data causes wrong numbers when fromAmount has drifted.
+  const displayDelta = txn.delta;
+  const displayToAmount = txn.toAmount;
 
   return (
     <tr
@@ -339,6 +325,21 @@ function TransactionRow({
   );
 }
 
+// Hoisted outside AdminShareholders so React never remounts it on parent re-renders,
+// which would reset the CSS width animation.
+function DeleteCountdownBar({ durationMs = 6000 }: { durationMs?: number }) {
+  const barRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = barRef.current; if (!el) return;
+    requestAnimationFrame(() => { el.style.width = '0%'; });
+  }, []);
+  return (
+    <div className="mt-2 h-1 w-full bg-emerald-100 rounded">
+      <div ref={barRef} className="h-1 bg-emerald-500 rounded" style={{ width: '100%', transition: `width ${durationMs}ms linear` }} />
+    </div>
+  );
+}
+
 export default function AdminShareholders() {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -414,57 +415,36 @@ export default function AdminShareholders() {
     })();
   }, []);
 
-  // Get related profit reports for a shareholder based on their transaction history
+  // Get related profit reports for a shareholder based on their transaction history.
+  // reportId values can carry suffixes like _edit_ / _profit_, so match by prefix.
   const getRelatedReports = (shareholderId: string): ProfitReport[] => {
     const history = shareHistory[shareholderId] || [];
-    const reportIds = [...new Set(history.map(h => h.reportId).filter(Boolean))];
-    return profitReports.filter(report => reportIds.includes(report._id));
+    const reportIds = [...new Set(history.map(h => h.reportId).filter(Boolean))] as string[];
+    return profitReports.filter(report =>
+      reportIds.some(id => id === report._id || id.startsWith(report._id + '_'))
+    );
   };
 
-  // Recalculate all transaction balances for a shareholder
+  // Rebuild the full transaction chain for a shareholder, then persist to state.
+  // Uses rebuildHistoryChain (shared utility) which sorts by date and recomputes
+  // every fromAmount/toAmount from stored deltas — safe to call after any mutation.
   const recalculateHistory = (shareholderId: string, history: ShareTxn[]) => {
-    const shareholder = shareholders.find(s => s.id === shareholderId);
-    if (!shareholder) return;
+    const affectedReportCount = new Set(
+      history.filter(t => t.reportId).map(t => t.reportId)
+    ).size;
 
-    // Check for affected reports
-    const affectedReportIds = new Set(history.filter(t => t.reportId).map(t => t.reportId));
-    const affectedReportsCount = affectedReportIds.size;
+    const rebuilt = rebuildHistoryChain(history);
+    const finalBalance = rebuilt.length > 0 ? rebuilt[rebuilt.length - 1].toAmount : 0;
 
-    // IMPORTANT: Always start from initialAmount, NOT current amount
-    // Using current amount would double the balance when recalculating
-    let runningBalance = shareholder.initialAmount || 0;
-
-    // Sort by date to ensure chronological order
-    const sorted = [...history].sort((a, b) =>
-      new Date(a.date).getTime() - new Date(b.date).getTime()
+    setShareHistory(prev => ({ ...prev, [shareholderId]: rebuilt }));
+    setShareholders(prev =>
+      prev.map(s => s.id === shareholderId ? { ...s, amount: finalBalance } : s)
     );
 
-    const recalculated = sorted.map((txn) => {
-      const fromAmount = runningBalance;
-      const toAmount = fromAmount + txn.delta;
-      runningBalance = toAmount;
-
-      return {
-        ...txn,
-        fromAmount,
-        toAmount
-      };
-    });
-
-    // Update state
-    setShareHistory(prev => ({ ...prev, [shareholderId]: recalculated }));
-
-    // Update shareholder's current balance
-    setShareholders(prev => prev.map(s =>
-      s.id === shareholderId ? { ...s, amount: runningBalance } : s
-    ));
-
-    // Show warning if reports are affected
-    if (affectedReportsCount > 0) {
-      console.warn(`⚠️ ${affectedReportsCount} تقرير(تقارير) متأثرة بهذا التغيير`);
+    if (affectedReportCount > 0) {
       toast({
         title: 'تنبيه: تقارير متأثرة',
-        description: `هذا التغيير يؤثر على ${affectedReportsCount} تقرير أرباح. قد تحتاج إلى مراجعة التقارير المتأثرة.`,
+        description: `هذا التغيير يؤثر على ${affectedReportCount} تقرير أرباح. قد تحتاج إلى مراجعة التقارير المتأثرة.`,
         variant: 'default',
         duration: 5000,
       });
@@ -542,8 +522,7 @@ export default function AdminShareholders() {
 
     if (!txn) return;
 
-    // Prevent deletion of creation transaction (first transaction with fromAmount = 0)
-    if (txn.note?.includes('إنشاء مساهم جديد') || txn.fromAmount === 0) {
+    if (txn.note?.includes('إنشاء مساهم جديد')) {
       toast({
         title: '🚫 غير مسموح',
         description: 'لا يمكن حذف العملية الأولى (إنشاء المساهم). هذه العملية أساسية ولا يمكن إزالتها.',
@@ -597,11 +576,15 @@ export default function AdminShareholders() {
           });
 
           if (response.ok) {
-
-            // Refresh reports to show updated data
-            const reportsResp = await apiGet<ProfitReport>('/api/profit-reports');
+            // Refresh reports — API may return array in .item or .items
+            const reportsResp = await apiGet<ProfitReport[]>('/api/profit-reports');
             if (reportsResp.ok) {
-              setProfitReports((reportsResp.items || []) as ProfitReport[]);
+              const list = Array.isArray(reportsResp.item)
+                ? reportsResp.item
+                : Array.isArray((reportsResp as Record<string, unknown>).items)
+                  ? (reportsResp as Record<string, unknown>).items as ProfitReport[]
+                  : [];
+              setProfitReports(list);
             }
           }
         }
@@ -726,7 +709,30 @@ export default function AdminShareholders() {
     if (!nm) return;
     if (pct < 0 || pct > 100) return;
     if (editId) {
-      setShareholders(prev => prev.map(s => s.id === editId ? { ...s, name: nm, amount: amt, percentage: pct } : s));
+      const current = shareholders.find(s => s.id === editId);
+      if (current && Math.abs(amt - current.amount) > 0.001) {
+        // Amount changed — record a manual adjustment transaction so history stays in sync,
+        // then rebuild the full chain (recalculateHistory also updates shareholders.amount).
+        const delta = amt - current.amount;
+        const history = shareHistory[editId] || [];
+        const adjustmentTxn: ShareTxn = {
+          id: crypto.randomUUID(),
+          date: new Date().toISOString(),
+          delta,
+          fromAmount: current.amount,
+          toAmount: amt,
+          netProfit: 0,
+          finalBalance: 0,
+          source: 'manual',
+          note: `تعديل مباشر: تغيير الرصيد من ${formatNumber(current.amount)} إلى ${formatNumber(amt)}`
+        };
+        // Update name/percentage first, then recalculate (which sets amount from chain)
+        setShareholders(prev => prev.map(s => s.id === editId ? { ...s, name: nm, percentage: pct } : s));
+        recalculateHistory(editId, [...history, adjustmentTxn]);
+      } else {
+        // Only metadata changed — no new transaction needed
+        setShareholders(prev => prev.map(s => s.id === editId ? { ...s, name: nm, percentage: pct } : s));
+      }
     } else {
       const id = crypto.randomUUID();
       const newShareholder = ensureShareholderMetadata({
@@ -768,19 +774,7 @@ export default function AdminShareholders() {
   const scheduledDeletesRef = useRef<Map<string, number>>(new Map());
   useEffect(() => { scheduledDeletesRef.current = scheduledDeletes; }, [scheduledDeletes]);
 
-  // Small green progress bar component (client-side animation)
-  const DeleteCountdownBar = ({ durationMs = 6000 }: { durationMs?: number }) => {
-    const barRef = useRef<HTMLDivElement | null>(null);
-    useEffect(() => {
-      const el = barRef.current; if (!el) return;
-      requestAnimationFrame(() => { el.style.width = '0%'; });
-    }, []);
-    return (
-      <div className="mt-2 h-1 w-full bg-emerald-100 rounded">
-        <div ref={barRef} className="h-1 bg-emerald-500 rounded" style={{ width: '100%', transition: `width ${durationMs}ms linear` }} />
-      </div>
-    );
-  };
+  // DeleteCountdownBar is defined at module level (above this component) to avoid remounting on every render.
   function applyManualDelta(sh: Shareholder, sign: 1 | -1) {
     const raw = deltas[sh.id] || '';
     const deltaAbs = sanitizeNumericValue(raw);
@@ -799,8 +793,10 @@ export default function AdminShareholders() {
       source: 'manual',
       note: `${sign > 0 ? 'زيادة' : 'نقصان'} يدوية بقيمة ${formatNumber(deltaAbs)} (من ${formatNumber(from)} إلى ${formatNumber(to)})`
     };
-    setShareHistory(h => ({ ...h, [sh.id]: [...(h[sh.id] || []), rec] }));
-    setShareholders(prev => prev.map(s => s.id === sh.id ? { ...s, amount: to } : s));
+    // Always go through recalculateHistory so the full chain is rebuilt in
+    // chronological order — direct state mutation (old code) skipped sorting
+    // and left subsequent transactions with stale fromAmount/toAmount.
+    recalculateHistory(sh.id, [...(shareHistory[sh.id] || []), rec]);
     setDeltas(m => ({ ...m, [sh.id]: '' }));
   }
 
@@ -1326,14 +1322,16 @@ export default function AdminShareholders() {
                               </Button>
                             ) : null;
                           })()}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => deleteTransaction(selectedId!, h.id)}
-                            className="border-rose-300 text-rose-600"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </Button>
+                          {!h.note?.includes('إنشاء مساهم جديد') && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => deleteTransaction(selectedId!, h.id)}
+                              className="border-rose-300 text-rose-600"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     </div>
@@ -1501,12 +1499,12 @@ export default function AdminShareholders() {
                 value={txnDelta}
                 onChange={(e) => {
                   const v = e.target.value;
-                  if (v === '' || v === '-') {
-                    setTxnDelta(v);
-                    return;
-                  }
-                  if (validateNumericInput(v.replace('-', ''))) {
-                    setTxnDelta(formatInputWithCommas(v));
+                  if (v === '' || v === '-') { setTxnDelta(v); return; }
+                  // Preserve the leading minus sign — formatInputWithCommas strips non-digits
+                  const isNeg = v.startsWith('-');
+                  const abs = v.replace('-', '');
+                  if (validateNumericInput(abs)) {
+                    setTxnDelta((isNeg ? '-' : '') + formatInputWithCommas(abs));
                   }
                 }}
                 placeholder="مثال: 5000 أو -3000"

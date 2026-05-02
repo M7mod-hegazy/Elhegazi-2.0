@@ -469,7 +469,7 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
 
                                     {/* Show +X more if there are more products in category than selected */}
                                     {shouldShowMoreSlot && (
-                                      <div className="bg-gradient-to-r from-slate-800/90 to-slate-900/90 flex items-center justify-center rounded-lg backdrop-blur-sm">
+                                      <div key="more-slot" className="bg-gradient-to-r from-slate-800/90 to-slate-900/90 flex items-center justify-center rounded-lg backdrop-blur-sm">
                                         <div className="text-center text-white">
                                           <div className="text-xs font-bold">+{remainingCount}</div>
                                           <div className="text-[10px] opacity-90">المزيد</div>
@@ -479,7 +479,7 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
 
                                     {/* Show placeholder if no products selected but category has products */}
                                     {visibleCount === 0 && totalProducts > 0 && (
-                                      <div className="bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center rounded-lg">
+                                      <div key="empty-placeholder" className="bg-gradient-to-br from-slate-200 to-slate-300 flex items-center justify-center rounded-lg">
                                         <div className="text-slate-500 text-center">
                                           <Package className="w-6 h-6 mx-auto mb-1 opacity-50" />
                                           <div className="text-[10px] font-medium">{totalProducts} منتج</div>

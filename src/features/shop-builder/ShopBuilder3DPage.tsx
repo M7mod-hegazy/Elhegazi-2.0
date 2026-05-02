@@ -1206,11 +1206,11 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                              <div className="flex gap-2">
                                <div className="flex flex-col gap-1.5 flex-1">
                                   <label className="text-[10px] font-semibold text-zinc-500">العرض (م)</label>
-                                  <input type="number" step="0.1" value={acc.width} onChange={e => updateAccessory(targetId, selectedSlat.id, acc.id, {width: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                                  <input type="number" step="0.01" value={acc.width} onChange={e => updateAccessory(targetId, selectedSlat.id, acc.id, {width: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                                </div>
                                <div className="flex flex-col gap-1.5 flex-1">
                                   <label className="text-[10px] font-semibold text-zinc-500">العمق (م)</label>
-                                  <input type="number" step="0.1" value={acc.depth} onChange={e => updateAccessory(targetId, selectedSlat.id, acc.id, {depth: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                                  <input type="number" step="0.01" value={acc.depth} onChange={e => updateAccessory(targetId, selectedSlat.id, acc.id, {depth: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                                </div>
                              </div>
 
@@ -1347,7 +1347,7 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                      </div>
                      <div className="flex flex-col gap-1.5 flex-1">
                         <label className="text-[10px] font-semibold text-zinc-500">عمق الرف (م)</label>
-                        <input type="number" step="0.05" min="0.2" value={selectedSlat.shelfDepth || 0.4} onChange={e => updateSlatWall(targetId, selectedSlat.id, {shelfDepth: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                        <input type="number" step="0.01" min="0.2" value={selectedSlat.shelfDepth || 0.4} onChange={e => updateSlatWall(targetId, selectedSlat.id, {shelfDepth: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                      </div>
                    </div>
                    <div className="flex flex-col gap-1.5 mt-2 border-t border-zinc-100 pt-2">
@@ -1398,7 +1398,7 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                    <label className="text-xs font-semibold text-zinc-600">المسافة بين الأعمدة (م)</label>
                    <input
                      type="number"
-                     step="0.1"
+                     step="0.01"
                      min="0.4"
                      value={selectedSlat.uprightSpacing || 0.8}
                      onChange={e => updateSlatWall(targetId, selectedSlat.id, {uprightSpacing: Number(e.target.value)})}
@@ -1412,21 +1412,21 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                      <div className="flex gap-2">
                        <div className="flex flex-col gap-1.5 flex-1">
                           <label className="text-[10px] font-semibold text-zinc-500">العرض (م)</label>
-                          <input type="number" step="0.1" value={selectedSlat.width || 1} onChange={e => updateSlatWall(targetId, selectedSlat.id, {width: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                          <input type="number" step="0.01" value={selectedSlat.width || 1} onChange={e => updateSlatWall(targetId, selectedSlat.id, {width: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                        </div>
                        <div className="flex flex-col gap-1.5 flex-1">
                           <label className="text-[10px] font-semibold text-zinc-500">الارتفاع (م)</label>
-                          <input type="number" step="0.1" value={selectedSlat.height} onChange={e => updateSlatWall(targetId, selectedSlat.id, {height: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                          <input type="number" step="0.01" value={selectedSlat.height} onChange={e => updateSlatWall(targetId, selectedSlat.id, {height: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                        </div>
                      </div>
                      <div className="flex gap-2">
                        <div className="flex flex-col gap-1.5 flex-1">
                           <label className="text-[10px] font-semibold text-zinc-500">الموضع الأفقي (0-1)</label>
-                          <input type="number" step="0.05" min="0" max="1" value={selectedSlat.position || 0.5} onChange={e => updateSlatWall(targetId, selectedSlat.id, {position: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                          <input type="number" step="0.01" min="0" max="1" value={selectedSlat.position || 0.5} onChange={e => updateSlatWall(targetId, selectedSlat.id, {position: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                        </div>
                        <div className="flex flex-col gap-1.5 flex-1">
                           <label className="text-[10px] font-semibold text-zinc-500">الارتفاع من الأرض (م)</label>
-                          <input type="number" step="0.1" value={selectedSlat.bottomOffset} onChange={e => updateSlatWall(targetId, selectedSlat.id, {bottomOffset: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                          <input type="number" step="0.01" value={selectedSlat.bottomOffset} onChange={e => updateSlatWall(targetId, selectedSlat.id, {bottomOffset: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                        </div>
                      </div>
                   </>
@@ -1434,11 +1434,11 @@ function SlatWallManagerContent({ targetId, type, primaryColor, secondaryColor }
                   <>
                      <div className="flex flex-col gap-1.5 flex-1 mt-2">
                         <label className="text-[10px] font-semibold text-zinc-500">الارتفاع (م)</label>
-                        <input type="number" step="0.1" value={selectedSlat.height} onChange={e => updateSlatWall(targetId, selectedSlat.id, {height: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                        <input type="number" step="0.01" value={selectedSlat.height} onChange={e => updateSlatWall(targetId, selectedSlat.id, {height: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                      </div>
                      <div className="flex flex-col gap-1.5 flex-1">
                         <label className="text-[10px] font-semibold text-zinc-500">الارتفاع من الأرض (م)</label>
-                        <input type="number" step="0.1" value={selectedSlat.bottomOffset} onChange={e => updateSlatWall(targetId, selectedSlat.id, {bottomOffset: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
+                        <input type="number" step="0.01" value={selectedSlat.bottomOffset} onChange={e => updateSlatWall(targetId, selectedSlat.id, {bottomOffset: Number(e.target.value)})} className="w-full p-1 border border-zinc-200 rounded-md text-xs outline-none focus:border-blue-500"/>
                      </div>
                   </>
                )}
@@ -2440,7 +2440,7 @@ const ShopBuilderContent = () => {
 
       const stats = [
         { label: 'الجدران', value: `${wallCount}`, icon: '🧱' },
-        { label: 'الطول الكلي', value: `${totalLength.toFixed(1)} م`, icon: '📏' },
+        { label: 'الطول الكلي', value: `${totalLength.toFixed(2)} م`, icon: '📏' },
         { label: 'المنتجات', value: `${productCount}`, icon: '📦' },
         { label: 'المنتجات التلقائية', value: `${autoProducts}`, icon: '🏷️' },
         { label: 'أنظمة العرض', value: `${displaySystems}`, icon: '🛒' },
@@ -2845,7 +2845,7 @@ const ShopBuilderContent = () => {
                           </label>
                           <input
                             type="number"
-                            step="0.05"
+                            step="0.01"
                             min="0.2"
                             value={segLenFs.toFixed(2)}
                             onChange={(e) => {
@@ -2864,10 +2864,10 @@ const ShopBuilderContent = () => {
                           </label>
                           <input
                             type="number"
-                            step="0.1"
+                            step="0.01"
                             min="2"
                             max="5.5"
-                            value={(wall.height ?? 3).toFixed(1)}
+                            value={(wall.height ?? 3).toFixed(2)}
                             onChange={(e) => {
                               const height = Number(e.target.value);
                               if (!Number.isFinite(height)) return;
@@ -2938,7 +2938,7 @@ const ShopBuilderContent = () => {
                           type="number"
                           step="0.5"
                           min="0.5"
-                          value={(wall.height || 3).toFixed(1)}
+                          value={(wall.height || 3).toFixed(2)}
                           onChange={(e) => {
                             const height = Number(e.target.value);
                             upsertWall({ id: wall.id, height });
@@ -2954,7 +2954,7 @@ const ShopBuilderContent = () => {
                         <label className="text-[10px] font-semibold text-zinc-900">سمك (م)</label>
                         <input
                           type="number"
-                          step="0.05"
+                          step="0.01"
                           min="0.05"
                           value={(wall.thickness || 0.2).toFixed(2)}
                           onChange={(e) => {
@@ -3034,8 +3034,8 @@ const ShopBuilderContent = () => {
                           <div className="flex flex-col gap-1">
                             <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>العرض (م)</label>
                             <input
-                              type="number" step="0.1" min="0.5"
-                              value={(slatWall.width || 1).toFixed(1)}
+                              type="number" step="0.01" min="0.5"
+                              value={(slatWall.width || 1).toFixed(2)}
                               onChange={(e) => updateSlatWall(wall.id, slatWall.id, { width: Number(e.target.value) })}
                               className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
                               style={{ border: `1px solid ${primaryColor}40` }}
@@ -3058,8 +3058,8 @@ const ShopBuilderContent = () => {
                       <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>الارتفاع (م)</label>
                         <input
-                          type="number" step="0.1" min="0.5" max="4"
-                          value={(slatWall.height || 2).toFixed(1)}
+                          type="number" step="0.01" min="0.5" max="4"
+                          value={(slatWall.height || 2).toFixed(2)}
                           onChange={(e) => updateSlatWall(wall.id, slatWall.id, { height: Number(e.target.value) })}
                           className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
                           style={{ border: `1px solid ${primaryColor}40` }}
@@ -3070,8 +3070,8 @@ const ShopBuilderContent = () => {
                       <div className="flex flex-col gap-1">
                         <label className="text-[10px] font-semibold" style={{ color: primaryColor }}>عن الأرض (م)</label>
                         <input
-                          type="number" step="0.1" min="0" max="2"
-                          value={(slatWall.bottomOffset || 0).toFixed(1)}
+                          type="number" step="0.01" min="0" max="2"
+                          value={(slatWall.bottomOffset || 0).toFixed(2)}
                           onChange={(e) => updateSlatWall(wall.id, slatWall.id, { bottomOffset: Number(e.target.value) })}
                           className="w-16 h-9 text-center text-xs rounded-md focus:outline-none focus:ring-1 bg-white"
                           style={{ border: `1px solid ${primaryColor}40` }}
@@ -3406,9 +3406,9 @@ const ShopBuilderContent = () => {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0.1"
-                    value={(product.scale?.x || 1).toFixed(1)}
+                    value={(product.scale?.x || 1).toFixed(2)}
                     onChange={(e) => {
                       const scale = Number(e.target.value);
                       upsertProduct({ id: product.id, scale: { x: scale, y: scale, z: scale } });
@@ -3505,7 +3505,7 @@ const ShopBuilderContent = () => {
                     </label>
                     <input
                       type="number"
-                      step="0.05"
+                      step="0.01"
                       min="0.2"
                       value={segLenBar.toFixed(2)}
                       onChange={(e) => {
@@ -3532,10 +3532,10 @@ const ShopBuilderContent = () => {
                     </label>
                     <input
                       type="number"
-                      step="0.1"
+                      step="0.01"
                       min="2"
                       max="5.5"
-                      value={(wall.height ?? 3).toFixed(1)}
+                      value={(wall.height ?? 3).toFixed(2)}
                       onChange={(e) => {
                         const height = Number(e.target.value);
                         if (!Number.isFinite(height)) return;
@@ -3653,7 +3653,7 @@ const ShopBuilderContent = () => {
                     type="number"
                     step="0.5"
                     min="0.5"
-                    value={(wall.height || 3).toFixed(1)}
+                    value={(wall.height || 3).toFixed(2)}
                     onChange={(e) => {
                       const height = Number(e.target.value);
                       upsertWall({ id: wall.id, height });
@@ -3685,7 +3685,7 @@ const ShopBuilderContent = () => {
                   </label>
                   <input
                     type="number"
-                    step="0.05"
+                    step="0.01"
                     min="0.05"
                     value={(wall.thickness || 0.2).toFixed(2)}
                     onChange={(e) => {
@@ -3730,7 +3730,7 @@ const ShopBuilderContent = () => {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0.1"
                     value={Math.hypot(wall.end.x - wall.start.x, wall.end.y - wall.start.y).toFixed(2)}
                     onChange={(e) => {
@@ -3943,9 +3943,9 @@ const ShopBuilderContent = () => {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0.1"
-                    value={(column.width || 0.4).toFixed(1)}
+                    value={(column.width || 0.4).toFixed(2)}
                     onChange={(e) => {
                       const width = Number(e.target.value);
                       const updatedColumns = wall.columns?.map(c =>
@@ -3983,7 +3983,7 @@ const ShopBuilderContent = () => {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0"
                     max="1"
                     value={(column.position || 0.5).toFixed(2)}
@@ -4024,7 +4024,7 @@ const ShopBuilderContent = () => {
                   </label>
                   <input
                     type="number"
-                    step="0.05"
+                    step="0.01"
                     min="0.05"
                     value={(column.depth || 0.4).toFixed(2)}
                     onChange={(e) => {
@@ -4063,9 +4063,9 @@ const ShopBuilderContent = () => {
                   </label>
                   <input
                     type="number"
-                    step="0.1"
+                    step="0.01"
                     min="0.1"
-                    value={(column.height || 3).toFixed(1)}
+                    value={(column.height || 3).toFixed(2)}
                     onChange={(e) => {
                       const height = Number(e.target.value);
                       const updatedColumns = wall.columns?.map(c =>

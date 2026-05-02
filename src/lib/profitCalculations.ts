@@ -333,6 +333,30 @@ export const formatNumber = (value: number, decimals: number = 2): string => {
 };
 
 /**
+ * Rebuild a shareholder history chain in chronological order.
+ *
+ * Seeds the running balance from the very first transaction's `fromAmount`
+ * (which is 0 for the creation record), then recalculates every subsequent
+ * `fromAmount` / `toAmount` from the stored `delta` values. Call this after
+ * ANY insert, update, or delete so the chain is always self-consistent.
+ */
+export function rebuildHistoryChain<T extends { id: string; date: string; delta: number; fromAmount: number; toAmount: number }>(
+  history: T[]
+): T[] {
+  if (history.length === 0) return [];
+  const sorted = [...history].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()
+  );
+  let running = sorted[0].fromAmount; // seed: 0 for creation txn
+  return sorted.map(txn => {
+    const from = running;
+    const to = from + txn.delta;
+    running = to;
+    return { ...txn, fromAmount: from, toAmount: to };
+  });
+}
+
+/**
  * Round to specified decimal places
  * 
  * @param value - Number to round

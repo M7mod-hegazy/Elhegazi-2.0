@@ -1867,10 +1867,12 @@ const BuilderToolbar: React.FC<BuilderToolbarProps> = ({
                     type="color"
                     value={layout.defaultWallColor || '#ffffff'}
                     onChange={(e) => {
-                      // Apply color to all walls
-                      layout.walls.forEach(w => {
+                      // Apply color to regular walls only; keep door walls unchanged.
+                      layout.walls
+                        .filter((w) => !w.texture?.startsWith('door_'))
+                        .forEach((w) => {
                         upsertWall({ id: w.id, color: e.target.value });
-                      });
+                        });
                     }}
                     className="w-20 h-20 rounded-lg border-2 border-slate-300 cursor-pointer shadow-md"
                     title="اختر لون الجدران"
