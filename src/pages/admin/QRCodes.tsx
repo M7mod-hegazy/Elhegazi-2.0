@@ -799,6 +799,7 @@ const AdminQRCodes = () => {
 
     const innerPageMm = getInnerPageDimensionsMm(settings.pageFormat, settings.pageEdgeMarginMm);
 
+    const { w: pageWmm, h: pageHmm } = getPageDimensionsMm(settings.pageFormat);
     let printContent = `
         <html dir="rtl">
           <head>
@@ -806,12 +807,14 @@ const AdminQRCodes = () => {
             <style>
               @page {
                 size: ${settings.pageFormat};
-                margin: ${settings.pageEdgeMarginMm}mm;
+                margin: 0;
+              }
+              html, body {
+                margin: 0;
+                padding: 0;
               }
               body {
                 font-family: 'Arial', sans-serif;
-                margin: 0;
-                padding: 0;
                 background: ${settings.backgroundColor};
                 font-size: 12px;
                 -webkit-print-color-adjust: exact;
@@ -822,9 +825,9 @@ const AdminQRCodes = () => {
                 page-break-after: always;
                 display: flex;
                 flex-direction: column;
-                width: ${innerPageMm.w}mm;
-                height: ${innerPageMm.h}mm;
-                padding: 0;
+                width: ${pageWmm}mm;
+                height: ${pageHmm}mm;
+                padding: ${settings.pageEdgeMarginMm}mm;
                 box-sizing: border-box;
                 overflow: hidden;
               }
