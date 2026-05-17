@@ -222,6 +222,32 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
           </DialogTitle>
         </DialogHeader>
 
+        {/* Top action buttons */}
+        <div className="flex gap-2">
+          <Button
+            onClick={handleSendMessenger}
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
+            disabled={isSending}
+          >
+            {isSending ? (
+              <><span className="animate-spin"></span>جارٍ الإرسال...</>
+            ) : (
+              <><MessengerIcon /><span className="ml-2">ماسنجر</span></>
+            )}
+          </Button>
+          <Button
+            onClick={handleSend}
+            className="flex-1 bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2"
+            disabled={isSending}
+          >
+            {isSending ? (
+              <><span className="animate-spin"></span>جارٍ الإرسال...</>
+            ) : (
+              <><WhatsAppIcon /><span className="ml-2">واتساب</span></>
+            )}
+          </Button>
+        </div>
+
         <div className="space-y-4 max-h-[80vh] overflow-y-auto">
           {/* Product Image and Info */}
           <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
@@ -291,48 +317,14 @@ export const WhatsAppContactModal: React.FC<WhatsAppContactModalProps> = ({
           )}
 
           {/* Action Buttons */}
-          <div className="flex gap-2 pt-2 sticky bottom-0 bg-white flex-wrap">
+          <div className="flex gap-2 pt-2 sticky bottom-0 bg-white">
             <Button
               onClick={onClose}
               variant="outline"
-              className="flex-1 min-w-20"
+              className="flex-1"
               disabled={isSending}
             >
               إلغاء
-            </Button>
-            <Button
-              onClick={handleSendMessenger}
-              className="flex-1 min-w-20 bg-blue-600 hover:bg-blue-700 text-white flex items-center justify-center gap-2"
-              disabled={isSending}
-            >
-              {isSending ? (
-                <>
-                  <span className="animate-spin"></span>
-                  جارٍ الإرسال...
-                </>
-              ) : (
-                <>
-                  <MessengerIcon />
-                  <span className="ml-2">ماسنجر</span>
-                </>
-              )}
-            </Button>
-            <Button
-              onClick={handleSend}
-              className="flex-1 min-w-20 bg-green-600 hover:bg-green-700 text-white flex items-center justify-center gap-2"
-              disabled={isSending}
-            >
-              {isSending ? (
-                <>
-                  <span className="animate-spin"></span>
-                  جارٍ الإرسال...
-                </>
-              ) : (
-                <>
-                  <WhatsAppIcon />
-                  <span className="ml-2">واتساب</span>
-                </>
-              )}
             </Button>
           </div>
 

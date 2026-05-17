@@ -208,7 +208,7 @@ const SmartProductSelector: React.FC<SmartProductSelectorProps> = ({
                   <Badge variant="secondary" className="mr-2 text-xs">{products.length}</Badge>
                 </SelectItem>
                 {categories.map(cat => (
-                  <SelectItem key={cat.id} value={cat.slug || cat.id || cat.name}>
+                  <SelectItem key={cat.id || cat.slug || cat.name} value={cat.slug || cat.id || cat.name}>
                     <span>{cat.nameAr}</span>
                     <Badge variant="outline" className="mr-2 text-xs">
                       {getCategoryCount(cat.id || cat.slug || cat.name)}

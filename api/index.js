@@ -3475,6 +3475,104 @@ app.post('/orders/rate', async (c) => {
   }
 });
 
+// ── Sitemap ────────────────────────────────────────────────────────────────
+app.get('/sitemap.xml', async (c) => {
+  try {
+    await connectMongoDB();
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: Category } = await import('../server/models/Category.js');
+
+    const [products, categories] = await Promise.all([
+      Product.find({ active: true }).select('_id').lean().maxTimeMS(10000),
+      Category.find({}).select('_id').lean().maxTimeMS(10000),
+    ]);
+
+    const base = 'https://elhegazi.vercel.app';
+    const staticUrls = ['/', '/products', '/categories', '/about', '/contact', '/locations'];
+
+    const urls = [
+      ...staticUrls.map((path) => `  <url><loc>${base}${path}</loc><changefreq>weekly</changefreq><priority>0.8</priority></url>`),
+      ...products.map((p) => `  <url><loc>${base}/products/${p._id}</loc><changefreq>weekly</changefreq><priority>0.9</priority></url>`),
+      ...categories.map((cat) => `  <url><loc>${base}/categories/${cat._id}</loc><changefreq>weekly</changefreq><priority>0.7</priority></url>`),
+    ];
+
+    const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${urls.join('\n')}\n</urlset>`;
+
+    return new Response(xml, {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/xml; charset=utf-8',
+        'Cache-Control': 'public, max-age=3600',
+      },
+    });
+  } catch (err) {
+    console.error('[sitemap] error:', err.message);
+    return new Response('<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>', {
+      status: 500,
+      headers: { 'Content-Type': 'application/xml' },
+    });
+  }
+});
+
+// ── QR Presets ─────────────────────────────────────────────────────────────
+app.get('/qr-presets', async (c) => {
+  try {
+    await connectMongoDB();
+    const { default: QRPreset } = await import('../server/models/QRPreset.js');
+    const presets = await QRPreset.find({}).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+    return c.json({ ok: true, items: presets.map(p => ({ ...p, id: p._id.toString() })) });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/qr-presets', async (c) => {
+  try {
+    await connectMongoDB();
+    const { default: QRPreset } = await import('../server/models/QRPreset.js');
+    const body = await c.req.json();
+    if (!body.name || !body.settings) return c.json({ ok: false, error: 'name and settings required' }, 400);
+    const preset = await QRPreset.create({
+      name: String(body.name).trim().slice(0, 100),
+      settings: body.settings,
+      productIds: Array.isArray(body.productIds) ? body.productIds : null,
+    });
+    return c.json({ ok: true, item: { ...preset.toObject(), id: preset._id.toString() } });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/qr-presets/:id', async (c) => {
+  try {
+    await connectMongoDB();
+    const { default: QRPreset } = await import('../server/models/QRPreset.js');
+    const id = c.req.param('id');
+    const body = await c.req.json();
+    const update = {};
+    if (body.name) update.name = String(body.name).trim().slice(0, 100);
+    if (body.settings) update.settings = body.settings;
+    if ('productIds' in body) update.productIds = Array.isArray(body.productIds) ? body.productIds : null;
+    const preset = await QRPreset.findByIdAndUpdate(id, update, { new: true }).lean().maxTimeMS(8000);
+    if (!preset) return c.json({ ok: false, error: 'not found' }, 404);
+    return c.json({ ok: true, item: { ...preset, id: preset._id.toString() } });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.delete('/qr-presets/:id', async (c) => {
+  try {
+    await connectMongoDB();
+    const { default: QRPreset } = await import('../server/models/QRPreset.js');
+    const id = c.req.param('id');
+    await QRPreset.findByIdAndDelete(id).maxTimeMS(8000);
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // Export for Vercel (HEAD/OPTIONS avoid 405 from probes, link checks, and CORS preflights)
 const honoHandler = handle(app);
 export const GET = honoHandler;

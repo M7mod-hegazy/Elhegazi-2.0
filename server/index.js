@@ -6842,6 +6842,58 @@ const getReqUser = async (req) => {
   return {};
 };
 
+// ── QR Presets ──────────────────────────────────────────────────────────────
+app.get('/api/qr-presets', async (req, res) => {
+  try {
+    const { default: QRPreset } = await import('./models/QRPreset.js');
+    const presets = await QRPreset.find({}).sort({ createdAt: -1 }).lean().maxTimeMS(8000);
+    res.json({ ok: true, items: presets.map(p => ({ ...p, id: p._id.toString() })) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.post('/api/qr-presets', async (req, res) => {
+  try {
+    const { default: QRPreset } = await import('./models/QRPreset.js');
+    const { name, settings, productIds } = req.body;
+    if (!name || !settings) return res.status(400).json({ ok: false, error: 'name and settings required' });
+    const preset = await QRPreset.create({
+      name: String(name).trim().slice(0, 100),
+      settings,
+      productIds: Array.isArray(productIds) ? productIds : null,
+    });
+    res.json({ ok: true, item: { ...preset.toObject(), id: preset._id.toString() } });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.put('/api/qr-presets/:id', async (req, res) => {
+  try {
+    const { default: QRPreset } = await import('./models/QRPreset.js');
+    const update = {};
+    if (req.body.name) update.name = String(req.body.name).trim().slice(0, 100);
+    if (req.body.settings) update.settings = req.body.settings;
+    if ('productIds' in req.body) update.productIds = Array.isArray(req.body.productIds) ? req.body.productIds : null;
+    const preset = await QRPreset.findByIdAndUpdate(req.params.id, update, { new: true }).lean().maxTimeMS(8000);
+    if (!preset) return res.status(404).json({ ok: false, error: 'not found' });
+    res.json({ ok: true, item: { ...preset, id: preset._id.toString() } });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+app.delete('/api/qr-presets/:id', async (req, res) => {
+  try {
+    const { default: QRPreset } = await import('./models/QRPreset.js');
+    await QRPreset.findByIdAndDelete(req.params.id).maxTimeMS(8000);
+    res.json({ ok: true });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 export const logHistory = async (req, { section, action, details, note, level = 'info', important = true, meta = {} }) => {
   try {
     const u = await getReqUser(req);

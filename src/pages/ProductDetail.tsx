@@ -1898,6 +1898,54 @@ const ProductDetail = () => {
   // Set dynamic page title with product name
   usePageTitle(product ? (product.nameAr || product.name) : 'تفاصيل المنتج');
 
+  // Dynamic meta tags + JSON-LD for SEO
+  useEffect(() => {
+    if (!product) return;
+
+    const title = product.nameAr || product.name;
+    const desc = ((product.descriptionAr || product.description || '').slice(0, 160)) || title;
+    const image = product.images?.[0] || product.image || '';
+    const url = `https://elhegazi.vercel.app/products/${product._id}`;
+
+    const setMeta = (selector: string, attr: string, value: string) => {
+      const el = document.querySelector(selector) as HTMLMetaElement | null;
+      if (el) el.setAttribute(attr, value);
+    };
+
+    setMeta('meta[name="description"]', 'content', desc);
+    setMeta('meta[property="og:title"]', 'content', title);
+    setMeta('meta[property="og:description"]', 'content', desc);
+    if (image) setMeta('meta[property="og:image"]', 'content', image);
+    setMeta('meta[property="og:url"]', 'content', url);
+
+    // JSON-LD structured data
+    const existing = document.getElementById('ld-json-product');
+    if (existing) existing.remove();
+    const script = document.createElement('script');
+    script.id = 'ld-json-product';
+    script.type = 'application/ld+json';
+    script.text = JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'Product',
+      name: title,
+      ...(image ? { image: [image] } : {}),
+      ...(desc ? { description: desc } : {}),
+      ...(product.sku ? { sku: product.sku } : {}),
+      offers: {
+        '@type': 'Offer',
+        price: String(product.price),
+        priceCurrency: 'EGP',
+        availability: product.inStock !== false ? 'https://schema.org/InStock' : 'https://schema.org/OutOfStock',
+        url,
+      },
+    });
+    document.head.appendChild(script);
+
+    return () => {
+      document.getElementById('ld-json-product')?.remove();
+    };
+  }, [product]);
+
   // Fetch product and related items from backend
   useEffect(() => {
     let isMounted = true;

@@ -3,6 +3,10 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
+      "source": "/sitemap.xml",
+      "destination": "/api?__hono_path=sitemap.xml"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api?__hono_path=$1"
     },
@@ -11,7 +15,7 @@
       "destination": "/api?__hono_path="
     },
     {
-      "source": "/((?!api/|assets/|styles/|fonts/|favicon.ico|manifest.json|iconPng.png|service-worker.js|robots.txt).*)",
+      "source": "/((?!api/|assets/|styles/|fonts/|favicon.ico|manifest.json|iconPng.png|service-worker.js|robots.txt|sitemap.xml).*)",
       "destination": "/index.html"
     }
   ],
