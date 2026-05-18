@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShoppingCart, Eye, Check, Plus, EyeOff } from 'lucide-react';
 import whatsappIcon from '@/assets/whatsapp.png';
@@ -181,7 +181,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
               <img
                 src={optimizeImage(product.image, { w: 320 })}
                 alt={product.nameAr}
-                className={`w-full h-full object-cover transition-all duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'
+                className={`w-full h-full object-contain transition-all duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'
                   } ${isHovered ? 'scale-110 brightness-110' : 'scale-100'}`}
                 onLoad={() => setImageLoaded(true)}
                 onError={applyProductImageFallback}
@@ -413,7 +413,7 @@ const EnhancedProductCard = ({ product, showQuickView = true, showFavorite = tru
               <img
                 src={optimizeImage(product.image, { w: 100 })}
                 alt={product.nameAr}
-                className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
+                className="w-16 h-16 object-contain rounded-lg mx-auto mb-2"
                 onError={applyProductImageFallback}
               />
               <h4 className="font-semibold text-slate-900">{product.nameAr}</h4>

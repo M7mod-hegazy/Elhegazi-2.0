@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+﻿import { useState, useRef } from 'react';
 import { optimizeImage, applyProductImageFallback } from '@/lib/images';
 import { Link } from 'react-router-dom';
 import { Star, Eye, ShoppingBag, ArrowRight, Check, Plus } from 'lucide-react';
@@ -111,7 +111,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
               <img
                 src={optimizeImage(product.image, { w: 80 })}
                 alt={product.nameAr}
-                className="w-20 h-20 object-cover rounded-lg shadow-md flex-shrink-0"
+                className="w-20 h-20 object-contain rounded-lg shadow-md flex-shrink-0"
                 onError={applyProductImageFallback}
               />
               <div className="flex-1 text-right min-w-0">
@@ -255,7 +255,7 @@ const ProductsMobile = ({ products, loading, redirectUrl = '/products' }: Omit<P
                     <img
                       src={optimizeImage(product.image || `/api/categories/${product.category}/image`, { w: 200 })}
                       alt={product.nameAr}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-contain"
                       loading="lazy"
                       onError={applyProductImageFallback}
                     />

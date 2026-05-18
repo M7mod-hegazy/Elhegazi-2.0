@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+﻿import { useState, useEffect, useRef, useCallback } from 'react';
 import { optimizeImage, applyProductImageFallback } from '@/lib/images';
 import { Link, useNavigate } from 'react-router-dom';
 import { ChevronLeft, ChevronRight, ShoppingBag, Star, Eye, EyeOff, Heart, ArrowRight, Check, Plus } from 'lucide-react';
@@ -133,7 +133,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
               <img
                 src={optimizeImage(product.image, { w: 80 })}
                 alt={product.nameAr}
-                className="w-20 h-20 object-cover rounded-lg shadow-md flex-shrink-0"
+                className="w-20 h-20 object-contain rounded-lg shadow-md flex-shrink-0"
                 onError={applyProductImageFallback}
               />
               <div className="flex-1 text-right min-w-0">
@@ -386,7 +386,7 @@ const ProductsDesktop = ({ products, loading, hoveredProduct, setHoveredProduct 
                             <img
                               src={optimizeImage(product.image || `/api/categories/${product.category}/image`, { w: 320 })}
                               alt={product.nameAr}
-                              className={`w-full h-full object-cover transition-transform duration-700 ${hoveredProduct === product.id ? 'scale-110' : 'scale-100'}`}
+                              className={`w-full h-full object-contain transition-transform duration-700 ${hoveredProduct === product.id ? 'scale-110' : 'scale-100'}`}
                               loading="lazy"
                               onError={applyProductImageFallback}
                             />

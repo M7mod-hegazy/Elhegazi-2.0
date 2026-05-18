@@ -67,8 +67,8 @@ const CategoriesMobile = ({ selectedSlugs }: CategoriesMobileProps) => {
 
   const getCategoryPreviewProducts = (category: Category): HomeProduct[] => {
     // Use server-embedded products (guaranteed to belong to this category)
-    const embedded = (category as any).embeddedPreviewProducts as HomeProduct[] | undefined;
-    if (embedded && embedded.length > 0) return embedded.slice(0, 4);
+    const embedded = (category as any).embeddedPreviewProducts as Array<{ _id: string; name: string; nameAr: string; image: string }> | undefined;
+    if (embedded && embedded.length > 0) return embedded.slice(0, 4).map(p => ({ id: p._id, name: p.name, nameAr: p.nameAr, image: p.image }));
     // Fallback: filter by categoryId
     if (!products.length) return [];
     return products.filter(p => p.categoryId === category.id).slice(0, 4);

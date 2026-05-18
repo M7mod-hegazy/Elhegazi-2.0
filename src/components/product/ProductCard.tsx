@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Star, ShoppingCart, Eye, Send, Check, Plus, Heart } from 'lucide-react';
 import whatsappIcon from '@/assets/whatsapp.png';
@@ -179,7 +179,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                   <img
                     src={optimizeImage(product.image, { w: 320 })}
                     alt={product.nameAr}
-                    className={`w-full h-full object-cover transition-all duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'} group-hover:scale-110`}
+                    className={`w-full h-full object-contain transition-all duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'} group-hover:scale-110`}
                     onLoad={() => setImageLoaded(true)}
                     onError={applyProductImageFallback}
                     loading="lazy"
@@ -197,7 +197,7 @@ const ProductCard = ({ product, showQuickView = true, showFavorite = true, class
                     <img
                       src={optimizeImage(img, { w: 320 })}
                       alt={`${product.nameAr} - ${idx + 1}`}
-                      className="w-full h-full object-cover transition-all duration-700 group-hover:scale-110"
+                      className="w-full h-full object-contain transition-all duration-700 group-hover:scale-110"
                       onError={applyProductImageFallback}
                       loading="lazy"
                       decoding="async"

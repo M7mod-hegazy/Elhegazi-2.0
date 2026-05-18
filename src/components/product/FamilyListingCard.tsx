@@ -1,4 +1,4 @@
-import { useState } from 'react';
+﻿import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { buildProductPath } from '@/lib/product-link';
 import {
@@ -70,7 +70,7 @@ export function FamilyListingCard({ family, className = '' }: Props) {
               <img
                 src={optimizeImage(img, { w: 320 })}
                 alt={familyTitle}
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                className="absolute inset-0 h-full w-full object-contain transition-transform duration-700 group-hover:scale-110"
                 loading="lazy"
                 decoding="async"
                 srcSet={buildSrcSet(img, 320)}
@@ -83,7 +83,7 @@ export function FamilyListingCard({ family, className = '' }: Props) {
                   key={hoveredImg}
                   src={optimizeImage(hoveredImg, { w: 320 })}
                   alt={familyTitle}
-                  className="absolute inset-0 h-full w-full object-cover animate-[fadeIn_0.28s_ease_forwards]"
+                  className="absolute inset-0 h-full w-full object-contain animate-[fadeIn_0.28s_ease_forwards]"
                   style={{ animation: 'familyCardFadeIn 0.28s ease forwards' }}
                   onError={applyProductImageFallback}
                 />
@@ -193,7 +193,7 @@ export function FamilyListingCard({ family, className = '' }: Props) {
           <img
             src={optimizeImage(img, { w: 320 })}
             alt={legacyTitle}
-            className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+            className="h-full w-full object-contain transition-transform duration-700 group-hover:scale-110"
             loading="lazy"
             decoding="async"
             srcSet={buildSrcSet(img, 320)}

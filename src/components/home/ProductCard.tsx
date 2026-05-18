@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Star, Heart, Eye, EyeOff, ShoppingBag, ArrowRight, Check, Plus } from 'lucide-react';
 import whatsappIcon from '@/assets/whatsapp.png';
 import { AspectRatio } from '@radix-ui/react-aspect-ratio';
@@ -122,7 +122,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 <img
                   src={optimizeImage(product.image, { w: 160 })}
                   alt={`${product.nameAr} - ${product.name} by photographer on Unsplash`}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                   onError={applyProductImageFallback}
                   loading="lazy"
                   decoding="async"
@@ -227,7 +227,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
                 <img
                   src={product.image}
                   alt={`${product.nameAr} - ${product.name} by photographer on Unsplash`}
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                  className="w-full h-full object-contain group-hover:scale-110 transition-transform duration-500"
                 onError={applyProductImageFallback}
                 />
               </div>
@@ -330,7 +330,7 @@ const ProductCard: React.FC<ProductCardProps> = ({
               <img
                 src={optimizeImage(product.image, { w: 100 })}
                 alt={product.nameAr}
-                className="w-16 h-16 object-cover rounded-lg mx-auto mb-2"
+                className="w-16 h-16 object-contain rounded-lg mx-auto mb-2"
                 onError={applyProductImageFallback}
               />
               <h4 className="font-semibold text-slate-900">{product.nameAr}</h4>

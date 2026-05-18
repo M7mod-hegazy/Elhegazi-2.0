@@ -459,6 +459,28 @@ const ImageGalleryModal = ({
     }
   };
 
+  // Touch-based swipe (separate from pointer capture so nav buttons always work)
+  const touchSwipeStartX = useRef<number | null>(null);
+  const touchSwipeStartY = useRef<number | null>(null);
+
+  const onTouchSwipeStart = (e: React.TouchEvent) => {
+    if (zoom > 1) return;
+    touchSwipeStartX.current = e.touches[0].clientX;
+    touchSwipeStartY.current = e.touches[0].clientY;
+  };
+
+  const onTouchSwipeEnd = (e: React.TouchEvent) => {
+    if (zoom > 1 || touchSwipeStartX.current === null || touchSwipeStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchSwipeStartX.current;
+    const dy = e.changedTouches[0].clientY - touchSwipeStartY.current;
+    touchSwipeStartX.current = null;
+    touchSwipeStartY.current = null;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) >= SWIPE_THRESHOLD) {
+      if (dx < 0) onNext();
+      else onPrev();
+    }
+  };
+
   return (
     <div
       className="fixed inset-0 bg-black/90 backdrop-blur-lg z-[100] flex flex-col"
@@ -466,6 +488,7 @@ const ImageGalleryModal = ({
       aria-modal="true"
       aria-label="معرض الصور"
     >
+      {/* Header */}
       <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-3 sm:px-4 border-b border-white/10">
         <span className="text-white/90 text-sm truncate max-w-[50%]">
           {productName}
@@ -494,54 +517,24 @@ const ImageGalleryModal = ({
         </div>
       </div>
 
-      {/* Drag / swipe area */}
+      {/* Image area — flex-1 so it fills whatever space remains above the bottom bar */}
       <div
         ref={containerRef}
-        className="flex-1 min-h-0 flex items-stretch justify-center relative pb-20 sm:pb-24 overflow-hidden select-none"
-        style={{ cursor: zoom > 1 ? 'grab' : 'ew-resize', touchAction: 'none' }}
+        className="flex-1 min-h-0 relative overflow-hidden select-none"
+        style={{ touchAction: zoom > 1 ? 'none' : 'pan-y' }}
+        onTouchStart={onTouchSwipeStart}
+        onTouchEnd={onTouchSwipeEnd}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
       >
-        {/* Arrow buttons (desktop) — z-40 so transformed image never wins hit-testing; stop pointer propagation so parent swipe handler doesn't capture */}
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); onPrev(); }}
-          className="hidden sm:flex absolute start-2 top-1/2 -translate-y-1/2 z-40 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
-          aria-label="الصورة السابقة"
-        >
-          <ChevronLeftIcon className="w-6 h-6 text-white" />
-        </button>
-
-        <button
-          type="button"
-          onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); onNext(); }}
-          className="hidden sm:flex absolute end-2 top-1/2 -translate-y-1/2 z-40 p-3 bg-white/20 rounded-full hover:bg-white/30 transition-colors items-center justify-center"
-          aria-label="الصورة التالية"
-        >
-          <ChevronRight className="w-6 h-6 text-white" />
-        </button>
-
-        {/* Swipe hint overlay (shows briefly) */}
-        {safeImages.length > 1 && zoom === 1 && (
-          <div className="pointer-events-none absolute bottom-24 inset-x-0 flex justify-center z-20">
-            <span className="text-white/30 text-xs select-none">← اسحب للتنقل →</span>
-          </div>
-        )}
-
-        <div
-          className="relative z-0 flex flex-1 items-center justify-center w-full max-w-5xl mx-auto py-4 px-2"
-          style={{
-            transition: 'transform 0.0s ease', // Immediate updates during drag
-          }}
-        >
+        {/* Image — fills the container, object-contain keeps aspect ratio */}
+        <div className="absolute inset-0 flex items-center justify-center">
           <img
             src={safeImages[safeCurrentIndex]}
             alt={`صورة المنتج ${safeCurrentIndex + 1}`}
-            className="max-w-none w-auto h-auto max-h-[min(72vh,100%)] object-contain"
+            className="max-w-full max-h-full w-auto h-auto object-contain"
             style={{
               transform: zoom > 1
                 ? `scale(${zoom}) translate(${panX / zoom}px, ${panY / zoom}px)`
@@ -555,24 +548,38 @@ const ImageGalleryModal = ({
             draggable={false}
           />
         </div>
+
+        {/* Nav arrows — shown on all screen sizes, inside image area so no capture conflict */}
+        {safeImages.length > 1 && zoom === 1 && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onPrev(); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute start-2 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/40 rounded-full active:bg-black/60 hover:bg-black/60 transition-colors"
+              aria-label="الصورة السابقة"
+            >
+              <ChevronLeftIcon className="w-6 h-6 text-white" />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onNext(); }}
+              onPointerDown={(e) => e.stopPropagation()}
+              className="absolute end-2 top-1/2 -translate-y-1/2 z-20 p-3 bg-black/40 rounded-full active:bg-black/60 hover:bg-black/60 transition-colors"
+              aria-label="الصورة التالية"
+            >
+              <ChevronRight className="w-6 h-6 text-white" />
+            </button>
+          </>
+        )}
       </div>
 
+      {/* Bottom bar — normal flex child, NOT fixed, so it never overlaps the swipe area */}
       <div
-        className="fixed bottom-0 inset-x-0 z-[110] flex flex-col gap-2 bg-black/80 backdrop-blur-md border-t border-white/10 px-3 py-3"
+        className="shrink-0 flex flex-col gap-2 bg-black/80 backdrop-blur-md border-t border-white/10 px-3 py-3"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
         <div className="flex items-center justify-center gap-4">
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/15 rounded-full sm:hidden"
-            onClick={onPrev}
-            disabled={safeImages.length <= 1}
-            aria-label="الصورة السابقة"
-          >
-            <ChevronLeftIcon className="w-6 h-6" />
-          </Button>
           <Button
             type="button"
             variant="ghost"
@@ -595,17 +602,6 @@ const ImageGalleryModal = ({
             aria-label="تكبير"
           >
             <ZoomIn className="w-5 h-5" />
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon"
-            className="text-white hover:bg-white/15 rounded-full sm:hidden"
-            onClick={onNext}
-            disabled={safeImages.length <= 1}
-            aria-label="الصورة التالية"
-          >
-            <ChevronRight className="w-6 h-6" />
           </Button>
         </div>
         {safeImages.length > 1 && (
@@ -678,6 +674,8 @@ const MobileProductDetail = ({
   const [showFullDescription, setShowFullDescription] = useState(false);
   const [activeTab, setActiveTab] = useState<'info' | 'reviews'>('info');
   const [showGallery, setShowGallery] = useState(false);
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
 
   const discountPercentage = product.discount || (product.originalPrice && product.originalPrice > product.price)
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -701,6 +699,25 @@ const MobileProductDetail = ({
 
   const handleImageClick = () => {
     setShowGallery(true);
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (dx < 0) nextImage();
+      else prevImage();
+    } else if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
+      handleImageClick();
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
   };
 
   const closeGallery = () => {
@@ -777,17 +794,22 @@ const MobileProductDetail = ({
       </div>
 
       {/* Image Gallery */}
-      <div className="relative aspect-square overflow-hidden bg-white" onClick={handleImageClick}>
+      <div
+        className="relative w-full overflow-hidden bg-white"
+        style={{ aspectRatio: '1 / 1' }}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <div
-          className="flex transition-transform duration-300 ease-in-out h-full cursor-pointer"
+          className="flex transition-transform duration-300 ease-in-out h-full"
           style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}
         >
           {displayImages.map((image, index) => (
-            <div key={index} className="w-full flex-shrink-0 h-full">
+            <div key={index} className="w-full flex-shrink-0 h-full flex items-center justify-center cursor-pointer" onClick={handleImageClick}>
               <img
                 src={optimizeImage(image, { w: 800 })}
                 alt={`${product.nameAr} - ${index + 1}`}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 loading="lazy"
                 decoding="async"
                 onError={applyProductImageFallback}
@@ -1403,7 +1425,7 @@ const DesktopProductDetail = ({
               <img
                 src={optimizeImage(displayImages[selectedImage] || displayImages[0], { w: 800 })}
                 alt={product.nameAr}
-                className="w-full h-full object-cover"
+                className="w-full h-full object-contain"
                 loading="lazy"
                 decoding="async"
                 onError={applyProductImageFallback}
@@ -1425,7 +1447,7 @@ const DesktopProductDetail = ({
                   <img
                     src={optimizeImage(image, { w: 200 })}
                     alt={`${product.nameAr} - ${index + 1}`}
-                    className="w-full h-full object-cover"
+                    className="w-full h-full object-contain"
                     loading="lazy"
                     decoding="async"
                     onError={applyProductImageFallback}
@@ -2301,7 +2323,7 @@ const ProductDetail = () => {
               <img
                 src={optimizeImage(product.image || '', { w: 80 })}
                 alt={product.nameAr}
-                className="w-20 h-20 object-cover rounded-lg shadow-md flex-shrink-0"
+                className="w-20 h-20 object-contain rounded-lg shadow-md flex-shrink-0 bg-white"
                 onError={applyProductImageFallback}
               />
               <div className="flex-1 text-right min-w-0">

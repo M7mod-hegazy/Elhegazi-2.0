@@ -222,6 +222,7 @@ type ImportPreviewRow = ImportItem & {
 
 type ExportScope = 'all' | 'filtered' | 'selected';
 type ExportFieldKey =
+  | 'id'
   | 'nameAr'
   | 'name'
   | 'price'
@@ -396,6 +397,25 @@ const ProductForm = memo(function ProductForm({ formData, setFormData, categorie
               </div>
             </div>
           </div>
+
+          {/* Product ID (read-only, only shown when editing) */}
+          {editingProduct?.id && (
+            <div className="space-y-1.5">
+              <Label className="text-sm font-semibold text-slate-700 flex items-center gap-1.5">
+                <Tag className="w-3.5 h-3.5 text-blue-500" />
+                معرّف المنتج (ID)
+              </Label>
+              <Input
+                value={editingProduct.id}
+                readOnly
+                disabled
+                className="h-11 bg-blue-50 border-blue-200 text-blue-800 font-mono text-sm cursor-text select-all opacity-100"
+              />
+              <p className="text-[10px] text-slate-400">
+                رابط المنتج: /product/{editingProduct.id}
+              </p>
+            </div>
+          )}
 
           {/* Description */}
           <div className="space-y-1.5">
@@ -844,6 +864,7 @@ const AdminProducts = () => {
   const [exportCategoryFilter, setExportCategoryFilter] = useState<string>('all');
   const [exportSelectedIds, setExportSelectedIds] = useState<Set<string>>(new Set());
   const [exportFields, setExportFields] = useState<Record<ExportFieldKey, boolean>>({
+    id: true,
     nameAr: true,
     name: true,
     price: true,
@@ -1830,6 +1851,7 @@ const AdminProducts = () => {
   );
 
   const exportFieldOptions: Array<{ key: ExportFieldKey; label: string; hint: string }> = [
+    { key: 'id', label: '\u0645\u0639\u0631\u0651\u0641 \u0627\u0644\u0645\u0646\u062a\u062c (ID)', hint: 'id' },
     { key: 'nameAr', label: '\u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062a\u062c (\u0639\u0631\u0628\u064a)', hint: 'nameAr' },
     { key: 'name', label: '\u0627\u0633\u0645 \u0627\u0644\u0645\u0646\u062a\u062c (EN)', hint: 'name' },
     { key: 'price', label: '\u0627\u0644\u0633\u0639\u0631', hint: 'price' },
@@ -1846,6 +1868,7 @@ const AdminProducts = () => {
 
   const toggleAllExportFields = (checked: boolean) => {
     setExportFields({
+      id: checked,
       nameAr: checked,
       name: checked,
       price: checked,
@@ -1898,6 +1921,7 @@ const AdminProducts = () => {
     setIsExportSubmitting(true);
     try {
       const fieldsInOrder: ExportFieldKey[] = [
+        'id',
         'nameAr',
         'name',
         'price',
@@ -1917,6 +1941,9 @@ const AdminProducts = () => {
         const productRow: Record<string, string | number | boolean> = {};
         fieldsInOrder.forEach((field) => {
           switch (field) {
+            case 'id':
+              productRow.id = String(p.id || '');
+              break;
             case 'nameAr':
               productRow.nameAr = p.nameAr || p.name || '';
               break;
