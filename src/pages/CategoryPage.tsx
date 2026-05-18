@@ -255,6 +255,7 @@ const CategoryPage = () => {
   // Live data state
   const [liveProducts, setLiveProducts] = useState<Product[]>([]);
   const [liveCategories, setLiveCategories] = useState<Category[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [storefrontFamilies, setStorefrontFamilies] = useState<StorefrontProductFamily[]>([]);
 
   useEffect(() => {
@@ -345,12 +346,14 @@ const CategoryPage = () => {
         if (isMounted) {
           setLiveCategories(categories);
           setLiveProducts(products);
+          setIsLoading(false);
         }
       } catch (e) {
         console.error('Failed to fetch category/products:', e);
         if (isMounted) {
           setLiveCategories([]);
           setLiveProducts([]);
+          setIsLoading(false);
         }
       }
     };
@@ -574,6 +577,40 @@ const CategoryPage = () => {
     if (familyGridEnabled) return listingRows.slice(start, start + pageSize);
     return filteredAndSortedProducts.slice(start, start + pageSize);
   }, [familyGridEnabled, listingRows, filteredAndSortedProducts, currentPage, pageSize]);
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-primary/5">
+        {/* Hero skeleton */}
+        <div className="relative overflow-hidden max-h-[300px] bg-slate-200 animate-pulse" style={{ height: 300 }}>
+          <div className="absolute inset-0 bg-slate-300/50" />
+        </div>
+        {/* Filter bar skeleton */}
+        <div className="border-b border-slate-200 bg-white/80 py-6">
+          <div className="container mx-auto px-4 flex gap-4 justify-center">
+            <div className="h-10 w-64 bg-slate-200 rounded-full animate-pulse" />
+            <div className="h-10 w-32 bg-slate-200 rounded-lg animate-pulse" />
+            <div className="h-10 w-24 bg-slate-200 rounded-lg animate-pulse" />
+          </div>
+        </div>
+        {/* Products skeleton */}
+        <div className="container mx-auto px-4 py-16">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} className="rounded-2xl bg-white border border-slate-100 overflow-hidden animate-pulse">
+                <div className="aspect-[4/3] bg-slate-200" />
+                <div className="p-4 space-y-3">
+                  <div className="h-4 bg-slate-200 rounded w-3/4" />
+                  <div className="h-4 bg-slate-200 rounded w-1/2" />
+                  <div className="h-10 bg-slate-200 rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!category) {
     return (

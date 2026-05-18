@@ -378,7 +378,7 @@ const MobileHeroSection: React.FC = () => {
   ];
 
   // Load slides from HomeConfig (shared with desktop). Fallback to local defaults
-  const { homeConfig } = useHomeConfig();
+  const { homeConfig, loading: configLoading } = useHomeConfig();
   const cfgSlides: MobileSlide[] = (homeConfig?.slides || [])
     .filter((s: ConfigSlide) => s && s.enabled !== false)
     .map((s: ConfigSlide, i: number) => ({
@@ -391,7 +391,7 @@ const MobileHeroSection: React.FC = () => {
       pattern: s.pattern || undefined,
       badge: s.badge || '',
       product: mobileProducts[0],
-      products: [mobileProducts[0], mobileProducts[1], mobileProducts[2]],
+      products: [],
     }));
   const mobileSlides: MobileSlide[] = cfgSlides;
   const noSlides = mobileSlides.length === 0;
@@ -541,10 +541,25 @@ const MobileHeroSection: React.FC = () => {
     }
   };
 
+  // Show skeleton while config is loading (avoids flashing "no slides" message)
+  if (configLoading) {
+    return (
+      <section className="relative overflow-hidden h-[calc(100vh-4rem)] max-h-[700px] min-h-[450px] flex items-center justify-center bg-slate-900">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900 animate-pulse" />
+        <div className="relative z-10 w-full px-6 space-y-6 text-center">
+          <div className="h-5 bg-slate-700 rounded-full w-24 mx-auto animate-pulse" />
+          <div className="h-8 bg-slate-700 rounded-2xl w-3/4 mx-auto animate-pulse" />
+          <div className="h-5 bg-slate-700 rounded-full w-2/3 mx-auto animate-pulse" />
+          <div className="h-12 bg-slate-700 rounded-xl w-40 mx-auto animate-pulse" />
+        </div>
+      </section>
+    );
+  }
+
   // Render empty state after all hooks are declared
   if (noSlides || !currentSlideData) {
     return (
-      <section 
+      <section
         className="relative overflow-hidden h-[calc(100vh-4rem)] max-h-[700px] min-h-[450px] flex items-center justify-center"
       >
         <div className="absolute inset-0 bg-gradient-to-br from-slate-800 to-slate-900" />

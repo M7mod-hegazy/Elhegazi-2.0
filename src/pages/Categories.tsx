@@ -336,10 +336,7 @@ const Categories = () => {
         </div>
       </section>
 
-      {/* Loading / Error */}
-      {loading && (
-        <div className="py-12 text-center text-slate-600">جارِ التحميل...</div>
-      )}
+      {/* Error */}
       {error && !loading && (
         <div className="py-12 text-center text-red-600">{error}</div>
       )}
@@ -347,7 +344,22 @@ const Categories = () => {
       {/* Mobile-Optimized Categories Grid/List */}
       <section className="py-4 sm:py-6 lg:py-8 bg-slate-50">
         <div className="container mx-auto px-3 sm:px-4">
-          {filteredCategories.length === 0 ? (
+          {loading ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} className="bg-white rounded-2xl sm:rounded-3xl overflow-hidden shadow-md border border-slate-200 animate-pulse">
+                  <div className="flex flex-col sm:flex-row h-auto sm:h-80">
+                    <div className="w-full sm:w-2/5 bg-slate-100 p-4 sm:p-8 flex flex-col gap-4">
+                      <div className="h-6 bg-slate-200 rounded w-3/4" />
+                      <div className="h-4 bg-slate-200 rounded w-1/2" />
+                      <div className="h-8 bg-slate-200 rounded-full w-24 mt-auto" />
+                    </div>
+                    <div className="w-full sm:w-3/5 bg-slate-200" style={{ minHeight: 160 }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : filteredCategories.length === 0 ? (
             <ScrollAnimation animation="fadeIn" className="text-center py-8 sm:py-12 lg:py-16">
               <div className="bg-white rounded-xl sm:rounded-2xl p-6 sm:p-8 lg:p-12 shadow-sm border border-slate-200 max-w-sm sm:max-w-md mx-auto">
                 <Package className="w-12 h-12 sm:w-16 sm:h-16 text-slate-300 mx-auto mb-3 sm:mb-4" />

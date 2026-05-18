@@ -438,9 +438,7 @@ const ModernHeroSlider: React.FC = () => {
   const activeProducts = (() => {
     const configured = slideProducts[currentSlide];
     if (configured && configured.length) return configured;
-    const preset = heroSlides[currentSlide]?.products;
-    if (preset && preset.length) return preset;
-    return fakeProducts.slice(0, 3);
+    return [];
   })();
 
   /** Must match loop copies below so the marquee returns seamlessly. */

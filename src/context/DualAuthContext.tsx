@@ -174,13 +174,16 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           }
         })().finally(() => setLoading(false));
       } else {
-        setAuthState(prev => ({
-          ...prev,
-          user: null,
-          isAuthenticated: false,
-          isAdmin: false,
-          token: ''
-        }));
+        // No Firebase user — but don't clear state if an admin session is active
+        // (backend-only admin accounts have no Firebase user)
+        setAuthState(prev => {
+          if (prev.isAdminAuthenticated && prev.adminUser) {
+            // Keep isAuthenticated/isAdmin from the backend admin login
+            setLoading(false);
+            return { ...prev, token: '' };
+          }
+          return { ...prev, user: null, isAuthenticated: false, isAdmin: false, token: '' };
+        });
         setLoading(false);
       }
     });
@@ -427,61 +430,125 @@ export const DualAuthProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setLoading(true);
     setError(null);
     try {
-      await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
-      const fb = auth.currentUser;
-      if (fb) {
-        const dn = fb.displayName || '';
-        const parts = dn.trim().split(' ').filter(Boolean);
-        const firstName = parts[0] || '';
-        const lastName = parts.slice(1).join(' ') || '';
-        try {
-          const resp = await apiPostJson<{ user: { id: string; email: string; firstName?: string; lastName?: string; phone?: string; role: 'customer' | 'admin'; isActive: boolean } }, { email: string; firstName?: string; lastName?: string }>(
-            '/api/users/sync',
-            { email: fb.email || '', firstName, lastName }
-          );
-          const ok = resp as { ok: true; user: { id: string; email: string; firstName?: string; lastName?: string; phone?: string; role: 'customer' | 'admin'; isActive: boolean } };
+      // Try Firebase login first
+      let firebaseError: unknown = null;
+      let firebaseSuccess = false;
+      try {
+        await signInWithEmailAndPassword(auth, credentials.email, credentials.password);
+        firebaseSuccess = true;
+      } catch (err) {
+        firebaseError = err;
+      }
+
+      if (firebaseSuccess) {
+        const fb = auth.currentUser;
+        if (fb) {
+          const dn = fb.displayName || '';
+          const parts = dn.trim().split(' ').filter(Boolean);
+          const firstName = parts[0] || '';
+          const lastName = parts.slice(1).join(' ') || '';
+          try {
+            const resp = await apiPostJson<{ user: { id: string; email: string; firstName?: string; lastName?: string; phone?: string; role: 'customer' | 'admin'; isActive: boolean } }, { email: string; firstName?: string; lastName?: string }>(
+              '/api/users/sync',
+              { email: fb.email || '', firstName, lastName }
+            );
+            const ok = resp as { ok: true; user: { id: string; email: string; firstName?: string; lastName?: string; phone?: string; role: 'customer' | 'admin'; isActive: boolean } };
+            const u: User = {
+              id: ok.user.id,
+              email: ok.user.email,
+              firstName: ok.user.firstName || firstName,
+              lastName: ok.user.lastName || lastName,
+              role: ok.user.role,
+              isActive: ok.user.isActive,
+              createdAt: fb.metadata?.creationTime || new Date().toISOString(),
+            };
+            if (u.role === 'admin') {
+              // Admin logged in via Firebase — also activate the admin session
+              setAuthState(prev => ({
+                ...prev,
+                user: u,
+                adminUser: u,
+                isAuthenticated: true,
+                isAdminAuthenticated: true,
+                isAdmin: true,
+              }));
+              clearAdminLockState();
+              markAdminActivity();
+              try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
+            } else {
+              setAuthState(prev => ({
+                ...prev,
+                user: u,
+                isAuthenticated: true,
+                isAdmin: false,
+              }));
+              try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
+            }
+            return { success: true, user: u, isAdmin: u.role === 'admin' };
+          } catch {
+            const u: User = {
+              id: fb.uid,
+              email: fb.email || '',
+              firstName,
+              lastName,
+              role: 'customer',
+              isActive: true,
+              createdAt: fb.metadata?.creationTime || new Date().toISOString(),
+            };
+            setAuthState(prev => ({
+              ...prev,
+              user: u,
+              isAuthenticated: true,
+              isAdmin: false,
+            }));
+            try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
+            return { success: true, user: u, isAdmin: false };
+          }
+        }
+        return { success: true };
+      }
+
+      // Firebase failed — try backend login (admin-only accounts that don't have Firebase)
+      try {
+        const resp = await apiPostJson<{ user: { id: string; email: string; firstName?: string; lastName?: string; phone?: string; role: 'customer' | 'admin'; isActive: boolean }; token?: string }, { email: string; password: string }>(
+          '/api/auth/login',
+          { email: credentials.email, password: credentials.password }
+        );
+        const ok = resp as { ok: true; user: { id: string; email: string; firstName?: string; lastName?: string; phone?: string; role: 'customer' | 'admin'; isActive: boolean }; token?: string };
+        if (ok.user?.role === 'admin') {
           const u: User = {
             id: ok.user.id,
             email: ok.user.email,
-            firstName: ok.user.firstName || firstName,
-            lastName: ok.user.lastName || lastName,
+            firstName: ok.user.firstName || '',
+            lastName: ok.user.lastName || '',
+            phone: ok.user.phone,
             role: ok.user.role,
             isActive: ok.user.isActive,
-            createdAt: fb.metadata?.creationTime || new Date().toISOString(),
+            createdAt: new Date().toISOString(),
           };
+          const token = ok.token || '';
           setAuthState(prev => ({
             ...prev,
             user: u,
+            adminUser: u,
             isAuthenticated: true,
-            isAdmin: u.role === 'admin'
+            isAdminAuthenticated: true,
+            isAdmin: true,
+            adminToken: token,
           }));
-          try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
-          return { success: true, user: u, isAdmin: u.role === 'admin' };
-        } catch {
-          const u: User = {
-            id: fb.uid,
-            email: fb.email || '',
-            firstName,
-            lastName,
-            role: 'customer',
-            isActive: true,
-            createdAt: fb.metadata?.creationTime || new Date().toISOString(),
-          };
-          setAuthState(prev => ({
-            ...prev,
-            user: u,
-            isAuthenticated: true,
-            isAdmin: false
-          }));
-          try { localStorage.setItem('AUTH_MODE', 'firebase'); } catch { /* ignore */ }
-          return { success: true, user: u, isAdmin: false };
+          clearAdminLockState();
+          markAdminActivity();
+          try { localStorage.setItem('AUTH_MODE', 'admin'); } catch { /* ignore */ }
+          return { success: true, user: u, isAdmin: true };
         }
+      } catch {
+        // backend also failed — fall through to re-throw Firebase error
       }
-      return { success: true };
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : 'حدث خطأ أثناء تسجيل الدخول';
+
+      // Both failed — surface the original Firebase error
+      const msg = firebaseError instanceof Error ? firebaseError.message : 'حدث خطأ أثناء تسجيل الدخول';
       setError(msg);
-      throw err;
+      throw firebaseError;
     } finally {
       setLoading(false);
     }
