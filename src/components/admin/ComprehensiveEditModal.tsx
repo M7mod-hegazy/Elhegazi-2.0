@@ -264,7 +264,10 @@ export function ComprehensiveEditModal({
       // Final calculations
       const finalBalance = totalStores + cashTotal + debtsToUs - debtsOnUs;
       const netProfit = totalProfits - totalExpenses;
-      
+      // Always recalculate compareLastMonth from the new values — spreading report.totals
+      // would leave a stale الفرق which causes shareholder distributions to use the wrong number.
+      const compareLastMonth = finalBalance - Number(lastMonthClosing);
+
       const updatedTotals = {
         ...report.totals,
         lastMonthClosing: Number(lastMonthClosing),
@@ -274,7 +277,8 @@ export function ComprehensiveEditModal({
         totalExpenses,
         totalProfits,
         finalBalance,
-        netProfit
+        netProfit,
+        compareLastMonth,
       };
       
       const saveData = {

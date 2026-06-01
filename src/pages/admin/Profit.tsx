@@ -750,6 +750,8 @@ export default function AdminProfit() {
 
     // Ensure we have a valid reportId - create a temporary one for new reports
     const effectiveReportId = cleanReportId || `temp_report_${Date.now()}`;
+    // Remember the temp ID so saveSnapshot can rename these transactions after the first save
+    if (!cleanReportId) lastTempReportIdRef.current = effectiveReportId;
 
     // Applying distribution to shareholders
 
@@ -959,6 +961,8 @@ export default function AdminProfit() {
   // prevent selectedShareholders effect from re-running applyShareholderDistribution
   // when handleQuickEditSave programmatically updates the selection
   const skipDistributionOnSelectChangeRef = useRef(false);
+  // tracks the temp_report_<ts> ID used before the first save so we can rename those transactions after save
+  const lastTempReportIdRef = useRef<string | null>(null);
   const [showImpactModal, setShowImpactModal] = useState(false);
   const [source, setSource] = useState<'manual' | 'report'>('manual');
   const [showQuickEditModal, setShowQuickEditModal] = useState(false);
@@ -1921,7 +1925,24 @@ export default function AdminProfit() {
         toast({ title: fixText('تم الحفظ'), description: fixText('تم حفظ الملف بنجاح.'), variant: 'default' });
         const item = (resp as { ok: true; item: ProfitReportDoc }).item;
         if (currentReportId) setReports(prev => prev.map(x => x._id === currentReportId ? item : x));
-        else { setReports(prev => [item, ...prev]); setCurrentReportId(item?._id); }
+        else {
+          // Rename any temp_report_* transactions to use the real report ID
+          // so the selectedShareholders effect (which fires because currentReportId changes)
+          // finds and updates the existing transactions instead of creating duplicates.
+          const tempId = lastTempReportIdRef.current;
+          if (tempId && item?._id) {
+            setShareHistory(h => {
+              const updated: typeof h = {};
+              Object.keys(h).forEach(sid => {
+                updated[sid] = h[sid].map(t => t.reportId === tempId ? { ...t, reportId: item._id } : t);
+              });
+              return updated;
+            });
+            lastTempReportIdRef.current = null;
+          }
+          setReports(prev => [item, ...prev]);
+          setCurrentReportId(item?._id);
+        }
         // Keep edit mode enabled after save for further edits
       } else {
         const err = (resp as { ok: false; error: string }).error || fixText('تعذر الحفظ');
