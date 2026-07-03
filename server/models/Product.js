@@ -12,6 +12,7 @@ const ProductSchema = new mongoose.Schema(
     image: { type: String, default: '' },
     images: [{ type: String }],
     stock: { type: Number, default: 0 },
+    stockByStore: { type: Map, of: Number, default: {} },
     featured: { type: Boolean, default: false },
     active: { type: Boolean, default: true },
     descriptionAr: { type: String, default: '' },

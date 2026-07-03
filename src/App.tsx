@@ -99,6 +99,9 @@ const PortfolioWork = lazyWithFallback(() => import("@/pages/PortfolioWork"), "P
 const AdminPortfolioWork = lazy(() => import("./pages/admin/PortfolioWork"));
 
 const AdminOrderTracking = lazy(() => import("./pages/admin/OrderTracking"));
+const AdminSyncPage = lazy(() => import("./pages/admin/AdminSyncPage"));
+const SyncStoreManagement = lazy(() => import("./pages/admin/SyncStoreManagement"));
+const SyncStoreDetail = lazy(() => import("./pages/admin/SyncStoreDetail"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const Returns = lazy(() => import("./pages/Returns"));
 const Addresses = lazy(() => import("./pages/Addresses"));
@@ -411,7 +414,21 @@ const AppInner = () => {
                 {isVisible('adminModules', 'shareholders') ? <AdminShareholders /> : <NotFound />}
               </DualProtectedRoute>
             } />
-
+            <Route path="/admin/sync" element={
+              <DualProtectedRoute requireAdmin={true}>
+                {isVisible('adminModules', 'sync') ? <AdminSyncPage /> : <NotFound />}
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/sync/stores" element={
+              <DualProtectedRoute requireAdmin={true}>
+                {isVisible('adminModules', 'sync') ? <SyncStoreManagement /> : <NotFound />}
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/sync/stores/:id" element={
+              <DualProtectedRoute requireAdmin={true}>
+                {isVisible('adminModules', 'sync') ? <SyncStoreDetail /> : <NotFound />}
+              </DualProtectedRoute>
+            } />
 
             {/* Catch-all route */}
             <Route path="*" element={<NotFound />} />

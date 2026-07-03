@@ -31,6 +31,7 @@ import multer from 'multer';
 import net from 'node:net';
 import dns from 'node:dns/promises';
 import { requirePermission, applyReadConditions, validateWriteAgainstConditions, getUserPermissions, clearUserPermissionCache } from './rbac/permissions.js';
+import syncRouter from './routes/sync.routes.js';
 
 const ORDER_STATUS_TRANSITIONS = {
   pending: ['confirmed', 'cancelled'],
@@ -300,6 +301,7 @@ const DEFAULT_OWNER_VISIBILITY = {
     profit: true,
     shareholders: true,
     latestWork: true,
+    sync: true,
   },
   featureFlags: {
     rating: true,
@@ -6893,6 +6895,9 @@ app.delete('/api/qr-presets/:id', async (req, res) => {
     res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+// ─── Sync Routes ───
+app.use('/api/sync', syncRouter);
 
 export const logHistory = async (req, { section, action, details, note, level = 'info', important = true, meta = {} }) => {
   try {
