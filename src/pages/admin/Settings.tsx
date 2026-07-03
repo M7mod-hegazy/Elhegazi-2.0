@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -101,6 +101,8 @@ const AdminSettings: React.FC = () => {
   const [controlCenterBusy, setControlCenterBusy] = useState(false);
   const [controlCenterEnabled, setControlCenterEnabled] = useState(true);
   const [controlCenterVisibility, setControlCenterVisibility] = useState<OwnerVisibility>(defaultOwnerVisibility);
+  const [visSaveStatus, setVisSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [visLoaded, setVisLoaded] = useState(false);
 
   const [backupStep, setBackupStep] = useState<1 | 2 | 3 | 4 | 5>(1);
   const [backupMode, setBackupMode] = useState<'export' | 'import'>('export');
@@ -202,6 +204,7 @@ const AdminSettings: React.FC = () => {
     if (!visRes.ok || !visData?.ok) throw new Error(visData?.error || 'Failed to load Control Center data');
     setControlCenterEnabled(visData.item?.enabled !== false);
     setControlCenterVisibility(normalizeOwnerVisibility(visData.item?.visibility));
+    setVisLoaded(true);
   }, [controlCenterToken, controlHeaders]);
 
   useEffect(() => {
@@ -216,6 +219,8 @@ const AdminSettings: React.FC = () => {
       timer = window.setTimeout(() => {
         setControlCenterAuthed(false);
         setControlCenterToken('');
+        setVisLoaded(false);
+        setVisSaveStatus('idle');
         toast({ title: 'Control Center', description: 'انتهت الجلسة بسبب عدم النشاط لمدة 15 دقيقة', variant: 'destructive' });
       }, CONTROL_CENTER_IDLE_MS);
     };
@@ -227,6 +232,41 @@ const AdminSettings: React.FC = () => {
       events.forEach((evt) => window.removeEventListener(evt, reset));
     };
   }, [controlCenterAuthed, toast]);
+
+  useEffect(() => {
+    if (!controlCenterAuthed || !controlCenterToken) return;
+    void loadControlCenter();
+  }, [controlCenterAuthed, controlCenterToken, loadControlCenter]);
+
+  const debouncedSaveRef = useRef<ReturnType<typeof setTimeout>>();
+
+  useEffect(() => {
+    if (!controlCenterAuthed || !visLoaded) return;
+    setVisSaveStatus('saving');
+    if (debouncedSaveRef.current) clearTimeout(debouncedSaveRef.current);
+    debouncedSaveRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/owner-vault/visibility', {
+          method: 'PUT',
+          headers: { ...controlHeaders, 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ enabled: controlCenterEnabled, visibility: controlCenterVisibility }),
+        });
+        const data = await res.json();
+        if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed');
+        if (data.item?.visibility) {
+          setControlCenterVisibility(normalizeOwnerVisibility(data.item.visibility));
+        }
+        if (data.item && 'enabled' in data.item) {
+          setControlCenterEnabled(data.item.enabled !== false);
+        }
+        setVisSaveStatus('saved');
+      } catch {
+        setVisSaveStatus('error');
+      }
+    }, 400);
+    return () => { if (debouncedSaveRef.current) clearTimeout(debouncedSaveRef.current); };
+  }, [controlCenterAuthed, controlCenterEnabled, controlCenterVisibility, controlHeaders]);
 
   const saveGeneral = async () => {
     setLoading(true);
@@ -375,7 +415,6 @@ const AdminSettings: React.FC = () => {
       setControlCenterToken(res.item.token);
       setControlCenterAuthed(true);
       setControlCenterPassword('');
-      await loadControlCenter();
       toast({ title: 'Control Center', description: 'تم فتح التحكم المتقدم' });
     } catch (error) {
       toast({ title: 'Control Center', description: error instanceof Error ? error.message : 'Error', variant: 'destructive' });
@@ -710,7 +749,12 @@ const AdminSettings: React.FC = () => {
                             </div>
                           </div>
                         ))}
-                        <Button onClick={saveControlCenterVisibility} disabled={controlCenterBusy}>{controlCenterBusy ? 'جارٍ الحفظ...' : 'حفظ سياسات الإظهار والإخفاء'}</Button>
+                        <div className="flex items-center gap-3 pt-2">
+                          {visSaveStatus === 'saving' && <span className="text-xs text-amber-600 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-amber-500 animate-pulse" />جارٍ الحفظ...</span>}
+                          {visSaveStatus === 'saved' && <span className="text-xs text-emerald-600 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />تم الحفظ</span>}
+                          {visSaveStatus === 'error' && <span className="text-xs text-red-600 flex items-center gap-1"><span className="inline-block w-2 h-2 rounded-full bg-red-500" />فشل الحفظ — حاول مرة أخرى</span>}
+                          {visSaveStatus === 'idle' && !controlCenterAuthed && <span className="text-xs text-slate-400">سجّل الدخول لحفظ التغييرات</span>}
+                        </div>
                       </>
                     )}
 
@@ -800,7 +844,7 @@ const AdminSettings: React.FC = () => {
                       </div>
                     )}
 
-                    <Button variant="outline" onClick={() => { setControlCenterAuthed(false); setControlCenterToken(''); }}>
+                    <Button variant="outline" onClick={() => { setControlCenterAuthed(false); setControlCenterToken(''); setVisLoaded(false); setVisSaveStatus('idle'); }}>
                       إغلاق جلسة Control Center
                     </Button>
                   </div>

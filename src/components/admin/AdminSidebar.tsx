@@ -23,7 +23,8 @@ import {
   Activity,
   Layers,
   Globe,
-  Images
+  Images,
+  ArrowLeftRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useDualAuth } from '@/hooks/useDualAuth';
@@ -66,7 +67,8 @@ const navigationGroups = [
     items: [
       { name: 'المستخدمين', href: '/admin/users', icon: Users },
       { name: 'المواقع', href: '/admin/locations', icon: MapPin },
-      { name: 'سجل النشاط', href: '/admin/history', icon: History }
+      { name: 'سجل النشاط', href: '/admin/history', icon: History },
+      { name: 'المزامنة', href: '/admin/sync', icon: ArrowLeftRight }
     ]
   },
   {
@@ -112,6 +114,7 @@ const AdminSidebarEnhanced = ({ collapsed, onToggle, isMobile, mobileMenuOpen, o
           item.href === '/admin/settings' ? 'settings' :
           item.href === '/admin/qr-codes' ? 'qrcodes' :
           item.href === '/admin/portfolio-work' ? 'latestWork' :
+          item.href === '/admin/sync' ? 'sync' :
           null;
         return key ? isVisible('adminModules', key) : true;
       })

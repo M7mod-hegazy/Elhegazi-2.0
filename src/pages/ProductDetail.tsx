@@ -534,7 +534,7 @@ const ImageGalleryModal = ({
           <img
             src={safeImages[safeCurrentIndex]}
             alt={`صورة المنتج ${safeCurrentIndex + 1}`}
-            className="max-w-full max-h-full w-auto h-auto object-contain"
+            className="w-full h-full object-contain"
             style={{
               transform: zoom > 1
                 ? `scale(${zoom}) translate(${panX / zoom}px, ${panY / zoom}px)`
@@ -796,7 +796,7 @@ const MobileProductDetail = ({
       {/* Image Gallery */}
       <div
         className="relative w-full overflow-hidden bg-white"
-        style={{ aspectRatio: '1 / 1' }}
+        style={{ height: 'min(100vw, 420px)' }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
