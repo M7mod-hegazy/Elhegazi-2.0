@@ -72,6 +72,7 @@ export const defaultOwnerVisibility: OwnerVisibility = {
     profit: true,
     shareholders: true,
     latestWork: true,
+    sync: true,
   },
   featureFlags: {
     rating: true,
