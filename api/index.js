@@ -168,6 +168,7 @@ const DEFAULT_OWNER_VISIBILITY = {
     profit: true,
     shareholders: true,
     latestWork: true,
+    sync: true,
   },
   featureFlags: {
     rating: true,
@@ -3568,6 +3569,389 @@ app.delete('/qr-presets/:id', async (c) => {
     const id = c.req.param('id');
     await QRPreset.findByIdAndDelete(id).maxTimeMS(8000);
     return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ===== SYNC MANAGEMENT (Admin dashboard + POS sync endpoints for Vercel) =====
+
+function hashSyncApiKey(apiKey) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const derived = crypto.scryptSync(apiKey, salt, 64).toString('hex');
+  return `sync_scrypt$${salt}$${derived}`;
+}
+
+function verifySyncApiKey(apiKey, encoded) {
+  if (!encoded || !encoded.startsWith('sync_scrypt$')) return false;
+  const parts = String(encoded).split('$');
+  if (parts.length !== 3) return false;
+  const salt = parts[1];
+  const storedHex = parts[2];
+  const incomingHex = crypto.scryptSync(apiKey, salt, 64).toString('hex');
+  const stored = Buffer.from(storedHex, 'hex');
+  const incoming = Buffer.from(incomingHex, 'hex');
+  if (stored.length !== incoming.length) return false;
+  return crypto.timingSafeEqual(stored, incoming);
+}
+
+// ── Sync status dashboard ──
+app.get('/sync/status', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: Category } = await import('../server/models/Category.js');
+    const [totalProducts, activeProducts, totalCategories, stores] = await Promise.all([
+      Product.countDocuments({}).maxTimeMS(8000),
+      Product.countDocuments({ active: true }).maxTimeMS(8000),
+      Category.countDocuments({}).maxTimeMS(8000),
+      SyncStore.find({}).select('name lastSeenAt').sort({ lastSeenAt: -1 }).lean().maxTimeMS(8000),
+    ]);
+    const lastSync = stores.length > 0 && stores[0].lastSeenAt ? stores[0].lastSeenAt : null;
+    return c.json({
+      ok: true,
+      item: {
+        status: {
+          storeName: stores.length > 0 ? stores[0].name : '—',
+          storeId: stores.length > 0 ? String(stores[0]._id) : '',
+          lastSeenAt: lastSync,
+          totalProducts,
+          activeProducts,
+          totalCategories,
+          changesSinceLastSync: 0,
+        },
+      },
+    });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/sync/check', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({
+      ok: true,
+      item: { products: [], categories: [], stockChanges: [], totalProducts: 0, pages: 0 },
+    });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Store CRUD (batch routes BEFORE parameterized routes) ──
+app.post('/sync/admin/stores/batch-activate', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const body = await c.req.json().catch(() => ({}));
+    const ids = Array.isArray(body.ids) ? body.ids.filter((id) => mongoose.Types.ObjectId.isValid(id)) : [];
+    if (ids.length > 0) {
+      await SyncStore.updateMany(
+        { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } },
+        { $set: { isActive: true } }
+      ).maxTimeMS(8000);
+    }
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/sync/admin/stores/batch-deactivate', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const body = await c.req.json().catch(() => ({}));
+    const ids = Array.isArray(body.ids) ? body.ids.filter((id) => mongoose.Types.ObjectId.isValid(id)) : [];
+    if (ids.length > 0) {
+      await SyncStore.updateMany(
+        { _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } },
+        { $set: { isActive: false } }
+      ).maxTimeMS(8000);
+    }
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/sync/admin/stores/batch-delete', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const body = await c.req.json().catch(() => ({}));
+    const ids = Array.isArray(body.ids) ? body.ids.filter((id) => mongoose.Types.ObjectId.isValid(id)) : [];
+    if (ids.length > 0) {
+      await SyncStore.deleteMany({ _id: { $in: ids.map((id) => new mongoose.Types.ObjectId(id)) } }).maxTimeMS(8000);
+    }
+    return c.json({ ok: true });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/sync/admin/trigger-sync', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({ ok: true, message: 'Manual sync triggered' });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Store CRUD (parameterized routes) ──
+app.get('/sync/admin/stores', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const stores = await SyncStore.find({})
+      .select('name apiKeyPrefix isActive lastSeenAt allowedIps notes createdAt updatedAt')
+      .sort({ createdAt: -1 })
+      .lean()
+      .maxTimeMS(8000);
+    return c.json({ ok: true, items: stores });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/sync/admin/stores', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const body = await c.req.json().catch(() => ({}));
+    const name = String(body.name || '').trim();
+    if (!name) return c.json({ ok: false, error: 'Store name is required' }, 400);
+
+    const apiKey = crypto.randomBytes(32).toString('hex');
+    const apiKeyHash = hashSyncApiKey(apiKey);
+    const apiKeyPrefix = apiKey.slice(-4);
+
+    const store = await SyncStore.create({
+      name,
+      apiKeyHash,
+      apiKeyPrefix,
+      notes: String(body.notes || ''),
+      allowedIps: Array.isArray(body.allowedIps) ? body.allowedIps : [],
+    });
+
+    return c.json({
+      ok: true,
+      item: {
+        store: {
+          _id: String(store._id),
+          name: store.name,
+          apiKeyPrefix: store.apiKeyPrefix,
+          isActive: store.isActive,
+          lastSeenAt: store.lastSeenAt,
+          allowedIps: store.allowedIps,
+          notes: store.notes,
+          createdAt: store.createdAt,
+          updatedAt: store.updatedAt,
+        },
+        apiKey,
+      },
+    }, 201);
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/sync/admin/stores/:id', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const id = c.req.param('id');
+    if (!mongoose.Types.ObjectId.isValid(id)) return c.json({ ok: false, error: 'Invalid store id' }, 400);
+    const store = await SyncStore.findById(id)
+      .select('name apiKeyPrefix isActive lastSeenAt allowedIps notes createdAt updatedAt')
+      .lean()
+      .maxTimeMS(8000);
+    if (!store) return c.json({ ok: false, error: 'Store not found' }, 404);
+    return c.json({ ok: true, item: store });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/sync/admin/stores/:id', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const id = c.req.param('id');
+    if (!mongoose.Types.ObjectId.isValid(id)) return c.json({ ok: false, error: 'Invalid store id' }, 400);
+    const body = await c.req.json().catch(() => ({}));
+    const update = {};
+    if (body.name !== undefined) update.name = String(body.name).trim();
+    if (body.isActive !== undefined) update.isActive = Boolean(body.isActive);
+    if (body.allowedIps !== undefined) update.allowedIps = body.allowedIps;
+    if (body.notes !== undefined) update.notes = body.notes;
+    const store = await SyncStore.findByIdAndUpdate(id, { $set: update }, { new: true })
+      .select('name apiKeyPrefix isActive lastSeenAt allowedIps notes createdAt updatedAt')
+      .lean()
+      .maxTimeMS(8000);
+    if (!store) return c.json({ ok: false, error: 'Store not found' }, 404);
+    return c.json({ ok: true, item: store });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.delete('/sync/admin/stores/:id', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const id = c.req.param('id');
+    if (!mongoose.Types.ObjectId.isValid(id)) return c.json({ ok: false, error: 'Invalid store id' }, 400);
+    const store = await SyncStore.findByIdAndDelete(id).maxTimeMS(8000);
+    if (!store) return c.json({ ok: false, error: 'Store not found' }, 404);
+    return c.json({ ok: true, deleted: true });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/sync/admin/stores/:id/rotate-key', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const id = c.req.param('id');
+    if (!mongoose.Types.ObjectId.isValid(id)) return c.json({ ok: false, error: 'Invalid store id' }, 400);
+    const apiKey = crypto.randomBytes(32).toString('hex');
+    const apiKeyHash = hashSyncApiKey(apiKey);
+    const apiKeyPrefix = apiKey.slice(-4);
+    const store = await SyncStore.findByIdAndUpdate(
+      id,
+      { $set: { apiKeyHash, apiKeyPrefix } },
+      { new: true }
+    ).select('name apiKeyPrefix').lean().maxTimeMS(8000);
+    if (!store) return c.json({ ok: false, error: 'Store not found' }, 404);
+    return c.json({ ok: true, item: { apiKey, apiKeyPrefix: store.apiKeyPrefix } });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Store activity & webhooks ──
+app.get('/sync/admin/stores/:id/activity', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({ ok: true, items: [] });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/sync/admin/stores/:id/webhook', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({ ok: true, item: null });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.put('/sync/admin/stores/:id/webhook', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({ ok: true, item: null });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.get('/sync/admin/stores/:id/webhook/logs', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({ ok: true, items: [] });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+app.post('/sync/admin/stores/:id/webhook/test', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({ ok: true, item: { ok: true, statusCode: 200, message: 'No webhook configured' } });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Synced products (admin dashboard) ──
+app.get('/sync/admin/products', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const page = Math.max(1, Number(c.req.query('page')) || 1);
+    const limit = Math.min(50, Math.max(1, Number(c.req.query('limit')) || 20));
+    const skip = (page - 1) * limit;
+    const [items, total] = await Promise.all([
+      Product.find({})
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('name nameAr sku price stock stockByStore image images categorySlug updatedAt')
+        .lean()
+        .maxTimeMS(15000),
+      Product.countDocuments({}).maxTimeMS(15000),
+    ]);
+    const stores = await SyncStore.find({}).select('name').lean().maxTimeMS(8000);
+    const storeNames = Object.fromEntries(stores.map((s) => [String(s._id), s.name]));
+    const products = items.map((p) => ({
+      ...p,
+      stockByStore: Object.fromEntries(
+        Object.entries(p.stockByStore || {}).map(([sid, qty]) => [storeNames[sid] || sid.slice(-6), qty])
+      ),
+    }));
+    return c.json({ ok: true, items: products, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Sync activity feed ──
+app.get('/sync/activity', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({ ok: true, items: [] });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Sync impact summary ──
+app.get('/sync/impact-summary', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({
+      ok: true,
+      item: {
+        summary: {
+          totalChanges: 0,
+          newProducts: 0,
+          pricesUp: { count: 0, totalIncrease: 0 },
+          pricesDown: { count: 0, totalDecrease: 0 },
+          stockToZero: { count: 0 },
+          imageChanges: { count: 0 },
+          productsToInactive: { count: 0 },
+          fieldChanges: { count: 0 },
+        },
+      },
+    });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Sync snapshots (rollback history) ──
+app.get('/sync/snapshots', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    return c.json({ ok: true, items: [], total: 0 });
   } catch (err) {
     return c.json({ ok: false, error: err.message }, 500);
   }

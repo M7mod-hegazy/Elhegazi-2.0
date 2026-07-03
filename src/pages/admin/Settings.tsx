@@ -254,12 +254,6 @@ const AdminSettings: React.FC = () => {
         });
         const data = await res.json();
         if (!res.ok || !data?.ok) throw new Error(data?.error || 'Failed');
-        if (data.item?.visibility) {
-          setControlCenterVisibility(normalizeOwnerVisibility(data.item.visibility));
-        }
-        if (data.item && 'enabled' in data.item) {
-          setControlCenterEnabled(data.item.enabled !== false);
-        }
         setVisSaveStatus('saved');
       } catch {
         setVisSaveStatus('error');

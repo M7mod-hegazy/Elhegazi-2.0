@@ -5,7 +5,7 @@ import {
   ArrowLeftRight, ExternalLink, Clock, ImageIcon, Eye,
   CheckCircle2, AlertCircle, TrendingUp, ShoppingBag, Zap,
   Database, Shield, AlertTriangle, Info, Server, BarChart3, TrendingDown,
-  Webhook, Copy, Loader2,
+  Webhook, Copy, Loader2, Smartphone, ScanBarcode, Globe, Bell,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge';
 import { LoadingSpinner } from '@/components/ui/loading';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { usePageTitle } from '@/hooks/usePageTitle';
+import { useBranding } from '@/hooks/useBranding';
 import { getSyncStatus, getStores, getSyncedProducts, getSyncActivity, getSyncImpactSummary, getWebhookConfig, getWebhookLogs, testWebhookDelivery, getRollbackHistory, type SyncStore, type SyncStatusData, type SyncProduct, type SyncActivityEvent, type SyncImpactSummary, type WebhookConfig, type WebhookLog, type SyncSnapshot } from '@/lib/api-sync';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -425,7 +426,8 @@ function WebhookSection({ stores }: { stores: SyncStore[] }) {
 }
 
 export default function AdminSyncPage() {
-  usePageTitle('المزامنة مع المتاجر');
+  const { branding } = useBranding();
+  usePageTitle(`Sync · ${branding.siteName}`);
   const navigate = useNavigate();
 
   const [status, setStatus] = useState<SyncStatusData | null>(null);
@@ -470,90 +472,101 @@ export default function AdminSyncPage() {
   const activeStores = stores.filter((s) => s.isActive);
   const totalImages = available.reduce((sum, p) => sum + (p.images?.length || 0) + (p.image ? 1 : 0), 0);
 
-  const benefits = [
-    {
-      icon: Database,
-      title: 'تحديث المخزون تلقائياً',
-      titleEn: 'Auto Inventory Sync',
-      desc: 'مزامنة فورية للمخزون بين المتجر الإلكتروني ونقاط البيع',
-      color: 'text-indigo-600 bg-indigo-100',
-    },
-    {
-      icon: Server,
-      title: 'إدارة المنتجات من مكان واحد',
-      titleEn: 'Central Product Management',
-      desc: 'تحكم مركزي بالمنتجات والأسعار والفئات من لوحة تحكم واحدة',
-      color: 'text-emerald-600 bg-emerald-100',
-    },
-    {
-      icon: Activity,
-      title: 'تتبع الطلبات في الوقت الفعلي',
-      titleEn: 'Real-time Order Tracking',
-      desc: 'متابعة الطلبات والتغييرات بشكل فوري دون تأخير',
-      color: 'text-amber-600 bg-amber-100',
-    },
-  ];
-
   return (
     <AdminLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
-          {/* Sync brand badge */}
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-4">
-            <div className="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-full px-3 py-1 text-[11px] font-bold">
-              <ArrowLeftRight className="h-3 w-3" />
-              المزامنة · Sync
-            </div>
-          </motion.div>
-
-          {/* Header */}
-          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center shadow-lg">
-                <ArrowLeftRight className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-black text-slate-800">المزامنة مع المتاجر</h1>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">
-                  {activeStores.length} متجر نشط • {available.length} منتج متزامن • {totalImages} صورة
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button variant="outline" size="sm" onClick={load} className="gap-1.5 text-xs font-bold">
-                <RefreshCw className="h-3.5 w-3.5" />
-                تحديث
-              </Button>
-              <Button size="sm" onClick={() => navigate('/admin/sync/stores')} className="gap-1.5 text-xs font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700">
-                <Store className="h-3.5 w-3.5" />
-                إدارة المتاجر
-              </Button>
-            </div>
-          </motion.div>
-
-          {/* Benefits section */}
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"
-          >
-            {benefits.map((benefit, i) => (
-              <Card key={i} className="border-0 shadow-md bg-white/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300">
-                <CardContent className="p-4">
-                  <div className="flex items-start gap-3">
-                    <div className={`h-9 w-9 rounded-xl ${benefit.color} flex items-center justify-center shrink-0 mt-0.5`}>
-                      <benefit.icon className="h-4.5 w-4.5" />
+          {/* Branded Hero */}
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-700 shadow-2xl">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmZmYiIGZpbGwtb3BhY2l0eT0iMC4wMyI+PHBhdGggZD0iTTM2IDM0djItSDI0di0yaDEyek0zNiAyNHYySDI0di0yaDEyeiIvPjwvZz48L2c+PC9zdmc+')] opacity-40" />
+              <div className="absolute -top-24 -left-24 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl" />
+              <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-purple-500/10 rounded-full blur-3xl" />
+              <div className="relative p-6 md:p-8">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="h-14 w-14 rounded-xl bg-white/10 backdrop-blur-sm border border-white/10 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
+                      {branding.logo.url ? (
+                        <img src={branding.logo.url} alt={branding.logo.altText} className="w-full h-full object-contain" />
+                      ) : (
+                        <ArrowLeftRight className="h-7 w-7 text-white" />
+                      )}
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-slate-800">{benefit.title}</h3>
-                      <p className="text-[10px] font-medium text-slate-400 mt-0.5">{benefit.titleEn}</p>
-                      <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">{benefit.desc}</p>
+                      <div className="flex items-center gap-2 mb-1">
+                        <h1 className="text-xl md:text-2xl font-black text-white">Sync</h1>
+                        <span className="text-white/40 text-lg font-light">by</span>
+                        <span className="text-xl md:text-2xl font-black text-white">تطبيق الحجازي للمحاسبة</span>
+                      </div>
+                      <p className="text-sm text-white/60 font-medium">
+                        منصة المزامنة الذكية — {branding.siteName}
+                      </p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Button variant="secondary" size="sm" onClick={load} className="gap-1.5 text-xs font-bold bg-white/15 text-white hover:bg-white/25 border-0">
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      تحديث
+                    </Button>
+                    <Button size="sm" onClick={() => navigate('/admin/sync/stores')} className="gap-1.5 text-xs font-bold bg-white text-slate-900 hover:bg-white/90">
+                      <Store className="h-3.5 w-3.5" />
+                      إدارة المتاجر
+                    </Button>
+                  </div>
+                </div>
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-white/50">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                    {activeStores.length} متجر نشط
+                  </span>
+                  <span className="w-px h-3 bg-white/10" />
+                  <span className="flex items-center gap-1.5">
+                    <Package className="h-3 w-3" />
+                    {available.length} منتج متزامن
+                  </span>
+                  <span className="w-px h-3 bg-white/10" />
+                  <span className="flex items-center gap-1.5">
+                    <ImageIcon className="h-3 w-3" />
+                    {totalImages} صورة
+                  </span>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Capabilities / Features */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { icon: Database, title: 'مزامنة المخزون التلقائية', desc: 'تحديث فوري للمخزون بين المتجر الإلكتروني وجميع نقاط البيع دون تدخل يدوي', accent: 'from-indigo-500 to-blue-600' },
+                { icon: ScanBarcode, title: 'مزامنة الأسعار والباركود', desc: 'تطابق تام للأسعار والباركود بين جميع المتاجر — تغيير واحد ينعكس في كل مكان', accent: 'from-emerald-500 to-teal-600' },
+                { icon: Globe, title: 'إدارة مركزية للمنتجات', desc: 'أضف المنتجات والفئات مرة واحدة ووزعها على جميع المتاجر المتصلة', accent: 'from-purple-500 to-violet-600' },
+                { icon: Smartphone, title: 'دعم متعدد المتاجر', desc: 'اربط عدد غير محدود من المتاجر ونقاط البيع بإعدادات أمان مستقلة لكل متجر', accent: 'from-amber-500 to-orange-600' },
+                { icon: Bell, title: 'إشعارات Webhook', desc: 'استقبل تحديثات لحظية عند تغير المنتجات، الأسعار، أو المخزون عبر webhooks', accent: 'from-rose-500 to-pink-600' },
+                { icon: Activity, title: 'مراقبة في الوقت الفعلي', desc: 'لوحة تحكم حية تعرض حالة الاتصال، نشاط المزامنة، وأداء كل متجر', accent: 'from-cyan-500 to-sky-600' },
+                { icon: Shield, title: 'أمان متقدم', desc: 'مفاتيح API مشفرة، نطاقات IP مسموحة، وسجلات تدقيق كاملة لجميع العمليات', accent: 'from-slate-600 to-slate-800' },
+                { icon: Clock, title: 'سجل المزامنة والتراجع', desc: 'سجل كامل للتغييرات مع إمكانية التراجع عن المزامنات السابقة عند الحاجة', accent: 'from-teal-500 to-emerald-600' },
+              ].map((feat, i) => (
+                <motion.div
+                  key={feat.title}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.06 + i * 0.04 }}
+                  className="group relative"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-br rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -m-px" style={{ backgroundImage: `linear-gradient(135deg, ${feat.accent.replace('from-', '').split(' ')[0]}15, ${feat.accent.replace('to-', '').split(' ')[1]}08)` }} />
+                  <Card className="relative border-0 shadow-md bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 h-full">
+                    <CardContent className="p-4">
+                      <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${feat.accent} bg-opacity-10 flex items-center justify-center mb-3 shadow-sm`}>
+                        <feat.icon className="h-4.5 w-4.5 text-white" />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-800 mb-1">{feat.title}</h3>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">{feat.desc}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
           </motion.div>
 
           {/* Stats cards */}
