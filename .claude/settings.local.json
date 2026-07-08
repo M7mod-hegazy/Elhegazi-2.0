@@ -1,7 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(npm i *)",
+      "Bash(gh api *)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "PowerShell(head *)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\M7mod Hegazy\\\\Desktop\\\\asd\\\\django\\\\elhegaze.V_1.1-main\\\\elhegaze.V_1.1-main\" -Directory)",
+      "Bash(Select-Object Name)",
+      "Bash(git checkout *)",
+      "Skill(superpowers:brainstorming)",
+      "Read(//c/Users/M7mod Hegazy/.claude/plugins/cache/claude-plugins-official/superpowers/5.1.0/**)",
+      "Bash(bash scripts/start-server.sh --project-dir \"C:\\\\Users\\\\M7mod Hegazy\\\\Desktop\\\\asd\\\\django\\\\arabian-blue-bloom-main\")",
+      "Bash(bash *)",
+      "Bash(node -e \"const l = require\\('./node_modules/lucide-react'\\); console.log\\('BookmarkPlus:', !!l.BookmarkPlus, 'Pencil:', !!l.Pencil, 'Trash2:', !!l.Trash2, 'Check:', !!l.Check\\)\")",
+      "Bash(cat vite.config.ts)",
+      "Bash(cat vite.config.js)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(grep -E \"\\\\.\\(tsx|ts\\)$\")"
     ]
   }
 }

@@ -1,0 +1,91 @@
+<h2>أين تظهر الـ Presets؟</h2>
+<p class="subtitle">Where should the saved presets panel live on the QR Codes page?</p>
+
+<div class="cards">
+
+  <div class="card" data-choice="a" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="display:flex;gap:8px;height:160px;font-size:11px;">
+        <div style="width:58%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+          <div style="background:#e2e8f0;height:12px;border-radius:3px;margin-bottom:6px;width:70%"></div>
+          <div style="background:#f1f5f9;height:90px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;">معاينة QR</div>
+        </div>
+        <div style="width:40%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;overflow:hidden;">
+          <div style="background:#3b82f6;color:white;border-radius:4px;padding:3px 6px;font-size:10px;margin-bottom:6px;text-align:center;">⭐ الإعدادات المحفوظة</div>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;padding:4px;margin-bottom:3px;font-size:9px;">🏷 فاتورة حرارية 58mm</div>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;padding:4px;margin-bottom:3px;font-size:9px;">🎨 بطاقة A4 ملونة</div>
+          <div style="background:#f1f5f9;border:1px dashed #cbd5e1;border-radius:3px;padding:4px;font-size:9px;color:#94a3b8;">+ حفظ الإعداد الحالي</div>
+          <div style="margin-top:6px;border-top:1px solid #e2e8f0;padding-top:6px;">
+            <div style="background:#e2e8f0;height:8px;border-radius:3px;margin-bottom:4px;"></div>
+            <div style="background:#e2e8f0;height:8px;border-radius:3px;width:80%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>A — شريط جانبي ثابت</h3>
+      <p>الـ presets تظهر في أعلى لوحة الإعدادات اليمنى دائماً. وصول فوري بدون ضغط.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="b" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="position:relative;height:160px;font-size:11px;">
+        <div style="display:flex;gap:8px;height:100%;">
+          <div style="width:58%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+            <div style="background:#e2e8f0;height:12px;border-radius:3px;margin-bottom:6px;width:70%"></div>
+            <div style="background:#f1f5f9;height:90px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;">معاينة QR</div>
+          </div>
+          <div style="width:40%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+            <div style="background:#e2e8f0;height:8px;border-radius:3px;margin-bottom:4px;"></div>
+            <div style="background:#e2e8f0;height:8px;border-radius:3px;width:60%;margin-bottom:8px;"></div>
+            <div style="background:#7c3aed;color:white;border-radius:4px;padding:3px 6px;font-size:9px;text-align:center;cursor:pointer;">⭐ فتح الإعدادات المحفوظة</div>
+            <div style="background:#e2e8f0;height:8px;border-radius:3px;margin-top:6px;"></div>
+          </div>
+        </div>
+        <!-- Modal overlay -->
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.3);border-radius:6px;display:flex;align-items:center;justify-content:center;">
+          <div style="background:white;border-radius:6px;padding:10px;width:75%;box-shadow:0 4px 20px rgba(0,0,0,0.2);">
+            <div style="font-size:10px;font-weight:bold;margin-bottom:6px;text-align:center;">⭐ الإعدادات المحفوظة</div>
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;padding:4px;margin-bottom:3px;font-size:9px;">🏷 فاتورة حرارية 58mm</div>
+            <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;padding:4px;margin-bottom:3px;font-size:9px;">🎨 بطاقة A4 ملونة</div>
+            <div style="background:#f1f5f9;border:1px dashed #cbd5e1;border-radius:3px;padding:4px;font-size:9px;color:#94a3b8;">+ حفظ الإعداد الحالي</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>B — نافذة منبثقة (Modal)</h3>
+      <p>زر صغير يفتح نافذة لإدارة الـ presets. لا يأخذ مساحة في الشاشة العادية.</p>
+    </div>
+  </div>
+
+  <div class="card" data-choice="c" onclick="toggleSelect(this)">
+    <div class="card-image">
+      <div style="height:160px;font-size:11px;display:flex;flex-direction:column;gap:6px;">
+        <!-- Top bar -->
+        <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:6px;display:flex;gap:4px;align-items:center;">
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;padding:3px 8px;font-size:9px;white-space:nowrap;">⭐ فاتورة 58mm</div>
+          <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:3px;padding:3px 8px;font-size:9px;white-space:nowrap;">🎨 A4 ملون</div>
+          <div style="background:#f1f5f9;border:1px dashed #cbd5e1;border-radius:3px;padding:3px 8px;font-size:9px;color:#94a3b8;white-space:nowrap;">+ جديد</div>
+          <div style="margin-left:auto;background:#3b82f6;color:white;border-radius:3px;padding:3px 6px;font-size:9px;">حفظ</div>
+        </div>
+        <!-- Content below -->
+        <div style="display:flex;gap:8px;flex:1;">
+          <div style="width:58%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+            <div style="background:#f1f5f9;height:80px;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#94a3b8;font-size:10px;">معاينة QR</div>
+          </div>
+          <div style="width:40%;background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:8px;">
+            <div style="background:#e2e8f0;height:8px;border-radius:3px;margin-bottom:4px;"></div>
+            <div style="background:#e2e8f0;height:8px;border-radius:3px;width:60%;"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <h3>C — شريط أفقي في الأعلى</h3>
+      <p>الـ presets كـ "tabs" أو chips في بار أفقي فوق كل المحتوى. سريع جداً للتبديل بينها.</p>
+    </div>
+  </div>
+
+</div>

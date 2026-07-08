@@ -1,6 +1,20 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import SyncStore from '../models/SyncStore.js';
+
+// Accept both hash schemes so a key minted by either admin backend verifies here.
+async function verifyKeyAny(apiKey, encoded) {
+  if (!encoded) return false;
+  if (String(encoded).startsWith('sync_scrypt$')) {
+    const parts = String(encoded).split('$');
+    if (parts.length !== 3) return false;
+    const incoming = crypto.scryptSync(apiKey, parts[1], 64);
+    const stored = Buffer.from(parts[2], 'hex');
+    return stored.length === incoming.length && crypto.timingSafeEqual(stored, incoming);
+  }
+  return bcrypt.compare(apiKey, encoded);
+}
 
 const RATE_LIMIT_WINDOW = 60 * 1000;
 const RATE_LIMIT_MAX = 30;
@@ -30,7 +44,7 @@ export default async function validateSyncRequest(req, res, next) {
       return res.status(403).json({ ok: false, error: 'Store is deactivated. Contact admin.' });
     }
 
-    const keyOk = await bcrypt.compare(apiKey, store.apiKeyHash);
+    const keyOk = await verifyKeyAny(apiKey, store.apiKeyHash);
     if (!keyOk) {
       return res.status(403).json({ ok: false, error: 'Invalid API key' });
     }

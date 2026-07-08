@@ -4179,6 +4179,14 @@ app.post('/api/orders', async (req, res) => {
       // Don't fail the order creation if email fails
     }
 
+    // Push the order to any registered POS webhooks (fire-and-forget).
+    try {
+      const { dispatchOrderWebhooks } = await import('./services/orderWebhook.js');
+      dispatchOrderWebhooks(order).catch(() => {});
+    } catch (whErr) {
+      console.error('Failed to dispatch order webhook:', whErr.message);
+    }
+
     // Log order creation
     try {
       await logHistory({

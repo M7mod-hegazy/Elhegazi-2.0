@@ -3,9 +3,10 @@ import { useNavigate } from 'react-router-dom';
 import {
   RefreshCw, Wifi, WifiOff, Store, Package, Layers, Activity,
   ArrowLeftRight, ExternalLink, Clock, ImageIcon, Eye,
-  CheckCircle2, AlertCircle, TrendingUp, ShoppingBag, Zap,
+  CheckCircle2, AlertCircle, TrendingUp, ShoppingBag, Zap, Upload, Download,
   Database, Shield, AlertTriangle, Info, Server, BarChart3, TrendingDown,
   Webhook, Copy, Loader2, Smartphone, ScanBarcode, Globe, Bell,
+  Play, Monitor,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -425,10 +426,30 @@ function WebhookSection({ stores }: { stores: SyncStore[] }) {
   );
 }
 
+// White-label: resellers set VITE_POS_ORDER_URL to their POS-app order/landing page.
+const POS_ORDER_URL = import.meta.env.VITE_POS_ORDER_URL || 'https://elhegazi.app';
+// Optional explainer video + POS-app screenshots for the marketing section.
+// When unset, styled placeholders render so the layout stays intact.
+const POS_VIDEO_URL = import.meta.env.VITE_POS_VIDEO_URL || '';
+const POS_SHOTS = [
+  import.meta.env.VITE_POS_SHOT_1 || '',
+  import.meta.env.VITE_POS_SHOT_2 || '',
+  import.meta.env.VITE_POS_SHOT_3 || '',
+];
+const POS_ABOUT_POINTS = [
+  'شاشة بيع سريعة تعمل باللمس والباركود — بدون إنترنت أيضاً',
+  'استقبال طلبات المتجر الإلكتروني وتحويلها إلى فواتير بضغطة',
+  'إدارة المخزون والعملاء والموردين والخزينة من مكان واحد',
+  'تقارير أرباح ومبيعات وطباعة فواتير احترافية بالعربية',
+];
+const POS_SHOT_CAPTIONS = ['شاشة نقطة البيع', 'إدارة المخزون', 'التقارير والأرباح'];
+
 export default function AdminSyncPage() {
   const { branding } = useBranding();
   usePageTitle(`Sync · ${branding.siteName}`);
   const navigate = useNavigate();
+  // Show the real deployed host, not a hardcoded brand, so resold instances stay accurate.
+  const siteHost = typeof window !== 'undefined' ? window.location.host : branding.siteName;
 
   const [status, setStatus] = useState<SyncStatusData | null>(null);
   const [stores, setStores] = useState<SyncStore[]>([]);
@@ -512,6 +533,16 @@ export default function AdminSyncPage() {
                       <Store className="h-3.5 w-3.5" />
                       إدارة المتاجر
                     </Button>
+                    <a
+                      href={POS_ORDER_URL}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-all"
+                    >
+                      <Smartphone className="h-3.5 w-3.5" />
+                      اطلب تطبيق POS
+                      <ExternalLink className="h-3 w-3" />
+                    </a>
                   </div>
                 </div>
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-xs text-white/50">
@@ -534,30 +565,132 @@ export default function AdminSyncPage() {
             </div>
           </motion.div>
 
-          {/* Capabilities / Features */}
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-8">
+          {/* Explainer video (first prominent visual) */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.04 }} className="mb-6">
+            <div className="text-center mb-3">
+              <h2 className="text-lg md:text-xl font-black text-slate-800">شاهد كيف يعمل تطبيق نقاط البيع</h2>
+              <p className="text-xs text-slate-500 mt-0.5">جولة سريعة تشرح تطبيق POS والمزامنة مع متجرك الإلكتروني</p>
+            </div>
+            <a
+              href={POS_VIDEO_URL || undefined}
+              target={POS_VIDEO_URL ? '_blank' : undefined}
+              rel="noopener noreferrer"
+              className={`group block relative rounded-3xl overflow-hidden border border-slate-200 shadow-lg bg-gradient-to-br from-slate-800 via-slate-900 to-indigo-900 ${POS_VIDEO_URL ? 'cursor-pointer' : 'cursor-default'}`}
+              style={{ aspectRatio: '16 / 9' }}
+            >
+              <div className="absolute inset-0 opacity-25" style={{ backgroundImage: 'radial-gradient(circle at 25% 30%, rgba(99,102,241,0.5) 0%, transparent 55%), radial-gradient(circle at 75% 75%, rgba(255,255,255,0.15) 0%, transparent 50%)' }} />
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+                <div className="w-20 h-20 rounded-full bg-white/15 backdrop-blur-sm border border-white/30 flex items-center justify-center mb-4 group-hover:scale-110 group-hover:bg-white/25 transition-all duration-300 shadow-xl">
+                  <Play className="h-9 w-9 fill-white" />
+                </div>
+                <span className="text-lg font-black">شغّل الفيديو التعريفي</span>
+                {!POS_VIDEO_URL && <span className="text-xs text-white/60 mt-1.5">سيظهر هنا الفيديو التعريفي لتطبيق POS</span>}
+              </div>
+              <span className="absolute top-3 right-3 text-[10px] font-bold bg-white/15 backdrop-blur-sm text-white px-2.5 py-1 rounded-full">فيديو تعريفي</span>
+            </a>
+          </motion.div>
+
+          {/* Big explanation of the POS app + screenshots */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.045 }} className="mb-6">
+            <Card className="border-0 shadow-md bg-white">
+              <CardContent className="p-6 md:p-8">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 text-xs font-black mb-4">
+                  <Smartphone className="h-3.5 w-3.5" />
+                  ما هو تطبيق نقاط البيع؟
+                </span>
+                <h2 className="text-2xl md:text-3xl font-black text-slate-800 leading-tight mb-4">تطبيق محاسبة ونقاط بيع متكامل يدير محلك بالكامل</h2>
+                <p className="text-sm md:text-base text-slate-600 leading-loose mb-6">
+                  تطبيق POS هو نظام سطح المكتب الذي يدير مبيعاتك ومخزونك وعملاءك وخزينتك في مكان واحد — يعمل بسرعة على شاشة اللمس والباركود، وحتى بدون إنترنت. عند ربطه بمتجرك الإلكتروني تتزامن المنتجات والصور والأسعار والمخزون تلقائياً، وتصلك طلبات الموقع مباشرة لتحويلها إلى فواتير بيع بضغطة واحدة.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {POS_ABOUT_POINTS.map((p, i) => (
+                    <div key={i} className="flex items-start gap-2.5">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-500 shrink-0 mt-0.5" />
+                      <span className="text-sm font-bold text-slate-700 leading-relaxed">{p}</span>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="text-center mt-6 mb-3">
+              <h3 className="text-lg font-black text-slate-800">لمحة من تطبيق نقاط البيع</h3>
+              <p className="text-xs text-slate-500 mt-0.5">هكذا يبدو التطبيق أثناء إدارة محلك</p>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {POS_SHOTS.map((url, i) => {
+                const Icon = [Monitor, Package, BarChart3][i] || Monitor;
+                return (
+                  <div key={i}>
+                    <div className="rounded-2xl overflow-hidden border border-slate-200 shadow-sm bg-white">
+                      <div className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 border-b border-slate-200">
+                        <span className="w-2 h-2 rounded-full bg-red-300" />
+                        <span className="w-2 h-2 rounded-full bg-amber-300" />
+                        <span className="w-2 h-2 rounded-full bg-emerald-300" />
+                      </div>
+                      {url ? (
+                        <img src={url} alt={POS_SHOT_CAPTIONS[i]} className="w-full object-cover" style={{ aspectRatio: '4 / 3' }} />
+                      ) : (
+                        <div className="relative flex flex-col items-center justify-center bg-gradient-to-br from-slate-50 to-indigo-50/40" style={{ aspectRatio: '4 / 3' }}>
+                          <Icon className="h-10 w-10 text-indigo-300 mb-2" />
+                          <span className="text-xs font-bold text-slate-400">معاينة تطبيق POS</span>
+                          <span className="text-[10px] text-slate-400/70 mt-1 px-4 text-center">صورة توضيحية — استبدلها بلقطة من التطبيق</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs font-bold text-slate-600 text-center mt-2">{POS_SHOT_CAPTIONS[i]}</p>
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+
+          {/* اطلب تطبيق POS — CTA Card */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }} className="mb-6">
+            <Card className="border-0 shadow-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white overflow-hidden">
+              <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNDAiIGhlaWdodD0iNDAiIHZpZXdCb3g9IjAgMCA0MCA0MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMjAgMHY0ME0wIDIwaDQwIiBzdHJva2U9InJnYmEoMjU1LDI1NSwyNTUsMC4wNSkiIHN0cm9rZS13aWR0aD0iMSIvPjwvc3ZnPg==')] opacity-30" />
+              <CardContent className="relative p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="h-12 w-12 rounded-xl bg-white/15 backdrop-blur-sm border border-white/20 flex items-center justify-center shrink-0">
+                    <Smartphone className="h-6 w-6 text-white" />
+                  </div>
+                  <div>
+                    <h2 className="text-base font-black">تطبيق POS للمحاسبة وإدارة المخزون</h2>
+                    <p className="text-sm text-white/80 mt-0.5">حمل تطبيق نقاط البيع واربطه بمتجرك الإلكتروني — إدارة المبيعات، المخزون، والعملاء من جهاز واحد</p>
+                  </div>
+                </div>
+                <a
+                  href={POS_ORDER_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 bg-white text-emerald-700 rounded-xl text-xs font-black hover:bg-emerald-50 transition-all shrink-0 shadow-lg"
+                >
+                  <Download className="h-4 w-4" />
+                  طلب التطبيق مجاناً
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+              </CardContent>
+            </Card>
+          </motion.div>
+
+          {/* Website Capabilities */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.07 }} className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <Globe className="h-4 w-4 text-blue-600" />
+              <h2 className="text-sm font-black text-slate-700">ما يوفره موقعك الإلكتروني</h2>
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">{siteHost}</span>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
               {[
-                { icon: Database, title: 'مزامنة المخزون التلقائية', desc: 'تحديث فوري للمخزون بين المتجر الإلكتروني وجميع نقاط البيع دون تدخل يدوي', accent: 'from-indigo-500 to-blue-600' },
-                { icon: ScanBarcode, title: 'مزامنة الأسعار والباركود', desc: 'تطابق تام للأسعار والباركود بين جميع المتاجر — تغيير واحد ينعكس في كل مكان', accent: 'from-emerald-500 to-teal-600' },
-                { icon: Globe, title: 'إدارة مركزية للمنتجات', desc: 'أضف المنتجات والفئات مرة واحدة ووزعها على جميع المتاجر المتصلة', accent: 'from-purple-500 to-violet-600' },
-                { icon: Smartphone, title: 'دعم متعدد المتاجر', desc: 'اربط عدد غير محدود من المتاجر ونقاط البيع بإعدادات أمان مستقلة لكل متجر', accent: 'from-amber-500 to-orange-600' },
-                { icon: Bell, title: 'إشعارات Webhook', desc: 'استقبل تحديثات لحظية عند تغير المنتجات، الأسعار، أو المخزون عبر webhooks', accent: 'from-rose-500 to-pink-600' },
-                { icon: Activity, title: 'مراقبة في الوقت الفعلي', desc: 'لوحة تحكم حية تعرض حالة الاتصال، نشاط المزامنة، وأداء كل متجر', accent: 'from-cyan-500 to-sky-600' },
-                { icon: Shield, title: 'أمان متقدم', desc: 'مفاتيح API مشفرة، نطاقات IP مسموحة، وسجلات تدقيق كاملة لجميع العمليات', accent: 'from-slate-600 to-slate-800' },
-                { icon: Clock, title: 'سجل المزامنة والتراجع', desc: 'سجل كامل للتغييرات مع إمكانية التراجع عن المزامنات السابقة عند الحاجة', accent: 'from-teal-500 to-emerald-600' },
+                { icon: Globe, title: 'متجر إلكتروني متكامل', desc: 'اعرض منتجاتك على موقع احترافي يعمل 24/7 — يدعم المنتجات، الفئات، والبحث المتقدم', accent: 'from-blue-500 to-indigo-600' },
+                { icon: ShoppingBag, title: 'إدارة المنتجات عن بُعد', desc: 'أضف وعدّل منتجاتك من لوحة تحكم الموقع — الأسماء، الأسعار، الوصف، والصور', accent: 'from-emerald-500 to-teal-600' },
+                { icon: Layers, title: 'صور متعددة لكل منتج', desc: 'ارفع صور متعددة مع معاينة حية — اعرض منتجك من كل الزوايا', accent: 'from-purple-500 to-violet-600' },
+                { icon: TrendingUp, title: 'عروض وتخفيضات فورية', desc: 'أنشئ عروضاً وتخفيضات على الموقع تنعكس تلقائياً على نقاط البيع', accent: 'from-amber-500 to-orange-600' },
               ].map((feat, i) => (
-                <motion.div
-                  key={feat.title}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.06 + i * 0.04 }}
-                  className="group relative"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-br rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 -m-px" style={{ backgroundImage: `linear-gradient(135deg, ${feat.accent.replace('from-', '').split(' ')[0]}15, ${feat.accent.replace('to-', '').split(' ')[1]}08)` }} />
-                  <Card className="relative border-0 shadow-md bg-white/90 backdrop-blur-sm hover:shadow-xl transition-all duration-300 h-full">
+                <motion.div key={feat.title} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.04 }}>
+                  <Card className="border-0 shadow-md bg-white/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300 h-full">
                     <CardContent className="p-4">
-                      <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${feat.accent} bg-opacity-10 flex items-center justify-center mb-3 shadow-sm`}>
+                      <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${feat.accent} flex items-center justify-center mb-3 shadow-sm`}>
                         <feat.icon className="h-4.5 w-4.5 text-white" />
                       </div>
                       <h3 className="text-sm font-bold text-slate-800 mb-1">{feat.title}</h3>
@@ -567,6 +700,113 @@ export default function AdminSyncPage() {
                 </motion.div>
               ))}
             </div>
+          </motion.div>
+
+          {/* Sync Capabilities */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <ArrowLeftRight className="h-4 w-4 text-indigo-600" />
+              <h2 className="text-sm font-black text-slate-700">مزامنة تطبيق POS مع المتجر</h2>
+              <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">ميزات إضافية عند الربط</span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { icon: Database, title: 'مزامنة المخزون التلقائية', desc: 'تحديث فوري للمخزون — بيع منتج في POS ينقص تلقائياً من الموقع', accent: 'from-indigo-500 to-blue-600' },
+                { icon: ScanBarcode, title: 'مزامنة الأسعار والباركود', desc: 'تطابق تام للأسعار والباركود — تغيير واحد ينعكس في كل مكان', accent: 'from-emerald-500 to-teal-600' },
+                { icon: ShoppingBag, title: 'طلبات الموقع تصبح فواتير', desc: 'طلبات المتجر تصل تطبيق POS فوراً ليراجعها الكاشير ويحوّلها إلى فاتورة بيع بضغطة', accent: 'from-cyan-500 to-sky-600' },
+                { icon: Clock, title: 'سجل كامل مع إمكانية التراجع', desc: 'كل عملية مزامنة مسجلة — استعد أي نسخة سابقة بضغطة زر', accent: 'from-teal-500 to-emerald-600' },
+              ].map((feat, i) => (
+                <motion.div key={feat.title} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.11 + i * 0.04 }}>
+                  <Card className="border-0 shadow-md bg-white/90 backdrop-blur-sm hover:shadow-lg transition-all duration-300 h-full">
+                    <CardContent className="p-4">
+                      <div className={`h-9 w-9 rounded-xl bg-gradient-to-br ${feat.accent} flex items-center justify-center mb-3 shadow-sm`}>
+                        <feat.icon className="h-4.5 w-4.5 text-white" />
+                      </div>
+                      <h3 className="text-sm font-bold text-slate-800 mb-1">{feat.title}</h3>
+                      <p className="text-[11px] text-slate-500 leading-relaxed">{feat.desc}</p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </motion.div>
+
+          {/* How Sync Works — Flow Guide */}
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.13 }} className="mb-8">
+            <Card className="border-0 shadow-md bg-white/90 backdrop-blur-sm overflow-hidden">
+              <CardHeader className="pb-3 border-b border-slate-100">
+                <CardTitle className="text-sm font-black text-slate-700 flex items-center gap-2">
+                  <ArrowLeftRight className="h-4 w-4 text-indigo-500" />
+                  كيف تعمل المزامنة؟
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-5">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* Pull direction */}
+                  <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-8 w-8 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <Download className="h-4 w-4 text-blue-600" />
+                      </div>
+                      <h3 className="text-xs font-black text-slate-700">سحب من الموقع ← تطبيق POS</h3>
+                    </div>
+                    <div className="space-y-2 text-xs text-slate-500">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                        <span>استيراد المنتجات الجديدة من موقعك الإلكتروني إلى التطبيق</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                        <span>تحديث الأسعار، المخزون، والصور في التطبيق لتطابق الموقع</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-blue-500 mt-0.5 shrink-0" />
+                        <span>اختر المنتجات والحقول التي تريد سحبها — تحكم كامل</span>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-blue-100">
+                        <span className="font-bold text-slate-600">مناسب لـ: </span>
+                        بدء الربط لأول مرة، إضافة منتجات جديدة في الموقع
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Push direction */}
+                  <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-3">
+                      <div className="h-8 w-8 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <Upload className="h-4 w-4 text-amber-600" />
+                      </div>
+                      <h3 className="text-xs font-black text-slate-700">رفع من تطبيق POS ← الموقع</h3>
+                    </div>
+                    <div className="space-y-2 text-xs text-slate-500">
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                        <span>رفع تغييرات الأسعار والمخزون التي أجريتها في التطبيق إلى الموقع</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                        <span>مزامنة فورية — البيع في POS ينعكس على الموقع تلقائياً</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <CheckCircle2 className="h-3.5 w-3.5 text-amber-500 mt-0.5 shrink-0" />
+                        <span>مراجعة التغييرات قبل الرفع — سجل كامل لكل عملية</span>
+                      </div>
+                      <div className="mt-2 pt-2 border-t border-amber-100">
+                        <span className="font-bold text-slate-600">مناسب لـ: </span>
+                        تحديث يومي بعد المبيعات، تعديل أسعار من التطبيق
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-4 p-3 bg-slate-50 border border-slate-100 rounded-lg flex items-start gap-2">
+                  <Info className="h-4 w-4 text-indigo-500 mt-0.5 shrink-0" />
+                  <p className="text-[11px] text-slate-500">
+                    <span className="font-bold text-slate-700">مزامنة ثنائية الاتجاه: </span>
+                    يمكنك السحب من الموقع والرفع إليه في أي وقت. في حال تعديل نفس المنتج في كلا النظامين، سيقوم النظام بعرض تعارض لتختار الإصدار الذي تريد الاحتفاظ به.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
           </motion.div>
 
           {/* Stats cards */}

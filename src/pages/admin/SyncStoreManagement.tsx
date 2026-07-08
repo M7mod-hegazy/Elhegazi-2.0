@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Edit, Trash2, Key, ArrowLeft, Store, Copy,
-  CheckCircle2, XCircle, AlertCircle, Loader2,
-  Globe, Mail, Shield, Smartphone, Monitor,
+  CheckCircle2, XCircle, AlertCircle, Loader2, Info,
+  Globe, Mail, Shield, Smartphone, Monitor, Download,
   ChevronLeft, ChevronRight, Eye, EyeOff,
-  Check, ArrowLeftRight,
+  Check, ArrowLeftRight, ExternalLink,
 } from 'lucide-react';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
@@ -286,37 +286,51 @@ function SetupGuideDialog({
           {/* Steps */}
           <div className="space-y-3">
             {[
-              { num: 1, text: 'افتح تطبيق POS واذهب إلى الإعدادات > المزامنة' },
-              { num: 2, text: 'انقر على "إضافة متجر"' },
-              {
-                num: 3,
-                text: 'أدخل معرف المتجر التالي:',
-                extra: (
-                  <div className="mt-1.5 flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
-                    <code dir="ltr" className="text-xs font-mono font-bold text-indigo-700 flex-1 break-all">{storeId}</code>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={copyId}>
-                      <Copy className="h-3 w-3" />
-                    </Button>
-                  </div>
-                ),
-              },
+              { num: 1, text: 'افتح تطبيق POS على جهازك', extra: <p className="text-[10px] text-slate-400 mt-0.5">تأكد من أن جهازك متصل بالإنترنت</p> },
+              { num: 2, text: 'اذهب إلى: الإعدادات ← المزامنة مع المتجر', extra: <p className="text-[10px] text-slate-400 mt-0.5">ستجد صفحة المزامنة في قائمة الإعدادات الرئيسية</p> },
+              { num: 3, text: 'انقر على "ابدأ إعداد المزامنة"', extra: <p className="text-[10px] text-slate-400 mt-0.5">ستظهر شاشة الترحيب — انقر على الزر الأخضر لبدء الإعداد</p> },
               {
                 num: 4,
-                text: 'أدخل مفتاح API:',
+                text: 'أدخل معرف المتجر (Store ID):',
                 extra: (
-                  <div className="mt-1.5 flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5">
-                    <code dir="ltr" className="text-xs font-mono font-bold text-amber-800 flex-1 break-all">{apiKey}</code>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={copyKey}>
-                      <Copy className="h-3 w-3" />
-                    </Button>
+                  <div className="mt-1.5">
+                    <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 mb-1">
+                      <code dir="ltr" className="text-xs font-mono font-bold text-indigo-700 flex-1 break-all">{storeId}</code>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={copyId}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <Info className="h-3 w-3 text-indigo-500" />
+                      <span>أين أجد هذا؟ هذا المعرف تجده هنا — في نافذة تعليمات الإعداد. فقط انسخه والصقه.</span>
+                    </p>
                   </div>
                 ),
               },
-              { num: 5, text: 'انقر على "اختبار الاتصال" ثم "حفظ"' },
+              {
+                num: 5,
+                text: 'أدخل مفتاح API:',
+                extra: (
+                  <div className="mt-1.5">
+                    <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-1.5 mb-1">
+                      <code dir="ltr" className="text-xs font-mono font-bold text-amber-800 flex-1 break-all">{apiKey}</code>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={copyKey}>
+                        <Copy className="h-3 w-3" />
+                      </Button>
+                    </div>
+                    <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                      <AlertCircle className="h-3 w-3 text-amber-600" />
+                      <span>يظهر هذا المفتاح مرة واحدة فقط. انسخه الآن واحفظه في مكان آمن.</span>
+                    </p>
+                  </div>
+                ),
+              },
+              { num: 6, text: 'أدخل رابط موقعك الإلكتروني', extra: <p className="text-[10px] text-slate-400 mt-0.5">مثال: https://elhegazi.vercel.app — ستجده في شريط عنوان المتصفح</p> },
+              { num: 7, text: 'انقر على "اختبار الاتصال" — إذا ظهرت رسالة نجاح، اضغط "حفظ الإعدادات"' },
             ].map((step) => (
               <div key={step.num} className="flex items-start gap-3">
-                <div className="h-6 w-6 rounded-full bg-indigo-100 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-[11px] font-bold text-indigo-700">{step.num}</span>
+                <div className={`h-6 w-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${step.num <= 3 ? 'bg-indigo-100' : 'bg-amber-100'}`}>
+                  <span className={`text-[11px] font-bold ${step.num <= 3 ? 'text-indigo-700' : 'text-amber-700'}`}>{step.num}</span>
                 </div>
                 <div className="flex-1">
                   <p className="text-xs text-slate-600">{step.text}</p>
@@ -470,6 +484,10 @@ function AddStoreStepper({
                   onChange={(e) => setName(e.target.value)}
                   placeholder="مثال: فرع المهندسين"
                 />
+                <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  أي اسم تميّز به هذا الفرع أو نقطة البيع. سيظهر في لوحة التحكم والتقارير.
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold flex items-center gap-1.5">
@@ -482,6 +500,10 @@ function AddStoreStepper({
                   placeholder="https://example.com"
                   dir="ltr"
                 />
+                <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  <span>أين أجد هذا؟ رابط موقعك الإلكتروني الذي سيتم الربط معه — مثال: https://elhegazi.vercel.app</span>
+                </p>
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs font-bold flex items-center gap-1.5">
@@ -494,6 +516,10 @@ function AddStoreStepper({
                   placeholder="store@example.com"
                   dir="ltr"
                 />
+                <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  لإشعارات المزامنة والتنبيهات الهامة.
+                </p>
               </div>
             </div>
           )}
@@ -531,7 +557,10 @@ function AddStoreStepper({
                   placeholder="192.168.1.1, 10.0.0.0/24"
                   dir="ltr"
                 />
-                <p className="text-[10px] text-slate-400">اترك فارغاً للسماح بجميع عناوين IP</p>
+                <p className="text-[10px] text-slate-400 flex items-center gap-1">
+                  <Info className="h-3 w-3" />
+                  <span>أين أجد هذا؟ عنوان IP الخاص بجهاز التطبيق — يمكنك معرفته من إعدادات الشبكة أو تركه فارغاً للسماح بالكل.</span>
+                </p>
               </div>
             </div>
           )}
@@ -760,6 +789,28 @@ export default function SyncStoreManagement() {
             </Button>
           </div>
 
+          {/* Onboarding Banner */}
+          <div className="mb-4 p-4 bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-xl flex items-start gap-3">
+            <div className="h-8 w-8 rounded-lg bg-indigo-100 flex items-center justify-center shrink-0">
+              <Info className="h-4 w-4 text-indigo-600" />
+            </div>
+            <div className="text-xs text-slate-600 leading-relaxed">
+              <span className="font-bold text-slate-800">ما هي المتاجر المتصلة؟ </span>
+              المتجر هو فرع أو نقطة بيع تستخدم تطبيق POS. كل متجر يحصل على مفتاح API خاص لربطه بموقعك الإلكتروني.
+              <br />
+              <span className="font-bold text-slate-700">الرحلة كاملة: </span>
+              <span className="inline-flex items-center gap-1.5 mt-1 flex-wrap">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded border border-indigo-200 text-indigo-700 font-bold text-[10px]">① أضف متجراً</span>
+                <ArrowLeftRight className="h-3 w-3 text-slate-300" />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded border border-indigo-200 text-indigo-700 font-bold text-[10px]">② انسخ المفتاح ومعرف المتجر</span>
+                <ArrowLeftRight className="h-3 w-3 text-slate-300" />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded border border-indigo-200 text-indigo-700 font-bold text-[10px]">③ أدخل البيانات في تطبيق POS</span>
+                <ArrowLeftRight className="h-3 w-3 text-slate-300" />
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-white rounded border border-indigo-200 text-indigo-700 font-bold text-[10px]">④ ابدأ المزامنة</span>
+              </span>
+            </div>
+          </div>
+
           {/* Table */}
           {loading ? (
             <div className="flex justify-center py-20">
@@ -767,13 +818,58 @@ export default function SyncStoreManagement() {
             </div>
           ) : stores.length === 0 ? (
             <div className="bg-white/80 backdrop-blur-sm rounded-xl border-2 border-dashed border-slate-200 p-12 text-center">
-              <Store className="h-12 w-12 mx-auto text-slate-300 mb-4" />
-              <p className="text-sm font-bold text-slate-400 mb-1">لا توجد متاجر بعد</p>
-              <p className="text-xs text-slate-300 mb-4">أضف متجراً لبدء المزامنة مع نقاط البيع</p>
-              <Button onClick={() => setShowAddStepper(true)} className="gap-1.5 text-xs font-bold">
-                <Plus className="h-3.5 w-3.5" />
-                إضافة متجر
-              </Button>
+              <div className="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center mx-auto mb-4">
+                <Store className="h-8 w-8 text-slate-300" />
+              </div>
+              <p className="text-base font-black text-slate-500 mb-2">ابدأ بربط متجرك الإلكتروني</p>
+              <p className="text-xs text-slate-400 max-w-md mx-auto mb-6 leading-relaxed">
+                المتجر يمثل فرعك أو نقطة البيع. بعد إضافته، ستحصل على مفتاح API خاص تدخله في تطبيق POS لبدء مزامنة المنتجات والمخزون والأسعار بين الموقع والتطبيق.
+              </p>
+              <div className="flex items-center justify-center gap-3 mb-6">
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center">
+                    <Plus className="h-5 w-5 text-indigo-600" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">إضافة متجر</span>
+                </div>
+                <ArrowLeftRight className="h-4 w-4 text-slate-300" />
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center">
+                    <Key className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">نسخ المفتاح</span>
+                </div>
+                <ArrowLeftRight className="h-4 w-4 text-slate-300" />
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center">
+                    <Smartphone className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">إدخال في POS</span>
+                </div>
+                <ArrowLeftRight className="h-4 w-4 text-slate-300" />
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center">
+                    <ArrowLeftRight className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <span className="text-[10px] font-bold text-slate-400">مزامنة</span>
+                </div>
+              </div>
+              <div className="flex items-center justify-center gap-3">
+                <Button onClick={() => setShowAddStepper(true)} className="gap-1.5 text-xs font-bold">
+                  <Plus className="h-3.5 w-3.5" />
+                  إضافة متجر
+                </Button>
+                <a
+                  href="https://elhegazi.app"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-200 rounded-lg text-xs font-bold text-slate-500 hover:bg-slate-50 transition-all"
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  طلب تطبيق POS
+                  <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
             </div>
           ) : (
             <div className="bg-white/90 backdrop-blur-sm rounded-xl shadow-lg border border-slate-100 overflow-hidden">

@@ -8,6 +8,10 @@ const SyncStoreSchema = new mongoose.Schema({
   lastSeenAt: { type: Date },
   allowedIps: [{ type: String }],
   notes: { type: String, default: '' },
+  // Outbound order webhook — the POS registers its /api/webhooks/ecom/order URL here.
+  webhookUrl: { type: String, default: '' },
+  webhookSecret: { type: String, default: '' },
+  webhookActive: { type: Boolean, default: false },
 }, { timestamps: true });
 
 export default mongoose.models.SyncStore || mongoose.model('SyncStore', SyncStoreSchema);

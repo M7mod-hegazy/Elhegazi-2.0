@@ -393,6 +393,31 @@ router.get('/images/:sku', validateSyncRequest, async (req, res) => {
 });
 
 /* ──────────────────────────────────────
+   WEBHOOK REGISTER — POS registers its
+   order-webhook URL for this store
+   PUT /api/sync/admin/stores/:storeId/webhook
+   ────────────────────────────────────── */
+router.put('/admin/stores/:storeId/webhook', validateSyncRequest, async (req, res) => {
+  try {
+    // The authenticated store may only manage its own webhook.
+    if (String(req.params.storeId) !== String(req.syncStore._id)) {
+      return res.status(403).json({ ok: false, error: 'Store mismatch' });
+    }
+    const { webhookUrl = '', webhookSecret = '', isActive = true } = req.body || {};
+    await SyncStore.findByIdAndUpdate(req.syncStore._id, {
+      $set: {
+        webhookUrl: String(webhookUrl),
+        webhookSecret: String(webhookSecret),
+        webhookActive: Boolean(isActive),
+      },
+    });
+    res.json({ ok: true, item: { webhookUrl: String(webhookUrl), webhookActive: Boolean(isActive) } });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
    RESOLVE CONFLICT — user decided how to
    handle a SKU conflict
    Body: { sku, action: "merge"|"separate"|"skip",

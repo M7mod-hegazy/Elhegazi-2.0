@@ -2235,6 +2235,13 @@ app.post('/orders', async (c) => {
     const body = await c.req.json();
     const order = new Order(body);
     await order.save();
+    // Push to registered POS webhooks. Awaited so it isn't killed after the response.
+    try {
+      const { dispatchOrderWebhooks } = await import('../server/services/orderWebhook.js');
+      await dispatchOrderWebhooks(order);
+    } catch (whErr) {
+      console.error('[API] order webhook dispatch failed:', whErr.message);
+    }
     return c.json({ ok: true, item: order });
   } catch (err) {
     console.error('[API] Error:', err.message);
@@ -3324,6 +3331,13 @@ app.post('/orders', async (c) => {
     const body = await c.req.json();
     const order = new Order(body);
     await order.save();
+    // Push to registered POS webhooks. Awaited so it isn't killed after the response.
+    try {
+      const { dispatchOrderWebhooks } = await import('../server/services/orderWebhook.js');
+      await dispatchOrderWebhooks(order);
+    } catch (whErr) {
+      console.error('[API] order webhook dispatch failed:', whErr.message);
+    }
     return c.json({ ok: true, item: order });
   } catch (err) {
     console.error('[API] Error:', err.message);
@@ -3595,13 +3609,75 @@ function verifySyncApiKey(apiKey, encoded) {
   return crypto.timingSafeEqual(stored, incoming);
 }
 
-// ── Sync status dashboard ──
+// ════════════════════════════════════════════════════════════════════════
+//  POS-FACING SYNC API (header x-store-id / x-api-key auth)
+//  Ported from server/routes/sync.routes.js so the Vercel deployment serves
+//  the same contract the desktop POS app expects.
+// ════════════════════════════════════════════════════════════════════════
+
+// Accept both hash schemes so a key minted by the Express admin (bcrypt) or the
+// Vercel admin (scrypt) verifies everywhere.
+async function verifySyncKeyAny(apiKey, encoded) {
+  if (!encoded) return false;
+  if (String(encoded).startsWith('sync_scrypt$')) return verifySyncApiKey(apiKey, encoded);
+  try {
+    const mod = await import('bcrypt');
+    const bcrypt = mod.default || mod;
+    return await bcrypt.compare(apiKey, encoded);
+  } catch {
+    return false;
+  }
+}
+
+// Returns { store } on success or { error: <Response> } on failure.
+async function validateSyncStore(c) {
+  const storeId = c.req.header('x-store-id');
+  const apiKey = c.req.header('x-api-key');
+  if (!storeId || !apiKey) return { error: c.json({ ok: false, error: 'Missing x-store-id or x-api-key headers' }, 401) };
+  if (!mongoose.Types.ObjectId.isValid(storeId)) return { error: c.json({ ok: false, error: 'Invalid store ID format' }, 401) };
+  const { default: SyncStore } = await import('../server/models/SyncStore.js');
+  const store = await SyncStore.findById(storeId).lean().maxTimeMS(8000);
+  if (!store) return { error: c.json({ ok: false, error: 'Store not found' }, 403) };
+  if (!store.isActive) return { error: c.json({ ok: false, error: 'Store is deactivated. Contact admin.' }, 403) };
+  const ok = await verifySyncKeyAny(apiKey, store.apiKeyHash);
+  if (!ok) return { error: c.json({ ok: false, error: 'Invalid API key' }, 403) };
+  SyncStore.findByIdAndUpdate(storeId, { lastSeenAt: new Date() }).catch(() => {});
+  return { store };
+}
+
+// ── Status: admin dashboard (session) OR POS (headers) depending on request ──
 app.get('/sync/status', async (c) => {
+  const { default: Product } = await import('../server/models/Product.js');
+  const { default: Category } = await import('../server/models/Category.js');
+
+  // POS path — authenticated by store headers, returns the flat POS shape.
+  if (c.req.header('x-store-id')) {
+    const { store, error } = await validateSyncStore(c);
+    if (error) return error;
+    const [totalProducts, activeProducts, totalCategories, changed] = await Promise.all([
+      Product.countDocuments({}).maxTimeMS(8000),
+      Product.countDocuments({ active: true }).maxTimeMS(8000),
+      Category.countDocuments({}).maxTimeMS(8000),
+      Product.countDocuments({ updatedAt: { $gte: store.lastSeenAt || new Date(0) } }).maxTimeMS(8000),
+    ]);
+    return c.json({
+      ok: true,
+      status: {
+        storeName: store.name,
+        storeId: String(store._id),
+        lastSeenAt: store.lastSeenAt,
+        totalProducts,
+        activeProducts,
+        totalCategories,
+        changesSinceLastSync: changed,
+      },
+    });
+  }
+
+  // Admin dashboard path.
   if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
   try {
     const { default: SyncStore } = await import('../server/models/SyncStore.js');
-    const { default: Product } = await import('../server/models/Product.js');
-    const { default: Category } = await import('../server/models/Category.js');
     const [totalProducts, activeProducts, totalCategories, stores] = await Promise.all([
       Product.countDocuments({}).maxTimeMS(8000),
       Product.countDocuments({ active: true }).maxTimeMS(8000),
@@ -3623,6 +3699,247 @@ app.get('/sync/status', async (c) => {
         },
       },
     });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Available products changed since ?since ──
+app.get('/sync/available/products', async (c) => {
+  const { store, error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const sinceRaw = c.req.query('since');
+    const since = sinceRaw ? new Date(sinceRaw) : (store.lastSeenAt || new Date(0));
+    const search = String(c.req.query('search') || '').trim();
+    const query = { updatedAt: { $gte: since } };
+    if (search) {
+      const esc = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      query.$or = [
+        { name: { $regex: esc, $options: 'i' } },
+        { nameAr: { $regex: esc, $options: 'i' } },
+        { sku: { $regex: esc, $options: 'i' } },
+      ];
+    }
+    const page = Math.max(1, Number(c.req.query('page')) || 1);
+    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit')) || 50));
+    const [items, total] = await Promise.all([
+      Product.find(query).sort({ updatedAt: -1 }).skip((page - 1) * limit).limit(limit)
+        .select('name nameAr sku price stock stockByStore image images description descriptionAr active categorySlug updatedAt').lean().maxTimeMS(8000),
+      Product.countDocuments(query).maxTimeMS(8000),
+    ]);
+    return c.json({ ok: true, items, total, page, pages: Math.ceil(total / limit), since: since.toISOString() });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Available categories changed since ?since ──
+app.get('/sync/available/categories', async (c) => {
+  const { store, error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: Category } = await import('../server/models/Category.js');
+    const sinceRaw = c.req.query('since');
+    const since = sinceRaw ? new Date(sinceRaw) : (store.lastSeenAt || new Date(0));
+    const items = await Category.find({ updatedAt: { $gte: since } })
+      .select('name nameAr slug image parentCategory isActive updatedAt').lean().maxTimeMS(8000);
+    return c.json({ ok: true, items, total: items.length });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Available stock changed since ?since ──
+app.get('/sync/available/stock', async (c) => {
+  const { store, error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const sinceRaw = c.req.query('since');
+    const since = sinceRaw ? new Date(sinceRaw) : (store.lastSeenAt || new Date(0));
+    const items = await Product.find({ updatedAt: { $gte: since } })
+      .select('sku name nameAr stock updatedAt').lean().maxTimeMS(8000);
+    return c.json({ ok: true, items, total: items.length });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Search catalog ──
+app.get('/sync/search', async (c) => {
+  const { error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const q = String(c.req.query('q') || '').trim();
+    if (!q || q.length < 2) return c.json({ ok: true, items: [] });
+    const esc = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const page = Math.max(1, Number(c.req.query('page')) || 1);
+    const limit = Math.min(50, Math.max(1, Number(c.req.query('limit')) || 20));
+    const query = { $or: [
+      { name: { $regex: esc, $options: 'i' } },
+      { nameAr: { $regex: esc, $options: 'i' } },
+      { sku: { $regex: esc, $options: 'i' } },
+    ] };
+    const [items, total] = await Promise.all([
+      Product.find(query).sort({ updatedAt: -1 }).skip((page - 1) * limit).limit(limit)
+        .select('name nameAr sku price stock stockByStore image active').lean().maxTimeMS(8000),
+      Product.countDocuments(query).maxTimeMS(8000),
+    ]);
+    return c.json({ ok: true, items, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Pull full product docs by SKU ──
+app.post('/sync/pull/products', async (c) => {
+  const { error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const body = await c.req.json().catch(() => ({}));
+    const skus = Array.isArray(body.skus) ? body.skus : [];
+    if (!skus.length) return c.json({ ok: false, error: 'No SKUs provided' }, 400);
+    const items = await Product.find({ sku: { $in: skus } })
+      .select('name nameAr sku price stock stockByStore image images description descriptionAr active categorySlug').lean().maxTimeMS(8000);
+    return c.json({ ok: true, items });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Apply POS→store changes (per-store stock, upserts) ──
+app.post('/sync/apply', async (c) => {
+  const { store, error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: Category } = await import('../server/models/Category.js');
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const body = await c.req.json().catch(() => ({}));
+    const items = Array.isArray(body.items) ? body.items : [];
+    const categories = Array.isArray(body.categories) ? body.categories : [];
+    const succeeded = [];
+    const failed = [];
+
+    for (const item of items) {
+      try {
+        if (!item.sku) { failed.push({ sku: item.sku || 'unknown', error: 'Missing SKU' }); continue; }
+        const update = {};
+        if (item.fields) {
+          if (item.fields.price !== undefined) update.price = Number(item.fields.price);
+          if (item.fields.stock !== undefined) update[`stockByStore.${store._id}`] = Math.max(0, Number(item.fields.stock));
+          if (item.fields.name !== undefined) update.name = String(item.fields.name).trim();
+          if (item.fields.nameAr !== undefined) update.nameAr = String(item.fields.nameAr).trim();
+          if (item.fields.description !== undefined) update.description = String(item.fields.description);
+          if (item.fields.descriptionAr !== undefined) update.descriptionAr = String(item.fields.descriptionAr);
+          if (item.fields.active !== undefined) update.active = Boolean(item.fields.active);
+          if (item.fields.categorySlug !== undefined) update.categorySlug = String(item.fields.categorySlug);
+          if (item.fields.image !== undefined) update.image = String(item.fields.image);
+        }
+        if (Object.keys(update).length === 0) { failed.push({ sku: item.sku, error: 'No fields to update' }); continue; }
+        const result = await Product.findOneAndUpdate({ sku: item.sku }, { $set: update }, { new: true }).lean();
+        if (item.fields?.stock !== undefined && result) {
+          const storeStocks = result.stockByStore || {};
+          const totalStock = Object.values(storeStocks).reduce((s, v) => s + (Number(v) || 0), 0);
+          await Product.findOneAndUpdate({ sku: item.sku }, { $set: { stock: totalStock } });
+        }
+        if (!result) {
+          if (item.action === 'create') {
+            const np = await Product.create({
+              sku: item.sku,
+              name: item.fields?.name || item.sku,
+              nameAr: item.fields?.nameAr || item.fields?.name || item.sku,
+              price: Number(item.fields?.price) || 0,
+              stock: Math.max(0, Number(item.fields?.stock)) || 0,
+              ...(item.fields?.categorySlug ? { categorySlug: item.fields.categorySlug } : {}),
+            });
+            succeeded.push({ sku: item.sku, action: 'created', id: String(np._id) });
+          } else {
+            failed.push({ sku: item.sku, error: 'SKU not found on E-com' });
+          }
+        } else {
+          succeeded.push({ sku: item.sku, action: 'updated', fields: Object.keys(update) });
+        }
+      } catch (err) {
+        failed.push({ sku: item.sku || 'unknown', error: err.message });
+      }
+    }
+
+    for (const cat of categories) {
+      try {
+        if (!cat.slug) { failed.push({ slug: cat.slug || 'unknown', error: 'Missing slug' }); continue; }
+        const update = {};
+        if (cat.name !== undefined) update.name = String(cat.name);
+        if (cat.nameAr !== undefined) update.nameAr = String(cat.nameAr);
+        if (Object.keys(update).length > 0) {
+          await Category.findOneAndUpdate({ slug: cat.slug }, { $set: update });
+          succeeded.push({ slug: cat.slug, action: 'updated_category' });
+        }
+      } catch (err) {
+        failed.push({ slug: cat.slug || 'unknown', error: err.message });
+      }
+    }
+
+    await SyncStore.findByIdAndUpdate(store._id, { lastSeenAt: new Date() });
+    return c.json({ ok: true, succeeded, failed, total: succeeded.length + failed.length });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Image URLs for a SKU ──
+app.get('/sync/images/:sku', async (c) => {
+  const { error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const product = await Product.findOne({ sku: c.req.param('sku') }).select('image images').lean().maxTimeMS(8000);
+    if (!product) return c.json({ ok: false, error: 'Product not found' }, 404);
+    return c.json({ ok: true, image: product.image, images: product.images || [] });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Image upload (POS → store) ──
+app.post('/sync/images/upload/:sku', async (c) => {
+  const { error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const sku = c.req.param('sku');
+    const product = await Product.findOne({ sku }).lean().maxTimeMS(8000);
+    if (!product) return c.json({ ok: false, error: `Product with SKU ${sku} not found` }, 404);
+    const bodyForm = await c.req.parseBody();
+    const file = bodyForm.image;
+    if (!file || typeof file === 'string') return c.json({ ok: false, error: 'No image file provided' }, 400);
+    const allowed = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+    if (!allowed.includes(file.type)) return c.json({ ok: false, error: `Image type ${file.type} not allowed` }, 400);
+    const buf = Buffer.from(await file.arrayBuffer());
+    const dataUri = `data:${file.type};base64,${buf.toString('base64')}`;
+    if (!process.env.CLOUDINARY_CLOUD_NAME || !process.env.CLOUDINARY_API_KEY || !process.env.CLOUDINARY_API_SECRET) {
+      return c.json({ ok: false, error: 'Image uploads not configured' }, 500);
+    }
+    const cloudinary = await import('cloudinary').then((m) => m.v2);
+    cloudinary.config({
+      cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+      api_key: process.env.CLOUDINARY_API_KEY,
+      api_secret: process.env.CLOUDINARY_API_SECRET,
+    });
+    const result = await cloudinary.uploader.upload(dataUri, {
+      folder: 'sync/products',
+      public_id: `product_${sku}_${Date.now()}`,
+      format: 'webp',
+      transformation: [{ width: 1280, height: 1280, crop: 'limit', quality: 'auto:good' }],
+    });
+    const imageUrl = result.secure_url;
+    if (!product.image) await Product.findOneAndUpdate({ sku }, { $set: { image: imageUrl } });
+    else await Product.findOneAndUpdate({ sku }, { $push: { images: imageUrl } });
+    return c.json({ ok: true, url: imageUrl, publicId: result.public_id });
   } catch (err) {
     return c.json({ ok: false, error: err.message }, 500);
   }
@@ -3847,16 +4164,46 @@ app.get('/sync/admin/stores/:id/activity', async (c) => {
 app.get('/sync/admin/stores/:id/webhook', async (c) => {
   if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
   try {
-    return c.json({ ok: true, item: null });
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const id = c.req.param('id');
+    if (!mongoose.Types.ObjectId.isValid(id)) return c.json({ ok: true, item: null });
+    const store = await SyncStore.findById(id).select('webhookUrl webhookActive').lean().maxTimeMS(8000);
+    if (!store || !store.webhookUrl) return c.json({ ok: true, item: null });
+    return c.json({ ok: true, item: { webhookUrl: store.webhookUrl, webhookActive: !!store.webhookActive } });
   } catch (err) {
     return c.json({ ok: false, error: err.message }, 500);
   }
 });
 
 app.put('/sync/admin/stores/:id/webhook', async (c) => {
-  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
   try {
-    return c.json({ ok: true, item: null });
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const id = c.req.param('id');
+
+    // POS path — the store authenticates with its own headers.
+    if (c.req.header('x-store-id')) {
+      const { store, error } = await validateSyncStore(c);
+      if (error) return error;
+      if (String(id) !== String(store._id)) return c.json({ ok: false, error: 'Store mismatch' }, 403);
+      const body = await c.req.json().catch(() => ({}));
+      await SyncStore.findByIdAndUpdate(store._id, { $set: {
+        webhookUrl: String(body.webhookUrl || ''),
+        webhookSecret: String(body.webhookSecret || ''),
+        webhookActive: body.isActive === undefined ? true : Boolean(body.isActive),
+      } });
+      return c.json({ ok: true, item: { webhookUrl: String(body.webhookUrl || ''), webhookActive: body.isActive === undefined ? true : Boolean(body.isActive) } });
+    }
+
+    // Admin path.
+    if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+    if (!mongoose.Types.ObjectId.isValid(id)) return c.json({ ok: false, error: 'Invalid store id' }, 400);
+    const body = await c.req.json().catch(() => ({}));
+    await SyncStore.findByIdAndUpdate(id, { $set: {
+      webhookUrl: String(body.webhookUrl || ''),
+      webhookSecret: String(body.webhookSecret || ''),
+      webhookActive: body.isActive === undefined ? true : Boolean(body.isActive),
+    } });
+    return c.json({ ok: true, item: { webhookUrl: String(body.webhookUrl || ''), webhookActive: body.isActive === undefined ? true : Boolean(body.isActive) } });
   } catch (err) {
     return c.json({ ok: false, error: err.message }, 500);
   }
