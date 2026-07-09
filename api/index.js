@@ -3891,6 +3891,72 @@ app.post('/sync/apply', async (c) => {
   }
 });
 
+// ── Store catalog push (POS → website, full product listing) ──
+app.post('/sync/store-catalog', async (c) => {
+  const { store, error } = await validateSyncStore(c);
+  if (error) return error;
+  try {
+    const { default: StoreCatalog } = await import('../server/models/StoreCatalog.js');
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: SyncActivity } = await import('../server/models/SyncActivity.js');
+    const body = await c.req.json().catch(() => ({}));
+    const { products = [] } = body;
+    const storeId = store._id;
+    let upserted = 0, updatedSnapshots = 0;
+
+    for (const p of products) {
+      if (!p.sku) continue;
+      const entry = {
+        storeId,
+        sku: p.sku,
+        name: p.name || p.sku,
+        nameAr: p.nameAr || p.name || p.sku,
+        price: Number(p.price) || 0,
+        stock: Math.max(0, Number(p.stock)) || 0,
+        image: p.image || '',
+        images: p.images || [],
+        categorySlug: p.categorySlug || '',
+        syncedAt: new Date(),
+      };
+      await StoreCatalog.findOneAndUpdate(
+        { storeId, sku: p.sku },
+        { $set: entry },
+        { upsert: true }
+      ).maxTimeMS(8000);
+      upserted++;
+
+      const existing = await Product.findOne({ sku: p.sku }).lean().maxTimeMS(8000);
+      if (existing) {
+        const snapshotEntry = {
+          storeId,
+          name: p.name || p.sku,
+          nameAr: p.nameAr || p.name || p.sku,
+          price: Number(p.price) || 0,
+          stock: Math.max(0, Number(p.stock)) || 0,
+          image: p.image || '',
+          images: p.images || [],
+          syncedAt: new Date(),
+        };
+        await Product.updateOne({ sku: p.sku }, { $pull: { storeSnapshots: { storeId } } }).maxTimeMS(8000);
+        await Product.updateOne({ sku: p.sku }, { $push: { storeSnapshots: snapshotEntry } }).maxTimeMS(8000);
+        updatedSnapshots++;
+      }
+    }
+
+    await SyncActivity.create({
+      storeId,
+      storeName: store.name,
+      type: 'sync',
+      description: `Store ${store.name} pushed ${products.length} products to catalog`,
+      descriptionAr: `قام المتجر ${store.name} بدفع ${products.length} منتج إلى الكتالوج`,
+    });
+
+    return c.json({ ok: true, created: products.length, updated: updatedSnapshots });
+  } catch (err) {
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // ── Image URLs for a SKU ──
 app.get('/sync/images/:sku', async (c) => {
   const { error } = await validateSyncStore(c);
