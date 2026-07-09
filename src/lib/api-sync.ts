@@ -17,6 +17,7 @@ export interface SyncProduct {
   updatedAt: string;
   localMatch?: {
     exists: boolean;
+    acknowledged?: boolean;
     name?: { match: boolean; local: string; ecom: string };
     price?: { match: boolean; local: number; ecom: number };
     stock?: { match: boolean; local: number; ecom: number };

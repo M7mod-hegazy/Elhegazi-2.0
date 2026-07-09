@@ -629,34 +629,33 @@ router.get('/admin/products', async (req, res) => {
 
     const products = items.map((p) => {
       const snapshot = p.posSnapshot;
-      const exists = !!(snapshot && snapshot.syncedAt);
+      const hasSnapshot = !!(snapshot && snapshot.syncedAt);
       const ecomImgCount = [p.image, ...(p.images || [])].filter(Boolean).length;
       const snapImgCount = snapshot ? [snapshot.image, ...(snapshot.images || [])].filter(Boolean).length : 0;
 
-      const localMatch = exists ? {
+      const localMatch = {
         exists: true,
         name: {
-          local: snapshot.name || snapshot.nameAr || '',
+          local: hasSnapshot ? (snapshot.name || snapshot.nameAr || '') : '',
           ecom: p.nameAr || p.name || '',
-          match: ((snapshot.name || snapshot.nameAr || '').trim().toLowerCase() === (p.nameAr || p.name || '').trim().toLowerCase()),
+          match: hasSnapshot ? ((snapshot.name || snapshot.nameAr || '').trim().toLowerCase() === (p.nameAr || p.name || '').trim().toLowerCase()) : false,
         },
         price: {
-          local: snapshot.price ?? 0,
+          local: hasSnapshot ? (snapshot.price ?? 0) : 0,
           ecom: p.price ?? 0,
-          match: Number(snapshot.price) === Number(p.price),
+          match: hasSnapshot ? (Number(snapshot.price) === Number(p.price)) : false,
         },
         stock: {
-          local: snapshot.stock ?? 0,
+          local: hasSnapshot ? (snapshot.stock ?? 0) : 0,
           ecom: p.stock ?? 0,
-          match: Number(snapshot.stock) === Number(p.stock),
+          match: hasSnapshot ? (Number(snapshot.stock) === Number(p.stock)) : false,
         },
         image: {
-          local: snapshot.image || (snapshot.images?.length ? snapshot.images[0] : null),
+          local: hasSnapshot ? (snapshot.image || (snapshot.images?.length ? snapshot.images[0] : null)) : null,
           ecom: p.image || (p.images?.length ? p.images[0] : null),
-          match: snapImgCount === ecomImgCount,
+          match: hasSnapshot ? (snapImgCount === ecomImgCount) : false,
         },
-      } : {
-        exists: false,
+        acknowledged: hasSnapshot,
       };
 
       return {

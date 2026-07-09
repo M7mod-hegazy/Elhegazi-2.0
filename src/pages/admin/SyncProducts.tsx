@@ -93,7 +93,7 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages, pullLabel
   const [expanded, setExpanded] = useState(false);
   const images = useMemo(() => imgList(product), [product]);
   const lm = product.localMatch;
-  const isNew = lm && !lm.exists;
+  const isNew = lm && !lm.acknowledged;
 
   const formatPrice = (v: number | null | undefined) => (v != null ? Number(v).toFixed(2) + ' ر.س' : '—');
   const formatStock = (v: number | null | undefined) => (v != null ? String(Number(v)) : '—');
@@ -206,7 +206,7 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages, pullLabel
       {/* Expanded: side-by-side */}
       {expanded && (
         <div className="px-4 pb-4 animate-in slide-in-from-top-2 border-t border-slate-100">
-          {lm?.exists ? (
+          {lm?.acknowledged ? (
             <div className="pt-3 space-y-1.5">
               <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mb-1">
                 <span className="flex-1 px-2 py-1 rounded bg-slate-50 text-center">المتجر (POS)</span>
@@ -369,7 +369,7 @@ export default function SyncProducts() {
   }, [products, search]);
 
   const filteredAvailable = useMemo(() => {
-    let result = filteredSearch.filter((p) => p.localMatch?.exists);
+    let result = filteredSearch.filter((p) => p.localMatch?.acknowledged);
     if (fieldFilter) {
       const lmKey = fieldFilter === 'images' ? 'image' : fieldFilter;
       result = result.filter((p) => p.localMatch?.[lmKey as 'name' | 'price' | 'stock' | 'image']?.match === false);
@@ -385,7 +385,7 @@ export default function SyncProducts() {
   }, [filteredSearch, fieldFilter]);
 
   const filteredNew = useMemo(() => {
-    return filteredSearch.filter((p) => !p.localMatch?.exists);
+    return filteredSearch.filter((p) => !p.localMatch?.acknowledged);
   }, [filteredSearch]);
 
   const activeSkus = useMemo(() => {
@@ -421,12 +421,12 @@ export default function SyncProducts() {
 
   /* ─── Bulk helpers ─── */
   const isDiff = (p: SyncProduct, key: string) => {
-    if (!p.localMatch || !p.localMatch.exists) return key === null;
+    if (!p.localMatch || !p.localMatch.acknowledged) return key === null;
     if (key === null) return false;
     const lmKey = key === 'images' ? 'image' : key;
     return p.localMatch[lmKey as 'name' | 'price' | 'stock' | 'image']?.match === false;
   };
-  const isNewProd = (p: SyncProduct) => !p.localMatch?.exists;
+  const isNewProd = (p: SyncProduct) => !p.localMatch?.acknowledged;
   const fieldOrNew = (p: SyncProduct, key: string) => isNewProd(p) || isDiff(p, key);
   const onCount = (key: string) => filteredAvailable.filter((p) => fieldOrNew(p, key) && fields[p.sku]?.[key]).length;
   const totalEligible = (key: string) => filteredAvailable.filter((p) => fieldOrNew(p, key)).length;
@@ -483,8 +483,8 @@ export default function SyncProducts() {
         nameAr: product.nameAr,
         image: product.image,
         images: product.images,
-        isNew: !lm?.exists,
-        current: lm?.exists ? { name: lm.name?.local, price: lm.price?.local, stock: lm.stock?.local } : {},
+        isNew: !lm?.acknowledged,
+        current: lm?.acknowledged ? { name: lm.name?.local, price: lm.price?.local, stock: lm.stock?.local } : {},
         incoming: { name: product.name, nameAr: product.nameAr, price: product.price, stock: product.stock },
         diff: Object.fromEntries(activeFields.map((f) => [f, true])),
         fields: Object.fromEntries(activeFields.map((f) => [f, true])),
