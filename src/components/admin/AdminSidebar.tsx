@@ -68,7 +68,8 @@ const navigationGroups = [
       { name: 'المستخدمين', href: '/admin/users', icon: Users },
       { name: 'المواقع', href: '/admin/locations', icon: MapPin },
       { name: 'سجل النشاط', href: '/admin/history', icon: History },
-      { name: 'المزامنة', href: '/admin/sync', icon: ArrowLeftRight }
+      { name: 'المزامنة', href: '/admin/sync', icon: ArrowLeftRight },
+      { name: 'مزامنة المنتجات', href: '/admin/sync/products', icon: Package }
     ]
   },
   {
@@ -115,6 +116,7 @@ const AdminSidebarEnhanced = ({ collapsed, onToggle, isMobile, mobileMenuOpen, o
           item.href === '/admin/qr-codes' ? 'qrcodes' :
           item.href === '/admin/portfolio-work' ? 'latestWork' :
           item.href === '/admin/sync' ? 'sync' :
+          item.href === '/admin/sync/products' ? 'sync' :
           null;
         return key ? isVisible('adminModules', key) : true;
       })

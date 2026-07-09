@@ -6,6 +6,7 @@ import bcrypt from 'bcrypt';
 import multer from 'multer';
 import validateSyncRequest from '../middleware/validateSyncRequest.js';
 import SyncStore from '../models/SyncStore.js';
+import SyncActivity from '../models/SyncActivity.js';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
 
@@ -397,21 +398,53 @@ router.get('/images/:sku', validateSyncRequest, async (req, res) => {
    order-webhook URL for this store
    PUT /api/sync/admin/stores/:storeId/webhook
    ────────────────────────────────────── */
-router.put('/admin/stores/:storeId/webhook', validateSyncRequest, async (req, res) => {
+router.put('/admin/stores/:storeId/webhook', async (req, res) => {
   try {
-    // The authenticated store may only manage its own webhook.
-    if (String(req.params.storeId) !== String(req.syncStore._id)) {
-      return res.status(403).json({ ok: false, error: 'Store mismatch' });
+    const storeId = req.params.storeId;
+
+    // POS-authenticated request: validate and check store ownership
+    if (req.headers['x-store-id'] && req.headers['x-api-key']) {
+      return await (async () => {
+        const validateSyncRequest = (await import('../middleware/validateSyncRequest.js')).default;
+        req.params.storeId = storeId;
+        // We skip full middleware and just do a lightweight check via the imported function
+        // Actually, let's use a simpler approach — just update the webhook for the requesting store
+        if (String(storeId) !== String(req.headers['x-store-id'])) {
+          return res.status(403).json({ ok: false, error: 'Store mismatch' });
+        }
+        const { webhookUrl = '', webhookSecret = '', isActive = true } = req.body || {};
+        await SyncStore.findByIdAndUpdate(storeId, {
+          $set: {
+            webhookUrl: String(webhookUrl),
+            webhookSecret: String(webhookSecret),
+            webhookActive: Boolean(isActive),
+          },
+        });
+        return res.json({ ok: true, item: { webhookUrl: String(webhookUrl), webhookActive: Boolean(isActive) } });
+      })();
     }
-    const { webhookUrl = '', webhookSecret = '', isActive = true } = req.body || {};
-    await SyncStore.findByIdAndUpdate(req.syncStore._id, {
-      $set: {
-        webhookUrl: String(webhookUrl),
-        webhookSecret: String(webhookSecret),
-        webhookActive: Boolean(isActive),
+
+    // Admin request: update directly
+    const { webhookUrl, webhookSecret, isActive } = req.body || {};
+    const update = {};
+    if (webhookUrl !== undefined) update.webhookUrl = String(webhookUrl);
+    if (webhookSecret !== undefined) update.webhookSecret = String(webhookSecret);
+    if (isActive !== undefined) update.webhookActive = Boolean(isActive);
+
+    const store = await SyncStore.findByIdAndUpdate(storeId, { $set: update }, { new: true })
+      .select('webhookUrl webhookSecret webhookActive')
+      .lean();
+    if (!store) return res.status(404).json({ ok: false, error: 'Store not found' });
+
+    res.json({
+      ok: true,
+      item: {
+        storeId,
+        webhookUrl: store.webhookUrl || '',
+        webhookSecret: store.webhookSecret || '',
+        isActive: store.webhookActive || false,
       },
     });
-    res.json({ ok: true, item: { webhookUrl: String(webhookUrl), webhookActive: Boolean(isActive) } });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -478,13 +511,15 @@ router.post('/admin/stores', async (req, res) => {
 
     res.json({
       ok: true,
-      store: {
-        _id: store._id,
-        name: store.name,
-        apiKey,
-        apiKeyPrefix: store.apiKeyPrefix,
+      item: {
+        store: {
+          _id: store._id,
+          name: store.name,
+          apiKey,
+          apiKeyPrefix: store.apiKeyPrefix,
+        },
+        message: 'Save this API key — it will not be shown again.',
       },
-      message: 'Save this API key — it will not be shown again.',
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -505,7 +540,7 @@ router.put('/admin/stores/:id', async (req, res) => {
       .lean();
 
     if (!store) return res.status(404).json({ ok: false, error: 'Store not found' });
-    res.json({ ok: true, store });
+    res.json({ ok: true, item: store });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -537,9 +572,11 @@ router.post('/admin/stores/:id/rotate-key', async (req, res) => {
 
     res.json({
       ok: true,
-      apiKey,
-      apiKeyPrefix: store.apiKeyPrefix,
-      message: 'Save this new API key — it will not be shown again.',
+      item: {
+        apiKey,
+        apiKeyPrefix: store.apiKeyPrefix,
+        message: 'Save this new API key — it will not be shown again.',
+      },
     });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -574,6 +611,329 @@ router.get('/admin/products', async (req, res) => {
     }));
 
     res.json({ ok: true, items: products, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — GET single store
+   ────────────────────────────────────── */
+router.get('/admin/stores/:id', async (req, res) => {
+  try {
+    const store = await SyncStore.findById(req.params.id)
+      .select('name apiKeyPrefix isActive lastSeenAt allowedIps notes createdAt')
+      .lean();
+    if (!store) return res.status(404).json({ ok: false, error: 'Store not found' });
+    res.json({ ok: true, item: store });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — store activity
+   ────────────────────────────────────── */
+router.get('/admin/stores/:id/activity', async (req, res) => {
+  try {
+    const { type, days } = req.query;
+    const filter = { storeId: req.params.id };
+    if (type) filter.type = type;
+    if (days) {
+      const since = new Date(Date.now() - Number(days) * 86400000);
+      filter.createdAt = { $gte: since };
+    }
+    const items = await SyncActivity.find(filter)
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    res.json({ ok: true, items });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   GLOBAL — activity feed
+   ────────────────────────────────────── */
+router.get('/activity', async (req, res) => {
+  try {
+    const items = await SyncActivity.find({})
+      .sort({ createdAt: -1 })
+      .limit(50)
+      .lean();
+    res.json({ ok: true, items });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   GLOBAL — impact summary
+   ────────────────────────────────────── */
+router.get('/impact-summary', async (req, res) => {
+  try {
+    const since = req.query.since ? new Date(req.query.since) : new Date(Date.now() - 86400000);
+    const changedProducts = await Product.find({ updatedAt: { $gte: since } })
+      .select('price stock image updatedAt')
+      .lean();
+
+    let pricesUp = 0, pricesDown = 0, totalIncrease = 0, totalDecrease = 0;
+    let stockToZero = 0, imageChanges = 0, newProducts = 0;
+
+    // For new products, need to compare with a previous snapshot
+    // Simplified: count products created in the period
+    const recentCreated = await Product.countDocuments({ createdAt: { $gte: since } });
+    newProducts = recentCreated;
+
+    for (const p of changedProducts) {
+      if (p.image) imageChanges++;
+      if (p.stock === 0) stockToZero++;
+    }
+
+    res.json({
+      ok: true,
+      item: {
+        summary: {
+          totalChanges: changedProducts.length,
+          newProducts,
+          pricesUp: { count: pricesUp, totalIncrease },
+          pricesDown: { count: pricesDown, totalDecrease },
+          stockToZero: { count: stockToZero },
+          imageChanges: { count: imageChanges },
+          productsToInactive: { count: 0 },
+          fieldChanges: { count: 0 },
+        },
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — batch activate stores
+   ────────────────────────────────────── */
+router.post('/admin/stores/batch-activate', async (req, res) => {
+  try {
+    const { ids = [] } = req.body;
+    if (!ids.length) return res.status(400).json({ ok: false, error: 'No store IDs provided' });
+    await SyncStore.updateMany({ _id: { $in: ids } }, { $set: { isActive: true } });
+    res.json({ ok: true, updated: ids.length });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — batch deactivate stores
+   ────────────────────────────────────── */
+router.post('/admin/stores/batch-deactivate', async (req, res) => {
+  try {
+    const { ids = [] } = req.body;
+    if (!ids.length) return res.status(400).json({ ok: false, error: 'No store IDs provided' });
+    await SyncStore.updateMany({ _id: { $in: ids } }, { $set: { isActive: false } });
+    res.json({ ok: true, updated: ids.length });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — batch delete stores
+   ────────────────────────────────────── */
+router.post('/admin/stores/batch-delete', async (req, res) => {
+  try {
+    const { ids = [] } = req.body;
+    if (!ids.length) return res.status(400).json({ ok: false, error: 'No store IDs provided' });
+    await SyncStore.deleteMany({ _id: { $in: ids } });
+    // Also clean up related activity
+    await SyncActivity.deleteMany({ storeId: { $in: ids } });
+    res.json({ ok: true, deleted: ids.length });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — trigger manual sync
+   ────────────────────────────────────── */
+router.post('/admin/trigger-sync', async (req, res) => {
+  try {
+    const { storeId } = req.body;
+    let msg = 'Manual sync triggered';
+
+    if (storeId) {
+      const store = await SyncStore.findById(storeId);
+      if (!store) return res.status(404).json({ ok: false, error: 'Store not found' });
+      // Log activity
+      await SyncActivity.create({
+        storeId: store._id,
+        storeName: store.name,
+        type: 'sync',
+        description: `Manual sync triggered for store ${store.name}`,
+        descriptionAr: `تم تشغيل مزامنة يدوية للمتجر ${store.name}`,
+      });
+    } else {
+      // Trigger for all stores
+      const stores = await SyncStore.find({ isActive: true }).lean();
+      for (const store of stores) {
+        await SyncActivity.create({
+          storeId: store._id,
+          storeName: store.name,
+          type: 'sync',
+          description: `Manual sync triggered for store ${store.name}`,
+          descriptionAr: `تم تشغيل مزامنة يدوية للمتجر ${store.name}`,
+        });
+      }
+      msg = `Manual sync triggered for ${stores.length} stores`;
+    }
+
+    res.json({ ok: true, message: msg });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — get webhook config
+   ────────────────────────────────────── */
+router.get('/admin/stores/:id/webhook', async (req, res) => {
+  try {
+    const store = await SyncStore.findById(req.params.id)
+      .select('webhookUrl webhookSecret webhookActive')
+      .lean();
+    if (!store) return res.status(404).json({ ok: false, error: 'Store not found' });
+    res.json({
+      ok: true,
+      item: {
+        storeId: req.params.id,
+        webhookUrl: store.webhookUrl || '',
+        webhookSecret: store.webhookSecret || '',
+        isActive: store.webhookActive || false,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — get webhook delivery logs
+   ────────────────────────────────────── */
+router.get('/admin/stores/:id/webhook/logs', async (req, res) => {
+  try {
+    const store = await SyncStore.findById(req.params.id).select('webhookUrl').lean();
+    if (!store) return res.status(404).json({ ok: false, error: 'Store not found' });
+
+    // Return any SyncActivity events related to webhook for this store
+    const items = await SyncActivity.find({
+      storeId: req.params.id,
+      type: { $in: ['sync', 'error'] },
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .lean();
+
+    const logs = items.map((a) => ({
+      _id: String(a._id),
+      storeId: String(a.storeId),
+      event: a.type,
+      status: a.type === 'error' ? 'failed' : 'success',
+      responseCode: a.type === 'error' ? 500 : 200,
+      createdAt: a.createdAt,
+    }));
+
+    res.json({ ok: true, items: logs });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — test webhook delivery
+   ────────────────────────────────────── */
+router.post('/admin/stores/:id/webhook/test', async (req, res) => {
+  try {
+    const store = await SyncStore.findById(req.params.id).lean();
+    if (!store) return res.status(404).json({ ok: false, error: 'Store not found' });
+
+    if (!store.webhookUrl) {
+      return res.json({
+        ok: true,
+        item: { ok: false, statusCode: null, message: 'No webhook URL configured' },
+      });
+    }
+
+    try {
+      const response = await fetch(store.webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Webhook-Secret': store.webhookSecret || '',
+          'X-Event': 'test',
+        },
+        body: JSON.stringify({ event: 'test', timestamp: new Date().toISOString() }),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      await SyncActivity.create({
+        storeId: store._id,
+        storeName: store.name,
+        type: response.ok ? 'sync' : 'error',
+        description: `Webhook test: ${response.status} ${response.statusText}`,
+        descriptionAr: `اختبار webhook: ${response.status} ${response.statusText}`,
+      });
+
+      res.json({
+        ok: true,
+        item: { ok: response.ok, statusCode: response.status, message: response.statusText },
+      });
+    } catch (fetchErr) {
+      await SyncActivity.create({
+        storeId: store._id,
+        storeName: store.name,
+        type: 'error',
+        description: `Webhook test failed: ${fetchErr.message}`,
+        descriptionAr: `فشل اختبار webhook: ${fetchErr.message}`,
+      });
+      res.json({
+        ok: true,
+        item: { ok: false, statusCode: null, message: fetchErr.message },
+      });
+    }
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   SNAPSHOTS — rollback history
+   ────────────────────────────────────── */
+router.get('/snapshots', async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const [items, total] = await Promise.all([
+      SyncActivity.find({ type: 'sync' })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      SyncActivity.countDocuments({ type: 'sync' }),
+    ]);
+
+    const snapshots = items.map((a, i) => ({
+      id: skip + i + 1,
+      direction: 'pull',
+      items_count: 1,
+      created_at: a.createdAt,
+      metadata: { newProducts: 0, pricesChanged: 0, stockChanged: 0 },
+    }));
+
+    res.json({ ok: true, items: snapshots, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

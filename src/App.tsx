@@ -102,6 +102,7 @@ const AdminOrderTracking = lazy(() => import("./pages/admin/OrderTracking"));
 const AdminSyncPage = lazy(() => import("./pages/admin/AdminSyncPage"));
 const SyncStoreManagement = lazy(() => import("./pages/admin/SyncStoreManagement"));
 const SyncStoreDetail = lazy(() => import("./pages/admin/SyncStoreDetail"));
+const SyncProducts = lazy(() => import("./pages/admin/SyncProducts"));
 const Favorites = lazy(() => import("./pages/Favorites"));
 const Returns = lazy(() => import("./pages/Returns"));
 const Addresses = lazy(() => import("./pages/Addresses"));
@@ -427,6 +428,11 @@ const AppInner = () => {
             <Route path="/admin/sync/stores/:id" element={
               <DualProtectedRoute requireAdmin={true}>
                 {isVisible('adminModules', 'sync') ? <SyncStoreDetail /> : <NotFound />}
+              </DualProtectedRoute>
+            } />
+            <Route path="/admin/sync/products" element={
+              <DualProtectedRoute requireAdmin={true}>
+                {isVisible('adminModules', 'sync') ? <SyncProducts /> : <NotFound />}
               </DualProtectedRoute>
             } />
 
