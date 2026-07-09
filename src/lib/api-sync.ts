@@ -102,8 +102,10 @@ export async function deleteStore(id: string): Promise<void> {
   if (!res.ok) throw new Error(extractError(res));
 }
 
-export async function getSyncedProducts(): Promise<SyncProduct[]> {
-  const res = await apiGet<SyncProduct>('/api/sync/admin/products');
+export async function getSyncedProducts(storeId?: string): Promise<SyncProduct[]> {
+  let url = '/api/sync/admin/products';
+  if (storeId) url += `?storeId=${storeId}`;
+  const res = await apiGet<SyncProduct>(url);
   if (!res.ok) throw new Error(extractError(res));
   return res.items || [];
 }

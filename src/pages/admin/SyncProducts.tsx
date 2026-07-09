@@ -315,16 +315,13 @@ export default function SyncProducts() {
   const [storeCatalogTotal, setStoreCatalogTotal] = useState(0);
   const [storeCatalogPage, setStoreCatalogPage] = useState(1);
   const [storeCatalogLoading, setStoreCatalogLoading] = useState(false);
-  const [storeProducts, setStoreProducts] = useState<SyncProduct[]>([]);
-  const [storeProductsTotal, setStoreProductsTotal] = useState(0);
-  const [storeProductsPage, setStoreProductsPage] = useState(1);
-  const [storeProductsLoading, setStoreProductsLoading] = useState(false);
+  const [productsLoading, setProductsLoading] = useState(false);
 
   const load = useCallback(async (storeId?: string) => {
     setLoading(true);
     try {
       const [p, s, a] = await Promise.all([
-        getSyncedProducts().catch(() => [] as SyncProduct[]),
+        getSyncedProducts(storeId).catch(() => [] as SyncProduct[]),
         getStores().catch(() => [] as SyncStore[]),
         getSyncActivity().catch(() => [] as SyncActivityEvent[]),
       ]);
@@ -341,24 +338,18 @@ export default function SyncProducts() {
     }
   }, []);
 
-  const loadStoreData = useCallback(async (storeId: string, catalogP = 1, productsP = 1, catalogSearch = '', productsSearch = '') => {
+  const loadStoreData = useCallback(async (storeId: string, catalogP = 1, catalogSearch = '') => {
     if (!storeId) return;
     setStoreCatalogLoading(true);
-    setStoreProductsLoading(true);
     try {
-      const [catRes, prodRes] = await Promise.all([
-        getStoreCatalog(storeId, catalogP, catalogSearch).catch(() => ({ items: [] as StoreCatalogEntry[], total: 0, page: 1, pages: 1 })),
-        getStoreProducts(storeId, productsP, productsSearch).catch(() => ({ items: [] as SyncProduct[], total: 0, page: 1, pages: 1 })),
-      ]);
+      const catRes = await getStoreCatalog(storeId, catalogP, catalogSearch).catch(
+        () => ({ items: [] as StoreCatalogEntry[], total: 0, page: 1, pages: 1 })
+      );
       setStoreCatalog(catRes.items);
       setStoreCatalogTotal(catRes.total);
       setStoreCatalogPage(catRes.page);
-      setStoreProducts(prodRes.items);
-      setStoreProductsTotal(prodRes.total);
-      setStoreProductsPage(prodRes.page);
     } finally {
       setStoreCatalogLoading(false);
-      setStoreProductsLoading(false);
     }
   }, []);
 
@@ -371,7 +362,10 @@ export default function SyncProducts() {
   }, [stores, selectedStoreId]);
 
   useEffect(() => {
-    if (selectedStoreId) loadStoreData(selectedStoreId);
+    if (selectedStoreId) {
+      loadStoreData(selectedStoreId);
+      load(selectedStoreId);
+    }
   }, [selectedStoreId, loadStoreData]);
 
   const handleStoreChange = (storeId: string) => {
@@ -438,14 +432,14 @@ export default function SyncProducts() {
 
   // Site products search
   const filteredStoreSearch = useMemo(() => {
-    if (!search.trim()) return storeProducts;
+    if (!search.trim()) return products;
     const q = search.trim().toLowerCase();
-    return storeProducts.filter((p) =>
+    return products.filter((p) =>
       (p.name || '').toLowerCase().includes(q) ||
       (p.nameAr || '').toLowerCase().includes(q) ||
       (p.sku || '').toLowerCase().includes(q)
     );
-  }, [storeProducts, search]);
+  }, [products, search]);
 
   // متاح من الموقع: Site products NOT acknowledged by this store (available to pull)
   const filteredAvailable = useMemo(() => {
