@@ -9,6 +9,7 @@ import SyncStore from '../models/SyncStore.js';
 import SyncActivity from '../models/SyncActivity.js';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
+import Order from '../models/Order.js';
 
 const router = Router();
 
@@ -675,8 +676,34 @@ router.get('/admin/products', async (req, res) => {
 });
 
 /* ──────────────────────────────────────
-   ADMIN — GET single store
-   ────────────────────────────────────── */
+    ADMIN — pending online orders for POS
+    ────────────────────────────────────── */
+router.get('/admin/pending-orders', async (req, res) => {
+  try {
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+
+    const status = req.query.status || 'pending';
+
+    const [items, total] = await Promise.all([
+      Order.find({ status })
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Order.countDocuments({ status }),
+    ]);
+
+    res.json({ ok: true, items, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+    ADMIN — GET single store
+    ────────────────────────────────────── */
 router.get('/admin/stores/:id', async (req, res) => {
   try {
     const store = await SyncStore.findById(req.params.id)

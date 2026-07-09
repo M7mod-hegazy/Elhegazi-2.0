@@ -276,6 +276,42 @@ export async function adminApplySync(items: Array<{ sku: string; fields: Record<
   return { succeeded: data.succeeded || [], failed: data.failed || [] };
 }
 
+// ─── Pending online orders ─────────────────────────────────────────────────────
+
+export interface PendingOrderItem {
+  productId: string;
+  product?: Record<string, unknown>;
+  quantity: number;
+  price: number;
+  subtotal: number;
+}
+
+export interface PendingOrder {
+  _id: string;
+  orderNumber?: string;
+  items: PendingOrderItem[];
+  subtotal: number;
+  total: number;
+  status: string;
+  paymentMethod: string;
+  paymentStatus: string;
+  shippingAddress?: {
+    name?: string;
+    phone?: string;
+    city?: string;
+    street?: string;
+  };
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export async function getPendingOrders(page = 1, status = 'pending'): Promise<{ items: PendingOrder[]; total: number }> {
+  const res = await apiGet<PendingOrder>(`/api/sync/admin/pending-orders?page=${page}&status=${status}`);
+  if (!res.ok) throw new Error(extractError(res));
+  return { items: res.items || [], total: res.total || 0 };
+}
+
 // ─── Rollback history ──────────────────────────────────────────────────────────
 
 export interface SyncSnapshot {
