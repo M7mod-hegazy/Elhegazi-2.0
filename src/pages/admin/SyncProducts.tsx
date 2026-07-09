@@ -17,7 +17,7 @@ import { LoadingSpinner } from '@/components/ui/loading';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useBranding } from '@/hooks/useBranding';
 import { useToast } from '@/hooks/use-toast';
-import { getSyncedProducts, getStores, getSyncActivity, getRollbackHistory, triggerManualSync, adminApplySync, getPendingOrders, type SyncProduct, type SyncStore, type SyncActivityEvent, type SyncSnapshot, type PendingOrder } from '@/lib/api-sync';
+import { getSyncedProducts, getStores, getSyncActivity, getRollbackHistory, triggerManualSync, adminApplySync, getPendingOrders, getStoreCatalog, getStoreProducts, type SyncProduct, type SyncStore, type SyncActivityEvent, type SyncSnapshot, type PendingOrder, type StoreCatalogEntry } from '@/lib/api-sync';
 import { cn } from '@/lib/utils';
 import ReviewModal from '@/components/sync/ReviewModal';
 
@@ -310,8 +310,17 @@ export default function SyncProducts() {
   const [reviewChanges, setReviewChanges] = useState<ChangeItem[]>([]);
   const [previewProduct, setPreviewProduct] = useState<SyncProduct | null>(null);
   const [activeTab, setActiveTab] = useState<TabId>('available');
+  const [selectedStoreId, setSelectedStoreId] = useState<string>('');
+  const [storeCatalog, setStoreCatalog] = useState<StoreCatalogEntry[]>([]);
+  const [storeCatalogTotal, setStoreCatalogTotal] = useState(0);
+  const [storeCatalogPage, setStoreCatalogPage] = useState(1);
+  const [storeCatalogLoading, setStoreCatalogLoading] = useState(false);
+  const [storeProducts, setStoreProducts] = useState<SyncProduct[]>([]);
+  const [storeProductsTotal, setStoreProductsTotal] = useState(0);
+  const [storeProductsPage, setStoreProductsPage] = useState(1);
+  const [storeProductsLoading, setStoreProductsLoading] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (storeId?: string) => {
     setLoading(true);
     try {
       const [p, s, a] = await Promise.all([
@@ -322,12 +331,54 @@ export default function SyncProducts() {
       setProducts(p);
       setStores(s);
       setActivity(a);
+
+      if (s.length > 0 && !storeId) {
+        storeId = String(s[0]._id);
+        setSelectedStoreId(storeId);
+      }
     } finally {
       setLoading(false);
     }
   }, []);
 
+  const loadStoreData = useCallback(async (storeId: string, catalogP = 1, productsP = 1, catalogSearch = '', productsSearch = '') => {
+    if (!storeId) return;
+    setStoreCatalogLoading(true);
+    setStoreProductsLoading(true);
+    try {
+      const [catRes, prodRes] = await Promise.all([
+        getStoreCatalog(storeId, catalogP, catalogSearch).catch(() => ({ items: [] as StoreCatalogEntry[], total: 0, page: 1, pages: 1 })),
+        getStoreProducts(storeId, productsP, productsSearch).catch(() => ({ items: [] as SyncProduct[], total: 0, page: 1, pages: 1 })),
+      ]);
+      setStoreCatalog(catRes.items);
+      setStoreCatalogTotal(catRes.total);
+      setStoreCatalogPage(catRes.page);
+      setStoreProducts(prodRes.items);
+      setStoreProductsTotal(prodRes.total);
+      setStoreProductsPage(prodRes.page);
+    } finally {
+      setStoreCatalogLoading(false);
+      setStoreProductsLoading(false);
+    }
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    if (stores.length > 0 && !selectedStoreId) {
+      setSelectedStoreId(String(stores[0]._id));
+    }
+  }, [stores, selectedStoreId]);
+
+  useEffect(() => {
+    if (selectedStoreId) loadStoreData(selectedStoreId);
+  }, [selectedStoreId, loadStoreData]);
+
+  const handleStoreChange = (storeId: string) => {
+    setSelectedStoreId(storeId);
+    setFields({});
+    setPage(1);
+  };
 
   const loadOrders = useCallback(async (p = 1) => {
     setOrdersLoading(true);
@@ -356,37 +407,55 @@ export default function SyncProducts() {
     if (activeTab === 'rollback') loadSnapshots(1);
   }, [activeTab, loadSnapshots]);
 
-  /* ─── Search + filters ─── */
-  const filteredSearch = useMemo(() => {
-    if (!search.trim()) return products;
+  /* ─── Search helpers ─── */
+  const matchSearch = (text: string) => {
+    if (!search.trim()) return true;
     const q = search.trim().toLowerCase();
-    return products.filter((p) =>
+    return text.toLowerCase().includes(q);
+  };
+
+  /* ─── Per-store filtered data ─── */
+
+  // Store catalog where existsOnSite === false (truly new store products)
+  const filteredNewCatalog = useMemo(() => {
+    return storeCatalog.filter((e) => !e.existsOnSite && matchSearch(e.nameAr || e.name || e.sku));
+  }, [storeCatalog, search]);
+
+  // Store catalog where existsOnSite === true but data differs
+  const filteredChangedCatalog = useMemo(() => {
+    return storeCatalog.filter((e) => {
+      if (!e.existsOnSite) return false;
+      if (!e.localMatch?.exists) return false;
+      if (!matchSearch(e.nameAr || e.name || e.sku)) return false;
+      return (
+        e.localMatch.name?.match === false ||
+        e.localMatch.price?.match === false ||
+        e.localMatch.stock?.match === false ||
+        e.localMatch.image?.match === false
+      );
+    });
+  }, [storeCatalog, search]);
+
+  // Site products search
+  const filteredStoreSearch = useMemo(() => {
+    if (!search.trim()) return storeProducts;
+    const q = search.trim().toLowerCase();
+    return storeProducts.filter((p) =>
       (p.name || '').toLowerCase().includes(q) ||
       (p.nameAr || '').toLowerCase().includes(q) ||
-      (p.sku || '').toLowerCase().includes(q) ||
-      String(p.price || '').includes(q)
+      (p.sku || '').toLowerCase().includes(q)
     );
-  }, [products, search]);
+  }, [storeProducts, search]);
 
+  // متاح من الموقع: Site products NOT acknowledged by this store (available to pull)
   const filteredAvailable = useMemo(() => {
-    let result = filteredSearch.filter((p) => p.localMatch?.acknowledged);
+    let result = filteredStoreSearch.filter((p) => !p.localMatch?.acknowledged);
     if (fieldFilter) {
       const lmKey = fieldFilter === 'images' ? 'image' : fieldFilter;
       result = result.filter((p) => p.localMatch?.[lmKey as 'name' | 'price' | 'stock' | 'image']?.match === false);
-    } else {
-      result = result.filter((p) => p.localMatch && (
-        p.localMatch.name?.match === false ||
-        p.localMatch.price?.match === false ||
-        p.localMatch.stock?.match === false ||
-        p.localMatch.image?.match === false
-      ));
     }
     return result;
-  }, [filteredSearch, fieldFilter]);
-
-  const filteredNew = useMemo(() => {
-    return filteredSearch.filter((p) => !p.localMatch?.acknowledged);
-  }, [filteredSearch]);
+  }, [filteredStoreSearch, fieldFilter]);
 
   const activeSkus = useMemo(() => {
     return Object.entries(fields)
@@ -419,6 +488,35 @@ export default function SyncProducts() {
     setFields((prev) => ({ ...prev, [sku]: { name: value, price: value, stock: value, images: value } }));
   };
 
+  /* ─── Map catalog entries to SyncProduct-like shape for ProductRow ─── */
+  const catalogToSyncProduct = (entry: StoreCatalogEntry): SyncProduct => ({
+    _id: entry._id,
+    sku: entry.sku,
+    name: entry.name,
+    nameAr: entry.nameAr,
+    price: entry.price,
+    stock: entry.stock,
+    image: entry.image,
+    images: entry.images,
+    categorySlug: entry.categorySlug,
+    updatedAt: entry.syncedAt,
+    localMatch: entry.localMatch || { exists: false, acknowledged: false },
+  });
+
+  /* ─── Current display list based on active tab ─── */
+  const currentDisplay = useMemo(() => {
+    switch (activeTab) {
+      case 'new':
+        return filteredNewCatalog.map(catalogToSyncProduct);
+      case 'store-changes':
+        return filteredChangedCatalog.map(catalogToSyncProduct);
+      case 'available':
+        return filteredAvailable;
+      default:
+        return [];
+    }
+  }, [activeTab, filteredNewCatalog, filteredChangedCatalog, filteredAvailable]);
+
   /* ─── Bulk helpers ─── */
   const isDiff = (p: SyncProduct, key: string) => {
     if (!p.localMatch || !p.localMatch.acknowledged) return key === null;
@@ -428,31 +526,30 @@ export default function SyncProducts() {
   };
   const isNewProd = (p: SyncProduct) => !p.localMatch?.acknowledged;
   const fieldOrNew = (p: SyncProduct, key: string) => isNewProd(p) || isDiff(p, key);
-  const onCount = (key: string) => filteredAvailable.filter((p) => fieldOrNew(p, key) && fields[p.sku]?.[key]).length;
-  const totalEligible = (key: string) => filteredAvailable.filter((p) => fieldOrNew(p, key)).length;
+  const onCount = (key: string) => currentDisplay.filter((p) => fieldOrNew(p, key) && fields[p.sku]?.[key]).length;
+  const totalEligible = (key: string) => currentDisplay.filter((p) => fieldOrNew(p, key)).length;
 
   const enableAllForAll = () => {
-    filteredAvailable.forEach((p) => {
+    currentDisplay.forEach((p) => {
       if (['name', 'price', 'stock', 'images'].some((k) => fieldOrNew(p, k))) toggleAllFields(p.sku, true);
     });
   };
-  const disableAllForAll = () => filteredAvailable.forEach((p) => toggleAllFields(p.sku, false));
+  const disableAllForAll = () => currentDisplay.forEach((p) => toggleAllFields(p.sku, false));
   const toggleColumn = (key: string) => {
-    const eligible = filteredAvailable.filter((p) => fieldOrNew(p, key));
+    const eligible = currentDisplay.filter((p) => fieldOrNew(p, key));
     const allCurrentlyOn = eligible.every((p) => fields[p.sku]?.[key] === true);
     eligible.forEach((p) => setField(p.sku, key, !allCurrentlyOn));
   };
   const toggleNewBatch = () => {
-    const newProds = filteredAvailable.filter(isNewProd);
+    const newProds = currentDisplay.filter(isNewProd);
     const countActive = newProds.filter((p) => fields[p.sku] && Object.values(fields[p.sku]).some(Boolean)).length;
     newProds.forEach((p) => toggleAllFields(p.sku, countActive !== newProds.length));
   };
 
   /* ─── Pagination ─── */
-  const currentProducts = activeTab === 'new' ? filteredNew : filteredAvailable;
-  const totalPages = Math.ceil(currentProducts.length / PAGE_SIZE);
+  const totalPages = Math.ceil(currentDisplay.length / PAGE_SIZE);
   const start = (page - 1) * PAGE_SIZE;
-  const displayProducts = currentProducts.slice(start, start + PAGE_SIZE);
+  const displayProducts = currentDisplay.slice(start, start + PAGE_SIZE);
 
   const pageRange = useMemo(() => {
     const maxVisible = 5;
@@ -469,11 +566,10 @@ export default function SyncProducts() {
   /* ─── Review + Apply (Pull) ─── */
   const openReview = () => {
     const selected: ChangeItem[] = [];
-    const active = activeTab === 'new' ? filteredNew : filteredAvailable;
     for (const [sku, fieldSet] of Object.entries(fields)) {
       const activeFields = Object.entries(fieldSet).filter(([, v]) => v).map(([k]) => k);
       if (activeFields.length === 0) continue;
-      const product = products.find((p) => p.sku === sku);
+      const product = currentDisplay.find((p) => p.sku === sku);
       if (!product) continue;
       const images = imgList(product);
       const lm = product.localMatch;
@@ -506,12 +602,13 @@ export default function SyncProducts() {
           Object.entries(c.fields || {}).map(([k, v]) => [k, v ? (c.incoming?.[k] ?? null) : null])
         ),
       }));
-      const res = await adminApplySync(items);
+      const res = await adminApplySync(items, selectedStoreId || undefined);
       if (res.succeeded.length > 0) {
         toast({ title: `تم تطبيق ${res.succeeded.length} تحديث على الموقع` });
         setFields({});
         setReviewOpen(false);
         load();
+        if (selectedStoreId) loadStoreData(selectedStoreId);
       } else {
         toast({ title: 'فشل تطبيق التحديثات', variant: 'destructive' });
       }
@@ -523,9 +620,10 @@ export default function SyncProducts() {
   const handleTriggerSync = async () => {
     setSyncing(true);
     try {
-      await triggerManualSync();
+      await triggerManualSync(selectedStoreId || undefined);
       toast({ title: 'تم تشغيل المزامنة' });
       load();
+      if (selectedStoreId) loadStoreData(selectedStoreId);
     } catch { toast({ title: 'فشل تشغيل المزامنة', variant: 'destructive' }); }
     finally { setSyncing(false); }
   };
@@ -575,9 +673,9 @@ export default function SyncProducts() {
   /* ─── Tab definitions matching POS sync ─── */
   const tabs: Array<{ id: TabId; label: string; count: number; icon: React.ComponentType<{ className?: string }> }> = [
     { id: 'orders', label: 'طلبات الموقع', count: ordersTotal, icon: ShoppingBag },
-    { id: 'new', label: 'منتجات جديدة', count: filteredNew.length, icon: Plus },
+    { id: 'new', label: 'منتجات جديدة', count: filteredNewCatalog.length, icon: Plus },
     { id: 'available', label: 'متاح من الموقع', count: filteredAvailable.length, icon: Download },
-    { id: 'store-changes', label: 'تغييرات المتجر', count: activity.filter((e) => e.type === 'sync').length, icon: Upload },
+    { id: 'store-changes', label: 'تغييرات المتجر', count: filteredChangedCatalog.length, icon: Upload },
     { id: 'logs', label: 'سجل المزامنة', count: activity.length, icon: Clock },
     { id: 'rollback', label: 'التراجع', count: snapshotsTotal, icon: Undo2 },
   ];
@@ -585,7 +683,7 @@ export default function SyncProducts() {
   const renderPagination = () => totalPages > 1 && (
     <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
       <span className="text-xs text-slate-400">
-        عرض {start + 1}–{Math.min(start + PAGE_SIZE, currentProducts.length)} من {currentProducts.length} منتج
+        عرض {start + 1}–{Math.min(start + PAGE_SIZE, currentDisplay.length)} من {currentDisplay.length} منتج
       </span>
       <div className="flex items-center gap-1">
         <button onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}
@@ -648,6 +746,30 @@ export default function SyncProducts() {
               </div>
             </div>
           </motion.div>
+
+          {/* ── Store filter ── */}
+          <div className="mb-4">
+            <div className="flex items-center gap-3 p-3 rounded-xl bg-white/80 backdrop-blur-sm border border-slate-200 shadow-sm">
+              <Store className="h-4 w-4 text-slate-400 shrink-0" />
+              <select
+                value={selectedStoreId}
+                onChange={(e) => handleStoreChange(e.target.value)}
+                className="flex-1 px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+              >
+                <option value="" disabled>اختر المتجر</option>
+                {stores.map((store) => (
+                  <option key={store._id} value={store._id}>
+                    {store.name} {store.isActive ? '' : '(غير نشط)'}
+                  </option>
+                ))}
+              </select>
+              {selectedStoreId && (
+                <span className="text-xs text-slate-400 shrink-0">
+                  آخر مزامنة: —
+                </span>
+              )}
+            </div>
+          </div>
 
           {/* ── Tabs (matching POS sync page) ── */}
           <div className="flex gap-1 mb-4 border-b border-slate-200 overflow-x-auto">
@@ -746,8 +868,8 @@ export default function SyncProducts() {
                   <Download className="h-4 w-4 text-blue-600" />
                 </div>
                 <div className="text-xs text-slate-500 leading-relaxed">
-                  <span className="font-bold text-slate-700">متاحة لنقاط البيع: </span>
-                  منتجات موجودة مسبقاً في المتجر ولكن بياناتها مختلفة في الموقع. اختر الحقول التي تريد تحديثها لكل منتج.
+                  <span className="font-bold text-slate-700">متاحة للسحب للمتجر: </span>
+                  منتجات موجودة على الموقع ولم يسحبها المتجر بعد. اختر المنتجات التي تريد إضافتها إلى نظام نقاط البيع.
                 </div>
               </div>
               <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm overflow-hidden">
@@ -857,13 +979,13 @@ export default function SyncProducts() {
                     </div>
                   )}
                 </div>
-                {filteredNew.length > 0 ? (
+                {filteredNewCatalog.length > 0 ? (
                   <>
                     <div className="px-4 py-2 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">{filteredNew.length} منتج جديد للمزامنة</span>
-                        <Button size="sm" onClick={() => { filteredNew.forEach((p) => toggleAllFields(p.sku, true)); toast({ title: `تم تحديد ${filteredNew.length} منتج` }); }}
+                        <span className="text-xs font-bold text-slate-500">{filteredNewCatalog.length} منتج جديد للمزامنة</span>
+                        <Button size="sm" onClick={() => { filteredNewCatalog.forEach((p) => toggleAllFields(p.sku, true)); toast({ title: `تم تحديد ${filteredNewCatalog.length} منتج` }); }}
                           className="gap-1.5 text-xs font-bold">
-                          <Download className="h-3.5 w-3.5" /> تحديد الكل
+                          <Upload className="h-3.5 w-3.5" /> تحديد الكل
                         </Button>
                     </div>
                     {displayProducts.map((product, i) => (
@@ -875,16 +997,16 @@ export default function SyncProducts() {
                     {renderPagination()}
                     {activeSkus.length > 0 && (
                       <div className="px-4 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
-                        <span className="text-xs text-slate-500">{activeSkus.length} منتج محدد للسحب</span>
+                        <span className="text-xs text-slate-500">{activeSkus.length} منتج محدد للرفع</span>
                         <Button size="sm" onClick={openReview} disabled={syncing} className="gap-1.5 text-xs font-bold">
-                          {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                          مراجعة وتطبيق ({activeSkus.length})
+                          {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                          مراجعة ورفع ({activeSkus.length})
                         </Button>
                       </div>
                     )}
                   </>
                 ) : (
-                  <EmptyState title="لا توجد منتجات جديدة" description="جميع المنتجات من الموقع تمت مزامنتها مع المتجر" />
+                  <EmptyState title="لا توجد منتجات جديدة" description="جميع منتجات المتجر موجودة على الموقع" />
                 )}
               </Card>
             </>
@@ -907,30 +1029,32 @@ export default function SyncProducts() {
                 </div>
                 <div className="text-xs text-slate-500 leading-relaxed">
                   <span className="font-bold text-slate-700">دفع من المتجر ← الموقع: </span>
-                  تغييرات قام المتجر بدفعها إلى الموقع. هذه هي المنتجات التي تم تحديثها بواسطة نظام نقاط البيع.
+                  منتجات المتجر المخزنة محلياً والتي تختلف بياناتها عن الموقع. اختر الحقول التي تريد تحديثها على الموقع.
                 </div>
               </div>
-              {activity.filter((e) => e.type === 'sync').length > 0 ? (
-                <div className="divide-y divide-slate-100">
-                  {activity.filter((e) => e.type === 'sync').slice(0, 50).map((event) => (
-                    <div key={event._id} className="flex items-center gap-3 px-4 py-3 hover:bg-slate-50/60 transition-colors">
-                      <div className="h-7 w-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                        <Upload className="h-3.5 w-3.5 text-emerald-600" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="text-xs font-bold text-slate-700 truncate">{event.storeName}</p>
-                          <span className="text-[10px] text-slate-400 whitespace-nowrap font-mono">
-                            {new Date(event.createdAt).toLocaleString('ar-EG')}
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-1">{event.descriptionAr || event.description}</p>
-                      </div>
-                    </div>
+              {storeCatalogLoading ? (
+                <div className="p-8 text-center"><Loader2 className="h-6 w-6 animate-spin mx-auto text-slate-300" /></div>
+              ) : filteredChangedCatalog.length > 0 ? (
+                <>
+                  {displayProducts.map((product, i) => (
+                    <motion.div key={product._id} initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.02 }}>
+                      <ProductRow product={product} fields={fields[product.sku] || { name: false, price: false, stock: false, images: false }}
+                        onFieldToggle={handleFieldToggle} onPreviewImages={setPreviewProduct} />
+                    </motion.div>
                   ))}
-                </div>
+                  {renderPagination()}
+                  {activeSkus.length > 0 && (
+                    <div className="px-4 py-3 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
+                      <span className="text-xs text-slate-500">{activeSkus.length} منتج محدد للرفع</span>
+                      <Button size="sm" onClick={openReview} disabled={syncing} className="gap-1.5 text-xs font-bold">
+                        {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
+                        مراجعة ورفع ({activeSkus.length})
+                      </Button>
+                    </div>
+                  )}
+                </>
               ) : (
-                <EmptyState title="لا توجد تغييرات من المتجر" description="لم يقم المتجر بدفع أي تغييرات حتى الآن" />
+                <EmptyState title="لا توجد تغييرات من المتجر" description="جميع منتجات المتجر متطابقة مع الموقع" />
               )}
             </Card>
           )}

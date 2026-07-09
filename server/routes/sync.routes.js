@@ -10,6 +10,7 @@ import SyncActivity from '../models/SyncActivity.js';
 import Product from '../models/Product.js';
 import Category from '../models/Category.js';
 import Order from '../models/Order.js';
+import StoreCatalog from '../models/StoreCatalog.js';
 
 const router = Router();
 
@@ -251,8 +252,18 @@ router.post('/apply', validateSyncRequest, async (req, res) => {
         }
 
         if (!result) {
-          // SKU not found — maybe create new product
+          // SKU not found — create new product
           if (item.action === 'create') {
+            const snapshotEntry = {
+              storeId: req.syncStore._id,
+              name: item.fields?.name || item.sku,
+              nameAr: item.fields?.nameAr || item.fields?.name || item.sku,
+              price: Number(item.fields?.price) || 0,
+              stock: Math.max(0, Number(item.fields?.stock)) || 0,
+              image: item.fields?.image || '',
+              images: item.fields?.images || [],
+              syncedAt: new Date(),
+            };
             const newProduct = await Product.create({
               sku: item.sku,
               name: item.fields?.name || item.sku,
@@ -260,35 +271,41 @@ router.post('/apply', validateSyncRequest, async (req, res) => {
               price: Number(item.fields?.price) || 0,
               stock: Math.max(0, Number(item.fields?.stock)) || 0,
               ...(item.fields?.categorySlug ? { categorySlug: item.fields.categorySlug } : {}),
-            });
-            // Save posSnapshot for newly created product
-            await Product.findOneAndUpdate({ sku: item.sku }, {
-              $set: {
-                posSnapshot: {
-                  name: item.fields?.name || item.sku,
-                  nameAr: item.fields?.nameAr || item.fields?.name || item.sku,
-                  price: Number(item.fields?.price) || 0,
-                  stock: Math.max(0, Number(item.fields?.stock)) || 0,
-                  image: item.fields?.image || '',
-                  images: item.fields?.images || [],
-                  syncedAt: new Date(),
-                },
-              },
+              posSnapshot: { ...snapshotEntry },
+              storeSnapshots: [snapshotEntry],
             });
             succeeded.push({ sku: item.sku, action: 'created', id: String(newProduct._id) });
           } else {
             failed.push({ sku: item.sku, error: 'SKU not found on E-com' });
           }
         } else {
-          // Save posSnapshot — record what POS reported so future diffs detect website changes
-          const snapshotUpdate = {};
-          if (item.fields?.name !== undefined) snapshotUpdate['posSnapshot.name'] = String(item.fields.name).trim();
-          if (item.fields?.nameAr !== undefined) snapshotUpdate['posSnapshot.nameAr'] = String(item.fields.nameAr).trim();
-          if (item.fields?.price !== undefined) snapshotUpdate['posSnapshot.price'] = Number(item.fields.price);
-          if (item.fields?.stock !== undefined) snapshotUpdate['posSnapshot.stock'] = Math.max(0, Number(item.fields.stock));
-          if (item.fields?.image !== undefined) snapshotUpdate['posSnapshot.image'] = String(item.fields.image);
-          snapshotUpdate['posSnapshot.syncedAt'] = new Date();
-          await Product.findOneAndUpdate({ sku: item.sku }, { $set: snapshotUpdate });
+          // Save per-store snapshot + backward-compat posSnapshot
+          const setData = { ...update };
+          if (item.fields?.name !== undefined) setData['posSnapshot.name'] = String(item.fields.name).trim();
+          if (item.fields?.nameAr !== undefined) setData['posSnapshot.nameAr'] = String(item.fields.nameAr).trim();
+          if (item.fields?.price !== undefined) setData['posSnapshot.price'] = Number(item.fields.price);
+          if (item.fields?.stock !== undefined) setData['posSnapshot.stock'] = Math.max(0, Number(item.fields.stock));
+          if (item.fields?.image !== undefined) setData['posSnapshot.image'] = String(item.fields.image);
+          setData['posSnapshot.syncedAt'] = new Date();
+
+          // Remove old snapshot for this store, then push new one
+          const storeSnapshot = {
+            storeId: req.syncStore._id,
+            name: String(item.fields?.name || '').trim() || undefined,
+            nameAr: String(item.fields?.nameAr || '').trim() || undefined,
+            price: item.fields?.price !== undefined ? Number(item.fields.price) : undefined,
+            stock: item.fields?.stock !== undefined ? Math.max(0, Number(item.fields.stock)) : undefined,
+            image: item.fields?.image !== undefined ? String(item.fields.image) : undefined,
+            syncedAt: new Date(),
+          };
+          // Remove undefined keys
+          Object.keys(storeSnapshot).forEach(k => storeSnapshot[k] === undefined && delete storeSnapshot[k]);
+
+          await Product.updateOne({ sku: item.sku }, { $pull: { storeSnapshots: { storeId: req.syncStore._id } } });
+          await Product.findOneAndUpdate({ sku: item.sku }, {
+            $set: setData,
+            $push: { storeSnapshots: storeSnapshot },
+          });
           succeeded.push({ sku: item.sku, action: 'updated', fields: Object.keys(update) });
         }
       } catch (err) {
@@ -613,13 +630,14 @@ router.get('/admin/products', async (req, res) => {
     const page = Math.max(1, Number(req.query.page) || 1);
     const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
     const skip = (page - 1) * limit;
+    const filterStoreId = req.query.storeId || null;
 
     const [items, total] = await Promise.all([
       Product.find({})
         .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select('name nameAr sku price stock stockByStore image images categorySlug updatedAt posSnapshot')
+        .select('name nameAr sku price stock stockByStore image images categorySlug updatedAt posSnapshot storeSnapshots')
         .lean(),
       Product.countDocuments({}),
     ]);
@@ -628,8 +646,15 @@ router.get('/admin/products', async (req, res) => {
     const storeNames = Object.fromEntries(stores.map((s) => [String(s._id), s.name]));
 
     const products = items.map((p) => {
-      const snapshot = p.posSnapshot;
-      const hasSnapshot = !!(snapshot && snapshot.syncedAt);
+      // Find the snapshot for the selected store (or use global posSnapshot as fallback)
+      let storeSnapshot = null;
+      if (filterStoreId && p.storeSnapshots?.length) {
+        storeSnapshot = p.storeSnapshots.find(
+          (s) => String(s.storeId) === filterStoreId
+        );
+      }
+      const snapshot = storeSnapshot || p.posSnapshot;
+      const hasSnapshot = !!(snapshot && (snapshot.syncedAt || (snapshot.storeId)));
       const ecomImgCount = [p.image, ...(p.images || [])].filter(Boolean).length;
       const snapImgCount = snapshot ? [snapshot.image, ...(snapshot.images || [])].filter(Boolean).length : 0;
 
@@ -661,6 +686,7 @@ router.get('/admin/products', async (req, res) => {
       return {
         ...p,
         posSnapshot: undefined,
+        storeSnapshots: undefined,
         localMatch,
         stockByStore: Object.fromEntries(
           Object.entries(p.stockByStore || {}).map(([id, qty]) => [storeNames[id] || id.slice(-6), qty])
@@ -669,6 +695,151 @@ router.get('/admin/products', async (req, res) => {
     });
 
     res.json({ ok: true, items: products, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/sync/admin/store-products/:storeId — products a store has (from snapshots) ──
+router.get('/admin/store-products/:storeId', async (req, res) => {
+  try {
+    const storeId = req.params.storeId;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(50, Math.max(1, Number(req.query.limit) || 20));
+    const skip = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    const matchQuery = { 'storeSnapshots.storeId': storeId };
+    if (search) {
+      matchQuery.$or = [
+        { sku: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: 'i' } },
+        { nameAr: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      Product.find(matchQuery)
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .select('name nameAr sku price stock image images categorySlug updatedAt storeSnapshots')
+        .lean(),
+      Product.countDocuments(matchQuery),
+    ]);
+
+    const store = await SyncStore.findById(storeId).select('name').lean();
+    const storeName = store?.name || storeId.slice(-6);
+
+    // For each product, extract this store's snapshot and compare with website
+    const products = items.map((p) => {
+      const storeSnapshot = (p.storeSnapshots || []).find(
+        (s) => String(s.storeId) === storeId
+      );
+      const hasSnapshot = !!storeSnapshot;
+      const ecomImgCount = [p.image, ...(p.images || [])].filter(Boolean).length;
+      const snapImgCount = storeSnapshot
+        ? [storeSnapshot.image, ...(storeSnapshot.images || [])].filter(Boolean).length
+        : 0;
+
+      const localMatch = {
+        exists: true,
+        name: {
+          local: hasSnapshot ? (storeSnapshot.name || storeSnapshot.nameAr || '') : '',
+          ecom: p.nameAr || p.name || '',
+          match: hasSnapshot ? ((storeSnapshot.name || storeSnapshot.nameAr || '').trim().toLowerCase() === (p.nameAr || p.name || '').trim().toLowerCase()) : true,
+        },
+        price: {
+          local: hasSnapshot ? (storeSnapshot.price ?? 0) : 0,
+          ecom: p.price ?? 0,
+          match: hasSnapshot ? (Number(storeSnapshot.price) === Number(p.price)) : true,
+        },
+        stock: {
+          local: hasSnapshot ? (storeSnapshot.stock ?? 0) : 0,
+          ecom: p.stock ?? 0,
+          match: hasSnapshot ? (Number(storeSnapshot.stock) === Number(p.stock)) : true,
+        },
+        image: {
+          local: hasSnapshot ? (storeSnapshot.image || (storeSnapshot.images?.length ? storeSnapshot.images[0] : null)) : null,
+          ecom: p.image || (p.images?.length ? p.images[0] : null),
+          match: hasSnapshot ? (snapImgCount === ecomImgCount) : true,
+        },
+        acknowledged: hasSnapshot,
+        storeName,
+      };
+
+      return {
+        ...p,
+        storeSnapshots: undefined,
+        localMatch,
+      };
+    });
+
+    res.json({ ok: true, items: products, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// ── GET /api/sync/admin/store-catalog/:storeId — store's raw catalog for comparison ──
+router.get('/admin/store-catalog/:storeId', async (req, res) => {
+  try {
+    const storeId = req.params.storeId;
+    const page = Math.max(1, Number(req.query.page) || 1);
+    const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
+    const skip = (page - 1) * limit;
+    const search = req.query.search || '';
+
+    const matchQuery = { storeId };
+    if (search) {
+      matchQuery.$or = [
+        { sku: { $regex: search, $options: 'i' } },
+        { name: { $regex: search, $options: 'i' } },
+        { nameAr: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      StoreCatalog.find(matchQuery).sort({ syncedAt: -1 }).skip(skip).limit(limit).lean(),
+      StoreCatalog.countDocuments(matchQuery),
+    ]);
+
+    // For each catalog entry, check if it exists as a Product and compare
+    const enriched = await Promise.all(items.map(async (entry) => {
+      const product = await Product.findOne({ sku: entry.sku }).select('name nameAr price stock image images').lean();
+      const existsOnSite = !!product;
+      return {
+        ...entry,
+        existsOnSite,
+        siteData: product || null,
+        localMatch: existsOnSite ? {
+          exists: true,
+          name: {
+            local: entry.name || entry.nameAr || '',
+            ecom: product.nameAr || product.name || '',
+            match: (entry.name || entry.nameAr || '').trim().toLowerCase() === (product.nameAr || product.name || '').trim().toLowerCase(),
+          },
+          price: {
+            local: entry.price ?? 0,
+            ecom: product.price ?? 0,
+            match: Number(entry.price) === Number(product.price),
+          },
+          stock: {
+            local: entry.stock ?? 0,
+            ecom: product.stock ?? 0,
+            match: Number(entry.stock) === Number(product.stock),
+          },
+          image: {
+            local: entry.image || (entry.images?.length ? entry.images[0] : null),
+            ecom: product.image || (product.images?.length ? product.images[0] : null),
+            match: (entry.image || (entry.images?.length ? entry.images[0] : null)) === (product.image || (product.images?.length ? product.images[0] : null)),
+          },
+          acknowledged: true,
+        } : { exists: false, acknowledged: false },
+      };
+    }));
+
+    res.json({ ok: true, items: enriched, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -695,6 +866,77 @@ router.get('/admin/pending-orders', async (req, res) => {
     ]);
 
     res.json({ ok: true, items, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+    STORE — push full product catalog (authenticated store)
+    ────────────────────────────────────── */
+router.post('/store-catalog', validateSyncRequest, async (req, res) => {
+  try {
+    const { products = [] } = req.body;
+    const storeId = req.syncStore._id;
+    let created = 0, updated = 0;
+
+    for (const p of products) {
+      if (!p.sku) continue;
+
+      const entry = {
+        storeId,
+        sku: p.sku,
+        name: p.name || p.sku,
+        nameAr: p.nameAr || p.name || p.sku,
+        price: Number(p.price) || 0,
+        stock: Math.max(0, Number(p.stock)) || 0,
+        image: p.image || '',
+        images: p.images || [],
+        categorySlug: p.categorySlug || '',
+        syncedAt: new Date(),
+      };
+
+      // Upsert into StoreCatalog (separate from Products)
+      await StoreCatalog.findOneAndUpdate(
+        { storeId, sku: p.sku },
+        { $set: entry },
+        { upsert: true }
+      );
+      created++;
+    }
+
+    // Also push snapshots to Products for existing products (for comparison)
+    for (const p of products) {
+      if (!p.sku) continue;
+      const existing = await Product.findOne({ sku: p.sku }).lean();
+      if (existing) {
+        const snapshotEntry = {
+          storeId,
+          name: p.name || p.sku,
+          nameAr: p.nameAr || p.name || p.sku,
+          price: Number(p.price) || 0,
+          stock: Math.max(0, Number(p.stock)) || 0,
+          image: p.image || '',
+          images: p.images || [],
+          syncedAt: new Date(),
+        };
+        await Product.updateOne({ sku: p.sku }, { $pull: { storeSnapshots: { storeId } } });
+        await Product.findOneAndUpdate({ sku: p.sku }, {
+          $push: { storeSnapshots: snapshotEntry },
+        });
+        updated++;
+      }
+    }
+
+    await SyncActivity.create({
+      storeId,
+      storeName: req.syncStore.name,
+      type: 'sync',
+      description: `Store ${req.syncStore.name} pushed ${products.length} products to catalog`,
+      descriptionAr: `قام المتجر ${req.syncStore.name} بدفع ${products.length} منتج إلى الكتالوج`,
+    });
+
+    res.json({ ok: true, created: products.length, updated });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }
@@ -885,9 +1127,11 @@ router.post('/admin/trigger-sync', async (req, res) => {
    ────────────────────────────────────── */
 router.post('/admin/apply', async (req, res) => {
   try {
-    const { items = [] } = req.body;
+    const { items = [], storeId } = req.body;
     const succeeded = [];
     const failed = [];
+
+    const targetStoreId = storeId || (req.syncStore?._id ? String(req.syncStore._id) : null);
 
     for (const item of items) {
       try {
@@ -896,27 +1140,27 @@ router.post('/admin/apply', async (req, res) => {
           continue;
         }
         const update = {};
-        const snapshot = {};
+        const snapshotFields = {};
         if (item.fields) {
           if (item.fields.name !== undefined) {
             update.name = String(item.fields.name).trim();
-            snapshot['posSnapshot.name'] = String(item.fields.name).trim();
+            snapshotFields.name = String(item.fields.name).trim();
           }
           if (item.fields.nameAr !== undefined) {
             update.nameAr = String(item.fields.nameAr).trim();
-            snapshot['posSnapshot.nameAr'] = String(item.fields.nameAr).trim();
+            snapshotFields.nameAr = String(item.fields.nameAr).trim();
           }
           if (item.fields.price !== undefined) {
             update.price = Number(item.fields.price);
-            snapshot['posSnapshot.price'] = Number(item.fields.price);
+            snapshotFields.price = Number(item.fields.price);
           }
           if (item.fields.stock !== undefined) {
             update.stock = Math.max(0, Number(item.fields.stock));
-            snapshot['posSnapshot.stock'] = Math.max(0, Number(item.fields.stock));
+            snapshotFields.stock = Math.max(0, Number(item.fields.stock));
           }
           if (item.fields.image !== undefined) {
             update.image = String(item.fields.image);
-            snapshot['posSnapshot.image'] = String(item.fields.image);
+            snapshotFields.image = String(item.fields.image);
           }
         }
 
@@ -925,31 +1169,46 @@ router.post('/admin/apply', async (req, res) => {
           continue;
         }
 
-        snapshot['posSnapshot.syncedAt'] = new Date();
+        const setData = { ...update };
+        if (snapshotFields.name !== undefined) setData['posSnapshot.name'] = snapshotFields.name;
+        if (snapshotFields.nameAr !== undefined) setData['posSnapshot.nameAr'] = snapshotFields.nameAr;
+        if (snapshotFields.price !== undefined) setData['posSnapshot.price'] = snapshotFields.price;
+        if (snapshotFields.stock !== undefined) setData['posSnapshot.stock'] = snapshotFields.stock;
+        if (snapshotFields.image !== undefined) setData['posSnapshot.image'] = snapshotFields.image;
+        setData['posSnapshot.syncedAt'] = new Date();
+
         const result = await Product.findOneAndUpdate(
           { sku: item.sku },
-          { $set: { ...update, ...snapshot } },
+          { $set: setData },
           { new: true }
         ).lean();
 
         if (!result) {
-          // Create new product if SKU doesn't exist (admin push for new product)
+          const snapshotEntry = {
+            storeId: targetStoreId || undefined,
+            ...snapshotFields,
+            syncedAt: new Date(),
+          };
           const newProduct = await Product.create({
             sku: item.sku,
             name: item.fields?.name || item.sku,
             nameAr: item.fields?.nameAr || item.fields?.name || item.sku,
             price: Number(item.fields?.price) || 0,
             stock: Math.max(0, Number(item.fields?.stock)) || 0,
-            posSnapshot: {
-              name: item.fields?.name || item.sku,
-              nameAr: item.fields?.nameAr || item.fields?.name || item.sku,
-              price: Number(item.fields?.price) || 0,
-              stock: Math.max(0, Number(item.fields?.stock)) || 0,
-              syncedAt: new Date(),
-            },
+            posSnapshot: { ...snapshotEntry },
+            ...(targetStoreId ? { storeSnapshots: [snapshotEntry] } : {}),
           });
           succeeded.push({ sku: item.sku, action: 'created', id: String(newProduct._id) });
         } else {
+          // Update per-store snapshot if storeId provided
+          if (targetStoreId && Object.keys(snapshotFields).length > 0) {
+            await Product.updateOne({ sku: item.sku }, {
+              $pull: { storeSnapshots: { storeId: targetStoreId } },
+            });
+            await Product.findOneAndUpdate({ sku: item.sku }, {
+              $push: { storeSnapshots: { storeId: targetStoreId, ...snapshotFields, syncedAt: new Date() } },
+            });
+          }
           succeeded.push({ sku: item.sku, action: 'updated', fields: Object.keys(update) });
         }
       } catch (err) {
@@ -958,8 +1217,14 @@ router.post('/admin/apply', async (req, res) => {
     }
 
     // Log activity
-    const activeStores = await SyncStore.find({ isActive: true }).lean();
-    for (const store of activeStores) {
+    let activityStores = [];
+    if (targetStoreId) {
+      const store = await SyncStore.findById(targetStoreId).lean();
+      if (store) activityStores.push(store);
+    } else {
+      activityStores = await SyncStore.find({ isActive: true }).lean();
+    }
+    for (const store of activityStores) {
       await SyncActivity.create({
         storeId: store._id,
         storeName: store.name,

@@ -270,8 +270,10 @@ export async function triggerManualSync(storeId?: string): Promise<void> {
   if (!res.ok) throw new Error(extractError(res));
 }
 
-export async function adminApplySync(items: Array<{ sku: string; fields: Record<string, unknown> }>): Promise<{ succeeded: Array<{ sku: string }>; failed: Array<{ sku: string; error: string }> }> {
-  const res = await apiPostJson<any, { items: typeof items }>('/api/sync/admin/apply', { items });
+export async function adminApplySync(items: Array<{ sku: string; fields: Record<string, unknown> }>, storeId?: string): Promise<{ succeeded: Array<{ sku: string }>; failed: Array<{ sku: string; error: string }> }> {
+  const body: Record<string, unknown> = { items };
+  if (storeId) body.storeId = storeId;
+  const res = await apiPostJson<any, Record<string, unknown>>('/api/sync/admin/apply', body);
   if (!res.ok) throw new Error(extractError(res));
   const data = res as any;
   return { succeeded: data.succeeded || [], failed: data.failed || [] };
@@ -311,6 +313,62 @@ export async function getPendingOrders(page = 1, status = 'pending'): Promise<{ 
   const res = await apiGet<PendingOrder>(`/api/sync/admin/pending-orders?page=${page}&status=${status}`);
   if (!res.ok) throw new Error(extractError(res));
   return { items: res.items || [], total: res.total || 0 };
+}
+
+// ─── Store catalog ─────────────────────────────────────────────────────────────
+
+export interface StoreCatalogEntry {
+  _id: string;
+  storeId: string;
+  sku: string;
+  name: string;
+  nameAr: string;
+  price: number;
+  stock: number;
+  image?: string;
+  images?: string[];
+  categorySlug?: string;
+  syncedAt: string;
+  existsOnSite: boolean;
+  siteData?: {
+    name?: string;
+    nameAr?: string;
+    price?: number;
+    stock?: number;
+    image?: string;
+    images?: string[];
+  } | null;
+  localMatch?: {
+    exists: boolean;
+    acknowledged: boolean;
+    name?: { match: boolean; local: string; ecom: string };
+    price?: { match: boolean; local: number; ecom: number };
+    stock?: { match: boolean; local: number; ecom: number };
+    image?: { match: boolean; local: string | null; ecom: string | null };
+  };
+}
+
+export async function getStoreCatalog(storeId: string, page = 1, search = ''): Promise<{ items: StoreCatalogEntry[]; total: number; page: number; pages: number }> {
+  let url = `/api/sync/admin/store-catalog/${storeId}?page=${page}&limit=50`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  const res = await apiGet<StoreCatalogEntry>(url);
+  if (!res.ok) throw new Error(extractError(res));
+  return { items: res.items || [], total: res.total || 0, page: res.page || 1, pages: res.pages || 1 };
+}
+
+export async function getStoreProducts(storeId: string, page = 1, search = ''): Promise<{ items: SyncProduct[]; total: number; page: number; pages: number }> {
+  let url = `/api/sync/admin/store-products/${storeId}?page=${page}&limit=50`;
+  if (search) url += `&search=${encodeURIComponent(search)}`;
+  const res = await apiGet<SyncProduct>(url);
+  if (!res.ok) throw new Error(extractError(res));
+  return { items: res.items || [], total: res.total || 0, page: res.page || 1, pages: res.pages || 1 };
+}
+
+export async function pushStoreCatalog(products: Array<{ sku: string; name?: string; nameAr?: string; price?: number; stock?: number; image?: string; images?: string[]; categorySlug?: string }>): Promise<{ created: number; updated: number }> {
+  const res = await apiPostJson<any, { products: typeof products }>('/api/sync/store-catalog', { products });
+  if (!res.ok) throw new Error(extractError(res));
+  const data = res as any;
+  return { created: data.created || 0, updated: data.updated || 0 };
 }
 
 // ─── Rollback history ──────────────────────────────────────────────────────────

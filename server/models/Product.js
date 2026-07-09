@@ -35,6 +35,16 @@ const ProductSchema = new mongoose.Schema(
       images: [String],
       syncedAt: Date,
     },
+    storeSnapshots: [{
+      storeId: { type: mongoose.Schema.Types.ObjectId, ref: 'SyncStore' },
+      name: String,
+      nameAr: String,
+      price: Number,
+      stock: Number,
+      image: String,
+      images: [String],
+      syncedAt: { type: Date, default: Date.now },
+    }],
   },
   { timestamps: true }
 );
