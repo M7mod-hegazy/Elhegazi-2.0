@@ -274,6 +274,12 @@ router.post('/apply', validateSyncRequest, async (req, res) => {
               posSnapshot: { ...snapshotEntry },
               storeSnapshots: [snapshotEntry],
             });
+            // Also save to StoreCatalog for tab comparison
+            await StoreCatalog.findOneAndUpdate(
+              { storeId: req.syncStore._id, sku: item.sku },
+              { $set: { ...snapshotEntry, categorySlug: item.fields?.categorySlug || '' } },
+              { upsert: true }
+            );
             succeeded.push({ sku: item.sku, action: 'created', id: String(newProduct._id) });
           } else {
             failed.push({ sku: item.sku, error: 'SKU not found on E-com' });
@@ -306,6 +312,25 @@ router.post('/apply', validateSyncRequest, async (req, res) => {
             $set: setData,
             $push: { storeSnapshots: storeSnapshot },
           });
+          // Also save to StoreCatalog for tab comparison
+          await StoreCatalog.findOneAndUpdate(
+            { storeId: req.syncStore._id, sku: item.sku },
+            {
+              $set: {
+                storeId: req.syncStore._id,
+                sku: item.sku,
+                name: item.fields?.name || '',
+                nameAr: item.fields?.nameAr || item.fields?.name || '',
+                price: item.fields?.price ?? 0,
+                stock: item.fields?.stock ?? 0,
+                image: item.fields?.image || '',
+                images: item.fields?.images || [],
+                categorySlug: item.fields?.categorySlug || '',
+                syncedAt: new Date(),
+              },
+            },
+            { upsert: true }
+          );
           succeeded.push({ sku: item.sku, action: 'updated', fields: Object.keys(update) });
         }
       } catch (err) {
@@ -789,6 +814,38 @@ router.get('/admin/store-catalog/:storeId', async (req, res) => {
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 50));
     const skip = (page - 1) * limit;
     const search = req.query.search || '';
+
+    // Auto-seed StoreCatalog from existing storeSnapshots if empty
+    const existingCount = await StoreCatalog.countDocuments({ storeId });
+    if (existingCount === 0) {
+      const productsWithSnapshots = await Product.find(
+        { 'storeSnapshots.storeId': storeId },
+        { storeSnapshots: { $elemMatch: { storeId } }, sku: 1, name: 1, nameAr: 1, price: 1, stock: 1, image: 1, images: 1, categorySlug: 1 }
+      ).lean();
+
+      for (const p of productsWithSnapshots) {
+        const snap = p.storeSnapshots?.[0];
+        if (!snap) continue;
+        await StoreCatalog.findOneAndUpdate(
+          { storeId, sku: p.sku },
+          {
+            $set: {
+              storeId,
+              sku: p.sku,
+              name: snap.name || p.name || p.sku,
+              nameAr: snap.nameAr || p.nameAr || snap.name || p.sku,
+              price: snap.price ?? p.price ?? 0,
+              stock: snap.stock ?? p.stock ?? 0,
+              image: snap.image || p.image || '',
+              images: snap.images || p.images || [],
+              categorySlug: p.categorySlug || '',
+              syncedAt: snap.syncedAt || new Date(),
+            },
+          },
+          { upsert: true }
+        );
+      }
+    }
 
     const matchQuery = { storeId };
     if (search) {
