@@ -4304,6 +4304,158 @@ app.get('/sync/snapshots', async (c) => {
   }
 });
 
+// ── Sync store catalog (admin) ──
+app.get('/sync/admin/store-catalog/:storeId', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: StoreCatalog } = await import('../server/models/StoreCatalog.js');
+    const { default: Product } = await import('../server/models/Product.js');
+    const storeId = c.req.param('storeId');
+    const page = Math.max(1, Number(c.req.query('page')) || 1);
+    const limit = Math.min(100, Math.max(1, Number(c.req.query('limit')) || 50));
+    const skip = (page - 1) * limit;
+    const search = c.req.query('search') || '';
+
+    // Auto-seed from existing storeSnapshots if StoreCatalog is empty
+    const existingCount = await StoreCatalog.countDocuments({ storeId }).maxTimeMS(15000);
+    if (existingCount === 0) {
+      const snapshotted = await Product.find(
+        { 'storeSnapshots.storeId': storeId },
+        { storeSnapshots: { $elemMatch: { storeId } }, sku: 1, name: 1, nameAr: 1, price: 1, stock: 1, image: 1, images: 1, categorySlug: 1 }
+      ).lean().maxTimeMS(15000);
+      for (const p of snapshotted) {
+        const snap = p.storeSnapshots?.[0];
+        if (!snap) continue;
+        await StoreCatalog.findOneAndUpdate(
+          { storeId, sku: p.sku },
+          { $set: { storeId, sku: p.sku, name: snap.name || p.name || p.sku, nameAr: snap.nameAr || p.nameAr || snap.name || p.sku, price: snap.price ?? p.price ?? 0, stock: snap.stock ?? p.stock ?? 0, image: snap.image || p.image || '', images: snap.images || p.images || [], categorySlug: p.categorySlug || '', syncedAt: snap.syncedAt || new Date() } },
+          { upsert: true }
+        );
+      }
+    }
+
+    const matchQuery = { storeId };
+    if (search) {
+      const esc = search.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      matchQuery.$or = [
+        { sku: { $regex: esc, $options: 'i' } },
+        { name: { $regex: esc, $options: 'i' } },
+        { nameAr: { $regex: esc, $options: 'i' } },
+      ];
+    }
+
+    const [items, total] = await Promise.all([
+      StoreCatalog.find(matchQuery).sort({ syncedAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(15000),
+      StoreCatalog.countDocuments(matchQuery).maxTimeMS(15000),
+    ]);
+
+    const enriched = await Promise.all(items.map(async (entry) => {
+      const product = await Product.findOne({ sku: entry.sku }).select('name nameAr price stock image images').lean().maxTimeMS(8000);
+      const existsOnSite = !!product;
+      return {
+        ...entry,
+        existsOnSite,
+        siteData: product || null,
+        localMatch: existsOnSite ? {
+          exists: true,
+          name: { local: entry.name || entry.nameAr || '', ecom: product.nameAr || product.name || '', match: (entry.name || entry.nameAr || '').trim().toLowerCase() === (product.nameAr || product.name || '').trim().toLowerCase() },
+          price: { local: entry.price ?? 0, ecom: product.price ?? 0, match: Number(entry.price) === Number(product.price) },
+          stock: { local: entry.stock ?? 0, ecom: product.stock ?? 0, match: Number(entry.stock) === Number(product.stock) },
+          image: { local: entry.image || (entry.images?.length ? entry.images[0] : null), ecom: product.image || (product.images?.length ? product.images[0] : null), match: (entry.image || (entry.images?.length ? entry.images[0] : null)) === (product.image || (product.images?.length ? product.images[0] : null)) },
+          acknowledged: true,
+        } : { exists: false, acknowledged: false },
+      };
+    }));
+
+    return c.json({ ok: true, items: enriched, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    console.error('[API sync/admin/store-catalog]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Sync pending orders (admin) ──
+app.get('/sync/admin/pending-orders', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: Order } = await import('../server/models/Order.js');
+    const page = Math.max(1, Number(c.req.query('page')) || 1);
+    const limit = Math.min(50, Math.max(1, Number(c.req.query('limit')) || 20));
+    const skip = (page - 1) * limit;
+    const status = c.req.query('status') || 'pending';
+
+    const [items, total] = await Promise.all([
+      Order.find({ status }).sort({ createdAt: -1 }).skip(skip).limit(limit).lean().maxTimeMS(15000),
+      Order.countDocuments({ status }).maxTimeMS(15000),
+    ]);
+
+    return c.json({ ok: true, items, total, page, pages: Math.ceil(total / limit) });
+  } catch (err) {
+    console.error('[API sync/admin/pending-orders]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
+// ── Sync admin apply (push changes from dashboard) ──
+app.post('/sync/admin/apply', async (c) => {
+  if (!(await isAdminRequest(c))) return c.json({ ok: false, error: 'Forbidden' }, 403);
+  try {
+    const { default: Product } = await import('../server/models/Product.js');
+    const { default: SyncActivity } = await import('../server/models/SyncActivity.js');
+    const { default: SyncStore } = await import('../server/models/SyncStore.js');
+    const body = await c.req.json().catch(() => ({}));
+    const { items = [], storeId } = body;
+    const succeeded = [];
+    const failed = [];
+
+    for (const item of items) {
+      try {
+        if (!item.sku) { failed.push({ sku: 'unknown', error: 'Missing SKU' }); continue; }
+        const update = {};
+        if (item.fields?.name !== undefined) update.name = String(item.fields.name).trim();
+        if (item.fields?.nameAr !== undefined) update.nameAr = String(item.fields.nameAr).trim();
+        if (item.fields?.price !== undefined) update.price = Number(item.fields.price);
+        if (item.fields?.stock !== undefined) update.stock = Math.max(0, Number(item.fields.stock));
+        if (item.fields?.image !== undefined) update.image = String(item.fields.image);
+        if (Object.keys(update).length === 0) { failed.push({ sku: item.sku, error: 'No fields' }); continue; }
+
+        const result = await Product.findOneAndUpdate({ sku: item.sku }, { $set: update }, { new: true }).lean().maxTimeMS(8000);
+        if (!result) {
+          await Product.create({ sku: item.sku, name: item.fields?.name || item.sku, nameAr: item.fields?.nameAr || item.fields?.name || item.sku, price: Number(item.fields?.price) || 0, stock: Math.max(0, Number(item.fields?.stock)) || 0 });
+          succeeded.push({ sku: item.sku, action: 'created' });
+        } else {
+          // Update per-store snapshot
+          if (storeId && (item.fields?.name !== undefined || item.fields?.nameAr !== undefined || item.fields?.price !== undefined || item.fields?.stock !== undefined)) {
+            const snapshotFields = {};
+            if (item.fields.name !== undefined) snapshotFields.name = String(item.fields.name).trim();
+            if (item.fields.nameAr !== undefined) snapshotFields.nameAr = String(item.fields.nameAr).trim();
+            if (item.fields.price !== undefined) snapshotFields.price = Number(item.fields.price);
+            if (item.fields.stock !== undefined) snapshotFields.stock = Math.max(0, Number(item.fields.stock));
+            if (Object.keys(snapshotFields).length > 0) {
+              await Product.updateOne({ sku: item.sku }, { $pull: { storeSnapshots: { storeId } } }).maxTimeMS(8000);
+              await Product.updateOne({ sku: item.sku }, { $push: { storeSnapshots: { storeId, ...snapshotFields, syncedAt: new Date() } } }).maxTimeMS(8000);
+            }
+          }
+          succeeded.push({ sku: item.sku, action: 'updated' });
+        }
+      } catch (err) {
+        failed.push({ sku: item.sku || 'unknown', error: err.message });
+      }
+    }
+
+    // Log activity
+    const stores = storeId ? [await SyncStore.findById(storeId).lean().maxTimeMS(8000)].filter(Boolean) : await SyncStore.find({ isActive: true }).lean().maxTimeMS(8000);
+    for (const store of stores) {
+      await SyncActivity.create({ storeId: store._id, storeName: store.name, type: 'sync', description: `Admin pushed ${succeeded.length} updates`, descriptionAr: `قام المسؤول بدفع ${succeeded.length} تحديث` });
+    }
+
+    return c.json({ ok: true, succeeded, failed, total: succeeded.length + failed.length });
+  } catch (err) {
+    console.error('[API sync/admin/apply]', err.message);
+    return c.json({ ok: false, error: err.message }, 500);
+  }
+});
+
 // Export for Vercel (HEAD/OPTIONS avoid 405 from probes, link checks, and CORS preflights)
 const honoHandler = handle(app);
 export const GET = honoHandler;
