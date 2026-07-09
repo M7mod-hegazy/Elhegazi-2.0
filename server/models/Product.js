@@ -26,6 +26,15 @@ const ProductSchema = new mongoose.Schema(
       height: { type: Number, min: 0 },
     },
     productFamilyId: { type: mongoose.Schema.Types.ObjectId, ref: 'ProductFamily', default: null, index: true },
+    posSnapshot: {
+      name: String,
+      nameAr: String,
+      price: Number,
+      stock: Number,
+      image: String,
+      images: [String],
+      syncedAt: Date,
+    },
   },
   { timestamps: true }
 );

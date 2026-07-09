@@ -260,11 +260,34 @@ router.post('/apply', validateSyncRequest, async (req, res) => {
               stock: Math.max(0, Number(item.fields?.stock)) || 0,
               ...(item.fields?.categorySlug ? { categorySlug: item.fields.categorySlug } : {}),
             });
+            // Save posSnapshot for newly created product
+            await Product.findOneAndUpdate({ sku: item.sku }, {
+              $set: {
+                posSnapshot: {
+                  name: item.fields?.name || item.sku,
+                  nameAr: item.fields?.nameAr || item.fields?.name || item.sku,
+                  price: Number(item.fields?.price) || 0,
+                  stock: Math.max(0, Number(item.fields?.stock)) || 0,
+                  image: item.fields?.image || '',
+                  images: item.fields?.images || [],
+                  syncedAt: new Date(),
+                },
+              },
+            });
             succeeded.push({ sku: item.sku, action: 'created', id: String(newProduct._id) });
           } else {
             failed.push({ sku: item.sku, error: 'SKU not found on E-com' });
           }
         } else {
+          // Save posSnapshot — record what POS reported so future diffs detect website changes
+          const snapshotUpdate = {};
+          if (item.fields?.name !== undefined) snapshotUpdate['posSnapshot.name'] = String(item.fields.name).trim();
+          if (item.fields?.nameAr !== undefined) snapshotUpdate['posSnapshot.nameAr'] = String(item.fields.nameAr).trim();
+          if (item.fields?.price !== undefined) snapshotUpdate['posSnapshot.price'] = Number(item.fields.price);
+          if (item.fields?.stock !== undefined) snapshotUpdate['posSnapshot.stock'] = Math.max(0, Number(item.fields.stock));
+          if (item.fields?.image !== undefined) snapshotUpdate['posSnapshot.image'] = String(item.fields.image);
+          snapshotUpdate['posSnapshot.syncedAt'] = new Date();
+          await Product.findOneAndUpdate({ sku: item.sku }, { $set: snapshotUpdate });
           succeeded.push({ sku: item.sku, action: 'updated', fields: Object.keys(update) });
         }
       } catch (err) {
@@ -595,7 +618,7 @@ router.get('/admin/products', async (req, res) => {
         .sort({ updatedAt: -1 })
         .skip(skip)
         .limit(limit)
-        .select('name nameAr sku price stock stockByStore image images categorySlug updatedAt')
+        .select('name nameAr sku price stock stockByStore image images categorySlug updatedAt posSnapshot')
         .lean(),
       Product.countDocuments({}),
     ]);
@@ -603,12 +626,47 @@ router.get('/admin/products', async (req, res) => {
     const stores = await SyncStore.find({}).select('name').lean();
     const storeNames = Object.fromEntries(stores.map((s) => [String(s._id), s.name]));
 
-    const products = items.map((p) => ({
-      ...p,
-      stockByStore: Object.fromEntries(
-        Object.entries(p.stockByStore || {}).map(([id, qty]) => [storeNames[id] || id.slice(-6), qty])
-      ),
-    }));
+    const products = items.map((p) => {
+      const snapshot = p.posSnapshot;
+      const exists = !!(snapshot && snapshot.syncedAt);
+      const ecomImgCount = [p.image, ...(p.images || [])].filter(Boolean).length;
+      const snapImgCount = snapshot ? [snapshot.image, ...(snapshot.images || [])].filter(Boolean).length : 0;
+
+      const localMatch = exists ? {
+        exists: true,
+        name: {
+          local: snapshot.name || snapshot.nameAr || '',
+          ecom: p.nameAr || p.name || '',
+          match: ((snapshot.name || snapshot.nameAr || '').trim().toLowerCase() === (p.nameAr || p.name || '').trim().toLowerCase()),
+        },
+        price: {
+          local: snapshot.price ?? 0,
+          ecom: p.price ?? 0,
+          match: Number(snapshot.price) === Number(p.price),
+        },
+        stock: {
+          local: snapshot.stock ?? 0,
+          ecom: p.stock ?? 0,
+          match: Number(snapshot.stock) === Number(p.stock),
+        },
+        image: {
+          local: snapshot.image || (snapshot.images?.length ? snapshot.images[0] : null),
+          ecom: p.image || (p.images?.length ? p.images[0] : null),
+          match: snapImgCount === ecomImgCount,
+        },
+      } : {
+        exists: false,
+      };
+
+      return {
+        ...p,
+        posSnapshot: undefined,
+        localMatch,
+        stockByStore: Object.fromEntries(
+          Object.entries(p.stockByStore || {}).map(([id, qty]) => [storeNames[id] || id.slice(-6), qty])
+        ),
+      };
+    });
 
     res.json({ ok: true, items: products, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
@@ -790,6 +848,102 @@ router.post('/admin/trigger-sync', async (req, res) => {
     }
 
     res.json({ ok: true, message: msg });
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+/* ──────────────────────────────────────
+   ADMIN — apply/push product changes from dashboard
+   Body: { items: [{ sku, fields: { name?, price?, stock?, images? } }] }
+   ────────────────────────────────────── */
+router.post('/admin/apply', async (req, res) => {
+  try {
+    const { items = [] } = req.body;
+    const succeeded = [];
+    const failed = [];
+
+    for (const item of items) {
+      try {
+        if (!item.sku) {
+          failed.push({ sku: item.sku || 'unknown', error: 'Missing SKU' });
+          continue;
+        }
+        const update = {};
+        const snapshot = {};
+        if (item.fields) {
+          if (item.fields.name !== undefined) {
+            update.name = String(item.fields.name).trim();
+            snapshot['posSnapshot.name'] = String(item.fields.name).trim();
+          }
+          if (item.fields.nameAr !== undefined) {
+            update.nameAr = String(item.fields.nameAr).trim();
+            snapshot['posSnapshot.nameAr'] = String(item.fields.nameAr).trim();
+          }
+          if (item.fields.price !== undefined) {
+            update.price = Number(item.fields.price);
+            snapshot['posSnapshot.price'] = Number(item.fields.price);
+          }
+          if (item.fields.stock !== undefined) {
+            update.stock = Math.max(0, Number(item.fields.stock));
+            snapshot['posSnapshot.stock'] = Math.max(0, Number(item.fields.stock));
+          }
+          if (item.fields.image !== undefined) {
+            update.image = String(item.fields.image);
+            snapshot['posSnapshot.image'] = String(item.fields.image);
+          }
+        }
+
+        if (Object.keys(update).length === 0) {
+          failed.push({ sku: item.sku, error: 'No fields to update' });
+          continue;
+        }
+
+        snapshot['posSnapshot.syncedAt'] = new Date();
+        const result = await Product.findOneAndUpdate(
+          { sku: item.sku },
+          { $set: { ...update, ...snapshot } },
+          { new: true }
+        ).lean();
+
+        if (!result) {
+          // Create new product if SKU doesn't exist (admin push for new product)
+          const newProduct = await Product.create({
+            sku: item.sku,
+            name: item.fields?.name || item.sku,
+            nameAr: item.fields?.nameAr || item.fields?.name || item.sku,
+            price: Number(item.fields?.price) || 0,
+            stock: Math.max(0, Number(item.fields?.stock)) || 0,
+            posSnapshot: {
+              name: item.fields?.name || item.sku,
+              nameAr: item.fields?.nameAr || item.fields?.name || item.sku,
+              price: Number(item.fields?.price) || 0,
+              stock: Math.max(0, Number(item.fields?.stock)) || 0,
+              syncedAt: new Date(),
+            },
+          });
+          succeeded.push({ sku: item.sku, action: 'created', id: String(newProduct._id) });
+        } else {
+          succeeded.push({ sku: item.sku, action: 'updated', fields: Object.keys(update) });
+        }
+      } catch (err) {
+        failed.push({ sku: item.sku || 'unknown', error: err.message });
+      }
+    }
+
+    // Log activity
+    const activeStores = await SyncStore.find({ isActive: true }).lean();
+    for (const store of activeStores) {
+      await SyncActivity.create({
+        storeId: store._id,
+        storeName: store.name,
+        type: 'sync',
+        description: `Admin pushed ${succeeded.length} product updates to store ${store.name}`,
+        descriptionAr: `قام المسؤول بدفع ${succeeded.length} تحديث منتج إلى المتجر ${store.name}`,
+      });
+    }
+
+    res.json({ ok: true, succeeded, failed, total: succeeded.length + failed.length });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
   }

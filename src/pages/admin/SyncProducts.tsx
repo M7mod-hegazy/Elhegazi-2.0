@@ -3,8 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import {
   RefreshCw, ArrowLeftRight, Store, Package, ImageIcon,
   CheckCircle2, Loader2, Search, ChevronDown, Upload, Download,
-  Info, Globe, Layers, TrendingUp, AlertTriangle,
-  ChevronRight, ChevronLeft, X, Clock,
+  Info, Globe, TrendingUp, AlertTriangle, Filter, XCircle,
+  ChevronRight, ChevronLeft, X, Clock, FileText, Layers,
+  ShoppingBag, Plus,
 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import AdminLayout from '@/components/admin/AdminLayout';
@@ -16,7 +17,7 @@ import { LoadingSpinner } from '@/components/ui/loading';
 import { usePageTitle } from '@/hooks/usePageTitle';
 import { useBranding } from '@/hooks/useBranding';
 import { useToast } from '@/hooks/use-toast';
-import { getSyncedProducts, getStores, getSyncActivity, triggerManualSync, type SyncProduct, type SyncStore, type SyncActivityEvent } from '@/lib/api-sync';
+import { getSyncedProducts, getStores, getSyncActivity, triggerManualSync, adminApplySync, type SyncProduct, type SyncStore, type SyncActivityEvent } from '@/lib/api-sync';
 import { apiPostJson } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import ReviewModal from '@/components/sync/ReviewModal';
@@ -47,6 +48,8 @@ interface ChangeItem {
   hasImages?: boolean;
 }
 
+const PAGE_SIZE = 25;
+
 function imgList(product: SyncProduct): string[] {
   const list: string[] = [];
   if (product.image) list.push(product.image);
@@ -58,6 +61,38 @@ function imgList(product: SyncProduct): string[] {
   return list;
 }
 
+/* ─── Sub-components ─── */
+
+function SyncSkeleton({ rows = 5 }) {
+  return (
+    <div className="space-y-3 p-4">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="animate-pulse h-14 rounded-lg bg-slate-100" style={{ animationDelay: `${i * 80}ms` }} />
+      ))}
+    </div>
+  );
+}
+
+function StatusBadge({ connected, pulse }: { connected: boolean; pulse?: boolean }) {
+  return (
+    <span className={cn(
+      'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold transition-all duration-500',
+      connected ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700',
+      pulse ? 'animate-pulse' : ''
+    )}>
+      {connected ? (
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
+        </span>
+      ) : (
+        <XCircle className="h-3 w-3" />
+      )}
+      {connected ? 'متصل' : 'غير متصل'}
+    </span>
+  );
+}
+
 function ProductRow({ product, fields, onFieldToggle, onPreviewImages }: {
   product: SyncProduct;
   fields: FieldSelections[string];
@@ -66,12 +101,37 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages }: {
 }) {
   const [expanded, setExpanded] = useState(false);
   const images = useMemo(() => imgList(product), [product]);
+  const lm = product.localMatch;
+  const isNew = lm && !lm.exists;
+
+  const formatPrice = (v: number | null | undefined) => (v != null ? Number(v).toFixed(2) + ' ر.س' : '—');
+  const formatStock = (v: number | null | undefined) => (v != null ? String(Number(v)) : '—');
 
   const allFields = [
-    { key: 'name', label: 'الاسم', match: null },
-    { key: 'price', label: 'السعر', match: null, ecom: `${product.price?.toFixed(2) ?? '—'} ر.س` },
-    { key: 'stock', label: 'المخزون', match: null, ecom: `${product.stock ?? '—'}` },
-    { key: 'images', label: 'الصور', match: null, ecom: images.length > 0 ? `${images.length} صور` : '—' },
+    {
+      key: 'name' as const,
+      label: 'الاسم',
+      match: lm?.name?.match ?? null,
+      ecom: isNew ? (product.nameAr || product.name) : (lm?.name?.ecom ?? (product.nameAr || product.name)),
+    },
+    {
+      key: 'price' as const,
+      label: 'السعر',
+      match: lm?.price?.match ?? null,
+      ecom: isNew ? formatPrice(product.price) : formatPrice(lm?.price?.ecom ?? product.price),
+    },
+    {
+      key: 'stock' as const,
+      label: 'المخزون',
+      match: lm?.stock?.match ?? null,
+      ecom: isNew ? formatStock(product.stock) : formatStock(lm?.stock?.ecom ?? product.stock),
+    },
+    {
+      key: 'images' as const,
+      label: 'الصور',
+      match: lm?.image?.match ?? null,
+      ecom: isNew ? (images.length > 0 ? `${images.length} صور` : '—') : (images.length > 0 ? `${images.length} صور` : '—'),
+    },
   ];
 
   const anyFieldOn = fields && Object.values(fields).some(Boolean);
@@ -79,6 +139,7 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages }: {
   return (
     <div className={cn('border-b border-slate-100 last:border-b-0 transition-all duration-200', anyFieldOn ? 'bg-indigo-50/10' : 'hover:bg-slate-50/30')}>
       <div className="px-4 py-3">
+        {/* Line 1: thumbnail + name + expand */}
         <div className="flex items-start gap-3">
           <div className="relative flex-shrink-0 cursor-pointer" onClick={() => onPreviewImages(product)}>
             <div className="w-14 h-14 rounded-xl overflow-hidden bg-slate-50 border border-slate-200 shadow-sm">
@@ -93,6 +154,9 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages }: {
             <div className="flex items-center gap-1.5">
               <span className="text-sm font-black text-slate-700 truncate">{product.nameAr || product.name}</span>
               <span className="text-[11px] text-slate-400 font-bold shrink-0" style={{ direction: 'ltr', display: 'inline-block' }}>({product.sku})</span>
+              {isNew && (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-100 text-blue-700 leading-none shrink-0">جديد</span>
+              )}
               <button
                 onClick={() => setExpanded(!expanded)}
                 className={cn('p-1 rounded-lg transition-all duration-200 shrink-0 mr-auto', expanded ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-100')}
@@ -100,14 +164,16 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages }: {
                 <ChevronDown className={cn('h-4 w-4 transition-transform duration-200', expanded ? 'rotate-180' : '')} />
               </button>
             </div>
+            {/* Price + stock summary */}
             <div className="flex items-center gap-3 mt-1">
-              <span className="text-xs font-bold text-slate-500">السعر: {product.price?.toFixed(2)} ر.س</span>
+              <span className="text-xs font-bold text-slate-500">السعر: {formatPrice(product.price)}</span>
               <span className="w-px h-3 bg-slate-200" />
-              <span className="text-xs font-bold text-slate-500">المخزون: {product.stock ?? 0}</span>
+              <span className="text-xs font-bold text-slate-500">المخزون: {formatStock(product.stock)}</span>
             </div>
           </div>
         </div>
 
+        {/* Line 2: field pills — all 4 always visible */}
         <div className="flex items-center gap-1.5 mt-2.5 mr-0 flex-wrap">
           {allFields.map((f) => {
             const isMatched = f.match === true;
@@ -116,7 +182,7 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages }: {
             return (
               <button
                 key={f.key}
-                onClick={() => { if (differs) onFieldToggle(product.sku, f.key); }}
+                onClick={() => { if (differs || isNew) onFieldToggle(product.sku, f.key); }}
                 className={cn(
                   'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition-all',
                   isMatched
@@ -125,7 +191,7 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages }: {
                       ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
                       : 'bg-white border-slate-200 text-slate-400 hover:border-slate-300'
                 )}
-                title={`${f.label}: ${isMatched ? 'مطابق ✓' : `${on ? 'نشط' : 'معطل'}`}`}
+                title={isMatched ? `${f.label}: مطابق ✓` : `${f.label}: ${on ? 'نشط' : 'معطل'}`}
               >
                 <span>{f.label}</span>
                 {isMatched ? (
@@ -148,30 +214,111 @@ function ProductRow({ product, fields, onFieldToggle, onPreviewImages }: {
         </div>
       </div>
 
+      {/* Expanded: side-by-side comparison */}
       {expanded && (
         <div className="px-4 pb-4 animate-in slide-in-from-top-2 border-t border-slate-100">
-          <div className="pt-3 space-y-1.5">
-            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mb-1">
-              <span className="flex-1 px-2 py-1 rounded bg-slate-50 text-center">الموقع الإلكتروني</span>
-              <ArrowLeftRight className="h-3 w-3 shrink-0" />
+          {lm?.exists ? (
+            /* Existing product — show local vs ecom diff */
+            <div className="pt-3 space-y-1.5">
+              <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mb-1">
+                <span className="flex-1 px-2 py-1 rounded bg-slate-50 text-center">المتجر (POS)</span>
+                <ArrowLeftRight className="h-3 w-3 shrink-0" />
+                <span className="flex-1 px-2 py-1 rounded bg-slate-50 text-center">الموقع الإلكتروني</span>
+              </div>
+              {allFields.map((f) => {
+                const lmField = f.key === 'images' ? lm.image : lm?.[f.key as 'name' | 'price' | 'stock'];
+                const differs = f.match === false;
+                const localVal = f.key === 'price' ? formatPrice(lmField?.local as number) :
+                  f.key === 'stock' ? formatStock(lmField?.local as number) :
+                  f.key === 'images' ? (lmField?.local ? 'موجودة' : '—') :
+                  lmField?.local ?? '—';
+                const ecomVal = f.key === 'price' ? formatPrice(lmField?.ecom as number) :
+                  f.key === 'stock' ? formatStock(lmField?.ecom as number) :
+                  f.key === 'images' ? (images.length > 0 ? `${images.length} صور` : '—') :
+                  lmField?.ecom ?? '—';
+                return (
+                  <div key={f.key}>
+                    <div className={cn(
+                      'flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs',
+                      differs ? 'bg-red-50/50 ring-1 ring-red-200/50' : 'bg-slate-50/50'
+                    )}>
+                      <span className="w-16 font-bold text-slate-400 shrink-0">{f.label}</span>
+                      <span className={cn(
+                        'flex-1 px-2 py-0.5 rounded text-left',
+                        differs ? 'bg-red-100/50 text-red-700 font-bold line-through decoration-2' : 'text-slate-700'
+                      )}>
+                        {localVal}
+                      </span>
+                      <span className="shrink-0">
+                        {differs
+                          ? <ArrowLeftRight className="h-3.5 w-3.5 text-amber-500 animate-pulse" />
+                          : <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
+                        }
+                      </span>
+                      <span className={cn(
+                        'flex-1 px-2 py-0.5 rounded text-left',
+                        differs ? 'bg-amber-50 text-amber-700 font-bold' : 'text-slate-700'
+                      )}>
+                        {ecomVal}
+                      </span>
+                    </div>
+                    {f.key === 'images' && differs && (
+                      <div className="mt-1 px-3 py-1.5 rounded-lg bg-amber-50 text-[10px] text-amber-700 font-bold flex items-center gap-1">
+                        <Info className="h-3 w-3" />
+                        التطبيق يدعم صورة واحدة — سيتم استبدالها بأول صورة من الموقع
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-            {allFields.map((f) => (
-              <div key={f.key} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-slate-50/50">
-                <span className="w-16 font-bold text-slate-400 shrink-0">{f.label}</span>
-                <span className="flex-1 text-slate-700 font-bold">{f.ecom}</span>
+          ) : (
+            /* New product — show all field values */
+            <div className="pt-3 space-y-1.5">
+              <div className="flex items-center gap-2 text-[11px] font-bold text-slate-400 mb-1">
+                <span className="flex-1 px-2 py-1 rounded bg-slate-50 text-center">الموقع الإلكتروني</span>
               </div>
-            ))}
-            {images.length > 0 && (
-              <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
-                {images.map((url, i) => (
-                  <button key={i} onClick={() => onPreviewImages(product)} className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-400 transition shadow-sm">
-                    <img src={url} alt="" className="w-full h-full object-cover" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
+              {allFields.map((f) => (
+                <div key={f.key} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs bg-blue-50/50">
+                  <span className="w-16 font-bold text-slate-400 shrink-0">{f.label}</span>
+                  <span className="flex-1 text-slate-700 font-bold">{f.ecom}</span>
+                </div>
+              ))}
+            </div>
+          )}
+          {/* Image gallery */}
+          {images.length > 0 && (
+            <div className="flex gap-2 mt-3 pt-3 border-t border-slate-100">
+              {images.map((url, i) => (
+                <button key={i} onClick={() => onPreviewImages(product)} className="w-16 h-16 rounded-lg overflow-hidden border border-slate-200 hover:border-indigo-400 transition shadow-sm">
+                  <img src={url} alt="" className="w-full h-full object-cover" />
+                </button>
+              ))}
+            </div>
+          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Empty state ─── */
+function EmptyState({ title, description, action, actionLabel, onAction }: {
+  title: string;
+  description: string;
+  action?: boolean;
+  actionLabel?: string;
+  onAction?: () => void;
+}) {
+  return (
+    <div className="p-12 text-center">
+      <Package className="h-16 w-16 mx-auto text-slate-200 mb-4" />
+      <p className="text-sm font-bold text-slate-400 mb-1">{title}</p>
+      <p className="text-xs text-slate-300 mb-4">{description}</p>
+      {action && onAction && (
+        <Button size="sm" onClick={onAction} className="gap-1.5 text-xs font-bold">
+          {actionLabel}
+        </Button>
       )}
     </div>
   );
@@ -188,11 +335,14 @@ export default function SyncProducts() {
   const [activity, setActivity] = useState<SyncActivityEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
+  const [fieldFilter, setFieldFilter] = useState<string | null>(null);
   const [fields, setFields] = useState<FieldSelections>({});
   const [syncing, setSyncing] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewChanges, setReviewChanges] = useState<ChangeItem[]>([]);
   const [previewProduct, setPreviewProduct] = useState<SyncProduct | null>(null);
+  const [activeTab, setActiveTab] = useState<'existing' | 'new'>('existing');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -212,31 +362,137 @@ export default function SyncProducts() {
 
   useEffect(() => { load(); }, [load]);
 
-  const filteredProducts = useMemo(() => {
+  /* ─── Search + filter ─── */
+  const filteredSearch = useMemo(() => {
     if (!search.trim()) return products;
     const q = search.trim().toLowerCase();
     return products.filter((p) =>
-      p.name.toLowerCase().includes(q) ||
+      (p.name || '').toLowerCase().includes(q) ||
       (p.nameAr || '').toLowerCase().includes(q) ||
-      (p.sku || '').toLowerCase().includes(q)
+      (p.sku || '').toLowerCase().includes(q) ||
+      String(p.price || '').includes(q)
     );
   }, [products, search]);
 
-  const handleFieldToggle = (sku: string, field: string) => {
-    setFields((prev) => {
-      const current = prev[sku] || { name: false, price: false, stock: false, images: false };
-      const updated = { ...current, [field]: !current[field as keyof typeof current] };
-      return { ...prev, [sku]: updated };
-    });
-  };
+  const filteredExisting = useMemo(() => {
+    let result = filteredSearch.filter((p) => p.localMatch?.exists);
+    if (fieldFilter) {
+      if (fieldFilter === 'new') {
+        result = result.filter((p) => !p.localMatch?.exists);
+      } else {
+        const lmKey = fieldFilter === 'images' ? 'image' : fieldFilter;
+        result = result.filter((p) => p.localMatch?.[lmKey as 'name' | 'price' | 'stock' | 'image']?.match === false);
+      }
+    } else {
+      result = result.filter((p) => p.localMatch && (
+        p.localMatch.name?.match === false ||
+        p.localMatch.price?.match === false ||
+        p.localMatch.stock?.match === false ||
+        p.localMatch.image?.match === false
+      ));
+    }
+    return result;
+  }, [filteredSearch, fieldFilter]);
+
+  const filteredNew = useMemo(() => {
+    return filteredSearch.filter((p) => !p.localMatch?.exists);
+  }, [filteredSearch]);
+
+  /* Active SKU tracking */
+  const activeSkus = useMemo(() => {
+    return Object.entries(fields)
+      .filter(([, f]) => Object.values(f).some(Boolean))
+      .map(([sku]) => sku);
+  }, [fields]);
+
+  const activeFieldsCount = useMemo(() => {
+    return Object.values(fields).reduce((sum, f) => {
+      return sum + Object.values(f).filter(Boolean).length;
+    }, 0);
+  }, [fields]);
 
   const selectCount = useMemo(() =>
     Object.values(fields).filter((f) => Object.values(f).some(Boolean)).length,
     [fields]
   );
 
+  const handleFieldToggle = (sku: string, field: string) => {
+    setFields((prev) => {
+      const current = prev[sku] || { name: false, price: false, stock: false, images: false };
+      return { ...prev, [sku]: { ...current, [field]: !current[field as keyof typeof current] } };
+    });
+  };
+
+  const setField = (sku: string, field: string, value: boolean) => {
+    setFields((prev) => {
+      const current = prev[sku] || { name: false, price: false, stock: false, images: false };
+      return { ...prev, [sku]: { ...current, [field]: value } };
+    });
+  };
+
+  const toggleAllFields = (sku: string, value: boolean) => {
+    setFields((prev) => ({ ...prev, [sku]: { name: value, price: value, stock: value, images: value } }));
+  };
+
+  /* ─── Bulk toggle helpers ─── */
+  const isDiff = (p: SyncProduct, key: string) => {
+    if (!p.localMatch || !p.localMatch.exists) return key === null;
+    if (key === null) return false;
+    const lmKey = key === 'images' ? 'image' : key;
+    return p.localMatch[lmKey as 'name' | 'price' | 'stock' | 'image']?.match === false;
+  };
+
+  const isNewProd = (p: SyncProduct) => !p.localMatch?.exists;
+  const fieldOrNew = (p: SyncProduct, key: string) => isNewProd(p) || isDiff(p, key);
+
+  const onCount = (key: string) => filteredExisting.filter((p) => fieldOrNew(p, key) && fields[p.sku]?.[key]).length;
+  const totalEligible = (key: string) => filteredExisting.filter((p) => fieldOrNew(p, key)).length;
+
+  const enableAllForAll = () => {
+    filteredExisting.forEach((p) => {
+      const hasDiff = ['name', 'price', 'stock', 'images'].some((k) => fieldOrNew(p, k));
+      if (hasDiff) toggleAllFields(p.sku, true);
+    });
+  };
+
+  const disableAllForAll = () => {
+    filteredExisting.forEach((p) => toggleAllFields(p.sku, false));
+  };
+
+  const toggleColumn = (key: string) => {
+    const eligible = filteredExisting.filter((p) => fieldOrNew(p, key));
+    const allCurrentlyOn = eligible.every((p) => fields[p.sku]?.[key] === true);
+    const target = allCurrentlyOn ? false : true;
+    eligible.forEach((p) => setField(p.sku, key, target));
+  };
+
+  const toggleNewBatch = () => {
+    const newProds = filteredExisting.filter(isNewProd);
+    const countActive = newProds.filter((p) => fields[p.sku] && Object.values(fields[p.sku]).some(Boolean)).length;
+    const allOn = countActive === newProds.length;
+    newProds.forEach((p) => toggleAllFields(p.sku, !allOn));
+  };
+
+  /* ─── Pagination ─── */
+  const currentProducts = activeTab === 'new' ? filteredNew : filteredExisting;
+  const totalPages = Math.ceil(currentProducts.length / PAGE_SIZE);
+  const start = (page - 1) * PAGE_SIZE;
+  const displayProducts = currentProducts.slice(start, start + PAGE_SIZE);
+
+  const pageRange = useMemo(() => {
+    const maxVisible = 5;
+    let lo = Math.max(1, page - Math.floor(maxVisible / 2));
+    let hi = Math.min(totalPages, lo + maxVisible - 1);
+    if (hi - lo + 1 < maxVisible) lo = Math.max(1, hi - maxVisible + 1);
+    const pages: number[] = [];
+    for (let i = lo; i <= hi; i++) pages.push(i);
+    return pages;
+  }, [totalPages, page]);
+
+  useEffect(() => { setPage(1); }, [search, fieldFilter, activeTab]);
+
+  /* ─── Review / Push ─── */
   const handlePush = () => {
-    // Build change items from selected products
     const selected: ChangeItem[] = [];
     for (const [sku, fieldSet] of Object.entries(fields)) {
       const activeFields = Object.entries(fieldSet).filter(([, v]) => v).map(([k]) => k);
@@ -244,22 +500,23 @@ export default function SyncProducts() {
       const product = products.find((p) => p.sku === sku);
       if (!product) continue;
       const images = imgList(product);
+      const lm = product.localMatch;
       selected.push({
         sku: product.sku,
         name: product.nameAr || product.name,
         nameAr: product.nameAr,
         image: product.image,
         images: product.images,
-        isNew: false,
-        current: {},
-        incoming: {
-          name: product.name,
-          nameAr: product.nameAr,
-          price: product.price,
-          stock: product.stock,
-        },
+        isNew: !lm?.exists,
+        current: lm?.exists ? {
+          name: lm.name?.local,
+          price: lm.price?.local,
+          stock: lm.stock?.local,
+        } : {},
+        incoming: { name: product.name, nameAr: product.nameAr, price: product.price, stock: product.stock },
         diff: Object.fromEntries(activeFields.map((f) => [f, true])),
         fields: Object.fromEntries(activeFields.map((f) => [f, true])),
+        localImages: [],
         ecomImages: images,
         hasImages: activeFields.includes('images') && images.length > 0,
       });
@@ -277,9 +534,9 @@ export default function SyncProducts() {
           Object.entries(c.fields || {}).map(([k, v]) => [k, v ? (c.incoming?.[k] ?? null) : null])
         ),
       }));
-      const res = await apiPostJson<any, { items: typeof items }>('/api/sync/apply', { items });
-      if (res.ok) {
-        toast({ title: 'تم تطبيق المزامنة بنجاح' });
+      const res = await adminApplySync(items);
+      if (res.succeeded.length > 0) {
+        toast({ title: `تم تطبيق المزامنة بنجاح (${res.succeeded.length} منتج)` });
         setFields({});
         setReviewOpen(false);
         load();
@@ -320,7 +577,7 @@ export default function SyncProducts() {
     <AdminLayout>
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/20 to-indigo-50/30 p-4 md:p-6">
         <div className="max-w-6xl mx-auto">
-          {/* Slim header */}
+          {/* Header */}
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mb-6">
             <div className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-indigo-600 via-indigo-600/90 to-indigo-600/80 shadow-lg">
               <div className="relative p-5 md:p-6">
@@ -364,68 +621,319 @@ export default function SyncProducts() {
             </div>
           </motion.div>
 
-          {/* Controls bar */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="relative flex-1 max-w-xs">
-              <Search className="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <Input
-                placeholder="بحث عن منتج…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="h-9 pr-9 text-xs rounded-xl border-slate-200 bg-white/80"
-              />
-            </div>
-            <div className="mr-auto flex items-center gap-2">
-              <Button
-                size="sm"
-                onClick={handlePush}
-                disabled={selectCount === 0}
-                className="gap-1.5 text-xs font-bold"
-              >
-                <Upload className="h-3.5 w-3.5" />
-                دفع للمتاجر ({selectCount})
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={handleTriggerSync}
-                disabled={syncing}
-                className="gap-1.5 text-xs font-bold"
-              >
-                <Download className="h-3.5 w-3.5" />
-                سحب من المتاجر
-              </Button>
-            </div>
+          {/* Tabs */}
+          <div className="flex gap-1 mb-4 border-b border-slate-200">
+            <button
+              onClick={() => { setActiveTab('existing'); setPage(1); }}
+              className={cn(
+                'relative px-4 py-2.5 text-sm font-bold transition-all duration-200 flex items-center gap-2',
+                activeTab === 'existing' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+              )}
+            >
+              <Download className="h-4 w-4" />
+              منتجات موجودة
+              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-bold', activeTab === 'existing' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400')}>
+                {filteredExisting.length}
+              </span>
+              {activeTab === 'existing' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-full" />}
+            </button>
+            <button
+              onClick={() => { setActiveTab('new'); setPage(1); }}
+              className={cn(
+                'relative px-4 py-2.5 text-sm font-bold transition-all duration-200 flex items-center gap-2',
+                activeTab === 'new' ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+              )}
+            >
+              <Package className="h-4 w-4" />
+              منتجات جديدة
+              <span className={cn('px-1.5 py-0.5 rounded-full text-[10px] font-bold', activeTab === 'new' ? 'bg-indigo-50 text-indigo-600' : 'bg-slate-100 text-slate-400')}>
+                {filteredNew.length}
+              </span>
+              {activeTab === 'new' && <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-500 rounded-full" />}
+            </button>
           </div>
 
-          {/* Product list */}
-          <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm overflow-hidden">
-            {filteredProducts.length === 0 ? (
-              <CardContent className="p-12 text-center">
-                <Package className="h-16 w-16 mx-auto text-slate-200 mb-4" />
-                <p className="text-sm font-bold text-slate-400 mb-1">لا توجد منتجات</p>
-                <p className="text-xs text-slate-300">{search ? 'حاول تغيير كلمة البحث' : 'لم تتم مزامنة أي منتجات بعد'}</p>
-              </CardContent>
-            ) : (
-              <div>
-                {filteredProducts.map((product, i) => (
-                  <motion.div
-                    key={product._id}
-                    initial={{ opacity: 0, y: 4 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.02 }}
-                  >
-                    <ProductRow
-                      product={product}
-                      fields={fields[product.sku] || { name: false, price: false, stock: false, images: false }}
-                      onFieldToggle={handleFieldToggle}
-                      onPreviewImages={setPreviewProduct}
-                    />
-                  </motion.div>
-                ))}
+          {/* Direction explanation */}
+          {activeTab === 'existing' && (
+            <div className="mb-3 p-3 rounded-xl bg-blue-50/50 border border-blue-200/50 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                <Download className="h-4 w-4 text-blue-600" />
               </div>
-            )}
-          </Card>
+              <div className="text-xs text-slate-500 leading-relaxed">
+                <span className="font-bold text-slate-700">دفع من الموقع ← المتجر: </span>
+                منتجات موجودة مسبقاً في المتجر ولكن بياناتها تغيرت في الموقع. اختر الحقول التي تريد دفعها لكل منتج.
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'new' && (
+            <div className="mb-3 p-3 rounded-xl bg-green-50/50 border border-green-200/50 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+                <Package className="h-4 w-4 text-green-600" />
+              </div>
+              <div className="text-xs text-slate-500 leading-relaxed">
+                <span className="font-bold text-slate-700">دفع من الموقع ← المتجر: </span>
+                منتجات جديدة غير موجودة في المتجر حالياً. اختر الحقول التي تريد دفعها لكل منتج (سيتم إنشاؤها تلقائياً).
+              </div>
+            </div>
+          )}
+
+          {/* Existing products tab */}
+          {activeTab === 'existing' && (
+            <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm overflow-hidden">
+              {/* Search + active badge */}
+              <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-3 flex-wrap">
+                <div className="relative flex-[1] min-w-[180px]">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    className="w-full pr-10 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    placeholder="بحث في المنتجات المتاحة…"
+                    value={search}
+                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+                  />
+                </div>
+                {activeSkus.length > 0 && (
+                  <div className="flex items-center gap-2 bg-indigo-50 px-3 py-1.5 rounded-xl">
+                    <span className="text-xs font-bold text-indigo-600">{activeSkus.length} منتج • {activeFieldsCount} حقل نشط</span>
+                    <button onClick={() => { activeSkus.forEach((sku) => toggleAllFields(sku, false)); }} className="text-xs text-slate-400 hover:text-slate-600 transition-colors">
+                      <XCircle className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {filteredExisting.length > 0 ? (
+                <>
+                  {/* Bulk toggle bar */}
+                  <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-sm font-bold text-slate-700 whitespace-nowrap">
+                        {activeSkus.length} منتج • {activeFieldsCount} حقل نشط
+                      </span>
+                      <span className="w-px h-4 bg-slate-200" />
+                      <button onClick={enableAllForAll} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-indigo-600 text-white hover:bg-indigo-700 transition">
+                        تشغيل الكل
+                      </button>
+                      <button onClick={disableAllForAll} className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-white border border-slate-200 text-slate-400 hover:bg-slate-100 transition">
+                        إيقاف الكل
+                      </button>
+                      <span className="w-px h-4 bg-slate-200" />
+                      {[
+                        { key: 'name', label: 'الاسم', icon: FileText },
+                        { key: 'price', label: 'السعر', icon: TrendingUp },
+                        { key: 'stock', label: 'المخزون', icon: Layers },
+                        { key: 'images', label: 'الصور', icon: ImageIcon },
+                        { key: null, label: 'جديد', icon: ShoppingBag },
+                      ].map((col) => {
+                        const isNew = col.key === null;
+                        const count = isNew
+                          ? filteredExisting.filter((p) => isNewProd(p) && fields[p.sku] && Object.values(fields[p.sku]).some(Boolean)).length
+                          : onCount(col.key);
+                        const totalE = isNew
+                          ? filteredExisting.filter(isNewProd).length
+                          : totalEligible(col.key);
+                        if (totalE === 0) return null;
+                        const Icon = col.icon;
+                        return (
+                          <div key={col.label} className="flex items-center gap-0.5">
+                            <button
+                              onClick={isNew ? toggleNewBatch : () => toggleColumn(col.key!)}
+                              className={cn(
+                                'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition',
+                                count > 0 ? 'bg-white border-indigo-500 text-indigo-600' : 'bg-white border-slate-200 text-slate-400'
+                              )}
+                            >
+                              <Icon className="h-3 w-3" />
+                              {col.label}
+                              <span className={cn('text-[9px] px-1 py-0.5 rounded', count > 0 ? 'bg-indigo-50' : 'bg-slate-100')}>
+                                {count}/{totalE}
+                              </span>
+                            </button>
+                            <button
+                              onClick={() => { setFieldFilter((prev) => prev === (isNew ? 'new' : col.key) ? null : (isNew ? 'new' : col.key)); setPage(1); }}
+                              className={cn('p-1 rounded-lg transition', fieldFilter === (isNew ? 'new' : col.key) ? 'bg-indigo-50 text-indigo-600' : 'text-slate-400 hover:bg-slate-100')}
+                              title={isNew ? 'فلترة: المنتجات الجديدة فقط' : `فلترة: ${col.label} المختلفة فقط`}
+                            >
+                              <Filter className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-slate-200/60">
+                      <span className="text-[10px] text-slate-400">فعّل/عطّل الأعمدة لكل المنتجات المؤهلة</span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            const newSkus = filteredExisting.filter((p) => isNewProd(p)).map((p) => p.sku);
+                            if (newSkus.length > 0) {
+                              newSkus.forEach((sku) => toggleAllFields(sku, true));
+                              toast({ title: `تم تحديد ${newSkus.length} منتج جديد للدفع` });
+                            } else {
+                              toast({ title: 'لا توجد منتجات جديدة للدفع' });
+                            }
+                          }}
+                          disabled={syncing}
+                          className="gap-1.5 text-xs font-bold border-slate-200"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                          سحب الجديد ({filteredExisting.filter(isNewProd).length})
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handlePush}
+                          disabled={activeSkus.length === 0 || syncing}
+                          className="gap-1.5 text-xs font-bold"
+                        >
+                          {syncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ArrowLeftRight className="h-3.5 w-3.5" />}
+                          مراجعة ودفع ({activeSkus.length})
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Product list with pagination */}
+                  {displayProducts.map((product, i) => (
+                    <motion.div
+                      key={product._id}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.02 }}
+                    >
+                      <ProductRow
+                        product={product}
+                        fields={fields[product.sku] || { name: false, price: false, stock: false, images: false }}
+                        onFieldToggle={handleFieldToggle}
+                        onPreviewImages={setPreviewProduct}
+                      />
+                    </motion.div>
+                  ))}
+
+                  {/* Pagination */}
+                  {totalPages > 1 && (
+                    <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-400">
+                        عرض {start + 1}–{Math.min(start + PAGE_SIZE, currentProducts.length)} من {currentProducts.length} منتج
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                          className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronRight className="h-4 w-4 rtl:rotate-180" />
+                        </button>
+                        {pageRange.map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setPage(p)}
+                            className={cn(
+                              'min-w-[32px] h-8 rounded-lg text-xs font-bold border transition',
+                              p === page ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 text-slate-500 hover:bg-slate-100'
+                            )}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={page === totalPages}
+                          className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <EmptyState
+                  title="لا توجد منتجات مختلفة"
+                  description={search ? 'حاول تغيير كلمة البحث' : 'جميع المنتجات متطابقة مع المتجر'}
+                />
+              )}
+            </Card>
+          )}
+
+          {/* New products tab */}
+          {activeTab === 'new' && (
+            <Card className="border-0 shadow-lg bg-white/90 backdrop-blur-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-200">
+                <div className="relative flex-[1] min-w-[180px]">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                  <input
+                    type="text"
+                    className="w-full pr-10 pl-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                    placeholder="بحث في المنتجات الجديدة…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+              </div>
+              {filteredNew.length > 0 ? (
+                <>
+                  {displayProducts.map((product, i) => (
+                    <motion.div
+                      key={product._id}
+                      initial={{ opacity: 0, y: 4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.02 }}
+                    >
+                      <ProductRow
+                        product={product}
+                        fields={fields[product.sku] || { name: false, price: false, stock: false, images: false }}
+                        onFieldToggle={handleFieldToggle}
+                        onPreviewImages={setPreviewProduct}
+                      />
+                    </motion.div>
+                  ))}
+                  {totalPages > 1 && (
+                    <div className="px-4 py-3 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-xs text-slate-400">
+                        عرض {start + 1}–{Math.min(start + PAGE_SIZE, currentProducts.length)} من {currentProducts.length} منتج
+                      </span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setPage((p) => Math.max(1, p - 1))}
+                          disabled={page === 1}
+                          className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronRight className="h-4 w-4 rtl:rotate-180" />
+                        </button>
+                        {pageRange.map((p) => (
+                          <button
+                            key={p}
+                            onClick={() => setPage(p)}
+                            className={cn(
+                              'min-w-[32px] h-8 rounded-lg text-xs font-bold border transition',
+                              p === page ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 text-slate-500 hover:bg-slate-100'
+                            )}
+                          >
+                            {p}
+                          </button>
+                        ))}
+                        <button
+                          onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                          disabled={page === totalPages}
+                          className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+                        >
+                          <ChevronLeft className="h-4 w-4 rtl:rotate-180" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <EmptyState
+                  title="لا توجد منتجات جديدة"
+                  description="جميع المنتجات من الموقع تمت مزامنتها مع المتجر"
+                />
+              )}
+            </Card>
+          )}
 
           {/* Activity feed */}
           {activity.length > 0 && (

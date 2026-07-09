@@ -15,6 +15,13 @@ export interface SyncProduct {
   active?: boolean;
   categorySlug?: string;
   updatedAt: string;
+  localMatch?: {
+    exists: boolean;
+    name?: { match: boolean; local: string; ecom: string };
+    price?: { match: boolean; local: number; ecom: number };
+    stock?: { match: boolean; local: number; ecom: number };
+    image?: { match: boolean; local: string | null; ecom: string | null };
+  };
 }
 
 export interface SyncStore {
@@ -260,6 +267,13 @@ export async function batchDeleteStores(ids: string[]): Promise<void> {
 export async function triggerManualSync(storeId?: string): Promise<void> {
   const res = await apiPostJson<any, { storeId?: string }>('/api/sync/admin/trigger-sync', { storeId });
   if (!res.ok) throw new Error(extractError(res));
+}
+
+export async function adminApplySync(items: Array<{ sku: string; fields: Record<string, unknown> }>): Promise<{ succeeded: Array<{ sku: string }>; failed: Array<{ sku: string; error: string }> }> {
+  const res = await apiPostJson<any, { items: typeof items }>('/api/sync/admin/apply', { items });
+  if (!res.ok) throw new Error(extractError(res));
+  const data = res as any;
+  return { succeeded: data.succeeded || [], failed: data.failed || [] };
 }
 
 // ─── Rollback history ──────────────────────────────────────────────────────────
