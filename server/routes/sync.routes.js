@@ -209,6 +209,12 @@ router.post('/apply', validateSyncRequest, async (req, res) => {
     const succeeded = [];
     const failed = [];
 
+    console.log(`[DEBUG] apply POST | store="${req.syncStore.name}"(${req.syncStore._id}) | items=${items.length} | categories=${categories.length}`);
+    if (items.length > 0) {
+      const skus = items.map((i) => i.sku).slice(0, 5);
+      console.log(`[DEBUG] apply POST first 5 SKUs:`, JSON.stringify(skus));
+    }
+
     // Apply product changes
     for (const item of items) {
       try {
@@ -360,6 +366,9 @@ router.post('/apply', validateSyncRequest, async (req, res) => {
 
     // Update lastSeenAt
     await SyncStore.findByIdAndUpdate(req.syncStore._id, { lastSeenAt: new Date() });
+
+    console.log(`[DEBUG] apply done | store="${req.syncStore.name}" | succeeded=${succeeded.length} | failed=${failed.length}`);
+    if (failed.length > 0) console.log(`[DEBUG] apply failures:`, JSON.stringify(failed.slice(0, 3)));
 
     res.json({
       ok: true,
@@ -671,6 +680,8 @@ router.get('/admin/products', async (req, res) => {
     const storeNames = Object.fromEntries(stores.map((s) => [String(s._id), s.name]));
 
     const products = items.map((p) => {
+      console.log(`[DEBUG] admin/products item | sku=${p.sku} | filterStoreId=${filterStoreId || 'none'} | hasSnapshots=${p.storeSnapshots?.length || 0} | hasPosSnapshot=${!!p.posSnapshot}`);
+
       // Find the snapshot for the selected store (or use global posSnapshot as fallback)
       let storeSnapshot = null;
       if (filterStoreId && p.storeSnapshots?.length) {
@@ -817,6 +828,7 @@ router.get('/admin/store-catalog/:storeId', async (req, res) => {
 
     // Auto-seed StoreCatalog from existing storeSnapshots if empty
     const existingCount = await StoreCatalog.countDocuments({ storeId });
+    let seededCount = 0;
     if (existingCount === 0) {
       const productsWithSnapshots = await Product.find(
         { 'storeSnapshots.storeId': storeId },
@@ -844,8 +856,11 @@ router.get('/admin/store-catalog/:storeId', async (req, res) => {
           },
           { upsert: true }
         );
+        seededCount++;
       }
     }
+
+    console.log(`[DEBUG] store-catalog GET | storeId=${storeId} | search="${search}" | storeCatalogCount=${existingCount} | autoSeeded=${seededCount} | page=${page}`);
 
     const matchQuery = { storeId };
     if (search) {
@@ -896,6 +911,11 @@ router.get('/admin/store-catalog/:storeId', async (req, res) => {
       };
     }));
 
+    const existsOnSite = enriched.filter((e) => e.existsOnSite).length;
+    const newOnSite = enriched.filter((e) => !e.existsOnSite).length;
+    const changed = enriched.filter((e) => e.localMatch?.exists && Object.values(e.localMatch).some((v) => typeof v === 'object' && v.match === false)).length;
+    console.log(`[DEBUG] store-catalog GET result | storeId=${storeId} | total=${total} | existsOnSite=${existsOnSite} | new=${newOnSite} | changed=${changed}`);
+
     res.json({ ok: true, items: enriched, total, page, pages: Math.ceil(total / limit) });
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
@@ -935,7 +955,15 @@ router.post('/store-catalog', validateSyncRequest, async (req, res) => {
   try {
     const { products = [] } = req.body;
     const storeId = req.syncStore._id;
+    const storeName = req.syncStore.name;
     let created = 0, updated = 0;
+
+    console.log(`[DEBUG] store-catalog POST | store="${storeName}"(${storeId}) | products=${products.length}`);
+
+    if (products.length > 0) {
+      const sample = products.slice(0, 3).map((p) => ({ sku: p.sku, name: p.name, price: p.price, stock: p.stock }));
+      console.log(`[DEBUG] store-catalog POST sample:`, JSON.stringify(sample));
+    }
 
     for (const p of products) {
       if (!p.sku) continue;
@@ -984,6 +1012,8 @@ router.post('/store-catalog', validateSyncRequest, async (req, res) => {
         updated++;
       }
     }
+
+    console.log(`[DEBUG] store-catalog POST done | store="${storeName}" | created=${created} | updated=${updated}`);
 
     await SyncActivity.create({
       storeId,
@@ -1189,6 +1219,11 @@ router.post('/admin/apply', async (req, res) => {
     const failed = [];
 
     const targetStoreId = storeId || (req.syncStore?._id ? String(req.syncStore._id) : null);
+    console.log(`[DEBUG] admin/apply POST | storeId=${storeId || 'none'} | items=${items.length}`);
+    if (items.length > 0) {
+      const skus = items.slice(0, 5).map((i) => ({ sku: i.sku, fields: Object.keys(i.fields || {}) }));
+      console.log(`[DEBUG] admin/apply first 5:`, JSON.stringify(skus));
+    }
 
     for (const item of items) {
       try {
@@ -1290,6 +1325,9 @@ router.post('/admin/apply', async (req, res) => {
         descriptionAr: `قام المسؤول بدفع ${succeeded.length} تحديث منتج إلى المتجر ${store.name}`,
       });
     }
+
+    console.log(`[DEBUG] admin/apply done | succeeded=${succeeded.length} | failed=${failed.length}`);
+    if (failed.length > 0) console.log(`[DEBUG] admin/apply failures:`, JSON.stringify(failed.slice(0, 3)));
 
     res.json({ ok: true, succeeded, failed, total: succeeded.length + failed.length });
   } catch (err) {
